@@ -87,6 +87,7 @@ const FIELD_NAME = NS.FIELD_NAME;
 const CENSORSHIP_FIELD_NAME = NS.CENSORSHIP_FIELD_NAME;
 const MANGA_FIELD_NAME = NS.MANGA_FIELD_NAME;
 const TRANSLATION_GROUP_FIELD_NAME = NS.TRANSLATION_GROUP_FIELD_NAME;
+const ORIGINAL_FIELD_NAME = NS.ORIGINAL_FIELD_NAME;
 
 const PLUGIN_ID = "mangaTools";
 
@@ -1740,6 +1741,33 @@ function MangaFieldBlock(props: {
     }
   };
 
+  // Writing a group is two edits in one, and they have to leave in one onChange:
+  // declaring a group ends "this is the original", which is the other answer to
+  // the same question. Two calls to write would each be computed from the props
+  // the other has just made stale, so the map is folded once and handed over.
+  const writeGroup = (value: string) => {
+    let next = NS.setField(props.values, TRANSLATION_GROUP_FIELD_NAME, value);
+    if (value) next = NS.setField(next, ORIGINAL_FIELD_NAME, "");
+    if (props.onChange) props.onChange(next);
+  };
+
+  // The other answer, declared rather than picked from the menu — see
+  // ORIGINAL_FIELD_NAME for why it is not a value of the group field. Toggling it
+  // on clears whatever group was set, for the same reason writing a group clears
+  // it: a gallery holding both has answered one question twice.
+  const isOriginal = NS.isOriginal(props.values);
+  const toggleOriginal = () => {
+    let next = NS.setField(
+      props.values,
+      ORIGINAL_FIELD_NAME,
+      isOriginal ? "" : NS.ORIGINAL_VALUE
+    );
+    if (!isOriginal) {
+      next = NS.setField(next, TRANSLATION_GROUP_FIELD_NAME, "");
+    }
+    if (props.onChange) props.onChange(next);
+  };
+
   const current = NS.describe(pickLanguage(props.values), intl.locale);
   let options: MangaToolsOption[] = NS.languageOptions(intl.locale).filter(
     (o) => {
@@ -2024,12 +2052,41 @@ function MangaFieldBlock(props: {
     }),
   ];
 
+  // The other answer to "who translated this", as a pressed-state button beside
+  // the field it belongs to — always drawn, because a control that vanishes when
+  // it is on is a control nobody can turn off.
+  //
+  // `manga-tools-chip` is the same hook the language row's button carries: it is
+  // what the stylesheet stretches to the field's height. `active` is Bootstrap's
+  // own pressed look, so the state needs no styling of its own. aria-pressed is
+  // what says "toggle" to a screen reader; the title says which way the click
+  // goes.
+  const originalChip = (
+    <button
+      type="button"
+      className={
+        "btn btn-secondary manga-tools-chip manga-tools-original" +
+        (isOriginal ? " active" : "")
+      }
+      aria-pressed={isOriginal}
+      title={t(
+        intl,
+        isOriginal
+          ? "mangaTools.translationGroup.originalOff"
+          : "mangaTools.translationGroup.originalOn"
+      )}
+      onClick={toggleOriginal}
+    >
+      {t(intl, "mangaTools.translationGroup.original")}
+    </button>
+  );
+
   const groupField = (
     <div className={cls.group} data-field="manga_tools_translation_group">
       <label className={cls.label} htmlFor="manga_tools_translation_group">
         {t(intl, "mangaTools.translationGroup.heading")}
       </label>
-      <div className={cls.control}>
+      <div className={cls.control + " manga-tools-chip-row"}>
         <Select
           className="manga-tools-select"
           classNamePrefix="react-select"
@@ -2056,15 +2113,16 @@ function MangaFieldBlock(props: {
             // A box holding only spaces means nothing, and nothing removes the
             // key rather than storing whitespace that reads as empty everywhere
             // else.
-            write(TRANSLATION_GROUP_FIELD_NAME, text.trim() ? text : "");
+            writeGroup(text.trim() ? text : "");
           }}
           onChange={(opt: MangaToolsGroupOption | null) => {
             // A group picked from the list is written in *its* spelling, which is
             // how a name typed in another case is put right; the create entry
             // carries the text back unchanged.
-            write(TRANSLATION_GROUP_FIELD_NAME, opt ? opt.value : "");
+            writeGroup(opt ? opt.value : "");
           }}
         />
+        {originalChip}
       </div>
     </div>
   );
@@ -2982,14 +3040,15 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   const language = NS.describe(pickLanguage(props.values), intl.locale);
   const mark = censorshipOf(props.values);
   const group = NS.translationGroupOf(props.values);
+  const original = NS.isOriginal(props.values);
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
   const Icon = PluginApi.components.Icon;
   const Button = PluginApi.libraries.Bootstrap?.Button;
   const Collapse = PluginApi.libraries.Bootstrap?.Collapse;
 
-  // Nothing set means nothing to say: with none of the three set the whole panel
+  // Nothing set means nothing to say: with none of the four set the whole panel
   // is dropped, rather than left as an empty fold with only its heading.
-  if (!language && !mark && !group) return null;
+  if (!language && !mark && !group && !original) return null;
 
   // The same mount point the plain language row used: the end of .gallery-details,
   // which lands after "photographer" and before "details".
@@ -3032,6 +3091,16 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
         <h6 className="manga-tools-detail">
           {t(intl, "mangaTools.translationGroup.heading") + ": "}
           {group}
+        </h6>
+      ) : null}
+      {original ? (
+        // Under the same label as the group, because it answers the same question:
+        // this gallery was not translated. The wording carries that — a bare "原文"
+        // under "Translation group:" would read like a group called that, which is
+        // the reading this field exists to avoid.
+        <h6 className="manga-tools-detail">
+          {t(intl, "mangaTools.translationGroup.heading") + ": "}
+          {t(intl, "mangaTools.translationGroup.originalDetail")}
         </h6>
       ) : null}
     </div>

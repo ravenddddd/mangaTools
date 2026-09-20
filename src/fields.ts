@@ -248,6 +248,38 @@ NS.isManga = (customFields: unknown): boolean =>
   NS.pickField(customFields, NS.MANGA_FIELD_NAME) !== "";
 
 /**
+ * The field that declares a gallery the original text — nothing was translated.
+ *
+ * A presence, like the mark above and for the same reason: the question is yes or
+ * no, and a key set to "false" would be a third state nobody could have meant.
+ *
+ * It is about the translation group without being a value of it, and the
+ * difference is not tidiness. A group's name is whatever it calls itself, and
+ * this library has one called 沒有漢化 — a statement to look at, and a name. A
+ * state kept in the same field as names like that can be told from a name by
+ * nothing: not by the reader looking at the row, and not by the rule that reads a
+ * group's galleries to work out a language.
+ *
+ * The language is a separate fact and stays one. An original is *usually*
+ * Japanese, which the data may show and nothing here may assume — the two are
+ * independent, and this field says nothing about the language, or the language
+ * about it.
+ */
+NS.ORIGINAL_FIELD_NAME = "plugin.mangaTools.original";
+
+/**
+ * The value written when the original is declared. Presence is what is read.
+ *
+ * The mark's own string, because a presence field is written with one value and
+ * there is no reason for two spellings of yes.
+ */
+NS.ORIGINAL_VALUE = NS.MANGA_VALUE;
+
+/** Whether a gallery's custom fields declare it the original text. */
+NS.isOriginal = (customFields: unknown): boolean =>
+  NS.pickField(customFields, NS.ORIGINAL_FIELD_NAME) !== "";
+
+/**
  * Which of this plugin's fields a custom-field key names, or "" for any other.
  *
  * One list, asked by everything that has to recognise a key of ours. It exists
@@ -283,6 +315,7 @@ NS.ownField = (key: unknown): string => {
     NS.CENSORSHIP_FIELD_NAME,
     NS.MANGA_FIELD_NAME,
     NS.TRANSLATION_GROUP_FIELD_NAME,
+    NS.ORIGINAL_FIELD_NAME,
   ];
   for (let i = 0; i < names.length; i++) {
     if (names[i].toLowerCase() === k) return names[i];

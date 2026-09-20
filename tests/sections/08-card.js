@@ -522,6 +522,35 @@ module.exports = () => {
   assert.strictEqual(NS.isOwnField("  plugin.mangaTools.manga  "), true);
   assert.strictEqual(NS.isOwnField("plugin.mangaTools.mangaX"), false);
 
+  // The fifth field, and the second one that is a presence rather than a value: a
+  // gallery is the original text or it is not. It is the translation group's own
+  // subject and deliberately not a value of it — a state in a field of names
+  // cannot be told from a name, and this library has a group called 沒有漢化.
+  assert.strictEqual(
+    NS.ownField(NS.ORIGINAL_FIELD_NAME),
+    NS.ORIGINAL_FIELD_NAME,
+    "the original-text field is recognised like the other four"
+  );
+  assert.strictEqual(
+    NS.isOwnField("PLUGIN.MANGATOOLS.Original"),
+    true,
+    "…in any spelling, so a drifted key is still ours"
+  );
+  assert.strictEqual(NS.isOriginal({ [NS.ORIGINAL_FIELD_NAME]: "true" }), true);
+  assert.strictEqual(
+    NS.isOriginal({ "plugin.mangaTools.Original": "yes" }),
+    true,
+    "any non-empty value counts, as it does for the mark"
+  );
+  assert.strictEqual(NS.isOriginal({ [NS.ORIGINAL_FIELD_NAME]: "" }), false);
+  assert.strictEqual(NS.isOriginal({ other: "x" }), false);
+  assert.strictEqual(NS.isOriginal(null), false);
+  assert.strictEqual(
+    NS.ORIGINAL_VALUE,
+    NS.MANGA_VALUE,
+    "a presence is written with one value, so both fields use the same one"
+  );
+
   // The translation group's value, which is free text and so has the one rule
   // the other fields do not need: it is trimmed on the way out, because the
   // space somebody left on the end is not part of the group's name — and the
@@ -956,6 +985,7 @@ module.exports = () => {
       "plugin.mangaTools.Censorship": "uncensored",
       "plugin.mangaTools.Manga": "true",
       "plugin.mangaTools.translationgroup": "Lily Manga",
+      "plugin.mangaTools.Original": "true",
       other: "x",
     }),
     [
@@ -963,6 +993,7 @@ module.exports = () => {
       "plugin.mangaTools.Censorship",
       "plugin.mangaTools.Manga",
       "plugin.mangaTools.translationgroup",
+      "plugin.mangaTools.Original",
     ],
     "confirming removes every field of this plugin's, by the spelling it has — " +
       "the API removes by exact key, so a drifted one would survive otherwise"
@@ -1247,6 +1278,117 @@ module.exports = () => {
     "while the label is the trimmed name"
   );
 
+  // ── The original-text button, and the two answers to one question ─────
+  //
+  // A gallery either has a translation group or is the original text, and the
+  // group field is the field they are both about. So the button is a toggle that
+  // is always drawn — one that vanished while it was on could not be turned off —
+  // and each answer clears the other.
+  const ORIGINAL = NS.ORIGINAL_FIELD_NAME;
+  const originalField = (values) => {
+    const edits = [];
+    const block = editField(values, (next) => edits.push(next));
+    return {
+      block,
+      edits,
+      chip: find(block.node, (n) =>
+        n.props?.className?.startsWith(
+          "btn btn-secondary manga-tools-chip manga-tools-original"
+        )
+      ),
+      group: groupSelectOf(block),
+    };
+  };
+
+  const notOriginal = originalField({ other: "x" });
+  assert.ok(
+    notOriginal.chip,
+    "the button is drawn whether or not the gallery is the original: a control " +
+      "that disappears while it is on is one nobody can turn off"
+  );
+  assert.strictEqual(
+    notOriginal.chip.props["aria-pressed"],
+    false,
+    "unset reads as not pressed"
+  );
+  assert.ok(
+    hasText(notOriginal.chip, "原文"),
+    "and it is worded in the reader's language"
+  );
+  assert.strictEqual(
+    notOriginal.chip.props.title,
+    "这本是原文，没有翻译组",
+    "…and a title that says which way the click goes, not merely what the state is"
+  );
+
+  notOriginal.chip.props.onClick();
+  assert.deepStrictEqual(
+    notOriginal.edits[0],
+    { [MANGA]: "true", other: "x", [ORIGINAL]: "true" },
+    "clicking it declares the original, in this plugin's own field"
+  );
+
+  // The other answer clears the first. Two writes in one map: the field being set
+  // and the field being cleared have to leave in the same onChange, or the second
+  // is computed from props the first has just made stale.
+  const hadGroup = originalField({ [TG]: "Lily Manga", other: "x" });
+  hadGroup.chip.props.onClick();
+  assert.deepStrictEqual(
+    hadGroup.edits[0],
+    { [MANGA]: "true", other: "x", [ORIGINAL]: "true" },
+    "and it takes the group with it: a gallery holding both has answered twice"
+  );
+
+  const wasOriginal = originalField({ [ORIGINAL]: "true", other: "x" });
+  assert.strictEqual(
+    wasOriginal.chip.props["aria-pressed"],
+    true,
+    "a gallery that is the original reads as pressed"
+  );
+  assert.strictEqual(
+    wasOriginal.chip.props.className,
+    "btn btn-secondary manga-tools-chip manga-tools-original active",
+    "…and wears Bootstrap's pressed look, so the state is visible without hovering"
+  );
+  assert.strictEqual(
+    wasOriginal.chip.props.title,
+    "不是原文了，取消标记",
+    "…and its title says the opposite thing, because the click does the opposite"
+  );
+  assert.deepStrictEqual(
+    wasOriginal.edits,
+    [],
+    "drawing the block writes nothing, as everywhere else"
+  );
+  wasOriginal.chip.props.onClick();
+  assert.deepStrictEqual(
+    wasOriginal.edits[0],
+    { [MANGA]: "true", other: "x" },
+    "clicking again clears the field rather than storing a false"
+  );
+
+  // Writing a group is the same call taken the other way: the two are answers to
+  // one question, and the plugin does not leave a gallery holding both.
+  const setGroup = originalField({ [ORIGINAL]: "true", other: "x" });
+  setGroup.group.props.onChange({ value: "Lily Manga", label: "Lily Manga" });
+  assert.deepStrictEqual(
+    setGroup.edits[0],
+    { [MANGA]: "true", other: "x", [TG]: "Lily Manga" },
+    "picking a group clears the original mark in the same write"
+  );
+
+  const typed = originalField({ [ORIGINAL]: "true", other: "x" });
+  typed.group.props.onInputChange("Lily", { action: "input-change" });
+  assert.deepStrictEqual(
+    typed.edits[0],
+    { [MANGA]: "true", other: "x", [TG]: "Lily" },
+    "…and so does typing one, which is the same write through the same path"
+  );
+  console.log(
+    "✓ the original-text button (always drawn / pressed state / each answer clears " +
+      "the other)"
+  );
+
   // ── The menu under a language: matching groups first, their flag last ──
   //
   // A group's galleries agree about their language, so once the gallery's own
@@ -1480,12 +1622,12 @@ module.exports = () => {
   assert.strictEqual(
     controlOf(offered.block, "manga_tools_language").props.className,
     "col-sm-9 manga-tools-chip-row",
-    "the control column becomes a flex row when — and only when — it holds the button"
+    "the control column becomes a flex row when it holds the button"
   );
   assert.strictEqual(
-    controlOf(offered.block, "manga_tools_translation_group").props.className,
+    controlOf(offered.block, "manga_tools_censorship").props.className,
     "col-sm-9",
-    "so the group row below it keeps the markup it had"
+    "…and a row that holds only a select keeps the markup it had"
   );
 
   // The button is about the field being empty. A field that already holds the
@@ -1811,6 +1953,21 @@ module.exports = () => {
   );
   assert.ok(!hasText(groupOnly, "简体中文"), "and not the other two rows");
   assert.ok(!hasText(groupOnly, "未标注"), "nor an empty censorship row");
+
+  // The original on its own is a panel as well, and its row is worded so it cannot
+  // be read as a group called 原文 — the whole reason the state is its own field
+  // rather than a value of that one.
+  const originalOnly = renderChild(
+    panelOf({ [NS.ORIGINAL_FIELD_NAME]: "true" })
+  );
+  assert.ok(
+    hasText(originalOnly, "原文（无翻译组）"),
+    "declaring the original draws a row that says what it means"
+  );
+  assert.ok(
+    !hasText(originalOnly, "翻译组: 原文"),
+    "…and not one that reads like a group by that name"
+  );
 
   // The two settings decide the state each block opens in — and only that, which
   // is why a block already on screen keeps whatever the reader did to it.

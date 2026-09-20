@@ -43,6 +43,10 @@
   "mangaTools.translationGroup.create": "创建",
   "mangaTools.translationGroup.placeholder": "填写翻译组…",
   "mangaTools.translationGroup.fill": "填入",
+  "mangaTools.translationGroup.original": "原文",
+  "mangaTools.translationGroup.originalOn": "这本是原文，没有翻译组",
+  "mangaTools.translationGroup.originalOff": "不是原文了，取消标记",
+  "mangaTools.translationGroup.originalDetail": "原文（无翻译组）",
   "mangaTools.translationGroup.suggestedLanguage": "该翻译组的画廊通常是这种语言",
 
   "mangaTools.bulk.remove": "移除",

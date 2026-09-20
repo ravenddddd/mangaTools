@@ -43,6 +43,10 @@
   "mangaTools.translationGroup.create": "Create",
   "mangaTools.translationGroup.placeholder": "Set a translation group…",
   "mangaTools.translationGroup.fill": "Fill in",
+  "mangaTools.translationGroup.original": "Original",
+  "mangaTools.translationGroup.originalOn": "This gallery is the original text — nothing to translate",
+  "mangaTools.translationGroup.originalOff": "Not the original text after all — clear the mark",
+  "mangaTools.translationGroup.originalDetail": "original text (no translation group)",
   "mangaTools.translationGroup.suggestedLanguage": "This group's galleries usually carry this language",
 
   "mangaTools.bulk.remove": "Remove",

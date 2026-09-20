@@ -11,6 +11,7 @@ upgrades never produce merge conflicts.
 | **Language** | A language attribute on galleries, surfaced as a flag badge, an edit-page dropdown, a bulk-edit row and a localised detail row |
 | **Censorship** | Whether a gallery is censored or not, surfaced as a mark on the gallery card and a row in the detail page's Manga info panel |
 | **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and, in both directions, the language its galleries usually carry: a button on the language row, and the menu's order and flag hint |
+| **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a toggle on the group row, and a row in the details panel |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
 
@@ -453,6 +454,27 @@ way. The name is much the wider of the two forms, so it is the hint that gives w
 when a row runs out of room, clipped rather than wrapped: the group's own name is
 what the row is for, and one long language must not make every row in the menu two
 lines tall.
+
+**Not every manga was translated, and that is its own field.**
+`plugin.mangaTools.original` is a presence, like the mark that makes a gallery
+manga: a key that is there says this gallery is the original text. The group row
+carries a button that declares it — always drawn, because a control that vanished
+while it was on could not be turned off — and the two answers to "who translated
+this" clear each other: declaring the original empties the group field, and
+writing a group clears the mark. The details panel reads *original text (no
+translation group)* under the group label, worded that way so it cannot be taken
+for a group with that name.
+
+It is not a value of the group field, and the difference is not tidiness. A
+group's name is whatever it calls itself, and this library has one called
+`沒有漢化` — a statement to look at, and a name. A state kept among names like that
+can be told from a name by nothing: not by the reader looking at the row, and not
+by the rule above, which would go looking for the "usual language" of a group
+called *original*.
+
+The language stays a separate fact. An original is usually Japanese, which the
+data may show and nothing here assumes: the two are independent, and this field
+says nothing about the language, or the language about it.
 
 **The language row carries a button offering the language this group's galleries
 carry.** Whoever translated a comic translated it into a language, so the two

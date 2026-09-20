@@ -297,16 +297,17 @@
 /* ──────────────── The language row's suggested language ──────────────── */
 
 /*
- * The row becomes a flex box only when it holds the suggestion button: the other
- * rows hold one select and are laid out by Bootstrap's columns alone, so the
- * modifier is written on the control column by the block that draws the button,
- * and every other row keeps the markup it had.
+ * A row that holds a chip beside its select: the language row (the suggestion
+ * button) and the group row (the original-text toggle). Rows that hold one select
+ * are laid out by Bootstrap's columns alone, so the modifier is written on the
+ * control column by the block that draws the chip, and those rows keep the markup
+ * they had.
  *
- * The select is the item that gives — it grows into what the button leaves. It is
+ * The select is the item that gives — it grows into what the chip leaves. It is
  * also allowed to shrink below the 14rem floor `.manga-tools-select` sets for the
- * other rows, because that floor would otherwise push the button out of the
- * column on a narrow screen. The button never shrinks: it is the control being
- * offered, and half a button is not a control.
+ * other rows, because that floor would otherwise push the chip out of the column
+ * on a narrow screen. The chip never shrinks: it is a control, and half a button
+ * is not a control.
  */
 .manga-tools-chip-row {
   align-items: center;
@@ -320,25 +321,25 @@
 }
 
 /*
- * The button itself needs no look of its own: it carries Stash's own
+ * The chips themselves need no look of their own: they carry Stash's own
  * `btn btn-secondary`, which is exactly what the date field's calendar button
- * wears, so it is the same button as far as the theme is concerned — including
+ * wears, so they are the same button as far as the theme is concerned — including
  * in dark mode, where a hand-drawn chip would have had to be repainted.
  *
- * What is left is its height, which has to be the field's rather than the flag's.
- * `height: 100%` is the obvious guess and does nothing: a percentage resolves
- * against a definite height, and this row's height is whatever its tallest item
- * (the field) turns out to be. `align-self: stretch` is how a flex item is taken
- * to that height, and it is set here rather than as `align-items` on the row so
- * that only the button stretches — the field is the item that *sets* the height,
- * and stretching it would only mean enlarging the box its dropdown menu hangs
- * off the bottom of.
+ * What is left is their height, which has to be the field's rather than the
+ * content's. `height: 100%` is the obvious guess and does nothing: a percentage
+ * resolves against a definite height, and this row's height is whatever its
+ * tallest item (the field) turns out to be. `align-self: stretch` is how a flex
+ * item is taken to that height, and it is set here rather than as `align-items`
+ * on the row so that only the chip stretches — the field is the item that *sets*
+ * the height, and stretching it would only mean enlarging the box its dropdown
+ * menu hangs off the bottom of.
  *
- * `inline-flex` then, because a button that is taller than its content has to
- * centre that content itself: Bootstrap's `.btn` lays its content out as text on
- * a baseline, which is right for a button sized by its own label and wrong for
- * one stretched to something else's height. (This is also why the flag needs no
- * `vertical-align` here — a flex item has no baseline to be nudged off.)
+ * `inline-flex` then, because a button taller than its content has to centre that
+ * content itself: Bootstrap's `.btn` lays its content out as text on a baseline,
+ * which is right for a button sized by its own label and wrong for one stretched
+ * to something else's height. (This is also why the flag inside needs no
+ * `vertical-align` — a flex item has no baseline to be nudged off.)
  */
 .manga-tools-chip-row .manga-tools-chip {
   align-items: center;

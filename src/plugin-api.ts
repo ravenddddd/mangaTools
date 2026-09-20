@@ -103,6 +103,15 @@ export interface MangaToolsNamespace {
   isManga(customFields: unknown): boolean;
   /** The translation group field's name — free text. See fields.ts. */
   TRANSLATION_GROUP_FIELD_NAME: string;
+  /**
+   * The field that declares a gallery the original text. Its own field rather
+   * than a value of the group's: a state cannot be told from a group's name.
+   */
+  ORIGINAL_FIELD_NAME: string;
+  /** The value written when the original is declared. Presence is what is read. */
+  ORIGINAL_VALUE: string;
+  /** Whether a gallery's custom fields declare it the original text. */
+  isOriginal(customFields: unknown): boolean;
   /** A gallery's translation group, trimmed, or "" when it has none. */
   translationGroupOf(customFields: unknown): string;
   /** Whether two group names are the same one: trimmed, case-insensitively. */
