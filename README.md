@@ -304,6 +304,11 @@ other brown; that brown is deliberately not copied, since it is Stash's accent f
 | Gallery detail page | A **row in the Manga info panel**, with the state's icon and its name. Unset draws no row at all |
 | Gallery edit page | A two-option selector in the Manga info block. Unset is the selector's own clear button, which is what makes "not marked" a state you can return to without a third option to name it |
 
+**The block's rows run censorship, language, translation group** — in the edit
+block and in the detail panel both, which is the one order the two surfaces share.
+Censorship comes first because it is about the copy in hand, what was or was not
+done to the scans; the other two are about where the text came from.
+
 **The toolbar carries the manga switch, not this.** It used to cycle the three
 censorship states; the mark and the switch are asked of the same plugin state, so
 two controls in one toolbar meant two things to explain and no way to tell which

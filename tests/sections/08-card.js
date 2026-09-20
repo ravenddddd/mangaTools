@@ -176,10 +176,10 @@ module.exports = () => {
     { author: "x", "plugin.mangaTools.Language": "ja" },
     setter
   );
-  const select = find(
-    row,
-    (n) => n.props && typeof n.props.onChange === "function" && n.props.options
-  );
+  // By inputId, not by "the first select with options": the block's rows have an
+  // order they are drawn in, and a finder that depends on it quietly starts
+  // testing the censorship row the day that order changes — which it did.
+  const select = find(row, (n) => n.props?.inputId === "manga_tools_language");
 
   select.props.onChange({ value: "zh-Hant" });
   assert.deepStrictEqual(
@@ -222,7 +222,7 @@ module.exports = () => {
   NS.enabledLanguages = new Set(["ja", "en"]);
   const filtered = find(
     renderRow({ "plugin.mangaTools.language": "vi" }),
-    (n) => n.props?.options
+    (n) => n.props?.inputId === "manga_tools_language"
   );
   assert.deepStrictEqual(
     filtered.props.options.map((o) => o.value),
@@ -240,7 +240,7 @@ module.exports = () => {
   // Selected value echo: a canonical code in the wrong case echoes back canonical
   const sel = find(
     renderRow({ "plugin.mangaTools.language": "ZH-HANT" }),
-    (n) => n.props?.options
+    (n) => n.props?.inputId === "manga_tools_language"
   );
   assert.strictEqual(
     sel.props.value.label,
@@ -259,7 +259,7 @@ module.exports = () => {
   // make them unreachable.
   const selUnknown = find(
     renderRow({ "plugin.mangaTools.language": "chs" }),
-    (n) => n.props?.options
+    (n) => n.props?.inputId === "manga_tools_language"
   );
   assert.strictEqual(selUnknown.props.options[0].value, "chs");
   assert.strictEqual(

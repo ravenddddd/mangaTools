@@ -1967,7 +1967,8 @@ function MangaFieldBlock(props: {
           // icons by default, and none of Stash's own dropdowns have it — its
           // Select.tsx sets components: { IndicatorSeparator: () => null } in
           // its default props, and CountrySelect and FilterSelect each strip it
-          // too. Follow suit, so this field matches the ones above it.
+          // too. Follow suit, so this field wears the same furniture as the row
+          // above it and the one below.
           components={{ IndicatorSeparator: () => null }}
           // Flags are drawn with CSS and cannot live inside a plain-text label,
           // so the option has to be rendered here.
@@ -2245,8 +2246,8 @@ function MangaFieldBlock(props: {
           </div>
         </div>
       </div>
-      {open ? languageField : null}
       {open ? markField : null}
+      {open ? languageField : null}
       {open ? groupField : null}
     </div>,
     host
@@ -3152,8 +3153,20 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   // separate children rather than a label and a value in a wrapper, so the text
   // nodes come out the way Stash's own rows produce them. Each is drawn only
   // when its value is set.
+  //
+  // The censorship row comes first, then the language, then the group: the
+  // censorship is about the copy in hand — what was or was not done to the scans —
+  // and the other two are about where the text came from.
   const body = (
     <div className="manga-tools-panel-body">
+      {mark ? (
+        <h6 className="manga-tools-detail">
+          {t(intl, "mangaTools.censorship.heading") + ": "}
+          <CensorshipIcon value={mark} />
+          {mark ? " " : null}
+          {NS.censorshipLabel(intl, mark)}
+        </h6>
+      ) : null}
       {language ? (
         <h6 className="manga-tools-detail">
           {fieldLabel(intl) + ": "}
@@ -3162,14 +3175,6 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
           ) : null}
           {showFlag ? " " : null}
           {language.name}
-        </h6>
-      ) : null}
-      {mark ? (
-        <h6 className="manga-tools-detail">
-          {t(intl, "mangaTools.censorship.heading") + ": "}
-          <CensorshipIcon value={mark} />
-          {mark ? " " : null}
-          {NS.censorshipLabel(intl, mark)}
         </h6>
       ) : null}
       {group ? (
