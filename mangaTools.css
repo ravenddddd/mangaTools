@@ -268,14 +268,25 @@
  * wears, so it is the same button as far as the theme is concerned — including
  * in dark mode, where a hand-drawn chip would have had to be repainted.
  *
- * All that is left is the flag inside it. Bootstrap's `.btn` sets line-height
- * 1.5 while flag-icons sets its own to 1, so the flag sits on the text baseline
- * and reads low in the button; the same nudge the detail-page row uses puts it
- * back on the middle. `padding` is deliberately untouched — the date button's is
- * what makes the two look like the same control.
+ * What is left is its height, which has to be the field's rather than the flag's.
+ * `height: 100%` is the obvious guess and does nothing: a percentage resolves
+ * against a definite height, and this row's height is whatever its tallest item
+ * (the field) turns out to be. `align-self: stretch` is how a flex item is taken
+ * to that height, and it is set here rather than as `align-items` on the row so
+ * that only the button stretches — the field is the item that *sets* the height,
+ * and stretching it would only mean enlarging the box its dropdown menu hangs
+ * off the bottom of.
+ *
+ * `inline-flex` then, because a button that is taller than its content has to
+ * centre that content itself: Bootstrap's `.btn` lays its content out as text on
+ * a baseline, which is right for a button sized by its own label and wrong for
+ * one stretched to something else's height. (This is also why the flag needs no
+ * `vertical-align` here — a flex item has no baseline to be nudged off.)
  */
-.manga-tools-chip .manga-tools-flag {
-  vertical-align: -0.15rem;
+.manga-tools-chip-row .manga-tools-chip {
+  align-items: center;
+  align-self: stretch;
+  display: inline-flex;
 }
 
 /* ─────────────────────── Settings-page multiselect ─────────────────────── */

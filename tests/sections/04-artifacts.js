@@ -124,9 +124,19 @@ module.exports = () => {
       "pushed out of the column on a narrow screen"
   );
   assert.ok(
-    /\.manga-tools-chip\s+\.manga-tools-flag\s*\{[^}]*vertical-align/.test(css),
-    "and the flag inside the button needs the nudge the detail row gives its own: " +
-      "Bootstrap's line-height puts it on the text baseline, where it reads low"
+    /\.manga-tools-chip-row\s+\.manga-tools-chip\s*\{[^}]*align-self:\s*stretch/.test(
+      css
+    ),
+    "and the button takes the field's height by stretching — which is the only way " +
+      "to do it here, since height: 100% resolves against a definite height and " +
+      "this row's height is whatever its tallest item turns out to be"
+  );
+  assert.ok(
+    /\.manga-tools-chip-row\s+\.manga-tools-chip\s*\{[^}]*display:\s*inline-flex/.test(
+      css
+    ),
+    "…and lays its own content out as a flex box, so the flag centres in a button " +
+      "taller than it is: Bootstrap lays a button's content on a text baseline"
   );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +
