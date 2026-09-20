@@ -31,6 +31,7 @@ import { NS } from "./languages";
 import type {
   MangaToolsCustomFields,
   MangaToolsUsualLanguage,
+  MangaToolsUsualLanguageMap,
 } from "./plugin-api";
 
 /**
@@ -103,13 +104,21 @@ NS.translationGroupOf = (customFields: unknown): string =>
  * deciding whether to offer to create a name, and the rule below asks it to find
  * a group's galleries, and the two agreeing is the point.
  */
-NS.sameTranslationGroup = (a: unknown, b: unknown): boolean =>
-  String(a ?? "")
-    .trim()
-    .toLowerCase() ===
-  String(b ?? "")
+/**
+ * A group name reduced to the key it is stored under: trimmed, case-folded.
+ *
+ * The one spelling of "these two names are the same group" — sameTranslationGroup
+ * asks it of both sides — and the key the rules below count under, so a lookup
+ * and a comparison can never disagree about which galleries are one group.
+ */
+NS.groupKey = (name: unknown): string =>
+  String(name ?? "")
     .trim()
     .toLowerCase();
+
+/** Whether two group names are the same one, which is a question about case only */
+NS.sameTranslationGroup = (a: unknown, b: unknown): boolean =>
+  NS.groupKey(a) === NS.groupKey(b);
 
 /**
  * The language a translation group's galleries usually carry, or null.
@@ -139,26 +148,75 @@ NS.sameTranslationGroup = (a: unknown, b: unknown): boolean =>
  * The gallery being edited is counted like any other. Leaving it out would make
  * the group's usual language depend on which of its galleries happened to be
  * open.
+ *
+ * This is usualLanguagesOf's answer for one group, by key. A caller with several
+ * groups to ask about — the edit block asks about every name it offers — wants the
+ * map itself, which is one walk where this is one walk *each*.
  */
 NS.usualLanguageFor = (
   galleries: Map<string, unknown> | null,
   group: string
 ): MangaToolsUsualLanguage | null => {
-  if (!galleries || !group.trim()) return null;
+  const key = NS.groupKey(group);
+  return key ? NS.usualLanguagesOf(galleries)[key] || null : null;
+};
 
-  // Normalised before it is counted, so two spellings of one language come out as
-  // one answer rather than a tie between them.
-  const counts: { [code: string]: number } = {};
+/**
+ * The same answer for every group at once, keyed by groupKey.
+ *
+ * One walk of the store rather than one per group, because the edit block asks
+ * about every group it offers: a dropdown of two dozen names would otherwise walk
+ * a few thousand galleries two dozen times, once per keystroke in the field. The
+ * answer for a single group is the map's, not a second rule about counting — see
+ * usualLanguageFor above, which is a lookup into this.
+ *
+ * A group whose galleries give no majority is simply absent from the map, and so
+ * is one whose galleries carry a language this plugin cannot name. Absence is the
+ * whole of the "nothing to say" state, so a caller that gets undefined has nothing
+ * to draw rather than something to interpret.
+ */
+NS.usualLanguagesOf = (
+  galleries: Map<string, unknown> | null
+): MangaToolsUsualLanguageMap => {
+  const out: MangaToolsUsualLanguageMap = {};
+  if (!galleries) return out;
+
+  // Counted per key, and the language is normalised before it is counted, so two
+  // spellings of one language come out as one answer rather than a tie.
+  const counts: { [key: string]: { [code: string]: number } } = {};
   galleries.forEach((fields) => {
-    if (!NS.sameTranslationGroup(NS.translationGroupOf(fields), group)) return;
+    const key = NS.groupKey(NS.translationGroupOf(fields));
+    if (!key) return;
 
-    const raw = NS.pickField(fields, NS.FIELD_NAME);
-    const code = NS.findCanonical(NS.normalize(raw));
+    const code = NS.findCanonical(
+      NS.normalize(NS.pickField(fields, NS.FIELD_NAME))
+    );
     if (!code) return;
 
-    counts[code] = (counts[code] || 0) + 1;
+    if (!counts[key]) counts[key] = {};
+    const byLanguage = counts[key];
+    byLanguage[code] = (byLanguage[code] || 0) + 1;
   });
 
+  for (const key of Object.keys(counts)) {
+    const usual = majorityOf(counts[key]);
+    if (usual) out[key] = usual;
+  }
+
+  return out;
+};
+
+/**
+ * The most-carried language in a tally, or null when there is no majority.
+ *
+ * Two languages with the same count are a tie, and a tie is not a majority:
+ * picking either would be inventing a fact, so this answers nothing. Split out
+ * because it is the whole of the rule and the only part of it worth reading — an
+ * empty tally (every gallery abstained) lands here too.
+ */
+function majorityOf(counts: {
+  [code: string]: number;
+}): MangaToolsUsualLanguage | null {
   let best = "";
   let count = 0;
   let tied = false;
@@ -173,7 +231,7 @@ NS.usualLanguageFor = (
   }
 
   return best && !tied ? { code: best, count: count } : null;
-};
+}
 
 /** The value written when a gallery is marked. Presence is what is read. */
 NS.MANGA_VALUE = "true";

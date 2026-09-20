@@ -1572,26 +1572,55 @@ type MangaToolsGroupOption = {
   label: string;
   /** The wording for the create entry, already localised — see below. */
   createLabel?: string;
+  /**
+   * The flag of the language this group usually carries, for the menu's hint, or
+   * null when there is nothing to say about it.
+   */
+  hint?: string | null;
+  /** Whether that language is the one this gallery carries */
+  matches?: boolean;
 };
 
 /**
- * Renders a group option: the name, or — in the menu only — the offer to create it.
+ * Renders a group option: the name, or — in the menu only — the offer to create it
+ * and the language its galleries usually carry.
  *
  * The "value" context is the box itself, and there the text is simply the name: an
- * offer to create what is already selected would read as a question. In the menu
- * it is prefixed, so the entry nobody has used before is told apart from the
- * groups that exist.
+ * offer to create what is already selected would read as a question, and a hint
+ * about the group's usual language is not something to draw twice — the language
+ * row above says what the language is. In the menu it is prefixed, so the entry
+ * nobody has used before is told apart from the groups that exist, and the hint
+ * rides at its far end.
  *
- * The wording is carried on the option rather than looked up here because this is
- * called by react-select while it renders, and a component's worth of hooks cannot
- * be used in something invoked per option. The option is built in MangaFieldBlock,
- * which has the reader's `intl` in hand.
+ * Everything drawn here is carried on the option rather than looked up in this
+ * function: it is called by react-select while it renders, and a component's worth
+ * of hooks cannot be used in something invoked per option. The options are built
+ * in MangaFieldBlock, which has the reader's `intl` in hand.
  */
 function formatGroupOption(
   option: MangaToolsGroupOption,
   meta?: { context?: string }
 ) {
-  if (!option.createLabel || meta?.context !== "menu") return option.label;
+  if (meta?.context !== "menu") return option.label;
+
+  const hint = option.hint ? (
+    <Flag flag={option.hint} className="manga-tools-flag manga-tools-hint" />
+  ) : null;
+
+  if (!option.createLabel) {
+    // Plain names get the hint, and nothing else. Deliberately not the shared
+    // `.manga-tools-option`: that one spaces an icon off its label, and spreading
+    // its children apart here would push this row's name and flag to opposite
+    // ends of a menu the other two dropdowns also draw.
+    if (!hint) return option.label;
+    return (
+      <span className="manga-tools-group-option">
+        <span>{option.label}</span>
+        {hint}
+      </span>
+    );
+  }
+
   return <span className="manga-tools-option">{option.createLabel}</span>;
 }
 
@@ -1724,10 +1753,19 @@ function MangaFieldBlock(props: {
     ? { value: current.code, label: current.name, flag: current.flag }
     : null;
 
-  // The language this group's galleries usually carry, offered as a button beside
-  // the field it writes. What that rule can and cannot answer is
-  // NS.usualLanguageFor's business; what is decided here is the three things it
-  // cannot know:
+  // The language every group's galleries usually carry, in one walk of the store
+  // — the group menu below has two dozen names to ask about, and asking per name
+  // would walk a few thousand galleries two dozen times, once per keystroke in the
+  // field. What it can and cannot answer is NS.usualLanguagesOf's business.
+  //
+  // Read here rather than beside the group row below because the language row,
+  // which is drawn first, is where the button goes. The group name is
+  // NS.translationGroupOf's either way, not a second opinion about the field.
+  const usualLanguages = NS.usualLanguagesOf(store);
+  const usual =
+    usualLanguages[NS.groupKey(NS.translationGroupOf(props.values))];
+
+  // What the rule cannot know, and this row can:
   //
   //   enabledLanguages  the dropdown offers only the reader's enabled languages,
   //                     so a button offering another would write a value this
@@ -1735,12 +1773,6 @@ function MangaFieldBlock(props: {
   //   already equal     writing what is already there is furniture. `current` is
   //                     the described value, so this compares languages rather
   //                     than strings — the field tolerates any case
-  //   no group          there is nothing to look up
-  //
-  // Read here rather than beside the group row below because this is the row the
-  // button goes in, and it is drawn first. Same read either way: the group is
-  // NS.translationGroupOf's, not a second opinion about what the field holds.
-  const usual = NS.usualLanguageFor(store, NS.translationGroupOf(props.values));
   const offered =
     usual &&
     (!NS.enabledLanguages || NS.enabledLanguages.has(usual.code)) &&
@@ -1930,6 +1962,23 @@ function MangaFieldBlock(props: {
     !!groupName &&
     !known.some((name) => NS.sameTranslationGroup(name, groupName));
 
+  // The groups whose usual language is this gallery's come first, and the rest
+  // keep their name order behind them. Sorted rather than filtered: the others are
+  // still what a reader picks when this gallery is the exception, and hiding them
+  // would make the menu lie about what the library holds.
+  //
+  // Nothing moves until the language is set — with no language there is nothing to
+  // match against, and a list that reordered itself for no visible reason would be
+  // worse than one that did not.
+  const usualOf = (name: string) => usualLanguages[NS.groupKey(name)];
+  const matchesNow = (name: string) => {
+    const usualHere = usualOf(name);
+    return !!current && !!usualHere && usualHere.code === current.code;
+  };
+  const ordered = known
+    .filter(matchesNow)
+    .concat(known.filter((name) => !matchesNow(name)));
+
   const groupOptions: MangaToolsGroupOption[] = [
     ...(namesANewGroup
       ? [
@@ -1948,7 +1997,17 @@ function MangaFieldBlock(props: {
           },
         ]
       : []),
-    ...known.map((name) => ({ value: name, label: name })),
+    ...ordered.map((name) => {
+      const usualHere = usualOf(name);
+      // The flag, straight off the table: the code came from usualLanguagesOf,
+      // which counts only canonical codes, so describe() would build a localised
+      // name this never draws. Nothing at all when flags are off — the setting
+      // says the reader does not want them in their interface, and the order is
+      // what carries the meaning here.
+      const hint =
+        NS.showFlags && usualHere ? NS.LANGUAGES[usualHere.code].flag : null;
+      return { value: name, label: name, hint: hint };
+    }),
   ];
 
   const groupField = (

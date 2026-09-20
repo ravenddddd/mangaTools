@@ -152,6 +152,34 @@ module.exports = () => {
     "…and be sized to the flag's height, so flipping the setting does not resize " +
       "the button"
   );
+
+  // The group menu's row: the name at one end and the group's usual language at
+  // the other, faintly. Its own class matters as much as what is in it — the
+  // language and censorship dropdowns draw `.manga-tools-option`, and the
+  // `justify-content` that pushes this flag to the far end would push their icon
+  // and label to opposite ends with it.
+  const groupOptionRule = /\.manga-tools-group-option\s*\{([^}]*)\}/.exec(css);
+  assert.ok(
+    groupOptionRule &&
+      /justify-content:\s*space-between/.test(groupOptionRule[1]),
+    "the group menu's row should put the name and the hint at opposite ends"
+  );
+  assert.ok(
+    /display:\s*flex/.test(groupOptionRule[1]),
+    "…as a block-level flex box, so it fills the option and has something to " +
+      "space: an inline one is only as wide as its own content"
+  );
+  const sharedOptionRule = /\.manga-tools-option\s*\{([^}]*)\}/.exec(css);
+  assert.ok(
+    sharedOptionRule && !/space-between/.test(sharedOptionRule[1]),
+    "and the row the other two dropdowns draw must not have been spread — their " +
+      "icon belongs beside its label, not across the menu from it"
+  );
+  assert.ok(
+    /\.manga-tools-hint\s*\{[^}]*opacity/.test(css),
+    "the hint flag is drawn faint: two dozen rows of solid flags would read as a " +
+      "row of flags rather than as a remark"
+  );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +
       "performers / chip)"

@@ -69,6 +69,15 @@ export interface MangaToolsUsualLanguage {
 }
 
 /**
+ * Result of MangaTools.usualLanguagesOf(): one entry per group that has something
+ * to say, keyed by groupKey. A group with no majority is absent rather than
+ * present-and-null.
+ */
+export interface MangaToolsUsualLanguageMap {
+  [key: string]: MangaToolsUsualLanguage;
+}
+
+/**
  * A gallery's custom_fields, as Stash's GraphQL Map scalar gives it: string keys,
  * arbitrary values. This plugin only ever writes strings, but it does not get to
  * decide what is already in there.
@@ -98,6 +107,8 @@ export interface MangaToolsNamespace {
   translationGroupOf(customFields: unknown): string;
   /** Whether two group names are the same one: trimmed, case-insensitively. */
   sameTranslationGroup(a: unknown, b: unknown): boolean;
+  /** A group name reduced to the key the maps below are keyed by. */
+  groupKey(name: unknown): string;
   /**
    * The language a translation group's galleries usually carry, or null when
    * there is nothing to offer — see fields.ts for what null covers.
@@ -106,6 +117,13 @@ export interface MangaToolsNamespace {
     galleries: Map<string, unknown> | null,
     group: string
   ): MangaToolsUsualLanguage | null;
+  /**
+   * The same answer for every group at once, by groupKey, in one walk of the
+   * store. Prefer this when asking about more than one group.
+   */
+  usualLanguagesOf(
+    galleries: Map<string, unknown> | null
+  ): MangaToolsUsualLanguageMap;
   /**
    * Which of this plugin's fields a key names — the canonical name, or "" for a
    * key that is not ours. The one list every recogniser asks.

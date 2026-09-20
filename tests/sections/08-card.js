@@ -1247,6 +1247,90 @@ module.exports = () => {
     "while the label is the trimmed name"
   );
 
+  // ── The menu under a language: matching groups first, their flag last ──
+  //
+  // A group's galleries agree about their language, so once the gallery's own
+  // language is known the menu can say which groups are its kind — by putting them
+  // first, and by faintly showing what each group usually is.
+  const optionOf = (block, name) =>
+    groupSelectOf(block).props.options.find((o) => o.value === name);
+  const menuRowOf = (block, name, context) =>
+    groupSelectOf(block).props.formatOptionLabel(optionOf(block, name), {
+      context: context || "menu",
+    });
+
+  // No language yet: name order, and no reordering for no visible reason.
+  assert.deepStrictEqual(
+    optionValues(groupField({ other: "x" })),
+    ["Aozora", "Lily Manga"],
+    "with no language set the menu keeps its name order"
+  );
+
+  const matched = groupField({ [NS.FIELD_NAME]: "zh-Hans", other: "x" });
+  assert.deepStrictEqual(
+    optionValues(matched),
+    ["Lily Manga", "Aozora"],
+    "the group whose galleries carry this gallery's language comes first, and the " +
+      "rest keep their order behind it — sorted, not filtered: a reader whose " +
+      "gallery is the exception still has to be able to pick the exception"
+  );
+  assert.strictEqual(
+    optionOf(matched, "Lily Manga").hint,
+    "cn",
+    "and it carries the flag of that language, for the menu to show"
+  );
+  assert.strictEqual(
+    optionOf(matched, "Aozora").hint,
+    null,
+    "a group with nothing to say about its language carries no flag — its one " +
+      "gallery holds a value this plugin cannot name"
+  );
+
+  const menuRow = menuRowOf(matched, "Lily Manga");
+  assert.strictEqual(
+    menuRow.props.className,
+    "manga-tools-group-option",
+    "the menu row is its own class, not the shared option row: that one spaces an " +
+      "icon off its label, and spreading it would push the flag to the far end"
+  );
+  assert.ok(
+    find(
+      menuRow,
+      (n) => n.props?.className === "fi fi-cn manga-tools-flag manga-tools-hint"
+    ),
+    "…and the flag is drawn faintly, at the row's far end"
+  );
+  assert.strictEqual(
+    menuRowOf(matched, "Aozora"),
+    "Aozora",
+    "a group with no usual language is drawn as the plain name it is, not as a " +
+      "row with an empty end"
+  );
+
+  // The box itself, not the menu, shows the chosen name and nothing else: the
+  // language row above already says what the language is, and a second flag there
+  // would be drawing the same fact twice.
+  assert.strictEqual(
+    menuRowOf(matched, "Lily Manga", "value"),
+    "Lily Manga",
+    "the selected value is the name alone, whatever the menu draws"
+  );
+
+  // The hint follows the "Show flags" setting, like the button on the language
+  // row; the order does not, because that is what carries the meaning.
+  NS.showFlags = false;
+  const unquiet = groupField({ [NS.FIELD_NAME]: "zh-Hans", other: "x" });
+  assert.deepStrictEqual(
+    optionValues(unquiet),
+    ["Lily Manga", "Aozora"],
+    "with flags turned off the matching group still comes first"
+  );
+  assert.ok(
+    groupSelectOf(unquiet).props.options.every((o) => o.hint === null),
+    "…and no flag is drawn, because the setting says the reader does not want "
+  );
+  NS.showFlags = true;
+
   // ── The language row's suggestion button ─────────────────────────
   //
   // The button offers the language a group's galleries usually carry, and it
@@ -1510,9 +1594,58 @@ module.exports = () => {
     null,
     "and no group name is no question"
   );
+
+  // The same answers for every group at once, which is what the menu asks for: one
+  // walk of the store rather than one per name. usualLanguageFor is a lookup into
+  // this, so the two cannot disagree about a group.
+  assert.deepStrictEqual(
+    NS.usualLanguagesOf(
+      galleryMaps([
+        [1, "zh-Hans", "Lily Manga"],
+        [2, "ja", "Aozora"],
+        [3, "", "Lily Manga"],
+        [4, "zh-Hans", "  Lily Manga  "],
+      ])
+    ),
+    {
+      "lily manga": { code: "zh-Hans", count: 2 },
+      aozora: { code: "ja", count: 1 },
+    },
+    "one entry per group that has an answer, keyed by groupKey: two spellings of " +
+      "one name are one group, and a gallery carrying no language abstains rather " +
+      "than voting"
+  );
+  assert.deepStrictEqual(
+    NS.usualLanguagesOf(
+      galleryMaps([
+        [1, "zh-Hans", "G"],
+        [2, "ja", "G"],
+      ])
+    ),
+    {},
+    "a group whose galleries disagree is absent from the map rather than present " +
+      "with a guess in it"
+  );
+  assert.deepStrictEqual(
+    NS.usualLanguagesOf(null),
+    {},
+    "and no store is an empty map rather than undefined, so a caller can ask it " +
+      "for any key it likes"
+  );
+  assert.deepStrictEqual(
+    NS.usualLanguagesOf(
+      galleryMaps([
+        [1, "zh-Hans", "Lily Manga"],
+        [2, "klingon", "Lily Manga"],
+      ])
+    ),
+    { "lily manga": { code: "zh-Hans", count: 1 } },
+    "…and the map counts what the single-group rule counts, no more: an " +
+      "unrecognised value is not a language it can name, in either direction"
+  );
   console.log(
-    "✓ the language row's suggestion button (offered / already equal / tie / " +
-      "unknown value / writes like the select)"
+    "✓ the suggestion rule (offered / already equal / tie / unknown value / the " +
+      "menu's order and hint / writes like the select)"
   );
 
   // Stash draws no toolbar on an entity that is not a gallery.

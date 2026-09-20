@@ -10,7 +10,7 @@ upgrades never produce merge conflicts.
 |---|---|
 | **Language** | A language attribute on galleries, surfaced as a flag badge, an edit-page dropdown, a bulk-edit row and a localised detail row |
 | **Censorship** | Whether a gallery is censored or not, surfaced as a mark on the gallery card and a row in the detail page's Manga info panel |
-| **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and a button on the language row offering the language that group's galleries usually carry |
+| **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and, in both directions, the language its galleries usually carry: a button on the language row, and the menu's order and flag hint |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
 
@@ -435,6 +435,20 @@ no request and is the same set of galleries as everything else here. It is empty
 until the first fetch settles, which is right — before that there is nothing to
 offer, and a name can still be typed. A new name is offered only when it is not
 already one of them in some other case, so the menu never spells one group twice.
+
+**Once the language is known, the menu answers with it.** A group's galleries
+agree about their language — that is the same fact the language row's button is
+built on — so the names whose groups carry *this* gallery's language are listed
+first, and each row shows, faintly and at its far end, the flag of that language.
+Sorted rather than filtered: the rest are still what a reader picks when this
+gallery is the exception, and hiding them would make the menu lie about what the
+library holds. Both halves come from one walk of the store
+(`NS.usualLanguagesOf`), because two dozen names asked one at a time would walk a
+few thousand galleries two dozen times per keystroke.
+
+The hint follows the "Show flags" setting; the order does not. With flags off the
+menu still puts the matching groups first — the order is what says which ones
+they are — and the flag that would have said *why* is simply not drawn.
 
 **The language row carries a button offering the language this group's galleries
 carry.** Whoever translated a comic translated it into a language, so the two

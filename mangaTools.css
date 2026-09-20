@@ -138,6 +138,38 @@
 }
 
 /*
+ * The translation group's menu row: the name, and — at the far end, faint — the
+ * flag of the language that group's galleries usually carry.
+ *
+ * A class of its own rather than `.manga-tools-option`, which the language and
+ * censorship dropdowns draw too. That one spaces an icon off the label it
+ * belongs to, and the `justify-content` that pushes this row's flag to the far
+ * end would push their icon and name to opposite ends of the menu with it.
+ *
+ * A block-level flex box, so it fills the option and `space-between` has
+ * something to space: an inline one would be as wide as its own content and the
+ * flag would sit right against the name.
+ */
+.manga-tools-group-option {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  justify-content: space-between;
+}
+
+/*
+ * The flag at the end of that row. Faint on purpose: the menu is two dozen names
+ * long and most of them are not the reader's language, so a solid flag on each
+ * would read as a row of flags rather than as a hint. The order already says
+ * which groups match — this only says why. Raise it if it is too quiet to
+ * notice; the cover badge's resting opacity is 0.75 for comparison, but that one
+ * is the gallery's own language rather than a remark about somebody else's row.
+ */
+.manga-tools-hint {
+  opacity: 0.45;
+}
+
+/*
  * The icon inside one of those options — the censorship dropdown's, since the
  * language one draws a flag instead.
  *
