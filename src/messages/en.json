@@ -46,6 +46,7 @@
   "mangaTools.translationGroup.original": "Raw",
   "mangaTools.translationGroup.originalOn": "Mark as raw: the original text, no translation group",
   "mangaTools.translationGroup.originalOff": "No longer raw — clear the mark",
+  "mangaTools.translationGroup.originalOffRestore": "No longer raw — clear the mark and put the translation group back",
   "mangaTools.translationGroup.originalDetail": "raw (no translation group)",
   "mangaTools.translationGroup.suggestedLanguage": "This group's galleries usually carry this language",
 

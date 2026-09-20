@@ -1219,6 +1219,23 @@ function editFormFor(galleryId: string): typeof editForm {
 }
 
 /**
+ * The translation group the original-text mark took away, so that a mis-click can
+ * be undone by clicking the same button again.
+ *
+ * Held here rather than left in the gallery, which is the tempting way to do it:
+ * a raw gallery carrying a group would be answering "who translated this" twice,
+ * and the answer would travel — Stash's own custom-field filters would match it,
+ * and so would this plugin's rule about the language a group's galleries carry.
+ * The value waits until the mark comes off, and is never written anywhere.
+ *
+ * One shot, and only for the gallery it was taken from: un-marking puts it back
+ * once, and the memory is dropped either way, so a later mark starts from nothing
+ * rather than from a name somebody has already given up on. It does not survive a
+ * reload, which is the price of not keeping a second copy of the name in the data.
+ */
+let originalGroupTaken: { galleryId: string; group: string } | null = null;
+
+/**
  * Whether this gallery is manga, as far as anything on screen is concerned.
  *
  * Once the store has an answer it *is* the answer, and a gallery missing from it
@@ -1776,18 +1793,43 @@ function MangaFieldBlock(props: {
   // ORIGINAL_FIELD_NAME for why it is not a value of the group field. Toggling it
   // on clears whatever group was set, for the same reason writing a group clears
   // it: a gallery holding both has answered one question twice.
+  //
+  // What it takes away it holds on to, because a button that destroys a name
+  // somebody typed is a button that gets destroyed by a mis-click — see
+  // originalGroupTaken for why it is held outside the gallery rather than in it.
   const isOriginal = NS.isOriginal(props.values);
   const toggleOriginal = () => {
-    let next = NS.setField(
-      props.values,
-      ORIGINAL_FIELD_NAME,
-      isOriginal ? "" : NS.ORIGINAL_VALUE
-    );
-    if (!isOriginal) {
+    const galleryId = currentGalleryId();
+    let next = props.values;
+
+    if (isOriginal) {
+      // Put the name back, if this is the gallery it was taken from — and drop it
+      // either way, so a mark that found nothing to take does not restore
+      // something else's.
+      const taken = originalGroupTaken;
+      originalGroupTaken = null;
+      next = NS.setField(next, ORIGINAL_FIELD_NAME, "");
+      if (taken && taken.galleryId === galleryId && taken.group) {
+        next = NS.setField(next, TRANSLATION_GROUP_FIELD_NAME, taken.group);
+      }
+    } else {
+      const group = NS.translationGroupOf(props.values);
+      originalGroupTaken = group
+        ? { galleryId: galleryId, group: group }
+        : null;
+      next = NS.setField(next, ORIGINAL_FIELD_NAME, NS.ORIGINAL_VALUE);
       next = NS.setField(next, TRANSLATION_GROUP_FIELD_NAME, "");
     }
+
     if (props.onChange) props.onChange(next);
   };
+
+  // Whether this click would put a name back, which the tooltip says — the undo is
+  // worth having, and worth being visible rather than a surprise.
+  const restoresGroup =
+    !!originalGroupTaken &&
+    originalGroupTaken.galleryId === currentGalleryId() &&
+    !!originalGroupTaken.group;
 
   const current = NS.describe(pickLanguage(props.values), intl.locale);
   let options: MangaToolsOption[] = NS.languageOptions(intl.locale).filter(
@@ -2099,7 +2141,9 @@ function MangaFieldBlock(props: {
       title={t(
         intl,
         isOriginal
-          ? "mangaTools.translationGroup.originalOff"
+          ? restoresGroup
+            ? "mangaTools.translationGroup.originalOffRestore"
+            : "mangaTools.translationGroup.originalOff"
           : "mangaTools.translationGroup.originalOn"
       )}
       onClick={toggleOriginal}

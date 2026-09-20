@@ -486,6 +486,20 @@ things. It is not a hint about what to type — it is what the field is saying w
 it is off — and a grey sentence in a grey box is exactly the look of an empty
 field, which is the state it exists to be told apart from.
 
+**What the mark takes away, it holds on to.** Pressing the steak clears the group
+field, and pressing it again puts the name back: one click of a button that
+destroys something is one click from a mistake, and the undo is what makes the
+button safe to press. The name waits outside the gallery — never written to it —
+because a raw gallery carrying a group would be answering "who translated this"
+twice, and the answer travels: Stash's own custom-field filters would match it, and
+so would the rule above about the language a group's galleries carry.
+
+It is remembered once and for one gallery: un-marking gives the name back and drops
+the memory either way, so a later mark starts from nothing rather than from a name
+somebody has already given up on, and a name taken from one gallery is never handed
+to the next one along. It does not survive a reload, which is the price of not
+keeping a second copy of the name in the data — a *Cancel* answers the rest.
+
 It is not a value of the group field, and the difference is not tidiness. A
 group's name is whatever it calls itself, and this library has one called
 `沒有漢化` — a statement to look at, and a name. A state kept among names like that

@@ -1361,6 +1361,57 @@ module.exports = () => {
     "and it takes the group with it: a gallery holding both has answered twice"
   );
 
+  // What it takes, it holds on to: one click back puts the name where it was,
+  // which is what makes the button safe to press by accident. The name waits
+  // outside the gallery rather than in it — a raw gallery carrying a group would be
+  // answering "who translated this" twice, and Stash's own custom-field filters
+  // would match it.
+  const restored = originalField({ [ORIGINAL]: "true", other: "x" });
+  assert.strictEqual(
+    restored.chip.props.title,
+    "取消生肉标记，并恢复原来的翻译组",
+    "the tooltip says a name is waiting, so the undo is not a surprise"
+  );
+  restored.chip.props.onClick();
+  assert.deepStrictEqual(
+    restored.edits[0],
+    { [MANGA]: "true", other: "x", [TG]: "Lily Manga" },
+    "and un-marking puts the group back in the same write that clears the mark"
+  );
+
+  // One shot: the name was given back and the memory dropped with it, so un-marking
+  // again restores nothing rather than handing the same name over twice.
+  const again = originalField({ [ORIGINAL]: "true", other: "x" });
+  assert.strictEqual(
+    again.chip.props.title,
+    "取消生肉标记",
+    "with nothing waiting, the tooltip offers only what the click does"
+  );
+  again.chip.props.onClick();
+  assert.deepStrictEqual(
+    again.edits[0],
+    { [MANGA]: "true", other: "x" },
+    "and un-marking a gallery whose name was already given back restores nothing"
+  );
+
+  // And the name belongs to the gallery it came from. The memory outlives a
+  // navigation — the form does not — so it is keyed, and the next gallery along is
+  // not handed a name it never had.
+  originalField({ [TG]: "Lily Manga", other: "x" }).chip.props.onClick();
+  nav("/galleries/2");
+  const elsewhere = originalField({ [ORIGINAL]: "true", other: "x" });
+  assert.ok(
+    elsewhere.chip,
+    "gallery 2 is a gallery, so the block is drawn for it"
+  );
+  elsewhere.chip.props.onClick();
+  assert.deepStrictEqual(
+    elsewhere.edits[0],
+    { [MANGA]: "true", other: "x" },
+    "un-marking another gallery must not hand it a name it never had"
+  );
+  nav("/galleries/1");
+
   const wasOriginal = originalField({ [ORIGINAL]: "true", other: "x" });
   assert.strictEqual(
     wasOriginal.chip.props["aria-pressed"],
