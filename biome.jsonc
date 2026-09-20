@@ -1,0 +1,101 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.0/schema.json",
+
+  // Stash's own config, copied from ui/v2.5/biome.jsonc, with the two entries
+  // that only make sense inside its source tree dropped.
+  //
+  // Why Stash's rather than a config of our own: everything in this repository
+  // exists to extend Stash, the conventions below are already decided and
+  // documented there, and matching them means one set of habits instead of two.
+  // The version is pinned to exactly the one Stash uses, so the two cannot drift
+  // apart and start disagreeing about what is formatted.
+  //
+  // The one deliberate difference: `lineWidth` is written out as 80. Stash leaves
+  // it at Biome's default, which is also 80 — this only makes it a decision
+  // rather than an accident.
+  //
+  // Everything in here was formatted by this config before the plugin moved out
+  // of the stash-plugins monorepo, so it arrives already satisfying it and the
+  // formatter's job here is to keep it that way rather than to change it. The
+  // conventions it names were true before it was adopted too: two-space indent,
+  // double quotes, semicolons, `es5` trailing commas — its only real work then
+  // was re-wrapping a couple of dozen lines that had drifted past 80 columns.
+  //
+  // `vcs.useIgnoreFile` is what keeps dist/ out of it: the bundle esbuild writes
+  // is generated, is not committed, and has no business being reformatted.
+  "json": {
+    "parser": {
+      "allowComments": true
+    }
+  },
+  // The plugin assets: images, and whatever else a plugin serves rather than
+  // bundles. Nothing here is source — the files are somebody else's artwork,
+  // kept exactly as downloaded so their attribution stays intact, and Biome
+  // would otherwise read an SVG as markup and object to its XML declaration.
+  "files": {
+    "includes": ["**", "!**/assets"]
+  },
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "lineWidth": 80
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "react": "recommended",
+      "types": "recommended"
+    },
+    "rules": {
+      // generally want to enforce recommended rules
+      // so change recommended rules that emit info by default to error
+      //
+      "a11y": "off",
+      "complexity": {
+        "noUselessCatch": "error",
+        "noUselessEscapeInRegex": "error",
+        "noUselessFragments": "error",
+        "noUselessLabel": "error",
+        "noUselessLoneBlockStatements": "error",
+        "noUselessStringRaw": "error",
+        "noUselessSwitchCase": "error",
+        "noUselessTernary": "error",
+        "useFlatMap": "error",
+        "useIndexOf": "error",
+        "useLiteralKeys": "error",
+        "useOptionalChain": "error"
+      },
+      "style": {
+        // used where the type is known to be non-null, but the compiler can't figure it out
+        "noNonNullAssertion": "off",
+        // preferable, but not something we want to enforce right now
+        "useTemplate": "off",
+        // remove the following after fixing
+        "useImportType": "off"
+      },
+      "suspicious": {
+        // this is used extensively, and there's no obvious fix
+        "noArrayIndexKey": "off",
+        // The one rule here that Stash does not have on, and the only deliberate
+        // difference from its config. Stash's own source still has a handful of
+        // `var`s, so its set does not police them; this plugin would rather not
+        // keep any, and `var`'s function scoping and hoisting have already cost
+        // this codebase one confusing bug (a `var` read before its line, which
+        // only worked because of the hoisting).
+        "noVar": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      // es5 requires the least amount of changes and (imo) looks better than "all"
+      "trailingCommas": "es5"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "off" } }
+  }
+}

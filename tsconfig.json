@@ -1,0 +1,52 @@
+{
+  // This plugin's own compiler options, which used to come from a shared base
+  // file in the repository the plugin lived in. Inlining them here is what makes
+  // this repository buildable on its own: an `extends` pointing at a sibling
+  // that is not in the checkout is a type-checker that cannot start.
+  //
+  // The two options that matter most came from the official Stash plugin example
+  // (pkg/plugin/examples/react-component in the Stash repo):
+  //
+  //   "jsx": "react"  (the classic transform)
+  //     JSX compiles to React.createElement, using a `React` variable from the
+  //     surrounding scope. Plugins have no React import — they take it from
+  //     PluginApi.React — which is exactly what the classic transform expects.
+  //     esbuild is told the same thing, via this same file, so both compilers
+  //     agree on the emitted JSX.
+  //
+  //   "module": "esnext" + "moduleResolution": "bundler"
+  //     The example used module: "None", which kept emitted files as plain
+  //     scripts so they could be loaded independently through ui.javascript and
+  //     talk to each other via a window global. That is no longer needed:
+  //     "None" was deprecated in TypeScript 6.0 and removed in 7.0, and a
+  //     bundler now inlines the imports instead — Stash loads one file per
+  //     plugin. "bundler" resolution is what lets `import x from "./y"` resolve
+  //     the way esbuild resolves it, extensionless and extension-aware both.
+  "compilerOptions": {
+    "target": "es2019",
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    // TypeScript 7.0 is the native (Go) compiler and no longer auto-includes
+    // every package under node_modules/@types the way the JS compiler did, so
+    // the packages in use are listed explicitly.
+    "types": ["react"],
+    "jsx": "react",
+    "isolatedModules": true,
+    // The plugin carries its own message catalogs as JSON (src/messages/*.json);
+    // esbuild imports JSON natively, and this is what lets tsc and the editor
+    // read the same files.
+    "resolveJsonModule": true,
+    "noFallthroughCasesInSwitch": true,
+    "useDefineForClassFields": true,
+    // esbuild does the emitting; tsc is the type-checker only. noEmit says so out
+    // loud, so a stray `tsc -p .` cannot litter src/ with .js files that would
+    // then shadow the sources.
+    "noEmit": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,70 @@
+# Manga Tools — a toolbox that adapts Stash galleries to manga/comic management.
+#
+# The plugin ID comes from this file's name (mangaTools), not from a config
+# field. Paths under ui.javascript are relative to this file and are loaded in
+# array order. There is only one entry: the bundled output of
+# src/mangaTools.tsx, with src/languages.ts inlined into it by esbuild (see
+# build.mjs), so there is no load order to get wrong.
+name: Manga Tools
+description: Adapts Stash galleries to manga/comic management.
+# Shown as the link button beside the plugin in Settings → Plugins.
+url: https://github.com/ravenddddd/mangaTools
+version: 0.6.2
+ui:
+  javascript:
+    - mangaTools.js
+  css:
+    - mangaTools.css
+  # The one thing this plugin ships that is not code: the icon for the mark that
+  # makes a gallery manga. Stash serves a mapped directory at
+  # /plugin/{pluginId}/assets/<path>, so `assets/icons/x.svg` is fetched from
+  # /plugin/mangaTools/assets/icons/x.svg.
+  #
+  # It is a file rather than a string in the bundle because it is somebody else's
+  # artwork and is kept exactly as it was downloaded, attribution comment and all.
+  # Colouring it is done with a CSS mask, which reads the shape rather than the
+  # colour — see .manga-tools-manga-icon in mangaTools.css.
+  #
+  # `build.mjs` copies whatever this maps, so a directory named here is a
+  # directory that ships; naming one that does not exist fails the build.
+  assets:
+    /: assets
+
+# Plugin settings, editable under Settings → Plugins. Stash renders one plain
+# input per entry below (STRING/NUMBER/BOOLEAN only); the plugin patches that UI
+# for itself to show a multiselect and switches instead. All of them live in
+# Configuration.plugins.mangaTools:
+#   enabledLanguages  comma-separated canonical codes; empty = no restriction
+#   showFlags         draw flags, or names on their own
+#   showCoverBadge    draw the badge on gallery covers (independent of showFlags)
+#   openDetailsBlock  the state the details tab's block opens in
+#   openEditBlock     the state the edit form's block opens in
+#   hidePerformers    leave the performers field out of a manga gallery's edit page
+# Everything is absent until the user changes something, and an absent value
+# reads as the default (no restriction / both switches on / the blocks as they
+# were / the performers field hidden).
+settings:
+  enabledLanguages:
+    displayName: Enabled languages
+    description: Only these languages appear in the edit-page dropdown. Display (badge and detail row) is unaffected. Leave empty to show every language.
+    type: STRING
+  showFlags:
+    displayName: Show flags
+    description: Draw the flag beside the language name. Turn this off to show the name on its own.
+    type: BOOLEAN
+  showCoverBadge:
+    displayName: Show the language on gallery covers
+    description: The badge in the bottom-right of a gallery's cover. With flags turned off it shows the language name instead of a flag.
+    type: BOOLEAN
+  openDetailsBlock:
+    displayName: Start the details block expanded
+    description: The Manga info section in a gallery's details tab. Collapsed, the heading is what says the section is there. Only affects the state a block opens in.
+    type: BOOLEAN
+  openEditBlock:
+    displayName: Start the edit block expanded
+    description: The Manga info block in a gallery's edit form, holding the language, censorship and translation group fields. Only affects the state a block opens in.
+    type: BOOLEAN
+  hidePerformers:
+    displayName: Hide the performers field on a manga gallery
+    description: A manga gallery rarely has performers, so its edit page leaves the field out. Only the field is hidden — whatever a gallery already has stays on the gallery and is kept when it is saved. The bulk edit dialog and the details tab are unaffected.
+    type: BOOLEAN

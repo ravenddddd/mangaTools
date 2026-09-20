@@ -1,0 +1,4 @@
+node_modules/
+
+# Build output. The publishing repository packages it; nothing here is committed.
+dist/

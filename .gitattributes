@@ -1,0 +1,8 @@
+# Text, stored with LF and checked out with LF on every platform.
+#
+# Git for Windows installs with `core.autocrlf` on, which would check the tree
+# out with CRLF while the repository holds LF — so a Windows working copy would
+# not be byte-for-byte what CI checks out and builds, and a diff that looks like
+# nothing becomes every line. The tests read mangaTools.css and the bundle as
+# text; pinning the ending keeps what they read the same here as there.
+* text=auto eol=lf

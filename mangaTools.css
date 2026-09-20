@@ -1,0 +1,442 @@
+/*
+ * Manga Tools — styles
+ *
+ * Only adds its own class names; it never overrides Stash's (the single
+ * exception is .thumbnail-section below).
+ *
+ * Flags use flag-icons' `.fi` / `.fi-<country>`. That stylesheet is loaded
+ * globally by Stash (index.scss imports `flag-icons/css/flag-icons.min.css`),
+ * so all this file has to do is size them — no assets to ship.
+ */
+
+/* ───────────────────────── Cover badge ───────────────────────── */
+
+/*
+ * The badge sits at the bottom of the cover, so it needs a positioning context.
+ *
+ * Stash does not position .thumbnail-section (position: relative is only set on
+ * the same-named class inside performer cards). In a gallery card the nearest
+ * positioned ancestor is actually Bootstrap's .card, which is why
+ * .studio-overlay's top/right happen to line up with the cover's top-right
+ * corner — that looks right, but it is a coincidence. A badge using `bottom`
+ * would land below the card title instead, so establish the context here.
+ *
+ * Scoped to gallery cards: with this in place .studio-overlay anchors to
+ * .thumbnail-section rather than .card. That box is exactly the same size as the
+ * cover, so its top-right corner does not move.
+ */
+.gallery-card .thumbnail-section {
+  position: relative;
+}
+
+.manga-tools-badge {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  z-index: 9;
+
+  line-height: 0;
+
+  /* Resting opacity matches Stash's .studio-overlay (see GridCard/styles.scss)
+     so the badge reads as part of the same family as the studio icon.
+     Raise this to 1 if it looks too faint. */
+  opacity: 0.75;
+  transition: opacity 0.5s;
+
+  /* Important: without this the badge covers the card's <a>, so that patch of
+     the cover is no longer clickable. */
+  pointer-events: none;
+}
+
+/*
+ * The flag itself. A drop-shadow rather than a background keeps it legible on
+ * light covers — the same approach Stash uses for flags on performer cards
+ * (the .fi rule in Performers/styles.scss).
+ */
+.manga-tools-badge .fi {
+  border-radius: 2px;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+  height: 1.25rem;
+  width: 1.875rem;
+}
+
+/*
+ * The text chip, used whenever the badge has no flag to draw. Two cases, which
+ * look the same but are not the same thing:
+ *
+ *   .is-unknown  an unrecognised value — arbitrary data, so it is bounded and
+ *                ellipsised. "klingon" and a pasted paragraph both behave.
+ *   .is-name     a recognised language with the "Show flags" setting turned off.
+ *                The name is one of ours and can be long — 印度尼西亚语,
+ *                "Traditional Chinese", "Chinesisch (traditionell)" — so it is
+ *                shown whole rather than clipped to a few characters.
+ *
+ * The line-height has to be reset explicitly, overriding the `line-height: 0`
+ * left behind by the .fi rule above.
+ */
+.manga-tools-badge.is-unknown,
+.manga-tools-badge.is-name {
+  background-color: #6b7280;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.03rem;
+  line-height: 1.5;
+  padding: 0.05rem 0.4rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.manga-tools-badge.is-unknown {
+  max-width: 5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Fade out while the whole card is hovered — exactly what Stash does to
+ * .rating-banner and .studio-overlay (same 0.5s transition).
+ *
+ * One difference: the studio icon is a link and can be hovered itself, which is
+ * why Stash also has `.studio-overlay:hover { opacity: 0.75 }` to bring it back.
+ * The badge is pointer-events: none, so it never receives hover, and it simply
+ * disappears once the card is hovered. That is the intent — hovering means the
+ * user wants to look at the cover.
+ */
+.gallery-card:hover .manga-tools-badge,
+.gallery-card:active .manga-tools-badge {
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+
+/* ───────────────────── Flags in the dropdown / detail row ───────────────────── */
+
+/*
+ * The flag inside a list row, spaced away from the icon before it and the name
+ * after it.
+ *
+ * A margin rather than a flex `gap` on the row: those rows are Stash's
+ * `label-group`, which is a flex box, so a gap would open up the icon-to-name
+ * spacing as well — and in Stash's own rows those two abut.
+ *
+ * Scoped to the row classes, which both surfaces use and which the dropdown and
+ * the detail row do not: those two already have spacing of their own (a flex gap
+ * and a real space respectively), so a margin here would double it.
+ */
+.selected-object .manga-tools-flag,
+.unselected-object .manga-tools-flag {
+  margin: 0 0.45rem;
+}
+
+/* A react-select option (the menu item and the selected value share one renderer) */
+.manga-tools-option {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+}
+
+/*
+ * The icon inside one of those options — the censorship dropdown's, since the
+ * language one draws a flag instead.
+ *
+ * Stash's index.scss has an unscoped `.fa-icon { margin: 0 0.4rem }`, so every
+ * icon carries a margin on both sides unless something takes it off. This icon is
+ * already spaced by the option's own `gap`, so the margin lands as a second gap
+ * and the option reads wider than the ones with flags in them.
+ *
+ * Scoped to `.manga-tools-option`, which is this plugin's own class, so nothing
+ * else on the page is touched — the details block's icon has a rule of its own
+ * for the same reason, and neither reaches the other.
+ */
+.manga-tools-option .fa-icon {
+  margin: 0;
+}
+
+/* biome-ignore lint/style/noDescendingSpecificity: ordered with the rest of the
+   flag rules rather than by specificity — nothing here depends on the order, and
+   the file reads in the order the pieces appear on screen. */
+.manga-tools-flag {
+  border-radius: 2px;
+  flex: 0 0 auto;
+  height: 0.9rem;
+  width: 1.35rem;
+}
+
+/*
+ * The detail-page row. It is deliberately rendered as an <h6>, matching the
+ * "studio code" and "photographer" rows above it; font and line-height come from
+ * Stash's own `.gallery-details h6`, so all this does is align the flag.
+ *
+ * There is deliberately **no margin** between the flag and the name: that gap
+ * comes from a single space in the JSX, making it exactly as wide as the space
+ * after the colon. A margin would be a magic number that stops matching as soon
+ * as Stash changes its font size or the user picks a different UI font.
+ *
+ * The host (.manga-tools-detail-host) is an empty div with no padding or
+ * border, so the h6's margins collapse through it and spacing matches the
+ * sibling h6 elements.
+ */
+.manga-tools-detail .manga-tools-flag {
+  vertical-align: -0.15rem;
+}
+
+/*
+ * The censorship icon, and only it — Stash's index.scss has an unscoped
+ * `.fa-icon { margin: 0 0.4rem }`, so every icon carries a left and right margin
+ * unless something takes it off. Its two exemptions are an icon alone in a button
+ * (the collapse header's chevron, which is why that one looks right) and one in a
+ * popover or dropdown item; neither is this.
+ *
+ * Zeroed rather than replaced, because the gap this row wants is the text space
+ * already in the markup — the same arrangement as the language row above it, so
+ * both read the same at any font size.
+ */
+.manga-tools-detail .fa-icon {
+  margin: 0;
+}
+
+/* ───────────────────────── Edit-page dropdown ───────────────────────── */
+
+/*
+ * The mount point has to be completely transparent to layout.
+ *
+ * It holds a Form.Group (Bootstrap's .form-group.row). That row's column widths
+ * rely on its own negative margins cancelling out the parent .col's padding. If
+ * the mount point were a plain block-level div it would add an extra layer, the
+ * negative margins would resolve against that instead, and the field would sit
+ * at a different offset than the native ones.
+ *
+ * `display: contents` removes the box from layout entirely and lets its children
+ * lay out against the parent (.col) — identical to not having the layer at all.
+ */
+.manga-tools-field-host {
+  display: contents;
+}
+
+/*
+ * A manga gallery's edit page leaves Stash's performers field out, when the
+ * setting asks it to: the mount point is inserted directly after the studio row,
+ * which is the row before the performers one, so one sibling selector is enough.
+ *
+ * Hidden with CSS rather than by not rendering the row, because the row is
+ * Stash's and its value lives in Stash's form. `display: none` takes the field
+ * off the page and leaves the value untouched, so a gallery that does have
+ * performers keeps them on save; nothing this plugin does can clear one.
+ *
+ * The class is toggled on this plugin's own node (see MangaFieldBlock) rather
+ * than written onto Stash's row, so a re-render of the form cannot undo it.
+ */
+.manga-tools-field-host.hide-performers
+~ .form-group[data-field="performer_ids"] {
+  display: none;
+}
+
+.manga-tools-select {
+  min-width: 14rem;
+}
+
+/* ─────────────────────── Settings-page multiselect ─────────────────────── */
+
+/*
+ * Stash lays a `.setting` out as two side-by-side columns (label | control),
+ * which suits a short input but not a wide multiselect. The whole settings UI
+ * is wrapped in one block so the heading, description and select stack
+ * vertically and the select gets the full width of the row.
+ */
+.manga-tools-settings-block {
+  width: 100%;
+}
+
+/*
+ * Two of Stash's rules assume a setting row is a label|control pair and push
+ * the last child to the right:
+ *
+ *   .setting-section .setting > div:last-child   { min-width: 100px; text-align: right }
+ *   .setting-group   .setting > div:last-child   { margin-left: auto }
+ *
+ * This setting is a full-width vertical stack instead, so both have to be
+ * undone. `text-align` is the one that shows: it inherits into the h3 and
+ * .sub-heading inside the block and right-aligns their text.
+ *
+ * The third class name gives this rule enough specificity to win; !important
+ * is not needed.
+ */
+.setting-section .setting.manga-tools-settings > div:last-child {
+  margin-left: 0;
+  min-width: 0;
+  text-align: left;
+}
+
+.manga-tools-settings-control {
+  margin-top: 0.75rem;
+}
+
+/*
+ * The settings multiselect holds several selected tags, so it can grow wider
+ * than the edit-page dropdown. Cap it so it does not stretch the whole setting
+ * row on wide screens.
+ */
+.manga-tools-settings-select {
+  max-width: 30rem;
+}
+
+/* ─────────────────── Language list in the filter dialog ─────────────────── */
+
+/*
+ * The dialog's card draws our list, and Stash's own editor for the same criterion
+ * sits underneath it. The editor is never used — the card keeps its own selection
+ * and merges it into the URL when Apply is pressed — but Stash still renders it,
+ * so it is hidden rather than removed: hiding leaves `CriterionEditor` and
+ * everything above it untouched, where removing would mean the criterion had no
+ * editor at all.
+ *
+ * Scoped to our card by the type Stash keys cards on. If Stash ever changes that
+ * attribute both simply become visible again, beside our list: degraded, not
+ * broken.
+ */
+.criterion-list [data-type="language"] .custom-field-filter {
+  display: none;
+}
+
+/*
+ * And the row of condition tags that editor draws beside itself — one pill per
+ * condition it holds, which is the same selection again in Stash's raw wording
+ * ("manga_tools_language = ja").
+ *
+ * A sibling of the editor, not a child, so hiding the editor above does not reach
+ * it. This used to be hidden only while empty, on the grounds that it was the
+ * honest record of what the criterion holds; it is not one any more, now that the
+ * criterion is handed to Stash as the Language criterion and the real tag — the
+ * one in the dialog's tag row, which this plugin re-words — says the same thing
+ * in the reader's own language.
+ *
+ * `!important` because it has to be. The row carries Bootstrap's `d-flex`, which
+ * is `display: flex !important` — a plain `display: none` loses to it whatever
+ * selector is used. Overriding a utility class that is itself important is the
+ * one case where this is the right tool. (`margin-bottom: 0` does not work
+ * either: `mb-2` is important too.)
+ */
+.criterion-list [data-type="language"] .filter-tags {
+  /* biome-ignore lint/complexity/noImportantStyles: see above — the whole point
+     is to beat a utility class that is itself important. */
+  display: none !important;
+}
+
+/*
+ * ─────────────────────────── The manga panel ───────────────────────────
+ *
+ * Deliberately almost nothing: the collapse header copies Stash's own
+ * `CollapseButton` markup and the rows are its own `<h6>` detail rows, so both
+ * are styled by Stash's stylesheet and this block only has to place them.
+ *
+ * TWICE NOW this block has vanished, and both times the same way: an edit that
+ * deleted "everything from section X to section Y" where X came first in the file
+ * and this section sat in between. If it disappears a third time, that is why —
+ * grep for manga-tools-panel before assuming the rules were never written.
+ */
+.manga-tools-panel {
+  /*
+   * Padding, not margin, and that is the whole point of it being here.
+   *
+   * The same value as a row's margin — Bootstrap gives every heading 0.5rem, and
+   * that is what the <h6>s in this section are separated by — but expressed as
+   * padding so the two *add* rather than collapse. Adjacent vertical margins
+   * collapse to the larger of the two, so as a margin this one was invisible
+   * whenever the block was open: the last row's own bottom margin swallowed it
+   * and the block closed with exactly one row's spacing and no breathing room of
+   * its own.
+   */
+  padding-bottom: 0.5rem;
+}
+
+.manga-tools-panel-body {
+  margin-top: 0.25rem;
+}
+
+/*
+ * The left alignment is not cosmetic tidying, it is the whole reason this block
+ * has a rule at all.
+ *
+ * Bootstrap's `.btn` is `text-align: center`. Stash's own CollapseButton is left
+ * aligned by `.sidebar-section .collapse-button { text-align: left }` — a rule
+ * scoped to the sidebar, which this block is not in. The only other left-align
+ * Stash writes is on `button.collapse-button.btn-primary:hover, :focus, :active`
+ * (components/Shared/styles.scss), i.e. only *while* the button is hovered or
+ * focused. So without this line the label sits in the middle until the pointer
+ * touches it and snaps left, and back to the middle when focus moves on.
+ *
+ * `.manga-tools-panel .collapse-button` is two classes against `.btn`'s one, so
+ * it wins without needing `!important`. Stash's hover rule is more specific
+ * still, and says the same thing.
+ */
+.manga-tools-panel .collapse-button {
+  text-align: left;
+  width: 100%;
+}
+
+/*
+ * No rule for the header itself. The button inside it already carries
+ * Bootstrap's `.btn` padding — one layer is the block's height, two is a taller
+ * one for no reason — and Stash's `button.collapse-button { padding-left: 0 }`
+ * already pulls the label flush with the rows below it.
+ */
+
+/*
+ * ─────────────────────── The manga switch ───────────────────────
+ *
+ * The switch that makes a gallery manga — this plugin's entry point, and the only
+ * thing it shows on a gallery that has not been marked.
+ *
+ * The two states are Stash's own organized pair: dimmed when off, in the page's
+ * own colour when on. That second colour is `inherit` rather than a value, so it
+ * follows whatever theme is in use instead of naming a colour that only looks
+ * right in one of them. The classes carry two each so they outrank
+ * `button.minimal` (styles/_theme.scss), which also sets a colour.
+ */
+button.minimal.manga-tools-manga-toggle {
+  color: rgba(191, 204, 214, 0.5);
+}
+
+button.minimal.manga-tools-manga-toggle.is-manga {
+  color: inherit;
+}
+
+/*
+ * The icon: an asset masked into shape, so the file supplies the outline and this
+ * supplies the colour.
+ *
+ * Not an <svg> and not an <img>. Inlining the markup would let `currentColor`
+ * work — that is what every other icon here does — but the artwork is somebody
+ * else's file, worth keeping byte for byte with its attribution comment in it. A
+ * served image cannot be recoloured at all, and a mask can: it reads the alpha
+ * channel and ignores the paint, so the two states above are enough.
+ *
+ * The height is 1em to match the FontAwesome icons beside it, which are sized in
+ * em, and the vertical-align is FontAwesome's own — the toolbar holds both kinds
+ * and they have to sit on the same line.
+ *
+ * The URL is **relative**, and that is the only form that can work. An absolute
+ * /plugin/<id>/assets/... has to name the plugin's ID, which this code does not
+ * know: `mangaTools` is what the source says, but the ID is whatever the yml file
+ * is called, and the test build's is `mangaToolsTest`. A relative URL is resolved
+ * against this stylesheet's own address instead, which Stash derives from that
+ * same ID — so the icon follows the plugin wherever it is installed, and follows
+ * a Stash served under a base path too.
+ *
+ * `assets/` sits beside this file in the plugin, and the yml maps `/` to that
+ * directory, so the relative URL lands on /plugin/<id>/assets/<path> as long as
+ * the stylesheet is served from anywhere under /plugin/<id>/.
+ */
+.manga-tools-manga-icon {
+  --manga-tools-icon: url("assets/icons/manga.svg");
+
+  background-color: currentColor;
+  display: inline-block;
+  height: 1em;
+  vertical-align: -0.125em;
+  width: 1em;
+  -webkit-mask: var(--manga-tools-icon) center / contain no-repeat;
+  mask: var(--manga-tools-icon) center / contain no-repeat;
+}

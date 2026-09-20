@@ -1,0 +1,11 @@
+# pnpm 10 reads its settings from here, not from package.json, so this file
+# exists for the one setting below even though the repository is a single
+# package rather than a workspace.
+#
+# pnpm 10 refuses to run a dependency's install scripts unless it is told to,
+# and esbuild has one. It is not what fetches the binary — that arrives as the
+# platform-specific optional dependency — but the script is where esbuild checks
+# that the binary it found is the one it expected, and the warning it prints on
+# every install otherwise is noise a reader has to learn to ignore.
+allowBuilds:
+  esbuild: true

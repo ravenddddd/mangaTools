@@ -1,0 +1,24 @@
+{
+  "name": "mangatools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Manga Tools — a Stash plugin that adapts galleries to manga/comic management",
+  "author": "ravenddddd",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "lint": "biome lint --error-on-warnings",
+    "format": "biome format --write",
+    "format:check": "biome format",
+    "typecheck": "tsc --noEmit",
+    "build": "node build.mjs",
+    "test": "pnpm run lint && pnpm run format:check && pnpm run typecheck && pnpm run build && node tests/smoke.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.0",
+    "@types/react": "^18.3.31",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "mangaTools.select.placeholder": "Select language…",
+
+  "mangaTools.settings.enabledLanguages.heading": "Enabled languages",
+  "mangaTools.settings.enabledLanguages.description": "Only these languages appear in the edit-page dropdown. Display (badge and detail row) is unaffected. Leave empty to show every language.",
+  "mangaTools.settings.enabledLanguages.placeholder": "All languages",
+
+  "mangaTools.settings.showFlags.heading": "Show flags",
+  "mangaTools.settings.showFlags.description": "Draw the flag beside the language name. Turn this off to show the name on its own.",
+
+  "mangaTools.settings.showCoverBadge.heading": "Show the language on gallery covers",
+  "mangaTools.settings.showCoverBadge.description": "The badge in the bottom-right of a gallery's cover. With flags turned off it shows the language name instead of a flag.",
+
+  "mangaTools.settings.openDetailsBlock.heading": "Start the details block expanded",
+  "mangaTools.settings.openDetailsBlock.description": "The Manga info section in a gallery's details tab. Collapsed, its heading is what says the section is there. This decides the state a block opens in, not whether it can be opened.",
+  "mangaTools.settings.openEditBlock.heading": "Start the edit block expanded",
+  "mangaTools.settings.openEditBlock.description": "The Manga info block in a gallery's edit form, where its language, censorship and translation group are set. This decides the state a block opens in, not whether it can be opened.",
+
+  "mangaTools.settings.hidePerformers.heading": "Hide the performers field on a manga gallery",
+  "mangaTools.settings.hidePerformers.description": "A manga gallery rarely has performers, so its edit page leaves the field out. Only the field is hidden — whatever a gallery already has stays on the gallery and is kept when it is saved. The bulk edit dialog and the details tab are unaffected.",
+
+  "mangaTools.manga.mark": "Mark as manga",
+  "mangaTools.manga.marked": "Manga",
+  "mangaTools.manga.isManga": "Is manga",
+
+  "mangaTools.filter.manga.marked": "Marked",
+  "mangaTools.filter.manga.unmarked": "Unmarked",
+
+  "mangaTools.manga.confirm": "Are you sure you want to stop managing this gallery? Its language, censorship and translation group values will be removed.",
+  "mangaTools.manga.confirmResetsForm": "The edit form has unsaved changes, and taking the mark off will reset it.",
+  "mangaTools.manga.confirmCancel": "Cancel",
+  "mangaTools.manga.confirmOk": "Unmark",
+
+  "mangaTools.panel.heading": "Manga info",
+
+  "mangaTools.censorship.heading": "Censorship",
+
+  "mangaTools.censorship.censored": "Censored",
+  "mangaTools.censorship.uncensored": "Uncensored",
+  "mangaTools.censorship.unset": "Not marked",
+
+  "mangaTools.translationGroup.heading": "Translation group",
+  "mangaTools.translationGroup.create": "Create",
+  "mangaTools.translationGroup.placeholder": "Set a translation group…",
+
+  "mangaTools.bulk.remove": "Remove",
+  "mangaTools.bulk.unmarkWarning": "Unmarking removes this plugin's manga, language, censorship and translation group fields from the selected galleries."
+}
