@@ -237,6 +237,69 @@
   min-width: 14rem;
 }
 
+/* ────────────────── The group row's suggested language ────────────────── */
+
+/*
+ * The row becomes a flex box only when it has a chip in it: the other rows hold
+ * one select and are laid out by Bootstrap's columns alone, so the modifier is
+ * written on the control column by the block that draws the chip, and every
+ * other row keeps the markup it had.
+ *
+ * The select is the item that gives — it grows into what the chip leaves. It is
+ * also allowed to shrink below the 14rem floor `.manga-tools-select` sets for
+ * the other rows, because that floor would otherwise push the chip out of the
+ * column on a narrow screen. The chip never shrinks: it is the control being
+ * offered, and half a chip is not a control.
+ */
+.manga-tools-chip-row {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.manga-tools-chip-row .manga-tools-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * The suggestion itself: the language this group's galleries usually carry, one
+ * click from being written into the language field.
+ *
+ * The look is the cover badge's text chip, which is this plugin's one way of
+ * drawing a language as a filled chip — not that rule, which is positioned over
+ * a cover and fades on hover, and not its flag sizing, which belongs to a cover.
+ * A button, because it is a control and has to take focus.
+ *
+ * `button.` in the selector rather than the bare class: the badge's chip look is
+ * a two-class rule, and a rule matching one class would lose to it whichever
+ * order the two were written in.
+ */
+button.manga-tools-chip {
+  align-items: center;
+  background-color: #6b7280;
+  border: 0;
+  border-radius: 3px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  gap: 0.35rem;
+  line-height: 1.5;
+  padding: 0.05rem 0.4rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+/* Hover and focus, because a chip that looks painted on does not read as a
+   control. The same colour, one step darker. */
+button.manga-tools-chip:hover,
+button.manga-tools-chip:focus {
+  background-color: #4b5563;
+}
+
 /* ─────────────────────── Settings-page multiselect ─────────────────────── */
 
 /*

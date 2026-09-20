@@ -28,7 +28,10 @@
  * once (from a bare `language`), by hand, with no compatibility branch.
  */
 import { NS } from "./languages";
-import type { MangaToolsCustomFields } from "./plugin-api";
+import type {
+  MangaToolsCustomFields,
+  MangaToolsUsualLanguage,
+} from "./plugin-api";
 
 /**
  * The language field. Its value is a code from NS.LANGUAGES — see languages.ts
@@ -91,6 +94,86 @@ NS.TRANSLATION_GROUP_FIELD_NAME = "plugin.mangaTools.translationGroup";
  */
 NS.translationGroupOf = (customFields: unknown): string =>
   NS.pickField(customFields, NS.TRANSLATION_GROUP_FIELD_NAME).trim();
+
+/**
+ * Whether two group names are the same one, which is a question about case only.
+ *
+ * Trimmed and folded, because the field is typed by hand: "Aozora" and "aozora "
+ * are one group. This is the only spelling of that rule — the menu asks it before
+ * deciding whether to offer to create a name, and the rule below asks it to find
+ * a group's galleries, and the two agreeing is the point.
+ */
+NS.sameTranslationGroup = (a: unknown, b: unknown): boolean =>
+  String(a ?? "")
+    .trim()
+    .toLowerCase() ===
+  String(b ?? "")
+    .trim()
+    .toLowerCase();
+
+/**
+ * The language a translation group's galleries usually carry, or null.
+ *
+ * Asked of a store — this plugin's own, handed in by the caller — because that is
+ * where every marked gallery's whole custom_fields already are: nothing here
+ * needs a query, and a group that has never been used is a name with no galleries
+ * behind it.
+ *
+ * Null covers more than "there is no answer". No store, no group, a group whose
+ * galleries all carry no language, and a group whose galleries disagree evenly. A
+ * tie is not a majority, and picking one of two languages would be inventing a
+ * fact, so the caller shows nothing instead.
+ *
+ * A value the language table does not recognise is not counted either, for the
+ * same kind of reason: a suggestion propagates what it offers, and this plugin
+ * only offers languages it can name. It displays such a value; it does not spread
+ * one.
+ *
+ * Counted, never cached. The caller asks this in its render body, which runs once
+ * per keystroke in the group field — the same place, and for the same reason, as
+ * knownTranslationGroups in mangaTools.tsx. The store is both replaced wholesale
+ * by a refresh and written into in place, so a cache keyed on either one would be
+ * quietly wrong about the other, and one walk of a few thousand maps for a count
+ * per distinct language is not worth that.
+ *
+ * The gallery being edited is counted like any other. Leaving it out would make
+ * the group's usual language depend on which of its galleries happened to be
+ * open.
+ */
+NS.usualLanguageFor = (
+  galleries: Map<string, unknown> | null,
+  group: string
+): MangaToolsUsualLanguage | null => {
+  if (!galleries || !group.trim()) return null;
+
+  // Normalised before it is counted, so two spellings of one language come out as
+  // one answer rather than a tie between them.
+  const counts: { [code: string]: number } = {};
+  galleries.forEach((fields) => {
+    if (!NS.sameTranslationGroup(NS.translationGroupOf(fields), group)) return;
+
+    const raw = NS.pickField(fields, NS.FIELD_NAME);
+    const code = NS.findCanonical(NS.normalize(raw));
+    if (!code) return;
+
+    counts[code] = (counts[code] || 0) + 1;
+  });
+
+  let best = "";
+  let count = 0;
+  let tied = false;
+  for (const code of Object.keys(counts)) {
+    if (counts[code] > count) {
+      best = code;
+      count = counts[code];
+      tied = false;
+    } else if (counts[code] === count) {
+      tied = true;
+    }
+  }
+
+  return best && !tied ? { code: best, count: count } : null;
+};
 
 /** The value written when a gallery is marked. Presence is what is read. */
 NS.MANGA_VALUE = "true";

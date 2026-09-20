@@ -1247,6 +1247,219 @@ module.exports = () => {
     "while the label is the trimmed name"
   );
 
+  // ── The group row's language chip ────────────────────────────────
+  //
+  // The chip offers the language a group's galleries usually carry, and it reads
+  // the same store the menu above is built from — so what it can offer here is
+  // exactly what the fixtures hold. "Lily Manga" has one gallery carrying a
+  // language (1) and one carrying none (4); "Aozora" has one gallery, whose value
+  // this plugin does not recognise.
+  const controlOf = (block, field) =>
+    find(block.node, (n) => n.props?.["data-field"] === field).props
+      .children[1];
+  const chipOf = (block) =>
+    find(block.node, (n) => n.props?.className === "manga-tools-chip");
+  const chipField = (values) => {
+    const edits = [];
+    const block = editField(values, (next) => edits.push(next));
+    return { block, edits, chip: chipOf(block) };
+  };
+
+  const offered = chipField({ [TG]: "Lily Manga", other: "x" });
+  assert.ok(offered.chip, "a group the store knows offers its usual language");
+  assert.strictEqual(
+    offered.chip.type,
+    "button",
+    "the chip is a control, so it takes focus and answers the keyboard"
+  );
+  assert.strictEqual(
+    offered.chip.props.type,
+    "button",
+    "…and it is not a submit button: it sits inside Stash's own <form>, where one " +
+      "without a type submits the form and takes the unsaved edits with it"
+  );
+  assert.ok(
+    find(
+      offered.chip,
+      (n) => n.props?.className === "fi fi-cn manga-tools-flag"
+    ),
+    "it carries the language's flag, drawn by the same component the dropdown uses"
+  );
+  assert.ok(
+    hasText(offered.chip, "简体中文"),
+    "named in the reader's language, like every other language the plugin shows"
+  );
+  assert.strictEqual(
+    offered.chip.props.title,
+    "该翻译组的画廊通常是这种语言 (1)",
+    "the tooltip says why it is there, count included — composed rather than a " +
+      "catalog placeholder, because the plugin's own t() substitutes nothing"
+  );
+  assert.deepStrictEqual(
+    offered.edits,
+    [],
+    "a chip is an offer: drawing one writes nothing"
+  );
+
+  offered.chip.props.onClick();
+  assert.deepStrictEqual(
+    offered.edits[0],
+    {
+      [MANGA]: "true",
+      [TG]: "Lily Manga",
+      other: "x",
+      [NS.FIELD_NAME]: "zh-Hans",
+    },
+    "clicking writes through the same path the language dropdown writes through"
+  );
+  assert.ok(
+    NS.languageOptions("zh-CN").some((o) => o.value === "zh-Hans"),
+    "…a code the dropdown itself offers, so the field can show what it was given"
+  );
+
+  assert.strictEqual(
+    controlOf(offered.block, "manga_tools_translation_group").props.className,
+    "col-sm-9 manga-tools-chip-row",
+    "the control column becomes a flex row when — and only when — it holds a chip"
+  );
+  assert.strictEqual(
+    controlOf(offered.block, "manga_tools_language").props.className,
+    "col-sm-9",
+    "so the row above it keeps the markup it had"
+  );
+
+  // The chip is about the field being empty. A field that already holds the
+  // language gains nothing from being told so — and the comparison is made
+  // between languages rather than between strings, because the field tolerates
+  // any case and a value set by hand need not be canonical.
+  assert.strictEqual(
+    chipField({ [TG]: "Lily Manga", [NS.FIELD_NAME]: "zh-Hans" }).chip,
+    null,
+    "no chip when the language is already the one the group carries"
+  );
+  assert.strictEqual(
+    chipField({ [TG]: "Lily Manga", [NS.FIELD_NAME]: "ZH-HANS" }).chip,
+    null,
+    "…in another case too: that is the same language"
+  );
+
+  const differing = chipField({ [TG]: "Lily Manga", [NS.FIELD_NAME]: "ja" });
+  assert.ok(
+    differing.chip,
+    "but it stays on offer when the field holds something else — a correction, and " +
+      "one that is never applied on its own"
+  );
+  assert.deepStrictEqual(
+    differing.edits,
+    [],
+    "…so drawing it over a value that disagrees still writes nothing"
+  );
+
+  assert.strictEqual(
+    chipField({ other: "x" }).chip,
+    null,
+    "no group, nothing to look up"
+  );
+  assert.strictEqual(
+    chipField({ [TG]: "   ", other: "x" }).chip,
+    null,
+    "…and a box holding only spaces is no group either"
+  );
+  assert.strictEqual(
+    chipField({ [TG]: "Nobody", other: "x" }).chip,
+    null,
+    "a group the store has never seen teaches nothing, so there is nothing to offer"
+  );
+  assert.strictEqual(
+    chipField({ [TG]: "Aozora" }).chip,
+    null,
+    "and a group whose galleries carry a value this plugin does not recognise " +
+      "offers nothing: a suggestion propagates what it offers"
+  );
+  assert.strictEqual(
+    controlOf(chipField({ other: "x" }).block, "manga_tools_translation_group")
+      .props.className,
+    "col-sm-9",
+    "no chip, no layout modifier"
+  );
+
+  // The rule behind it, asked directly. It cannot be driven through the fixtures
+  // above — the store is not reachable from a test, and no fixture has one group
+  // on two galleries that disagree — which is exactly why the rule is a pure
+  // function on the namespace rather than a computation buried in the block.
+  const galleryMaps = (rows) =>
+    new Map(
+      rows.map(([id, language, group]) => [
+        String(id),
+        {
+          [NS.MANGA_FIELD_NAME]: "true",
+          [NS.FIELD_NAME]: language,
+          [TG]: group,
+        },
+      ])
+    );
+
+  assert.strictEqual(
+    NS.usualLanguageFor(
+      galleryMaps([
+        [1, "zh-Hans", "G"],
+        [2, "ja", "G"],
+      ]),
+      "G"
+    ),
+    null,
+    "two galleries that disagree are a tie, and a tie is not a majority: the chip " +
+      "offers neither rather than picking whichever the store happened to hold first"
+  );
+  assert.deepStrictEqual(
+    NS.usualLanguageFor(
+      galleryMaps([
+        [1, "zh-Hans", "G"],
+        [2, "ZH-HANS", "G"],
+        [3, "ja", "G"],
+      ]),
+      "g"
+    ),
+    { code: "zh-Hans", count: 2 },
+    "two spellings of one language are one answer rather than a tie, the group is " +
+      "matched the way the menu matches one, and the count is what the tooltip prints"
+  );
+  assert.deepStrictEqual(
+    NS.usualLanguageFor(
+      galleryMaps([
+        [1, "zh-Hans", "  G  "],
+        [2, "", "G"],
+      ]),
+      "G"
+    ),
+    { code: "zh-Hans", count: 1 },
+    "a gallery with no language abstains rather than voting for 'none'"
+  );
+  assert.strictEqual(
+    NS.usualLanguageFor(galleryMaps([[1, "klingon", "G"]]), "G"),
+    null,
+    "an unrecognised value is shown, never suggested"
+  );
+  assert.strictEqual(
+    NS.usualLanguageFor(galleryMaps([[1, "zh-Hans", ""]]), "G"),
+    null,
+    "a gallery with no group is in nobody's group"
+  );
+  assert.strictEqual(
+    NS.usualLanguageFor(null, "G"),
+    null,
+    "before the store answers there is nothing to read"
+  );
+  assert.strictEqual(
+    NS.usualLanguageFor(galleryMaps([[1, "zh-Hans", "G"]]), "   "),
+    null,
+    "and no group name is no question"
+  );
+  console.log(
+    "✓ the group row's language chip (offered, already equal, tie, unknown value, " +
+      "writes like the select)"
+  );
+
   // Stash draws no toolbar on an entity that is not a gallery.
   globalListeners["stash:location"]({
     detail: { data: { location: { pathname: "/scenes/1" } } },

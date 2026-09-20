@@ -60,6 +60,14 @@ export interface MangaToolsOption {
   flag: string | null;
 }
 
+/** Result of MangaTools.usualLanguageFor() */
+export interface MangaToolsUsualLanguage {
+  /** A canonical code from LANGUAGES — the same vocabulary the dropdown offers */
+  code: string;
+  /** How many of the group's galleries carry it: the evidence, for a tooltip */
+  count: number;
+}
+
 /**
  * A gallery's custom_fields, as Stash's GraphQL Map scalar gives it: string keys,
  * arbitrary values. This plugin only ever writes strings, but it does not get to
@@ -88,6 +96,16 @@ export interface MangaToolsNamespace {
   TRANSLATION_GROUP_FIELD_NAME: string;
   /** A gallery's translation group, trimmed, or "" when it has none. */
   translationGroupOf(customFields: unknown): string;
+  /** Whether two group names are the same one: trimmed, case-insensitively. */
+  sameTranslationGroup(a: unknown, b: unknown): boolean;
+  /**
+   * The language a translation group's galleries usually carry, or null when
+   * there is nothing to offer — see fields.ts for what null covers.
+   */
+  usualLanguageFor(
+    galleries: Map<string, unknown> | null,
+    group: string
+  ): MangaToolsUsualLanguage | null;
   /**
    * Which of this plugin's fields a key names — the canonical name, or "" for a
    * key that is not ours. The one list every recogniser asks.

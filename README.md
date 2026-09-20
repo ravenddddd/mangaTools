@@ -10,7 +10,7 @@ upgrades never produce merge conflicts.
 |---|---|
 | **Language** | A language attribute on galleries, surfaced as a flag badge, an edit-page dropdown, a bulk-edit row and a localised detail row |
 | **Censorship** | Whether a gallery is censored or not, surfaced as a mark on the gallery card and a row in the detail page's Manga info panel |
-| **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, and a row in the details one |
+| **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and a chip offering the language that group's galleries usually carry |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
 
@@ -435,6 +435,32 @@ no request and is the same set of galleries as everything else here. It is empty
 until the first fetch settles, which is right — before that there is nothing to
 offer, and a name can still be typed. A new name is offered only when it is not
 already one of them in some other case, so the menu never spells one group twice.
+
+**The row ends in a chip offering the language this group's galleries carry.**
+Whoever translated a comic translated it into a language, so the two fields are
+not independent: a group's galleries agree about theirs, and the store already
+says so — the chip is one count over the same map the menu above is built from,
+with no request of its own. Clicking it writes the language through the same call
+the language dropdown writes through, so it is set by Save and discarded by
+Cancel like anything else typed on the page. It writes nothing on its own.
+
+It appears when there is something to say, and stays away when there is not
+(`NS.usualLanguageFor`, in `src/fields.ts`):
+
+| The field holds | The chip |
+|---|---|
+| no language, and the group's galleries agree | shows that language; clicking fills it |
+| that same language | nothing — writing what is already there is furniture |
+| a different language | still shown: a correction, never applied by itself |
+| a value the group's galleries disagree about | nothing — a tie is not a majority |
+| a value this plugin does not recognise | nothing, and that value is never suggested onward |
+| a group no marked gallery carries | nothing — there is nothing to have learned |
+| a language the settings leave disabled | nothing — the dropdown could not show what it wrote |
+
+The comparison is made between languages rather than between strings (the field
+tolerates any case), and the gallery being edited is counted with the rest —
+leaving it out would make a group's usual language depend on which of its
+galleries happened to be open.
 
 **Opening the menu refetches that store**, because the one thing a list of this
 Stash's groups has to be is current, and it changes at the moment somebody saves a

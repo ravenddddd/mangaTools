@@ -42,6 +42,7 @@
   "mangaTools.translationGroup.heading": "翻譯組",
   "mangaTools.translationGroup.create": "建立",
   "mangaTools.translationGroup.placeholder": "填寫翻譯組…",
+  "mangaTools.translationGroup.suggestedLanguage": "該翻譯組的畫廊通常是這種語言",
 
   "mangaTools.bulk.remove": "移除",
   "mangaTools.bulk.unmarkWarning": "取消標記會從選中的畫廊中移除本外掛的漫畫、語言、修正和翻譯組欄位。"
