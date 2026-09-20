@@ -166,7 +166,7 @@
  * is the gallery's own language rather than a remark about somebody else's row.
  */
 .manga-tools-hint {
-  opacity: 0.45;
+  opacity: 0.4;
 }
 
 /*
@@ -188,7 +188,7 @@
   flex: 0 1 auto;
   font-size: 0.75rem;
   min-width: 0;
-  opacity: 0.6;
+  opacity: 0.5;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
