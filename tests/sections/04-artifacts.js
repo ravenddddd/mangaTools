@@ -100,30 +100,33 @@ module.exports = () => {
     "…by taking the field off the page, and not by emptying anything"
   );
 
-  // The group row's language chip. Two of these are load-bearing rather than
-  // cosmetic: the select has to be allowed below the 14rem floor the other rows
-  // set, or the chip is pushed out of the column; and the chip has to be a
-  // pointer, because it is a control rather than a label.
+  // The language row's suggestion button. The first two are load-bearing rather
+  // than cosmetic: the select has to be allowed below the 14rem floor the other
+  // rows set, or the button is pushed out of the column on a narrow screen.
+  //
+  // The button's own look is deliberately absent here — it wears Stash's
+  // `btn btn-secondary`, the same as the date field's calendar button, so there
+  // is nothing of ours to check beyond what the tests above already assert.
   const chipRowRule = /\.manga-tools-chip-row\s*\{([^}]*)\}/.exec(css);
   assert.ok(
     chipRowRule,
-    "the group row should be able to lay its select and its chip side by side"
+    "the language row should be able to lay its select and its button side by side"
   );
   assert.ok(
     /display:\s*flex/.test(chipRowRule[1]),
-    "…by becoming a flex row when it has a chip in it"
+    "…by becoming a flex row when it has the button in it"
   );
   assert.ok(
     /\.manga-tools-chip-row\s+\.manga-tools-select\s*\{[^}]*min-width:\s*0/.test(
       css
     ),
-    "the select in that row must be allowed below its 14rem floor, or the chip is " +
+    "the select in that row must be allowed below its 14rem floor, or the button is " +
       "pushed out of the column on a narrow screen"
   );
   assert.ok(
-    /button\.manga-tools-chip\s*\{[^}]*cursor:\s*pointer/.test(css),
-    "the chip is a control, and the pointer is what says so — note the element in " +
-      "the selector, since the badge's chip rule would otherwise win"
+    /\.manga-tools-chip\s+\.manga-tools-flag\s*\{[^}]*vertical-align/.test(css),
+    "and the flag inside the button needs the nudge the detail row gives its own: " +
+      "Bootstrap's line-height puts it on the text baseline, where it reads low"
   );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +

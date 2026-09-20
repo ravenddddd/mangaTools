@@ -1724,6 +1724,65 @@ function MangaFieldBlock(props: {
     ? { value: current.code, label: current.name, flag: current.flag }
     : null;
 
+  // The language this group's galleries usually carry, offered as a button beside
+  // the field it writes. What that rule can and cannot answer is
+  // NS.usualLanguageFor's business; what is decided here is the three things it
+  // cannot know:
+  //
+  //   enabledLanguages  the dropdown offers only the reader's enabled languages,
+  //                     so a button offering another would write a value this
+  //                     field's own menu could not then show
+  //   already equal     writing what is already there is furniture. `current` is
+  //                     the described value, so this compares languages rather
+  //                     than strings — the field tolerates any case
+  //   no group          there is nothing to look up
+  //
+  // Read here rather than beside the group row below because this is the row the
+  // button goes in, and it is drawn first. Same read either way: the group is
+  // NS.translationGroupOf's, not a second opinion about what the field holds.
+  const usual = NS.usualLanguageFor(store, NS.translationGroupOf(props.values));
+  const offered =
+    usual &&
+    (!NS.enabledLanguages || NS.enabledLanguages.has(usual.code)) &&
+    (!current || current.code !== usual.code)
+      ? usual
+      : null;
+  const offeredInfo = offered ? NS.describe(offered.code, intl.locale) : null;
+
+  // Stash's own furniture for a small button that belongs to the field beside it:
+  // the same secondary button the date field carries, with the flag as its whole
+  // content — no name, because the field next to it already names what the button
+  // writes, and a second label would be the same word twice.
+  //
+  // The flag is drawn whatever the "Show flags" setting says. That setting is about
+  // how *values* are displayed; this is a button, and a button with no content is
+  // not one. The count and the language's name go in the tooltip, which is also
+  // the button's accessible name.
+  //
+  // type="button" is not decoration: it sits inside Stash's own <form>, where a
+  // button without one submits the form and takes the unsaved edits with it.
+  const chipTitle =
+    offered && offeredInfo
+      ? offeredInfo.name +
+        " — " +
+        t(intl, "mangaTools.translationGroup.suggestedLanguage") +
+        " (" +
+        offered.count +
+        ")"
+      : "";
+  const languageChip =
+    offered && offeredInfo?.flag ? (
+      <button
+        type="button"
+        className="btn btn-secondary manga-tools-chip"
+        aria-label={chipTitle}
+        title={chipTitle}
+        onClick={() => write(FIELD_NAME, offered.code)}
+      >
+        <Flag flag={offeredInfo.flag} className="manga-tools-flag" />
+      </button>
+    ) : null;
+
   // Column widths come from the native field; this is the fallback.
   const cls = readNativeFieldClasses(EDIT_ANCHOR) || {
     group: "form-group row",
@@ -1739,7 +1798,9 @@ function MangaFieldBlock(props: {
       <label className={cls.label} htmlFor="manga_tools_language">
         {fieldLabel(intl)}
       </label>
-      <div className={cls.control}>
+      <div
+        className={cls.control + (languageChip ? " manga-tools-chip-row" : "")}
+      >
         <Select
           className="manga-tools-select"
           classNamePrefix="react-select"
@@ -1764,6 +1825,7 @@ function MangaFieldBlock(props: {
             write(FIELD_NAME, opt ? opt.value : "");
           }}
         />
+        {languageChip}
       </div>
     </div>
   );
@@ -1871,60 +1933,12 @@ function MangaFieldBlock(props: {
     ...known.map((name) => ({ value: name, label: name })),
   ];
 
-  // The language this group's galleries usually carry, one click away. What can
-  // and cannot be offered is NS.usualLanguageFor's business; these are the two
-  // things it cannot know, plus the one about this row:
-  //
-  //   enabledLanguages  the language dropdown offers only the reader's enabled
-  //                     languages, so a chip offering another would write a value
-  //                     that field's own menu cannot then show
-  //   already set       the chip would write what is already there, which is
-  //                     furniture — and the field tolerates case, so this is a
-  //                     normalised comparison rather than a string one
-  const usual = NS.usualLanguageFor(store, groupName);
-  const offered =
-    usual &&
-    (!NS.enabledLanguages || NS.enabledLanguages.has(usual.code)) &&
-    NS.normalize(pickLanguage(props.values)) !== usual.code
-      ? usual
-      : null;
-  const offeredInfo = offered ? NS.describe(offered.code, intl.locale) : null;
-
-  // A button, not a div with a click handler: this is a control, so it has to
-  // take focus and answer the keyboard like the field beside it. type="button"
-  // is not decoration either — it sits inside Stash's own <form>, where a button
-  // without one submits the form and takes the unsaved edits with it.
-  const languageChip =
-    offered && offeredInfo ? (
-      <button
-        type="button"
-        className="manga-tools-chip"
-        // The evidence, in the reader's language. Composed rather than written
-        // as a catalog placeholder: t() substitutes nothing, and no catalog here
-        // has ever held one.
-        title={
-          t(intl, "mangaTools.translationGroup.suggestedLanguage") +
-          " (" +
-          offered.count +
-          ")"
-        }
-        onClick={() => write(FIELD_NAME, offered.code)}
-      >
-        {NS.showFlags && offeredInfo.flag ? (
-          <Flag flag={offeredInfo.flag} className="manga-tools-flag" />
-        ) : null}
-        <span>{offeredInfo.name}</span>
-      </button>
-    ) : null;
-
   const groupField = (
     <div className={cls.group} data-field="manga_tools_translation_group">
       <label className={cls.label} htmlFor="manga_tools_translation_group">
         {t(intl, "mangaTools.translationGroup.heading")}
       </label>
-      <div
-        className={cls.control + (languageChip ? " manga-tools-chip-row" : "")}
-      >
+      <div className={cls.control}>
         <Select
           className="manga-tools-select"
           classNamePrefix="react-select"
@@ -1960,7 +1974,6 @@ function MangaFieldBlock(props: {
             write(TRANSLATION_GROUP_FIELD_NAME, opt ? opt.value : "");
           }}
         />
-        {languageChip}
       </div>
     </div>
   );

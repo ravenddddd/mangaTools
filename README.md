@@ -10,7 +10,7 @@ upgrades never produce merge conflicts.
 |---|---|
 | **Language** | A language attribute on galleries, surfaced as a flag badge, an edit-page dropdown, a bulk-edit row and a localised detail row |
 | **Censorship** | Whether a gallery is censored or not, surfaced as a mark on the gallery card and a row in the detail page's Manga info panel |
-| **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and a chip offering the language that group's galleries usually carry |
+| **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and a button on the language row offering the language that group's galleries usually carry |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
 
@@ -383,7 +383,7 @@ Who translated the comic: `plugin.mangaTools.translationGroup`, as free text.
 | Where | Effect |
 |---|---|
 | Gallery detail page | A row in the Manga info panel: the label and the name, and nothing else. Unset draws no row |
-| Gallery edit page | A box in the Manga info block, drawn as the same select the language and censorship fields are, with the groups already in use in its menu and a typed name offered as a new one |
+| Gallery edit page | A box in the Manga info block, drawn as the same select the language and censorship fields are, with the groups already in use in its menu and a typed name offered as a new one. What it holds decides the language row's suggestion button — see below |
 
 **Free text, and that is the whole of its design.** The other fields here pick
 from a vocabulary this plugin owns — a language is a code, a censorship is one of
@@ -436,18 +436,27 @@ until the first fetch settles, which is right — before that there is nothing t
 offer, and a name can still be typed. A new name is offered only when it is not
 already one of them in some other case, so the menu never spells one group twice.
 
-**The row ends in a chip offering the language this group's galleries carry.**
-Whoever translated a comic translated it into a language, so the two fields are
-not independent: a group's galleries agree about theirs, and the store already
-says so — the chip is one count over the same map the menu above is built from,
-with no request of its own. Clicking it writes the language through the same call
-the language dropdown writes through, so it is set by Save and discarded by
-Cancel like anything else typed on the page. It writes nothing on its own.
+**The language row carries a button offering the language this group's galleries
+carry.** Whoever translated a comic translated it into a language, so the two
+fields are not independent: a group's galleries agree about theirs, and the store
+already says so — the button is one count over the same map the group menu is
+built from, with no request of its own. Clicking it writes the language through
+the same call the language dropdown writes through, so it is set by Save and
+discarded by Cancel like anything else typed on the page. It writes nothing on
+its own.
+
+It is Stash's own furniture — `btn btn-secondary`, the same button the date field
+carries for its calendar — and its whole content is the flag. No name, because
+the field beside it already names what it writes; the language's name and the
+count are in the tooltip, which is also the button's accessible name. The flag is
+drawn whatever the "Show flags" setting says: that setting is about how values
+are displayed, and a button whose only content is the flag would be an empty
+button without it.
 
 It appears when there is something to say, and stays away when there is not
 (`NS.usualLanguageFor`, in `src/fields.ts`):
 
-| The field holds | The chip |
+| The field holds | The button |
 |---|---|
 | no language, and the group's galleries agree | shows that language; clicking fills it |
 | that same language | nothing — writing what is already there is furniture |

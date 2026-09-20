@@ -1247,18 +1247,21 @@ module.exports = () => {
     "while the label is the trimmed name"
   );
 
-  // ── The group row's language chip ────────────────────────────────
+  // ── The language row's suggestion button ─────────────────────────
   //
-  // The chip offers the language a group's galleries usually carry, and it reads
-  // the same store the menu above is built from — so what it can offer here is
-  // exactly what the fixtures hold. "Lily Manga" has one gallery carrying a
+  // The button offers the language a group's galleries usually carry, and it
+  // reads the same store the group menu is built from — so what it can offer here
+  // is exactly what the fixtures hold. "Lily Manga" has one gallery carrying a
   // language (1) and one carrying none (4); "Aozora" has one gallery, whose value
   // this plugin does not recognise.
   const controlOf = (block, field) =>
     find(block.node, (n) => n.props?.["data-field"] === field).props
       .children[1];
   const chipOf = (block) =>
-    find(block.node, (n) => n.props?.className === "manga-tools-chip");
+    find(
+      block.node,
+      (n) => n.props?.className === "btn btn-secondary manga-tools-chip"
+    );
   const chipField = (values) => {
     const edits = [];
     const block = editField(values, (next) => edits.push(next));
@@ -1267,10 +1270,17 @@ module.exports = () => {
 
   const offered = chipField({ [TG]: "Lily Manga", other: "x" });
   assert.ok(offered.chip, "a group the store knows offers its usual language");
+  assert.ok(
+    find(
+      controlOf(offered.block, "manga_tools_language"),
+      (n) => n.props?.className === "btn btn-secondary manga-tools-chip"
+    ),
+    "…beside the language field it writes, rather than beside the group it learns from"
+  );
   assert.strictEqual(
     offered.chip.type,
     "button",
-    "the chip is a control, so it takes focus and answers the keyboard"
+    "the button is a control, so it takes focus and answers the keyboard"
   );
   assert.strictEqual(
     offered.chip.props.type,
@@ -1283,22 +1293,31 @@ module.exports = () => {
       offered.chip,
       (n) => n.props?.className === "fi fi-cn manga-tools-flag"
     ),
-    "it carries the language's flag, drawn by the same component the dropdown uses"
+    "its whole content is the flag, drawn by the same component the dropdown uses"
   );
-  assert.ok(
-    hasText(offered.chip, "简体中文"),
-    "named in the reader's language, like every other language the plugin shows"
+  assert.strictEqual(
+    typeof offered.chip.props.children,
+    "object",
+    "…and no text of its own: one child, an element, where a name would be a string. " +
+      "The field beside it already names what it writes"
   );
   assert.strictEqual(
     offered.chip.props.title,
-    "该翻译组的画廊通常是这种语言 (1)",
-    "the tooltip says why it is there, count included — composed rather than a " +
-      "catalog placeholder, because the plugin's own t() substitutes nothing"
+    "简体中文 — 该翻译组的画廊通常是这种语言 (1)",
+    "the tooltip names the language and says why the button is there, count " +
+      "included — composed rather than a catalog placeholder, because the plugin's " +
+      "own t() substitutes nothing"
+  );
+  assert.strictEqual(
+    offered.chip.props["aria-label"],
+    offered.chip.props.title,
+    "and that is the button's accessible name too: a button whose only content is " +
+      "a CSS-drawn flag has no name without one"
   );
   assert.deepStrictEqual(
     offered.edits,
     [],
-    "a chip is an offer: drawing one writes nothing"
+    "a button is an offer: drawing one writes nothing"
   );
 
   offered.chip.props.onClick();
@@ -1317,25 +1336,37 @@ module.exports = () => {
     "…a code the dropdown itself offers, so the field can show what it was given"
   );
 
-  assert.strictEqual(
-    controlOf(offered.block, "manga_tools_translation_group").props.className,
-    "col-sm-9 manga-tools-chip-row",
-    "the control column becomes a flex row when — and only when — it holds a chip"
+  // The "Show flags" setting is about how values are displayed. The button is not
+  // a value, and a button whose only content is the flag has to keep it.
+  NS.showFlags = false;
+  assert.ok(
+    find(
+      chipField({ [TG]: "Lily Manga", other: "x" }).chip,
+      (n) => n.props?.className === "fi fi-cn manga-tools-flag"
+    ),
+    "the flag is drawn whatever the show-flags setting says: this is a button"
   );
+  NS.showFlags = true;
+
   assert.strictEqual(
     controlOf(offered.block, "manga_tools_language").props.className,
+    "col-sm-9 manga-tools-chip-row",
+    "the control column becomes a flex row when — and only when — it holds the button"
+  );
+  assert.strictEqual(
+    controlOf(offered.block, "manga_tools_translation_group").props.className,
     "col-sm-9",
-    "so the row above it keeps the markup it had"
+    "so the group row below it keeps the markup it had"
   );
 
-  // The chip is about the field being empty. A field that already holds the
+  // The button is about the field being empty. A field that already holds the
   // language gains nothing from being told so — and the comparison is made
   // between languages rather than between strings, because the field tolerates
   // any case and a value set by hand need not be canonical.
   assert.strictEqual(
     chipField({ [TG]: "Lily Manga", [NS.FIELD_NAME]: "zh-Hans" }).chip,
     null,
-    "no chip when the language is already the one the group carries"
+    "no button when the language is already the one the group carries"
   );
   assert.strictEqual(
     chipField({ [TG]: "Lily Manga", [NS.FIELD_NAME]: "ZH-HANS" }).chip,
@@ -1377,10 +1408,10 @@ module.exports = () => {
       "offers nothing: a suggestion propagates what it offers"
   );
   assert.strictEqual(
-    controlOf(chipField({ other: "x" }).block, "manga_tools_translation_group")
-      .props.className,
+    controlOf(chipField({ other: "x" }).block, "manga_tools_language").props
+      .className,
     "col-sm-9",
-    "no chip, no layout modifier"
+    "no button, no layout modifier"
   );
 
   // The rule behind it, asked directly. It cannot be driven through the fixtures
@@ -1456,8 +1487,8 @@ module.exports = () => {
     "and no group name is no question"
   );
   console.log(
-    "✓ the group row's language chip (offered, already equal, tie, unknown value, " +
-      "writes like the select)"
+    "✓ the language row's suggestion button (offered / already equal / tie / " +
+      "unknown value / writes like the select)"
   );
 
   // Stash draws no toolbar on an entity that is not a gallery.
