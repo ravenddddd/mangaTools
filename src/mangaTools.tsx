@@ -1054,28 +1054,49 @@ function ensureToolbarHost(): HTMLElement | null {
 }
 
 /**
- * The mark's icon.
+ * One of the SVG files this plugin ships, drawn as a mask.
  *
  * A span with a mask rather than an `<svg>`: the artwork is a file, shipped as
  * downloaded with its attribution comment intact, and a file cannot see the
  * page's `currentColor` — that only works for markup inlined into the page. A CSS
  * mask reads the shape and ignores the colour, so the file supplies one and
- * `background-color` supplies the other, and the two states are a colour rule
- * each. See .manga-tools-manga-icon in mangaTools.css.
+ * `background-color` supplies the other, and a state is a colour rule each. The
+ * class names the icon: `.manga-tools-<name>-icon` carries the file, and the
+ * declarations they all share are written once in mangaTools.css.
  */
-function MangaIcon() {
+function AssetIcon(props: { file: string; className: string }) {
   // The stylesheet carries a relative URL for this, and it is right whenever
   // plugin files sit under one path. This is the same answer reached from the
   // plugin's own tag instead, which does not depend on that being true — and it is
   // only known after start() has run.
   const style = assetBase
     ? ({
-        "--manga-tools-icon": `url("${assetBase}assets/icons/manga.svg")`,
+        "--manga-tools-icon": `url("${assetBase}assets/icons/${props.file}")`,
       } as React.CSSProperties)
     : undefined;
 
-  return (
-    <span className="manga-tools-manga-icon" aria-hidden="true" style={style} />
+  return <span className={props.className} aria-hidden="true" style={style} />;
+}
+
+/** The mark's icon — the one that makes a gallery manga. */
+function MangaIcon() {
+  return <AssetIcon className="manga-tools-manga-icon" file="manga.svg" />;
+}
+
+/**
+ * The two steaks: 生肉 is raw, and 熟肉 is what a translation makes of it.
+ *
+ * The joke is the Chinese fandom's — 生 and 熟 are how food is described, and a
+ * gallery nobody has translated is 生肉, raw meat. It is worth keeping for a
+ * reason beyond the joke: neither file says a word of anybody's language, so the
+ * state of the field reads the same whatever Stash's UI is set to. The words go in
+ * the button's name and its tooltip, where the reader's language does apply.
+ */
+function SteakIcon(props: { raw: boolean }) {
+  return props.raw ? (
+    <AssetIcon className="manga-tools-raw-icon" file="raw.svg" />
+  ) : (
+    <AssetIcon className="manga-tools-cooked-icon" file="cooked.svg" />
   );
 }
 
@@ -2056,11 +2077,16 @@ function MangaFieldBlock(props: {
   // the field it belongs to — always drawn, because a control that vanishes when
   // it is on is a control nobody can turn off.
   //
+  // It draws a steak rather than a word: 熟肉 by default, 生肉 once the gallery is
+  // declared the original. A picture of the state rather than its name is the point
+  // — 生肉/熟肉 is a piece of slang, and one that only reads in one language.
+  //
   // `manga-tools-chip` is the same hook the language row's button carries: it is
   // what the stylesheet stretches to the field's height. `active` is Bootstrap's
-  // own pressed look, so the state needs no styling of its own. aria-pressed is
-  // what says "toggle" to a screen reader; the title says which way the click
-  // goes.
+  // own pressed look, so the state needs no styling of its own beyond the shape.
+  // aria-pressed is what says "toggle" to a screen reader, and the name and tooltip
+  // are where the words go, since the button has none of its own.
+  const originalLabel = t(intl, "mangaTools.translationGroup.original");
   const originalChip = (
     <button
       type="button"
@@ -2069,6 +2095,7 @@ function MangaFieldBlock(props: {
         (isOriginal ? " active" : "")
       }
       aria-pressed={isOriginal}
+      aria-label={originalLabel}
       title={t(
         intl,
         isOriginal
@@ -2077,7 +2104,7 @@ function MangaFieldBlock(props: {
       )}
       onClick={toggleOriginal}
     >
-      {t(intl, "mangaTools.translationGroup.original")}
+      <SteakIcon raw={isOriginal} />
     </button>
   );
 
@@ -2092,7 +2119,17 @@ function MangaFieldBlock(props: {
           classNamePrefix="react-select"
           inputId="manga_tools_translation_group"
           isClearable
-          placeholder={t(intl, "mangaTools.translationGroup.placeholder")}
+          // A gallery declared the original has no group to enter, and the box says
+          // so rather than inviting one it cannot hold — the same wording the
+          // details panel uses. The control stays live on purpose: writing a group
+          // is a way of saying "actually it *was* translated", and disabling it
+          // would put two clicks between a reader and changing their mind.
+          placeholder={t(
+            intl,
+            isOriginal
+              ? "mangaTools.translationGroup.originalDetail"
+              : "mangaTools.translationGroup.placeholder"
+          )}
           value={groupRaw ? { value: groupRaw, label: groupName } : null}
           options={groupOptions}
           formatOptionLabel={formatGroupOption}

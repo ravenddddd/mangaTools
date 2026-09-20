@@ -835,8 +835,12 @@ module.exports = () => {
 
   // The switch's icon is a masked span, not an svg: the artwork is a file, and a
   // file cannot see `currentColor` — the mask reads its shape and CSS supplies
-  // the colour, which is what makes two states out of one image.
-  const icon = toggleOn.props.children.type(toggleOn.props.children.props);
+  // the colour, which is what makes two states out of one image. Two renders deep,
+  // because MangaIcon is one of the three asset icons and hands over to the one
+  // that knows about assetBase.
+  const mangaIcon = toggleOn.props.children.type(toggleOn.props.children.props);
+  assert.strictEqual(mangaIcon.props.className, "manga-tools-manga-icon");
+  const icon = mangaIcon.type(mangaIcon.props);
   assert.strictEqual(icon.type, "span");
   assert.strictEqual(icon.props.className, "manga-tools-manga-icon");
 
@@ -1300,6 +1304,18 @@ module.exports = () => {
     };
   };
 
+  // The icon it draws is the state: 熟肉 — cooked — while a translation group is
+  // what the gallery has, 生肉 once it is declared the original. Two files, and
+  // neither says a word of anybody's language, which is the point of using a
+  // picture for a piece of slang.
+  const steakOf = (chip) =>
+    find(
+      chip,
+      (n) =>
+        n.props?.className === "manga-tools-raw-icon" ||
+        n.props?.className === "manga-tools-cooked-icon"
+    );
+
   const notOriginal = originalField({ other: "x" });
   assert.ok(
     notOriginal.chip,
@@ -1311,13 +1327,19 @@ module.exports = () => {
     false,
     "unset reads as not pressed"
   );
-  assert.ok(
-    hasText(notOriginal.chip, "原文"),
-    "and it is worded in the reader's language"
+  assert.strictEqual(
+    steakOf(notOriginal.chip)?.props.className,
+    "manga-tools-cooked-icon",
+    "a gallery that is not the original shows the cooked steak"
+  );
+  assert.strictEqual(
+    notOriginal.chip.props["aria-label"],
+    "生肉",
+    "the button has no text, so its name is where the word goes"
   );
   assert.strictEqual(
     notOriginal.chip.props.title,
-    "这本是原文，没有翻译组",
+    "标为生肉：原文，没有翻译组",
     "…and a title that says which way the click goes, not merely what the state is"
   );
 
@@ -1351,8 +1373,13 @@ module.exports = () => {
     "…and wears Bootstrap's pressed look, so the state is visible without hovering"
   );
   assert.strictEqual(
+    steakOf(wasOriginal.chip)?.props.className,
+    "manga-tools-raw-icon",
+    "…and it swaps the steak: raw, because that is what the gallery is"
+  );
+  assert.strictEqual(
     wasOriginal.chip.props.title,
-    "不是原文了，取消标记",
+    "取消生肉标记",
     "…and its title says the opposite thing, because the click does the opposite"
   );
   assert.deepStrictEqual(
@@ -1365,6 +1392,26 @@ module.exports = () => {
     wasOriginal.edits[0],
     { [MANGA]: "true", other: "x" },
     "clicking again clears the field rather than storing a false"
+  );
+
+  // The box a group would be typed into says the gallery is raw rather than
+  // inviting a group it cannot hold — the same wording the details panel uses. It
+  // stays a live control on purpose: writing a group is a way of saying "actually
+  // it was translated", and disabling it would cost two clicks to change a mind.
+  assert.strictEqual(
+    wasOriginal.group.props.placeholder,
+    "生肉（原文，无翻译组）",
+    "the group box says which state the row is in"
+  );
+  assert.strictEqual(
+    wasOriginal.group.props.isDisabled,
+    undefined,
+    "…and stays live, so writing a group is still the one-click way to flip the state"
+  );
+  assert.strictEqual(
+    notOriginal.group.props.placeholder,
+    "填写翻译组…",
+    "while a gallery that is not the original invites a group as before"
   );
 
   // Writing a group is the same call taken the other way: the two are answers to
@@ -1961,11 +2008,11 @@ module.exports = () => {
     panelOf({ [NS.ORIGINAL_FIELD_NAME]: "true" })
   );
   assert.ok(
-    hasText(originalOnly, "原文（无翻译组）"),
+    hasText(originalOnly, "生肉（原文，无翻译组）"),
     "declaring the original draws a row that says what it means"
   );
   assert.ok(
-    !hasText(originalOnly, "翻译组: 原文"),
+    !hasText(originalOnly, "翻译组: 生肉"),
     "…and not one that reads like a group by that name"
   );
 

@@ -201,9 +201,39 @@ module.exports = () => {
       "group's name: clipped rather than wrapped, so one long language does not " +
       "make every row in the menu two lines tall"
   );
+  // This plugin's own artwork — the manga mark and the two steaks — is masked
+  // rather than inlined, and the three files share every declaration but the URL.
+  // The sharing is what is asserted: three near-identical rules are how one of
+  // them quietly ends up a pixel different from the others.
+  const assetIconRule =
+    /\.manga-tools-manga-icon,\s*\.manga-tools-raw-icon,\s*\.manga-tools-cooked-icon\s*\{([^}]*)\}/.exec(
+      css
+    );
+  assert.ok(assetIconRule, "the three masked icons should share one rule");
+  assert.ok(
+    /mask:\s*var\(--manga-tools-icon\)/.test(assetIconRule[1]) &&
+      /background-color:\s*currentColor/.test(assetIconRule[1]),
+    "…which masks the file's shape and takes the colour from the text around it"
+  );
+  for (const name of ["manga", "raw", "cooked"]) {
+    assert.ok(
+      new RegExp(
+        `\\.manga-tools-${name}-icon\\s*\\{[^}]*--manga-tools-icon:\\s*url\\("assets/icons/${name}\\.svg"\\)`
+      ).test(css),
+      `and .manga-tools-${name}-icon should name its own file, relatively, so it ` +
+        "follows the plugin's ID wherever it is installed"
+    );
+  }
+  assert.ok(
+    /\.manga-tools-original\s+\.manga-tools-raw-icon[^{]*\{[^}]*width:\s*1\.15em/.test(
+      css
+    ),
+    "the steak is the button's whole content, so it is sized for one rather than " +
+      "for a line of text"
+  );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +
-      "performers / chip)"
+      "performers / chip / asset icons)"
   );
 
   // ── 10b. Bundle shape ──────────────────────────────────────────────
@@ -232,7 +262,19 @@ module.exports = () => {
     /window\.MangaTools\s*=/.test(bundle),
     "languages.ts should be inlined into the bundle, not left as a separate file"
   );
+
+  // The artwork, which is the one thing the bundle cannot inline: `ui.assets` maps
+  // `assets/` to a served path, so a file that did not get copied is an icon that
+  // draws nothing — and nothing in Stash would say why. The names here are the ones
+  // the stylesheet asks for, one per rule.
+  for (const name of ["manga", "raw", "cooked"]) {
+    assert.ok(
+      fs.existsSync(path.join(PLUGIN, "assets", "icons", `${name}.svg`)),
+      `dist/ should carry assets/icons/${name}.svg: a served icon that was not ` +
+        "packaged is a mask over a 404, which draws an empty box and logs nothing"
+    );
+  }
   console.log(
-    "✓ bundle shape (single script file, self-contained, JSX transformed)"
+    "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"
   );
 };

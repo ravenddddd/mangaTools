@@ -11,7 +11,7 @@ upgrades never produce merge conflicts.
 | **Language** | A language attribute on galleries, surfaced as a flag badge, an edit-page dropdown, a bulk-edit row and a localised detail row |
 | **Censorship** | Whether a gallery is censored or not, surfaced as a mark on the gallery card and a row in the detail page's Manga info panel |
 | **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and, in both directions, the language its galleries usually carry: a button on the language row, and the menu's order and flag hint |
-| **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a toggle on the group row, and a row in the details panel |
+| **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a 生肉/熟肉 toggle on the group row, and a row in the details panel |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
 
@@ -461,16 +461,30 @@ manga: a key that is there says this gallery is the original text. The group row
 carries a button that declares it — always drawn, because a control that vanished
 while it was on could not be turned off — and the two answers to "who translated
 this" clear each other: declaring the original empties the group field, and
-writing a group clears the mark. The details panel reads *original text (no
-translation group)* under the group label, worded that way so it cannot be taken
-for a group with that name.
+writing a group clears the mark.
+
+The button draws one of two steaks, and the state is the picture: 熟肉 — cooked —
+while the gallery has a translation group, 生肉 — raw — once it is declared the
+original. That is the Chinese fandom's own joke about untranslated manga, and it
+is worth keeping for a second reason: neither file says a word of anybody's
+language, so the state reads the same whatever Stash's UI is set to. The words go
+in the button's name and its tooltip, which are localised and where a language
+does apply. Both files are masked rather than inlined, like the manga mark: the
+file supplies the shape, the stylesheet supplies the colour.
+
+While a gallery is marked raw its group box says so instead of inviting a group it
+cannot hold — the same wording the details panel uses (*raw (the original text, no
+translation group)*, worded that way so it cannot be taken for a group with that
+name). The box stays a **live control** on purpose: writing a group is a way of
+saying "actually it was translated", and disabling it would put two clicks between
+a reader and changing their mind.
 
 It is not a value of the group field, and the difference is not tidiness. A
 group's name is whatever it calls itself, and this library has one called
 `沒有漢化` — a statement to look at, and a name. A state kept among names like that
 can be told from a name by nothing: not by the reader looking at the row, and not
 by the rule above, which would go looking for the "usual language" of a group
-called *original*.
+called *raw*.
 
 The language stays a separate fact. An original is usually Japanese, which the
 data may show and nothing here assumes: the two are independent, and this field

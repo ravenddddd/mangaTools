@@ -15,15 +15,16 @@ ui:
     - mangaTools.js
   css:
     - mangaTools.css
-  # The one thing this plugin ships that is not code: the icon for the mark that
-  # makes a gallery manga. Stash serves a mapped directory at
+  # The things this plugin ships that are not code: the icon for the mark that
+  # makes a gallery manga, and the two steaks the original-text button draws
+  # (raw.svg for 生肉, cooked.svg for 熟肉). Stash serves a mapped directory at
   # /plugin/{pluginId}/assets/<path>, so `assets/icons/x.svg` is fetched from
   # /plugin/mangaTools/assets/icons/x.svg.
   #
-  # It is a file rather than a string in the bundle because it is somebody else's
-  # artwork and is kept exactly as it was downloaded, attribution comment and all.
-  # Colouring it is done with a CSS mask, which reads the shape rather than the
-  # colour — see .manga-tools-manga-icon in mangaTools.css.
+  # They are files rather than paths in the bundle because they are somebody else's
+  # artwork and are kept exactly as downloaded, attribution comment and all.
+  # Colouring them is done with a CSS mask, which reads the shape rather than the
+  # colour — see the three .manga-tools-*-icon rules in mangaTools.css.
   #
   # `build.mjs` copies whatever this maps, so a directory named here is a
   # directory that ships; naming one that does not exist fails the build.

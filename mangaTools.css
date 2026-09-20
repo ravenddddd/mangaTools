@@ -532,14 +532,17 @@ button.minimal.manga-tools-manga-toggle.is-manga {
 }
 
 /*
- * The icon: an asset masked into shape, so the file supplies the outline and this
- * supplies the colour.
+ * This plugin's own artwork, masked into shape: the file supplies the outline and
+ * this supplies the colour. Three of them — the manga mark, and the two steaks the
+ * original-text button draws — and they share every declaration below except the
+ * file each one names.
  *
  * Not an <svg> and not an <img>. Inlining the markup would let `currentColor`
  * work — that is what every other icon here does — but the artwork is somebody
  * else's file, worth keeping byte for byte with its attribution comment in it. A
  * served image cannot be recoloured at all, and a mask can: it reads the alpha
- * channel and ignores the paint, so the two states above are enough.
+ * channel and ignores the paint, so the toggle's two states above are a colour
+ * rule each.
  *
  * The height is 1em to match the FontAwesome icons beside it, which are sized in
  * em, and the vertical-align is FontAwesome's own — the toolbar holds both kinds
@@ -557,9 +560,9 @@ button.minimal.manga-tools-manga-toggle.is-manga {
  * directory, so the relative URL lands on /plugin/<id>/assets/<path> as long as
  * the stylesheet is served from anywhere under /plugin/<id>/.
  */
-.manga-tools-manga-icon {
-  --manga-tools-icon: url("assets/icons/manga.svg");
-
+.manga-tools-manga-icon,
+.manga-tools-raw-icon,
+.manga-tools-cooked-icon {
   background-color: currentColor;
   display: inline-block;
   height: 1em;
@@ -567,4 +570,31 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   width: 1em;
   -webkit-mask: var(--manga-tools-icon) center / contain no-repeat;
   mask: var(--manga-tools-icon) center / contain no-repeat;
+}
+
+/* The file each one draws is the only thing that differs between them. The
+   stylesheet's own relative URLs are the fallback; the component overwrites
+   --manga-tools-icon with one built from the plugin's tag when it has it. */
+.manga-tools-manga-icon {
+  --manga-tools-icon: url("assets/icons/manga.svg");
+}
+
+.manga-tools-raw-icon {
+  --manga-tools-icon: url("assets/icons/raw.svg");
+}
+
+.manga-tools-cooked-icon {
+  --manga-tools-icon: url("assets/icons/cooked.svg");
+}
+
+/*
+ * The steak inside the original-text button. It is the button's whole content, so
+ * it is sized and aligned for one: a little larger than the 1em an icon takes in a
+ * line of text, and centred rather than sitting on the text baseline — the button
+ * is a flex box (see .manga-tools-chip-row), so the second is automatic.
+ */
+.manga-tools-original .manga-tools-raw-icon,
+.manga-tools-original .manga-tools-cooked-icon {
+  height: 1.15em;
+  width: 1.15em;
 }
