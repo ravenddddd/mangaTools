@@ -170,6 +170,31 @@
 }
 
 /*
+ * The same hint as a name, for a reader who has flags turned off — the same thing
+ * the badge and the detail row fall back to, and for the same reason.
+ *
+ * Slightly more opaque than the flag, because the two do not read as equally
+ * quiet: a flag is a block of colour and a word is a word. `0.75rem` sets it
+ * apart from the group name without making it something to read first.
+ *
+ * It is the hint that gives way when the row runs out of room, never the name:
+ * a language under a long UI locale is a great deal wider than a flag
+ * ("Chinesisch (traditionell)"), and the group's own name is what the row is
+ * *for*. Clipped rather than wrapped — the same three declarations the badge's
+ * unknown-value chip uses — so a long one shortens the hint instead of making
+ * every row in the menu two lines tall.
+ */
+.manga-tools-hint-text {
+  flex: 0 1 auto;
+  font-size: 0.75rem;
+  min-width: 0;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
  * The icon inside one of those options — the censorship dropdown's, since the
  * language one draws a flag instead.
  *

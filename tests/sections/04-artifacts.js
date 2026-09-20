@@ -180,6 +180,27 @@ module.exports = () => {
     "the hint flag is drawn faint: two dozen rows of solid flags would read as a " +
       "row of flags rather than as a remark"
   );
+  // The same hint as a name, for a reader with flags turned off. The clipping is
+  // load-bearing: a language name under a long UI locale is far wider than a flag,
+  // and the group's own name is what the row is for.
+  const hintTextRule = /\.manga-tools-hint-text\s*\{([^}]*)\}/.exec(css);
+  assert.ok(
+    hintTextRule && /font-size:\s*0\.75rem/.test(hintTextRule[1]),
+    "the hint's name is drawn smaller than the group name it sits beside"
+  );
+  assert.ok(
+    hintTextRule && /opacity/.test(hintTextRule[1]),
+    "…and faint, so it reads as a remark rather than as a second name"
+  );
+  assert.ok(
+    hintTextRule &&
+      /overflow:\s*hidden/.test(hintTextRule[1]) &&
+      /text-overflow:\s*ellipsis/.test(hintTextRule[1]) &&
+      /white-space:\s*nowrap/.test(hintTextRule[1]),
+    "…and it is the hint that gives way when the row runs out of room, never the " +
+      "group's name: clipped rather than wrapped, so one long language does not " +
+      "make every row in the menu two lines tall"
+  );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +
       "performers / chip)"

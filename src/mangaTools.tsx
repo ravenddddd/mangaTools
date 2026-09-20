@@ -1573,12 +1573,12 @@ type MangaToolsGroupOption = {
   /** The wording for the create entry, already localised — see below. */
   createLabel?: string;
   /**
-   * The flag of the language this group usually carries, for the menu's hint, or
-   * null when there is nothing to say about it.
+   * The language this group's galleries usually carry, for the menu's hint, or
+   * null when there is nothing to say about it. Both forms, because which one is
+   * drawn is the "Show flags" setting's business and that is read while
+   * react-select renders — see formatGroupOption.
    */
-  hint?: string | null;
-  /** Whether that language is the one this gallery carries */
-  matches?: boolean;
+  hint?: { flag: string | null; name: string } | null;
 };
 
 /**
@@ -1592,6 +1592,11 @@ type MangaToolsGroupOption = {
  * nobody has used before is told apart from the groups that exist, and the hint
  * rides at its far end.
  *
+ * The hint is a flag or a name, and which one is the "Show flags" setting's call —
+ * the same call it makes for the badge and the detail row, where a language is
+ * drawn as a flag or as its name. A name is much the longer of the two, so it is
+ * the one that gives way when the row runs out of room (see .manga-tools-hint-text).
+ *
  * Everything drawn here is carried on the option rather than looked up in this
  * function: it is called by react-select while it renders, and a component's worth
  * of hooks cannot be used in something invoked per option. The options are built
@@ -1604,13 +1609,20 @@ function formatGroupOption(
   if (meta?.context !== "menu") return option.label;
 
   const hint = option.hint ? (
-    <Flag flag={option.hint} className="manga-tools-flag manga-tools-hint" />
+    NS.showFlags && option.hint.flag ? (
+      <Flag
+        flag={option.hint.flag}
+        className="manga-tools-flag manga-tools-hint"
+      />
+    ) : (
+      <span className="manga-tools-hint-text">{option.hint.name}</span>
+    )
   ) : null;
 
   if (!option.createLabel) {
     // Plain names get the hint, and nothing else. Deliberately not the shared
     // `.manga-tools-option`: that one spaces an icon off its label, and spreading
-    // its children apart here would push this row's name and flag to opposite
+    // its children apart here would push this row's name and hint to opposite
     // ends of a menu the other two dropdowns also draw.
     if (!hint) return option.label;
     return (
@@ -1999,13 +2011,15 @@ function MangaFieldBlock(props: {
       : []),
     ...ordered.map((name) => {
       const usualHere = usualOf(name);
-      // The flag, straight off the table: the code came from usualLanguagesOf,
-      // which counts only canonical codes, so describe() would build a localised
-      // name this never draws. Nothing at all when flags are off — the setting
-      // says the reader does not want them in their interface, and the order is
-      // what carries the meaning here.
-      const hint =
-        NS.showFlags && usualHere ? NS.LANGUAGES[usualHere.code].flag : null;
+      // Both forms are built here because this is where the reader's `intl` is:
+      // formatGroupOption runs inside react-select's render and cannot use a hook,
+      // which is also why the create entry's wording is composed up here.
+      const described = usualHere
+        ? NS.describe(usualHere.code, intl.locale)
+        : null;
+      const hint = described
+        ? { flag: described.flag, name: described.name }
+        : null;
       return { value: name, label: name, hint: hint };
     }),
   ];

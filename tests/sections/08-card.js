@@ -1274,10 +1274,12 @@ module.exports = () => {
       "rest keep their order behind it — sorted, not filtered: a reader whose " +
       "gallery is the exception still has to be able to pick the exception"
   );
-  assert.strictEqual(
+  assert.deepStrictEqual(
     optionOf(matched, "Lily Manga").hint,
-    "cn",
-    "and it carries the flag of that language, for the menu to show"
+    { flag: "cn", name: "简体中文" },
+    "and it carries that language for the menu to show — both forms of it, since " +
+      "which one is drawn is the flags setting's call and that is read while " +
+      "react-select renders"
   );
   assert.strictEqual(
     optionOf(matched, "Aozora").hint,
@@ -1317,7 +1319,9 @@ module.exports = () => {
   );
 
   // The hint follows the "Show flags" setting, like the button on the language
-  // row; the order does not, because that is what carries the meaning.
+  // row: with flags off it is the language's name, drawn small and faint at the
+  // far end — the same thing the badge and the detail row fall back to. The order
+  // does not follow it, because the order is what says which groups match.
   NS.showFlags = false;
   const unquiet = groupField({ [NS.FIELD_NAME]: "zh-Hans", other: "x" });
   assert.deepStrictEqual(
@@ -1325,9 +1329,26 @@ module.exports = () => {
     ["Lily Manga", "Aozora"],
     "with flags turned off the matching group still comes first"
   );
+  const textHint = find(
+    menuRowOf(unquiet, "Lily Manga"),
+    (n) => n.props?.className === "manga-tools-hint-text"
+  );
   assert.ok(
-    groupSelectOf(unquiet).props.options.every((o) => o.hint === null),
-    "…and no flag is drawn, because the setting says the reader does not want "
+    textHint,
+    "…and the hint is the language's name, not nothing: it is the wider of the " +
+      "two forms, but the row has the room and the fact is worth having"
+  );
+  assert.ok(
+    hasText(textHint, "简体中文"),
+    "…named in the reader's language, like every other language the plugin shows"
+  );
+  assert.strictEqual(
+    find(
+      menuRowOf(unquiet, "Lily Manga"),
+      (n) => n.props?.className === "fi fi-cn manga-tools-flag manga-tools-hint"
+    ),
+    null,
+    "…and the flag is gone, because that is what the setting asked for"
   );
   NS.showFlags = true;
 

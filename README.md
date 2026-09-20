@@ -446,9 +446,13 @@ library holds. Both halves come from one walk of the store
 (`NS.usualLanguagesOf`), because two dozen names asked one at a time would walk a
 few thousand galleries two dozen times per keystroke.
 
-The hint follows the "Show flags" setting; the order does not. With flags off the
-menu still puts the matching groups first — the order is what says which ones
-they are — and the flag that would have said *why* is simply not drawn.
+The hint follows the "Show flags" setting, the way the badge and the detail row
+do: with flags off it is the language's *name*, small and faint. The order does
+not follow it — the order is what says which groups match, and it stays either
+way. The name is much the wider of the two forms, so it is the hint that gives way
+when a row runs out of room, clipped rather than wrapped: the group's own name is
+what the row is for, and one long language must not make every row in the menu two
+lines tall.
 
 **The language row carries a button offering the language this group's galleries
 carry.** Whoever translated a comic translated it into a language, so the two
