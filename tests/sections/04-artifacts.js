@@ -138,6 +138,20 @@ module.exports = () => {
     "…and lays its own content out as a flex box, so the flag centres in a button " +
       "taller than it is: Bootstrap lays a button's content on a text baseline"
   );
+  // The wand, which stands in when the reader has flags turned off. Both of these
+  // are forced by code outside this file: Stash's unscoped `.fa-icon` margin, and
+  // FontAwesome drawing its glyphs at 1em where the flag it replaces is 0.9rem tall.
+  const chipIconRule = /\.manga-tools-chip\s+\.fa-icon\s*\{([^}]*)\}/.exec(css);
+  assert.ok(
+    chipIconRule && /margin:\s*0/.test(chipIconRule[1]),
+    "the wand has to zero Stash's unscoped .fa-icon margin, like the option rows " +
+      "and the detail row each do"
+  );
+  assert.ok(
+    chipIconRule && /font-size:\s*0\.9rem/.test(chipIconRule[1]),
+    "…and be sized to the flag's height, so flipping the setting does not resize " +
+      "the button"
+  );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +
       "performers / chip)"

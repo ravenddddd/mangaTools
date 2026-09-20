@@ -1303,7 +1303,7 @@ module.exports = () => {
   );
   assert.strictEqual(
     offered.chip.props.title,
-    "简体中文 — 该翻译组的画廊通常是这种语言 (1)",
+    "填入 简体中文 — 该翻译组的画廊通常是这种语言 (1)",
     "the tooltip names the language and says why the button is there, count " +
       "included — composed rather than a catalog placeholder, because the plugin's " +
       "own t() substitutes nothing"
@@ -1336,16 +1336,40 @@ module.exports = () => {
     "…a code the dropdown itself offers, so the field can show what it was given"
   );
 
-  // The "Show flags" setting is about how values are displayed. The button is not
-  // a value, and a button whose only content is the flag has to keep it.
+  // The "Show flags" setting says the reader does not want flags in their
+  // interface, and this button is part of the interface rather than a value — so
+  // it swaps its flag for a wand rather than going on drawing one.
+  const Solid = PluginApi.libraries.FontAwesomeSolid;
   NS.showFlags = false;
-  assert.ok(
+  const withoutFlags = chipField({ [TG]: "Lily Manga", other: "x" }).chip;
+  assert.strictEqual(
     find(
-      chipField({ [TG]: "Lily Manga", other: "x" }).chip,
+      withoutFlags,
       (n) => n.props?.className === "fi fi-cn manga-tools-flag"
     ),
-    "the flag is drawn whatever the show-flags setting says: this is a button"
+    null,
+    "with flags turned off the button draws no flag"
   );
+  assert.strictEqual(
+    find(withoutFlags, (n) => n.props?.icon)?.props.icon,
+    "faWandMagicSparkles",
+    "…it draws a wand instead: the suggestion is the button's meaning, and the " +
+      "language's name would be long in a row it shares with the field"
+  );
+  assert.ok(
+    !hasText(withoutFlags, "简体中文"),
+    "…and not the name, which the field beside it already shows"
+  );
+
+  // The last link of that chain. `Icon` throws *inside a render* when handed an
+  // undefined icon, so a Stash whose FontAwesome has neither spelling of the wand
+  // must still get a button with something in it.
+  delete Solid.faWandMagicSparkles;
+  assert.ok(
+    hasText(chipField({ [TG]: "Lily Manga", other: "x" }).chip, "简体中文"),
+    "with no wand to draw, the button falls back to the language's name"
+  );
+  Solid.faWandMagicSparkles = "faWandMagicSparkles";
   NS.showFlags = true;
 
   assert.strictEqual(

@@ -636,6 +636,10 @@ const PluginApi = {
       faChessPawn: "faChessPawn",
       faChessKnight: "faChessKnight",
       faChessBoard: "faChessBoard",
+      // The language row's suggestion, for a reader with flags turned off. The
+      // other two names in its fallback chain are deliberately absent here, so a
+      // test can take this one away and drive the rest of the chain.
+      faWandMagicSparkles: "faWandMagicSparkles",
     },
     FontAwesomeRegular: { faTimesCircle: "faTimesCircle(regular)" },
     // Captured so a test can assert the URL the filter pushes.

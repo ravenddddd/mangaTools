@@ -1750,20 +1750,32 @@ function MangaFieldBlock(props: {
   const offeredInfo = offered ? NS.describe(offered.code, intl.locale) : null;
 
   // Stash's own furniture for a small button that belongs to the field beside it:
-  // the same secondary button the date field carries, with the flag as its whole
+  // the same secondary button the date field carries, with one glyph as its whole
   // content — no name, because the field next to it already names what the button
   // writes, and a second label would be the same word twice.
   //
-  // The flag is drawn whatever the "Show flags" setting says. That setting is about
-  // how *values* are displayed; this is a button, and a button with no content is
-  // not one. The count and the language's name go in the tooltip, which is also
-  // the button's accessible name.
+  // The glyph follows the "Show flags" setting, which says the reader does not
+  // want flags in their interface — and this button is part of the interface, not
+  // a value. A wand stands in: this is a suggestion. The language's name would be
+  // the other honest choice and the wrong one, long enough to squeeze the field it
+  // shares its column with, and saying what that field already says.
+  //
+  // Same shape as the ✗ in dialog-filter.tsx and for the same reason: the name
+  // differs between FontAwesome versions, and `Icon` throws *inside a render* on an
+  // undefined icon, which would take the page rather than the glyph. So the chain
+  // has two spellings of the wand, then a different glyph that is still true of
+  // what the button writes, and only then the name — which always exists, and is
+  // the one thing a missing icon may not turn into an empty button.
   //
   // type="button" is not decoration: it sits inside Stash's own <form>, where a
   // button without one submits the form and takes the unsaved edits with it.
+  const chipIcon =
+    Solid.faWandMagicSparkles || Solid.faMagic || Solid.faLanguage || null;
   const chipTitle =
     offered && offeredInfo
-      ? offeredInfo.name +
+      ? t(intl, "mangaTools.translationGroup.fill") +
+        " " +
+        offeredInfo.name +
         " — " +
         t(intl, "mangaTools.translationGroup.suggestedLanguage") +
         " (" +
@@ -1771,7 +1783,7 @@ function MangaFieldBlock(props: {
         ")"
       : "";
   const languageChip =
-    offered && offeredInfo?.flag ? (
+    offered && offeredInfo ? (
       <button
         type="button"
         className="btn btn-secondary manga-tools-chip"
@@ -1779,7 +1791,13 @@ function MangaFieldBlock(props: {
         title={chipTitle}
         onClick={() => write(FIELD_NAME, offered.code)}
       >
-        <Flag flag={offeredInfo.flag} className="manga-tools-flag" />
+        {NS.showFlags && offeredInfo.flag ? (
+          <Flag flag={offeredInfo.flag} className="manga-tools-flag" />
+        ) : chipIcon ? (
+          <Icon icon={chipIcon} />
+        ) : (
+          <span>{offeredInfo.name}</span>
+        )}
       </button>
     ) : null;
 

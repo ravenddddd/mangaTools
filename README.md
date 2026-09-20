@@ -446,12 +446,19 @@ discarded by Cancel like anything else typed on the page. It writes nothing on
 its own.
 
 It is Stash's own furniture — `btn btn-secondary`, the same button the date field
-carries for its calendar — and its whole content is the flag. No name, because
-the field beside it already names what it writes; the language's name and the
-count are in the tooltip, which is also the button's accessible name. The flag is
-drawn whatever the "Show flags" setting says: that setting is about how values
-are displayed, and a button whose only content is the flag would be an empty
-button without it.
+carries for its calendar — and its content is one glyph. No name, because the
+field beside it already names what it writes; the language's name and the count
+are in the tooltip, which is also the button's accessible name.
+
+**Which glyph follows the "Show flags" setting.** That setting says the reader
+does not want flags in their interface, and this button is part of the interface
+rather than a value — so with flags off it draws a wand (`wand-magic-sparkles`, or
+`magic` if that Stash bundles an older FontAwesome), which is what a suggestion
+looks like. Not the language's name: it is long enough to squeeze the field it
+shares its column with, and it would repeat what that field already shows. The
+name is the last resort, for a Stash with neither wand — an undefined icon throws
+*inside a render*, so the lookup is guarded the way the censorship icons and the
+dialog's ✗ are, and a missing glyph may not leave an empty button.
 
 It appears when there is something to say, and stays away when there is not
 (`NS.usualLanguageFor`, in `src/fields.ts`):

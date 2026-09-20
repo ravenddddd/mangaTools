@@ -289,6 +289,24 @@
   display: inline-flex;
 }
 
+/*
+ * The wand, for a reader who has flags turned off. Two things, both of them
+ * forced by code elsewhere:
+ *
+ * `margin: 0` because Stash's index.scss has an unscoped
+ * `.fa-icon { margin: 0 0.4rem }` — the same margin the option rows and the
+ * detail row each zero for the same reason. Left on, it opens the button up
+ * unevenly and makes it wider than the flag version.
+ *
+ * `font-size: 0.9rem` is `.manga-tools-flag`'s height, so flipping the setting
+ * does not resize the button: FontAwesome draws its glyphs at 1em, and an
+ * inherited 1rem would come out a little taller than the flag it replaces.
+ */
+.manga-tools-chip .fa-icon {
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 /* ─────────────────────── Settings-page multiselect ─────────────────────── */
 
 /*

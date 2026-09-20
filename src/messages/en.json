@@ -42,6 +42,7 @@
   "mangaTools.translationGroup.heading": "Translation group",
   "mangaTools.translationGroup.create": "Create",
   "mangaTools.translationGroup.placeholder": "Set a translation group…",
+  "mangaTools.translationGroup.fill": "Fill in",
   "mangaTools.translationGroup.suggestedLanguage": "This group's galleries usually carry this language",
 
   "mangaTools.bulk.remove": "Remove",
