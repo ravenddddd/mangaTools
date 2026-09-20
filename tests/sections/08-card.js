@@ -1401,7 +1401,7 @@ module.exports = () => {
   // beside it is what turns the field back on.
   assert.strictEqual(
     wasOriginal.group.props.placeholder,
-    "生肉（原文，无翻译组）",
+    "生肉（无翻译组）",
     "the greyed box says which state the row is in"
   );
   assert.strictEqual(
@@ -2011,7 +2011,7 @@ module.exports = () => {
     panelOf({ [NS.ORIGINAL_FIELD_NAME]: "true" })
   );
   assert.ok(
-    hasText(originalOnly, "生肉（原文，无翻译组）"),
+    hasText(originalOnly, "生肉（无翻译组）"),
     "declaring the original draws a row that says what it means"
   );
   assert.ok(

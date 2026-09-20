@@ -231,9 +231,31 @@ module.exports = () => {
     "the steak is the button's whole content, so it is sized for one rather than " +
       "for a line of text"
   );
+  // The group box's statement, at full strength in a disabled control. Two
+  // declarations, and the second is the one worth having: a theme may dim a
+  // disabled control as a whole, which would undo the colour.
+  const statementRule =
+    /\.manga-tools-group-select\s+\.react-select__control--is-disabled\s+\.react-select__placeholder\s*\{([^}]*)\}/.exec(
+      css
+    );
+  assert.ok(
+    statementRule && /color:\s*inherit/.test(statementRule[1]),
+    "the declaration that a gallery is raw should read in the form's own " +
+      "foreground colour, not the grey of a hint about what to type"
+  );
+  assert.ok(
+    statementRule && /opacity:\s*1/.test(statementRule[1]),
+    "…and not be dimmed with the rest of the disabled control"
+  );
+  assert.ok(
+    !/^\.react-select__placeholder/m.test(css) &&
+      !/\.manga-tools-select\s+\.react-select__placeholder/.test(css),
+    "while the ordinary placeholder of all three dropdowns keeps the muted colour " +
+      "it should have — the rule must name the state, not just the field"
+  );
   console.log(
     "✓ CSS checks (braces / hover / positioning / flag sizing / settings alignment / " +
-      "performers / chip / asset icons)"
+      "performers / chip / asset icons / the raw statement)"
   );
 
   // ── 10b. Bundle shape ──────────────────────────────────────────────

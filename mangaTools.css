@@ -294,6 +294,27 @@
   min-width: 14rem;
 }
 
+/*
+ * The group box's statement reads at full strength while the control around it is
+ * dimmed: 生肉（无翻译组） is what the field is saying while it is off, not a hint
+ * about what to type, and a grey sentence in a grey box is the look of an empty
+ * field — which is the state this is at pains to be told apart from.
+ *
+ * `color: inherit` rather than a colour, so it is the form's ordinary foreground
+ * whatever the theme says that is; the same meaning the toolbar switch gives it.
+ * `opacity: 1` because a disabled control is dimmed as a whole in some themes,
+ * which would undo the colour — react-select's own disabled style is a background
+ * and a border, but Stash's theme is what decides, and it is not read here.
+ *
+ * Scoped to the group's select and to the disabled state, so the ordinary
+ * placeholder of all three dropdowns keeps the muted colour it should have.
+ */
+.manga-tools-group-select .react-select__control--is-disabled
+  .react-select__placeholder {
+  color: inherit;
+  opacity: 1;
+}
+
 /* ──────────────── The language row's suggested language ──────────────── */
 
 /*

@@ -2115,7 +2115,7 @@ function MangaFieldBlock(props: {
       </label>
       <div className={cls.control + " manga-tools-chip-row"}>
         <Select
-          className="manga-tools-select"
+          className="manga-tools-select manga-tools-group-select"
           classNamePrefix="react-select"
           inputId="manga_tools_translation_group"
           isClearable
