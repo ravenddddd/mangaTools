@@ -1394,25 +1394,28 @@ module.exports = () => {
     "clicking again clears the field rather than storing a false"
   );
 
-  // The box a group would be typed into says the gallery is raw rather than
-  // inviting a group it cannot hold — the same wording the details panel uses. It
-  // stays a live control on purpose: writing a group is a way of saying "actually
-  // it was translated", and disabling it would cost two clicks to change a mind.
+  // The box a group would be typed into is off while the gallery is raw, and says
+  // why: an empty field would mean "nobody has said", which is not what this is —
+  // this is "not applicable". It keeps its shape rather than being replaced by a
+  // line of text, so the row still lines up with the two above it, and the button
+  // beside it is what turns the field back on.
   assert.strictEqual(
     wasOriginal.group.props.placeholder,
     "生肉（原文，无翻译组）",
-    "the group box says which state the row is in"
+    "the greyed box says which state the row is in"
   );
   assert.strictEqual(
     wasOriginal.group.props.isDisabled,
-    undefined,
-    "…and stays live, so writing a group is still the one-click way to flip the state"
+    true,
+    "…and is disabled, because there is no group to enter and a live box would " +
+      "invite one"
   );
   assert.strictEqual(
     notOriginal.group.props.placeholder,
     "填写翻译组…",
     "while a gallery that is not the original invites a group as before"
   );
+  assert.ok(!notOriginal.group.props.isDisabled, "…with the box live again");
 
   // Writing a group is the same call taken the other way: the two are answers to
   // one question, and the plugin does not leave a gallery holding both.

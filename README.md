@@ -472,12 +472,13 @@ in the button's name and its tooltip, which are localised and where a language
 does apply. Both files are masked rather than inlined, like the manga mark: the
 file supplies the shape, the stylesheet supplies the colour.
 
-While a gallery is marked raw its group box says so instead of inviting a group it
-cannot hold — the same wording the details panel uses (*raw (the original text, no
+While a gallery is marked raw its group box is **disabled**, and says why: it
+carries the same wording the details panel uses (*raw (the original text, no
 translation group)*, worded that way so it cannot be taken for a group with that
-name). The box stays a **live control** on purpose: writing a group is a way of
-saying "actually it was translated", and disabling it would put two clicks between
-a reader and changing their mind.
+name). Disabled rather than left live, because an empty box means "nobody has
+said" and this is not that — this is "not applicable" — and rather than replaced
+by a line of text, because the row would then be a different shape from the two
+above it. The button beside it is what turns the field back on.
 
 It is not a value of the group field, and the difference is not tidiness. A
 group's name is whatever it calls itself, and this library has one called

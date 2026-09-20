@@ -2119,11 +2119,18 @@ function MangaFieldBlock(props: {
           classNamePrefix="react-select"
           inputId="manga_tools_translation_group"
           isClearable
-          // A gallery declared the original has no group to enter, and the box says
-          // so rather than inviting one it cannot hold — the same wording the
-          // details panel uses. The control stays live on purpose: writing a group
-          // is a way of saying "actually it *was* translated", and disabling it
-          // would put two clicks between a reader and changing their mind.
+          // Disabled while the gallery is the original, because there is no group
+          // to enter and a live box would invite one. This is not the same state as
+          // an empty field: empty means "nobody has said", and raw means "not
+          // applicable" — so the box says which one it is rather than looking
+          // unfilled.
+          //
+          // The field keeps its shape: the control stays where it is, greyed, and
+          // the button beside it is what turns this back on. Replacing the box with
+          // a line of text would say the same thing and leave the row a different
+          // shape from the two above it, which is the property the column widths
+          // here took the most work to get right.
+          isDisabled={isOriginal}
           placeholder={t(
             intl,
             isOriginal
