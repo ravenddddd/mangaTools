@@ -494,8 +494,65 @@ module.exports = () => {
     detail: { data: { location: { pathname: "/galleries" } } },
   });
   assert.notStrictEqual(bulkRow(), null, "restored on a gallery page");
+
+  // ── 14e. The scrape dialog is not ours to draw in ──
+  //
+  // Reported: scraping a gallery and then editing the scraped studio put the mark
+  // checkbox in the scrape dialog, under that field. The scrape dialog draws a
+  // studio row of its own — ScrapeDialogRow emits the same `data-field="studio"`
+  // the bulk dialog's row does — and it was open over a gallery page, whose
+  // RatingSystem is what mounts this component. Stash marks that dialog and no
+  // other: `dialogClassName: "… scrape-dialog …"` in ScrapeDialog.tsx.
+  const scrapeModal = makeEl("div");
+  scrapeModal.className = "modal-dialog scrape-dialog";
+  const scrapeBody = makeEl("div");
+  const scrapeForm = makeEl("form");
+  const scrapeStudio = makeEl("div");
+  // The class Stash's own row carries, px-3 and all: the fair reproduction has to
+  // be the row that was reported, not a convenient stand-in for it.
+  scrapeStudio.className = "px-3 pt-3 row";
+  scrapeStudio.dataset.field = "studio";
+  scrapeStudio.appendChild(makeEl("label"));
+  scrapeStudio.appendChild(makeEl("div"));
+  scrapeForm.appendChild(scrapeStudio);
+  scrapeBody.appendChild(scrapeForm);
+  scrapeModal.appendChild(scrapeBody);
+
+  // In front of the bulk dialog's own form, because document order is what the
+  // anchor query goes by — and the anchor is all it has to tell them apart.
+  documentRoot.insertBefore(scrapeModal, bulkForm);
+  assert.ok(
+    documentRoot.children.indexOf(scrapeModal) <
+      documentRoot.children.indexOf(bulkForm),
+    "precondition: the scraped studio row comes first, so the anchor would find it"
+  );
+  // Compared by position rather than by identity, which is not a style choice: a
+  // failed node-against-node comparison makes Node print the whole fixture DOM as
+  // the failure message, and that is enough text to exhaust the heap instead of
+  // reporting anything — an allocation error with no stack, which is how this was
+  // found. `indexOf` on two numbers says the same thing and cannot do that.
+
+  assert.strictEqual(
+    bulkRow(),
+    null,
+    "no manga row in a scrape dialog, however the anchor found its way there"
+  );
+  assert.strictEqual(
+    scrapeStudio.nextElementSibling,
+    null,
+    "…and no mount point left beside the scraped studio field"
+  );
+
+  documentRoot.detach(scrapeModal);
+  assert.notStrictEqual(
+    bulkRow(),
+    null,
+    "while the bulk dialog's own row carries on — the guard is about that dialog, " +
+      "not about the anchor being unusable"
+  );
   console.log(
-    "✓ bulk edit (placement / gate+cycle / prefill / set+remove+mark+unmark / scene isolation / one-shot / route)"
+    "✓ bulk edit (placement / gate+cycle / prefill / set+remove+mark+unmark / " +
+      "scene isolation / one-shot / route / not in a scrape dialog)"
   );
 
   // The badges read the plugin's own store, so a successful write refetches it —

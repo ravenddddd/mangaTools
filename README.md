@@ -955,6 +955,15 @@ canonical spelling.
   open, and a tag drawn for the card joins Stash's tag row, or a row the plugin
   makes when Stash has none.
 
+  **An anchor is only as unique as the attribute it names, and one of them is
+  shared**: the scrape dialog's rows come from `ScrapeDialogRow`, and its studio
+  row carries the same `data-field="studio"` the bulk dialog's row does. Since the
+  bulk row is mounted by `RatingSystem` — which the gallery page renders behind the
+  dialog, not the dialog itself — the mark checkbox turned up inside a gallery
+  scrape, under the studio field. Mount points are therefore refused inside a
+  scrape dialog, which Stash marks and nothing else does (`dialogClassName` puts
+  `scrape-dialog` on that modal).
+
   The censorship mark adds one more of each kind: a span next to the gallery
   card's `.card-popovers` row, named by the gallery id so the right card's row is
   the one found, and a span after the toolbar's `.organized-button` — see

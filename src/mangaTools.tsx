@@ -3405,6 +3405,31 @@ function ensureDetailHost(): HTMLElement | null {
 /** Class name of the edit field's mount point */
 const FIELD_HOST_CLASS = "manga-tools-field-host";
 
+/** Stash's own class for its scrape dialog, and the one place it is written down */
+const SCRAPE_DIALOG_CLASS = "scrape-dialog";
+
+/**
+ * Whether a node sits inside Stash's scrape dialog.
+ *
+ * The dialog draws rows of its own, and one of them is a **studio field carrying
+ * the same `data-field="studio"` the bulk dialog's row carries** — so an anchor
+ * query cannot tell the two apart, and the dialog can be open over a gallery page
+ * whose RatingSystem is what mounts the bulk row. That is not hypothetical: the
+ * mark checkbox turned up inside a gallery scrape, under the studio field, because
+ * the anchor landed on the scraped row instead of the bulk one.
+ *
+ * Stash names the dialog and nothing else does: ScrapeDialog.tsx passes
+ * `dialogClassName: "… scrape-dialog …"`. Walked by hand rather than with
+ * `closest`, which would be one more method a test's DOM has to implement for a
+ * single guard.
+ */
+function insideScrapeDialog(node: Node | null): boolean {
+  for (let el = node; el; el = el.parentNode) {
+    if ((el as Element).classList?.contains(SCRAPE_DIALOG_CLASS)) return true;
+  }
+  return false;
+}
+
 /** As above, held at module scope so the same node is reused */
 const fieldHosts: { [key: string]: HTMLElement | null } = {
   edit: null,
@@ -3436,6 +3461,11 @@ function ensureHostAfter(
     fieldHosts[key] = null;
     return null;
   }
+
+  // Nothing this plugin draws belongs in a scrape dialog, whichever anchor found
+  // its way in there. The cached host is deliberately left alone: that dialog
+  // being open says nothing about whether this key's own mount point exists.
+  if (insideScrapeDialog(anchor)) return null;
 
   let host = fieldHosts[key];
   if (!host) {
