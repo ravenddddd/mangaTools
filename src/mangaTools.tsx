@@ -104,7 +104,25 @@ const PLUGIN_ID = "mangaTools";
  * match each other's row.
  */
 const EDIT_ANCHOR = '.form-group[data-field="studio_id"]';
+
+/**
+ * The studio row inside a bulk dialog, named by `BulkUpdateFormGroup` — and **not**
+ * unique to it: the scrape dialog's studio row carries the same attribute, which is
+ * why finding it means searching inside the dialog's form rather than the document.
+ * See bulkAnchor.
+ */
 const BULK_ANCHOR = '[data-field="studio"]';
+
+/**
+ * What identifies a bulk dialog: the row `BulkUpdateFormGroup name="rating"` emits,
+ * and which nothing else in Stash emits at all — the edit pages do not name a
+ * rating row that way, and the gallery scrape dialog has no rating row.
+ *
+ * It identifies *a* bulk dialog rather than the galleries one; the route guard is
+ * what makes it the galleries one, since this plugin draws nothing on the scene,
+ * image or performer pages those other bulk dialogs belong to.
+ */
+const BULK_DIALOG_MARK = '[data-field="rating"]';
 
 const REFRESH_MS = 60000;
 
@@ -1689,9 +1707,8 @@ function formatGroupOption(
  * conservative default.
  */
 function readNativeFieldClasses(
-  anchorSelector: string
+  anchor: Element | null
 ): NativeFieldClasses | null {
-  const anchor = document.querySelector(anchorSelector);
   if (!anchor) return null;
 
   const label = anchor.querySelector("label");
@@ -1937,7 +1954,7 @@ function MangaFieldBlock(props: {
     ) : null;
 
   // Column widths come from the native field; this is the fallback.
-  const cls = readNativeFieldClasses(EDIT_ANCHOR) || {
+  const cls = readNativeFieldClasses(document.querySelector(EDIT_ANCHOR)) || {
     group: "form-group row",
     label: "form-label col-form-label col-sm-3",
     control: "col-sm-9",
@@ -2798,7 +2815,7 @@ function BulkFieldsRow() {
   // unrelated re-render cannot throw them away while the dialog is open.
   React.useEffect(
     () => () => {
-      if (!document.querySelector(BULK_ANCHOR)) {
+      if (!bulkAnchor()) {
         bulkLanguage = null;
         bulkCensorship = null;
         bulkManga = null;
@@ -2809,7 +2826,7 @@ function BulkFieldsRow() {
 
   if (!isGalleryContext() || !Select || !host) return null;
 
-  const cls = readNativeFieldClasses(BULK_ANCHOR) || {
+  const cls = readNativeFieldClasses(bulkAnchor()) || {
     group: "row",
     label: "col-form-label col-3",
     control: "col-9",
@@ -3405,29 +3422,35 @@ function ensureDetailHost(): HTMLElement | null {
 /** Class name of the edit field's mount point */
 const FIELD_HOST_CLASS = "manga-tools-field-host";
 
-/** Stash's own class for its scrape dialog, and the one place it is written down */
-const SCRAPE_DIALOG_CLASS = "scrape-dialog";
-
 /**
- * Whether a node sits inside Stash's scrape dialog.
+ * The bulk dialog's studio row, found **inside the dialog's own form**.
  *
- * The dialog draws rows of its own, and one of them is a **studio field carrying
- * the same `data-field="studio"` the bulk dialog's row carries** — so an anchor
- * query cannot tell the two apart, and the dialog can be open over a gallery page
- * whose RatingSystem is what mounts the bulk row. That is not hypothetical: the
- * mark checkbox turned up inside a gallery scrape, under the studio field, because
- * the anchor landed on the scraped row instead of the bulk one.
+ * A plain document query is not enough, and the reason is not hypothetical: the
+ * scrape dialog's rows are `ScrapeDialogRow`s, and its studio row carries the very
+ * `data-field="studio"` this looks for. The mount point is live whenever a gallery
+ * page is on screen — it is mounted by RatingSystem, which the *page* renders, not
+ * the dialog — so with a scrape dialog open the first match was the scraped row,
+ * and the mark checkbox appeared under it.
  *
- * Stash names the dialog and nothing else does: ScrapeDialog.tsx passes
- * `dialogClassName: "… scrape-dialog …"`. Walked by hand rather than with
- * `closest`, which would be one more method a test's DOM has to implement for a
- * single guard.
+ * Scoping the search is what fixes that, and it is the right way round for an
+ * insertion: the question asked is "is the bulk dialog up, and where is its studio
+ * row", and when it cannot be answered nothing is drawn. The form is reached from
+ * the rating row every bulk dialog has (see BULK_DIALOG_MARK); a dialog without one
+ * has no form to search, so its rows are never in scope at all.
+ *
+ * Walked by hand rather than with `closest`, which would be one more method the
+ * tests' DOM would have to implement for one lookup.
  */
-function insideScrapeDialog(node: Node | null): boolean {
-  for (let el = node; el; el = el.parentNode) {
-    if ((el as Element).classList?.contains(SCRAPE_DIALOG_CLASS)) return true;
+function bulkAnchor(): Element | null {
+  let el: Node | null = document.querySelector(BULK_DIALOG_MARK);
+  while (el) {
+    const element = el as Element;
+    if (element.tagName === "form") {
+      return element.querySelector(BULK_ANCHOR);
+    }
+    el = el.parentNode;
   }
-  return false;
+  return null;
 }
 
 /** As above, held at module scope so the same node is reused */
@@ -3438,7 +3461,7 @@ const fieldHosts: { [key: string]: HTMLElement | null } = {
 
 /**
  * Finds (creating if needed) the mount point for a language field row,
- * positioned **right after the row named by `anchorSelector`**.
+ * positioned **right after `anchor`**.
  *
  * Why not patch the component that renders that row: StudioSelect renders
  * inside a `<Col>`, so anything added there is nested inside that column and
@@ -3447,25 +3470,21 @@ const fieldHosts: { [key: string]: HTMLElement | null } = {
  *
  * Conveniently Stash leaves a data-field attribute on these rows (renderField
  * on the edit panel, BulkUpdateFormGroup in the bulk dialog), which makes a far
- * more stable anchor than walking the structure.
+ * more stable anchor than walking the structure. Finding that anchor is the
+ * callers' business: the edit panel's is a plain query, and the bulk dialog's has
+ * to be scoped to the dialog (see bulkAnchor).
  *
  * `key` is per-anchor so the edit panel and the bulk dialog each keep their own
  * mount point; they are never on screen at the same time.
  */
 function ensureHostAfter(
-  anchorSelector: string,
+  anchor: Element | null,
   key: string
 ): HTMLElement | null {
-  const anchor = document.querySelector(anchorSelector);
   if (!anchor?.parentNode) {
     fieldHosts[key] = null;
     return null;
   }
-
-  // Nothing this plugin draws belongs in a scrape dialog, whichever anchor found
-  // its way in there. The cached host is deliberately left alone: that dialog
-  // being open says nothing about whether this key's own mount point exists.
-  if (insideScrapeDialog(anchor)) return null;
 
   let host = fieldHosts[key];
   if (!host) {
@@ -3490,12 +3509,12 @@ function ensureHostAfter(
 
 /** The gallery edit panel's mount point (see LanguageRow) */
 function ensureFieldHost(): HTMLElement | null {
-  return ensureHostAfter(EDIT_ANCHOR, "edit");
+  return ensureHostAfter(document.querySelector(EDIT_ANCHOR), "edit");
 }
 
 /** The bulk edit dialog's mount point (see BulkFieldsRow) */
 function ensureBulkFieldHost(): HTMLElement | null {
-  return ensureHostAfter(BULK_ANCHOR, "bulk");
+  return ensureHostAfter(bulkAnchor(), "bulk");
 }
 
 /**

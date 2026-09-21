@@ -26,8 +26,19 @@ module.exports = () => {
   //
   // Stand in for EditGalleriesDialog's form: BulkUpdateFormGroup renders each row
   // as a Bootstrap `.row` carrying data-field, so that is the anchor.
+  //
+  // The rating row comes first because Stash's dialog has one, and it is what the
+  // plugin identifies the dialog by — the studio attribute alone is shared with
+  // the scrape dialog's rows, so the anchor has to be looked for inside this form
+  // rather than in the document. A fixture without it would be modelling a dialog
+  // Stash does not draw.
   const bulkForm = makeEl("form");
   documentRoot.appendChild(bulkForm);
+
+  const bulkRatingRow = makeEl("div");
+  bulkRatingRow.className = "row";
+  bulkRatingRow.dataset.field = "rating";
+  bulkForm.appendChild(bulkRatingRow);
 
   const bulkStudioRow = makeEl("div");
   bulkStudioRow.className = "row";
@@ -97,7 +108,10 @@ module.exports = () => {
     "the bulk rows should render through a portal"
   );
 
-  const bulkHost = bulkForm.children[1];
+  // Found from the studio row rather than by position in the form: the form is
+  // Stash's, its other rows come and go with what the dialog offers, and an index
+  // into it would be a fact about the fixture rather than about the plugin.
+  const bulkHost = bulkStudioRow.nextElementSibling;
   assert.strictEqual(bulkHost.className, "manga-tools-field-host");
   assert.strictEqual(
     bulkHost.previousElementSibling,
@@ -495,14 +509,17 @@ module.exports = () => {
   });
   assert.notStrictEqual(bulkRow(), null, "restored on a gallery page");
 
-  // ── 14e. The scrape dialog is not ours to draw in ──
+  // ── 14e. The scrape dialog's studio row is not the one we are after ──
   //
   // Reported: scraping a gallery and then editing the scraped studio put the mark
-  // checkbox in the scrape dialog, under that field. The scrape dialog draws a
-  // studio row of its own — ScrapeDialogRow emits the same `data-field="studio"`
-  // the bulk dialog's row does — and it was open over a gallery page, whose
-  // RatingSystem is what mounts this component. Stash marks that dialog and no
-  // other: `dialogClassName: "… scrape-dialog …"` in ScrapeDialog.tsx.
+  // checkbox in the scrape dialog, under that field. The scrape dialog draws rows
+  // of its own — ScrapeDialogRow emits the very `data-field="studio"` the bulk
+  // dialog's row does — and it was open over a gallery page, whose RatingSystem is
+  // what mounts this component. So the anchor is looked for inside the bulk
+  // dialog's own form, entered from the rating row that dialog alone has.
+  //
+  // In front of the bulk form on purpose: document order is what a document-wide
+  // query goes by, and this is the arrangement that used to find the wrong row.
   const scrapeModal = makeEl("div");
   scrapeModal.className = "modal-dialog scrape-dialog";
   const scrapeBody = makeEl("div");
@@ -517,42 +534,42 @@ module.exports = () => {
   scrapeForm.appendChild(scrapeStudio);
   scrapeBody.appendChild(scrapeForm);
   scrapeModal.appendChild(scrapeBody);
-
-  // In front of the bulk dialog's own form, because document order is what the
-  // anchor query goes by — and the anchor is all it has to tell them apart.
   documentRoot.insertBefore(scrapeModal, bulkForm);
   assert.ok(
     documentRoot.children.indexOf(scrapeModal) <
       documentRoot.children.indexOf(bulkForm),
-    "precondition: the scraped studio row comes first, so the anchor would find it"
+    "precondition: the scraped studio row comes first in the document"
   );
-  // Compared by position rather than by identity, which is not a style choice: a
-  // failed node-against-node comparison makes Node print the whole fixture DOM as
-  // the failure message, and that is enough text to exhaust the heap instead of
-  // reporting anything — an allocation error with no stack, which is how this was
-  // found. `indexOf` on two numbers says the same thing and cannot do that.
 
-  assert.strictEqual(
-    bulkRow(),
-    null,
-    "no manga row in a scrape dialog, however the anchor found its way there"
+  // A portal, so it is not null — asserted as a boolean rather than compared
+  // against null: a failed comparison against a portal makes Node print the whole
+  // fixture DOM as the failure message, which is enough text to exhaust the heap
+  // instead of reporting anything. That is how this investigation started.
+  assert.ok(!!bulkRow(), "the bulk dialog's own row still draws");
+  assert.ok(
+    bulkStudioRow.nextElementSibling?.className === "manga-tools-field-host",
+    "…and its mount point is still the bulk studio row's neighbour"
   );
-  assert.strictEqual(
-    scrapeStudio.nextElementSibling,
-    null,
-    "…and no mount point left beside the scraped studio field"
+  assert.ok(
+    !scrapeStudio.nextElementSibling,
+    "while nothing lands beside the scraped studio field"
   );
+
+  // And the mark that identifies the dialog is what the rule rests on: take the
+  // rating row away and there is no dialog to find, so nothing is drawn rather
+  // than guessed at.
+  bulkForm.detach(bulkRatingRow);
+  assert.ok(
+    !bulkRow(),
+    "no rating row, no bulk dialog, and no row drawn off the back of a guess"
+  );
+  bulkForm.insertBefore(bulkRatingRow, bulkStudioRow);
+  assert.ok(!!bulkRow(), "and back to normal with the dialog whole again");
 
   documentRoot.detach(scrapeModal);
-  assert.notStrictEqual(
-    bulkRow(),
-    null,
-    "while the bulk dialog's own row carries on — the guard is about that dialog, " +
-      "not about the anchor being unusable"
-  );
   console.log(
     "✓ bulk edit (placement / gate+cycle / prefill / set+remove+mark+unmark / " +
-      "scene isolation / one-shot / route / not in a scrape dialog)"
+      "scene isolation / one-shot / route / the scrape dialog's studio row)"
   );
 
   // The badges read the plugin's own store, so a successful write refetches it —
