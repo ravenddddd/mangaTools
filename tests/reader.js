@@ -439,13 +439,21 @@ function buildLightbox(current = 1, total = 5, ids = null) {
     loading: (on) => {
       const existing = lightbox.querySelector(".LoadingIndicator");
       if (existing) existing.remove();
-      if (!on) return;
 
-      header.remove();
-      display.remove();
-      const spinner = dom.makeElement("div");
-      spinner.className = "LoadingIndicator";
-      lightbox.appendChild(spinner);
+      if (on) {
+        // Away rather than gone: Stash unmounts them, and this puts them back so the
+        // rest of a section can carry on from where it was.
+        display.remove();
+        header.remove();
+        const spinner = dom.makeElement("div");
+        spinner.className = "LoadingIndicator";
+        lightbox.appendChild(spinner);
+        return;
+      }
+
+      if (display.parentNode) return;
+      lightbox.appendChild(display);
+      lightbox.appendChild(header);
     },
     close: () => lightbox.remove(),
   };
@@ -2378,6 +2386,87 @@ async function main() {
    * chapter is, and are never written — the point of taking the tab over is that
    * the plugin's field becomes the one that says where chapters are.
    */
+  /**
+   * Paging past what the lightbox has loaded makes it fetch, and while it fetches it
+   * shows a spinner *instead of* its header and its carousel. That is not a lightbox
+   * this plugin cannot read — it is one that is busy — and reading it as the former is
+   * how a reader ended up watching a spinner with the spread view switched off behind
+   * it.
+   */
+  await runSection(
+    "a busy lightbox is waited out, not given up on",
+    async () => {
+      const { box } = await startReader({
+        galleryId: "8",
+        on: true,
+        search: "?sortby=title&perPage=500",
+      });
+      const wasDrawn = drawn();
+      const at = loggedErrors.length;
+
+      box.loading(true);
+      dom.flush();
+      await settle();
+
+      assert.deepStrictEqual(
+        errorsSince(at),
+        [],
+        "a lightbox fetching its next page is not a fault to report"
+      );
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-active"),
+        true,
+        "and the reader is still on: Stash's spinner is what is on screen, which is " +
+          "Stash's business, and the spread view has not switched itself off behind it"
+      );
+
+      // Back, and drawing again — the screen the reader was on, redrawn.
+      box.loading(false);
+      dom.flush();
+      await settle();
+      assert.deepStrictEqual(drawn(), wasDrawn, "and it picks up where it was");
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a gallery that is not manga gets nothing of ours",
+    async () => {
+      shown.length = 0;
+      mountBridge();
+      const at = loggedErrors.length;
+
+      // The switch on, Stash's own chapters on the gallery, and pages to spare:
+      // everything this plugin could do here, it does not — because the gallery is not
+      // marked manga, which is the whole of what makes one this plugin's business.
+      const { box } = await startReader({
+        galleryId: "61",
+        on: true,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
+        expectSwitch: false,
+      });
+      await settle();
+
+      assert.strictEqual(
+        box.popover ? box.popover.querySelector(".manga-reader-options") : null,
+        null,
+        "no switch of this plugin's in its options menu"
+      );
+      assert.strictEqual(container(), null, "nothing drawn over it");
+      assert.deepStrictEqual(shown, [], "and nothing handed to its lightbox");
+      assert.deepStrictEqual(
+        errorsSince(at),
+        [],
+        "and it is not even read, so nothing is reported about it either"
+      );
+
+      stopReader(box);
+    }
+  );
+
   await runSection(
     "the chapters tab is drawn from this plugin's chapters",
     async () => {
