@@ -1864,7 +1864,7 @@ async function main() {
 
       // Opened again — a fresh lightbox, a fresh popover — it starts where the reader
       // left it.
-      const again = await startReader({ galleryId: "8", on: true });
+      const again = await startReader({ galleryId: "36", on: true });
       assert.strictEqual(
         again.box.lightbox.querySelector("#manga-reader-offset").checked,
         true,

@@ -119,7 +119,7 @@ let latest: ChromeState | null = null;
  * section about the wording passed for the wrong reason: nothing was being written
  * either way.
  */
-let labels: { [key: string]: HTMLElement } = {};
+const labels: { [key: string]: HTMLElement } = {};
 
 /** Whether the header's menus are open, and which */
 let openMenu: "chapters" | "settings" | null = null;
@@ -207,7 +207,10 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   // stops following the drag.
   if (panel.getAttribute("data-built") !== "yes") {
     panel.setAttribute("data-built", "yes");
-    panel.className = CLASS_MENU_PANEL + " " + CLASS_SETTINGS;
+    // Added, not assigned: the class that identifies this panel is how the pass finds
+    // it again, and overwriting the class name once meant every later pass failed to
+    // find it and gave up before syncing anything.
+    panel.classList.add(CLASS_SETTINGS);
     panel.textContent = "";
 
     const wrap = document.createElement("div");

@@ -48,12 +48,22 @@ export interface MangaReaderSpreadOptions {
   offset: 0 | 1;
   /** Treat a page wider than it is tall as one image spanning two pages. */
   detectSpreads: boolean;
+  /**
+   * Whether two pages share a screen at all.
+   *
+   * It was not an option here until the reader drew the pages itself: with the mode
+   * off, Stash's lightbox drew them, and the pairing was only ever asked for while it
+   * was on. Now that one switch means "one page or two", it is a question this file has
+   * to be able to answer.
+   */
+  double: boolean;
 }
 
 export const DEFAULT_SPREAD_OPTIONS: MangaReaderSpreadOptions = {
   coverAlone: true,
   offset: 0,
   detectSpreads: true,
+  double: true,
 };
 
 /**
@@ -111,7 +121,7 @@ export function layout(
   if (opts.offset === 1 && i < pages.length) standAlone();
 
   while (i < pages.length) {
-    const next = pages[i + 1];
+    const next = opts.double ? pages[i + 1] : undefined;
     if (next && pairable(pages[i]) && pairable(next)) {
       screens.push({ start: i, pages: [pages[i], next] });
       i += 2;

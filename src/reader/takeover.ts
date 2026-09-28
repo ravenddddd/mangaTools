@@ -331,7 +331,11 @@ function loadGallery(id: string): void {
         id,
         pages: answer.pages,
         images: answer.images,
-        screens: layout(answer.pages, { ...settings, offset }),
+        screens: layout(answer.pages, {
+          ...settings,
+          offset,
+          double: settings.doublePage,
+        }),
         chapters: placeChapters(chaptersOf(answer), answer.pages),
       };
       remember(id, gallery);
@@ -535,13 +539,19 @@ function chromeState(
       onSetting: (next: Partial<MangaReaderSettings>) => {
         settings = writeSettings(next);
 
-        // One page or two is a question about how the pages are laid out, so the
-        // gallery is laid out again and the screen redrawn — the place is a page, and
-        // it does not move because the pairing did.
+        // Only the pairing is a question about how the pages are laid out. The fade
+        // length is not: re-laying the pages because somebody dragged a slider would
+        // redraw the screen they are looking at, for a setting that cannot change it.
+        if (next.doublePage === undefined) return;
+
         if (galleryId && loaded.has(galleryId)) {
           remember(galleryId, {
             ...gallery,
-            screens: layout(gallery.pages, { ...settings, offset }),
+            screens: layout(gallery.pages, {
+              ...settings,
+              offset,
+              double: settings.doublePage,
+            }),
           });
           shownAt = -1;
           sync(lightbox);
@@ -1130,7 +1140,11 @@ function setOffset(gallery: MangaReaderGallery, next: 0 | 1): void {
   offsetFor = gallery.id;
   writeOffset(gallery.id, next);
 
-  gallery.screens = layout(gallery.pages, { ...settings, offset });
+  gallery.screens = layout(gallery.pages, {
+    ...settings,
+    offset,
+    double: settings.doublePage,
+  });
   shownAt = -1;
 
   step();
