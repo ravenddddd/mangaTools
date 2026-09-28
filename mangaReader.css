@@ -20,6 +20,81 @@
 }
 
 /*
+ * And Stash's own header and footer, while this plugin draws its own.
+ *
+ * `display: none` rather than removed: React owns them, and it puts them back the way
+ * it left them — which is what makes turning the mode off leave nothing behind.
+ */
+.Lightbox.manga-reader-takeover .Lightbox-header,
+.Lightbox.manga-reader-takeover .Lightbox-footer {
+  display: none;
+}
+
+/*
+ * This plugin's header, in the row Stash's occupied: the image's name and where it is
+ * in the gallery on the left, the two menus and the close button on the right.
+ */
+.manga-reader-chrome {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+  background: var(--manga-reader-chrome, rgba(0, 0, 0, 0.6));
+  color: inherit;
+  position: relative;
+}
+
+.manga-reader-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manga-reader-counter {
+  opacity: 0.7;
+  margin-right: auto;
+}
+
+.manga-reader-menu {
+  position: relative;
+}
+
+.manga-reader-menu-panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  min-width: 14rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.5rem;
+  text-align: left;
+  background: var(--manga-reader-panel, rgba(20, 20, 20, 0.98));
+  border: 1px solid var(--manga-reader-divider, #444);
+  border-radius: 3px;
+}
+
+.manga-reader-menu-panel.show {
+  display: block;
+}
+
+.manga-reader-menu-item {
+  display: block;
+  width: 100%;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+  background: none;
+  border: 0;
+  color: inherit;
+}
+
+.manga-reader-menu-item:hover,
+.manga-reader-menu-item.active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/*
  * The two pages. Fills the display area, which takeover.ts makes a containing
  * block for it.
  */

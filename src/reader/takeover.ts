@@ -29,9 +29,16 @@ import { stringFor } from "../i18n";
 // tools half writes, under the same names, through the same helpers.
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
+import {
+  type ChromeState,
+  ensureChrome,
+  forgetOpenMenu,
+  removeChrome,
+} from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
 import {
   type MangaReaderChapter,
+  chapterAt,
   chaptersFromStash,
   parseChapters,
   placeChapters,
@@ -88,6 +95,13 @@ const FADE_ID = "manga-reader-fade";
 const OFFSET_ID = "manga-reader-offset";
 /** Class of the group holding them, so it can be found again */
 const CLASS_OPTIONS = "manga-reader-options";
+
+/**
+ * On the lightbox while this plugin has taken it over: its carousel, its header and
+ * its footer are hidden by the stylesheet, and the pages and the header in their place
+ * are this plugin's.
+ */
+const CLASS_TAKEOVER = "manga-reader-takeover";
 
 /**
  * How many times the container may be put back before the plugin gives up.
@@ -186,26 +200,18 @@ let pending: string | null = null;
 let handedFor: { lightbox: Element; gallery: string } | null = null;
 
 /**
- * Where the lightbox is being moved to, while it is on the way there.
+ * Where the reader is, in the pages of the gallery it is reading.
  *
- * A turn of a screen is several pages, and the lightbox only moves one page per
- * press — and drops a press that arrives while the page before it is still
- * swapping. So a move is a small errand: press once, wait for the header to say it
- * landed, press again, and give up if it never does. See `press` and `arrived`.
+ * This plugin's own, and that is the point of taking the lightbox over: Stash's own
+ * idea of which image it is on stays under a carousel and a header this plugin hides,
+ * and nothing here consults it after the first moment. A turn is arithmetic on this,
+ * not a keystroke aimed at somebody else's index — which is what the errand machinery
+ * (press, wait for the header to land, press again, give up after three tries) was
+ * for, and it is gone with it.
+ *
+ * -1 until the gallery is read and the lightbox has said which image it is showing.
  */
-let errand: {
-  /** The page index (0-based) the last press started from */
-  from: number;
-  /** The page index being aimed at */
-  to: number;
-  /** The press that has been sent and not yet seen land */
-  retry: number | null;
-} | null = null;
-
-/** How long to wait for a press to land before sending it again, in milliseconds */
-const PRESS_RETRY_MS = 120;
-/** How many times one step may be re-sent before the errand is abandoned */
-const MAX_ATTEMPTS = 3;
+let place = -1;
 let attempts = 0;
 
 // ── The loop ───────────────────────────────────────────────────────
@@ -236,6 +242,7 @@ function step(): void {
     root = lightbox;
     galleryId = null;
     shownAt = -1;
+    place = -1;
     reinsers = 0;
     logged = false;
     handedFor = null;
@@ -271,10 +278,6 @@ function step(): void {
   if (!wanted()) return;
 
   sync(lightbox);
-
-  // After the drawing, so an unfinished move shows the page it is passing through
-  // rather than skipping it.
-  arrived(lightbox);
 }
 
 /** Whether the reader should be drawing, as far as can be told without asking */
@@ -358,6 +361,7 @@ function loadGallery(id: string): void {
       language = answer.language;
       galleryId = id;
       shownAt = -1;
+      place = -1;
       step();
     })
     .catch((e) => {
@@ -478,36 +482,27 @@ function sync(lightbox: Element): void {
   // is drawn, nothing is decided, and the next pass finds it back.
   if (lightboxIsLoading(lightbox)) return;
 
-  const position = readPosition(lightbox);
-  if (!position) {
-    // The counter is drawn only when there is more than one image, so a gallery of
-    // one page is the ordinary reason there is nothing to read here — and the
-    // other reason is that Stash's markup has changed under this plugin, which is
-    // worth a line rather than a silent nothing.
-    if (gallery.pages.length <= 1) return;
+  // Where the reader is, once: the lightbox says which image it is showing, and this
+  // plugin's pages say where that image is. After this the position is this plugin's
+  // own — a turn moves it, a chapter sets it, and Stash's index is never asked again.
+  if (place < 0) {
+    place = placeOf(gallery, lightbox);
 
-    console.error(
-      "[mangaReader] the lightbox header could not be read, so the spread view " +
-        "cannot follow it — turning itself off"
-    );
-    deactivate();
-    return;
+    if (place < 0 && gallery.pages.length > 1) {
+      console.error(
+        "[mangaReader] the lightbox is showing an image this plugin did not read, so " +
+          "the spread view cannot follow it — turning itself off"
+      );
+      deactivate();
+      return;
+    }
   }
 
-  // The screen is worked out from *which image* the lightbox is showing, not from a
-  // count of how far in it is — see placeOf. The header is read above because the
-  // move is still Stash's to make, and knowing when it has landed is what a press
-  // waits for; where the drawing goes is a question about images.
-  const place = placeOf(gallery, lightbox);
-  const at = place < 0 ? -1 : screenAt(gallery.screens, place);
-  if (at < 0) {
-    console.error(
-      "[mangaReader] the lightbox is showing an image this plugin did not read, so " +
-        "the spread view cannot follow it — turning itself off"
-    );
-    deactivate();
-    return;
-  }
+  ensureChrome(lightbox, chromeState(gallery, lightbox));
+  lightbox.classList.add(CLASS_TAKEOVER);
+
+  const at = screenNow(gallery);
+  if (at < 0) return;
 
   if (
     at === shownAt &&
@@ -524,6 +519,47 @@ function sync(lightbox: Element): void {
   if (!container) return;
 
   draw(gallery.screens[at], at);
+}
+
+/**
+ * Everything the header draws from, gathered at the moment it is drawn.
+ *
+ * The chapter the reader is in comes from the chapter's own list of images — an image
+ * in no chapter is in none, and the header says so rather than naming the chapter
+ * before it. That is the answer Stash's own header could not give, and one of the
+ * reasons this one is the plugin's.
+ */
+function chromeState(
+  gallery: MangaReaderGallery,
+  lightbox: Element
+): Parameters<typeof ensureChrome>[1] {
+  const at = screenNow(gallery);
+  const image =
+    at < 0 ? null : gallery.images[gallery.screens[at].start] || null;
+  const pageId =
+    at < 0 ? "" : gallery.pages[gallery.screens[at].start]?.id || "";
+
+  return {
+    image,
+    number: Math.max(place, 0) + 1,
+    total: gallery.pages.length,
+    chapter: chapterAt(gallery.chapters, pageId),
+    chapters: gallery.chapters,
+    placed: gallery.chapters,
+    settings,
+    locale: language,
+    handlers: {
+      onChapter: (to: number) => {
+        place = to;
+        step();
+      },
+      onSetting: (next: Partial<MangaReaderSettings>) => {
+        settings = writeSettings(next);
+        if (next.doublePage === false) deactivate();
+      },
+      onClose: () => pressEscape(),
+    },
+  };
 }
 
 /**
@@ -773,120 +809,16 @@ function preload(at: number): void {
 // ── Moving the lightbox, a page at a time ──────────────────────────
 
 /** The page the lightbox says it is on, 0-based, or null when it cannot be read */
-function currentIndex(lightbox: Element): number | null {
-  const position = readPosition(lightbox);
-  return position ? position.current - 1 : null;
-}
-
 /**
- * Starts moving the lightbox to a page, by whole pages.
+ * Where the reader is on screen, as a screen index, or -1 when it is nowhere yet.
  *
- * Called with the page index a turn of the screen lands on. Nothing is sent if the
- * lightbox is already there; otherwise the first press goes now and the rest
- * follow as it lands.
+ * A screen is what the reader draws; `place` is a page. This is the one conversion
+ * between them, and the only thing a turn has to know.
  */
-function startErrand(lightbox: Element, to: number): void {
-  const from = currentIndex(lightbox);
-  if (from === null || from === to) return;
-
-  endErrand();
-  attempts = 0;
-  errand = { from, to, retry: null };
-  press(lightbox);
+function screenNow(gallery: MangaReaderGallery): number {
+  if (place < 0) return -1;
+  return screenAt(gallery.screens, place);
 }
-
-/** Sends the next press of the errand, and arms the retry that covers a dropped one */
-function press(lightbox: Element): void {
-  if (!errand) return;
-
-  const from = currentIndex(lightbox);
-  if (from === null) {
-    endErrand();
-    return;
-  }
-  if (from === errand.to) {
-    endErrand();
-    return;
-  }
-
-  errand.from = from;
-  attempts += 1;
-  pressArrow(from < errand.to ? 1 : -1);
-  armRetry(lightbox);
-}
-
-/**
- * Waits a moment for the press to land, and sends it again if it did not.
- *
- * The lightbox drops a press that arrives while the page before it is still
- * swapping (see pressArrow), and a dropped press changes nothing in the DOM — so
- * nothing else here would ever notice. This is the only place that waits on a
- * clock rather than on the reader's own header.
- */
-function armRetry(lightbox: Element): void {
-  if (!errand) return;
-  if (errand.retry !== null) window.clearTimeout(errand.retry);
-
-  errand.retry = window.setTimeout(() => {
-    if (!errand) return;
-    errand.retry = null;
-
-    const at = currentIndex(lightbox);
-    // It landed: the drawing follows on its own, and the next press with it.
-    if (at === null || at !== errand.from) return;
-
-    if (attempts >= MAX_ATTEMPTS) {
-      // Three presses that went nowhere: the lightbox is not moving for reasons
-      // this plugin cannot see. Stop, and leave the reader where they are.
-      console.error(
-        "[mangaReader] the lightbox did not respond to the arrow keys, so the " +
-          "spread view has stopped moving it — the page shown is the one it is on"
-      );
-      endErrand();
-      return;
-    }
-
-    press(lightbox);
-  }, PRESS_RETRY_MS);
-}
-
-/**
- * Carries the errand on when a press has landed — called on every DOM change.
- *
- * This is what makes a turn feel immediate: the wait between presses is the
- * lightbox's own page swap, not a timer. The timer in armRetry is only there for
- * the press that landed nowhere.
- */
-function arrived(lightbox: Element): void {
-  if (!errand) return;
-
-  // A busy lightbox is a press landing: the page it is fetching is the one the press
-  // asked for. Its header is gone while it works, so there is nothing to read and
-  // nothing to do — and ending the errand here would abandon a turn that is halfway
-  // through a page switch, which is how a spread turn lands one page short.
-  if (lightboxIsLoading(lightbox)) return;
-
-  const at = currentIndex(lightbox);
-  if (at === null) {
-    endErrand();
-    return;
-  }
-  if (at === errand.to) {
-    endErrand();
-    return;
-  }
-
-  // Still on the page that press started from: it has not landed yet, and the
-  // timer is watching for that. Anywhere else, it landed short of the target.
-  if (at !== errand.from) press(lightbox);
-}
-
-function endErrand(): void {
-  if (errand && errand.retry !== null) window.clearTimeout(errand.retry);
-  errand = null;
-}
-
-// ── Turning the mode on and off ────────────────────────────────────
 
 function activate(): void {
   settings = writeSettings({ doublePage: true });
@@ -908,6 +840,15 @@ function deactivate(): void {
     container = null;
   }
 
+  // The header goes with the drawing, and the lightbox gets Stash's own back: the
+  // class that hides its chrome is the one that carries this plugin's.
+  if (root) {
+    removeChrome(root);
+    root.classList.remove(CLASS_TAKEOVER);
+  }
+  forgetOpenMenu();
+  place = -1;
+
   if (root) {
     root.classList.remove(CLASS_ACTIVE);
     const display = root.querySelector(SELECTOR_DISPLAY) as HTMLElement | null;
@@ -919,6 +860,8 @@ function deactivate(): void {
 
 function closeLightbox(): void {
   handedFor = null;
+  place = -1;
+  forgetOpenMenu();
 
   if (clickRoot) {
     clickRoot.removeEventListener("click", onNavClick, true);
@@ -1281,13 +1224,18 @@ function turnBy(lightbox: Element, direction: 1 | -1): boolean {
   const gallery = current();
   if (!gallery) return false;
 
-  const at = currentIndex(lightbox);
-  if (at === null) return false;
+  const at = screenNow(gallery);
+  if (at < 0) return false;
 
-  const steps = stepsToAdjacent(gallery.screens, at, direction);
+  const steps = stepsToAdjacent(gallery.screens, place, direction);
   if (steps === 0) return false;
 
-  startErrand(lightbox, at + steps);
+  // Straight to it: the pages are all here, so a turn is where the reader is going
+  // rather than a errand aimed at a lightbox that has to be waited for.
+  place += steps;
+  draw(gallery.screens[screenNow(gallery)], screenNow(gallery));
+  void at;
+  sync(lightbox);
   return true;
 }
 

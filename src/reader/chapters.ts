@@ -219,9 +219,32 @@ export function placeChapters(
   return placed;
 }
 
+/**
+ * The chapter an image is in, or null when it is in none.
+ *
+ * Null is a real answer rather than a failure: a cover, a divider, a page nobody has
+ * put in a chapter. The header says so, which is also how a page that still needs a
+ * chapter becomes visible — and it is the answer Stash's own header cannot give, since
+ * its chapters are ranges and a page between two of them belongs to the one before.
+ *
+ * Which chapter that is comes from the chapter's own list of images — not from where
+ * the image sits between its neighbours.
+ */
+export function chapterAt(
+  placed: MangaReaderPlacedChapter[],
+  pageId: string
+): MangaReaderPlacedChapter | null {
+  for (const chapter of placed) {
+    if (chapter.images.includes(pageId)) return chapter;
+  }
+
+  return null;
+}
+
 // Published for the smoke test, which reaches them through the window — see the
 // note on MangaReaderNamespace in plugin-api.ts.
 NR.CHAPTERS_VERSION = CHAPTERS_VERSION;
+NR.chapterAt = chapterAt;
 NR.parseChapters = parseChapters;
 NR.chaptersFromStash = chaptersFromStash;
 NR.placeChapters = placeChapters;

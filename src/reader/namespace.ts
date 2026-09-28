@@ -145,6 +145,14 @@ export interface MangaReaderNamespace {
     rows: { title?: unknown; image_index?: unknown }[] | null | undefined,
     pathIds: string[]
   ): MangaReaderChapter[];
+  /**
+   * The chapter an image is in, or null when it is in none — see chapters.ts, where
+   * the answer comes from what each chapter lists rather than from its neighbours.
+   */
+  chapterAt(
+    placed: MangaReaderPlacedChapter[],
+    pageId: string
+  ): MangaReaderPlacedChapter | null;
   /** Where each chapter falls in the order on screen */
   placeChapters(
     chapters: MangaReaderChapter[],
