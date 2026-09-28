@@ -62,6 +62,15 @@ export interface MangaReaderGallery {
   images: LightboxImage[];
   screens: MangaReaderScreen[];
   /**
+   * Whether those screens were laid out with two pages a screen.
+   *
+   * The pairing is a setting and the screens are a function of it, so a cached gallery
+   * is only good for the setting it was laid out under. Without this, a gallery read
+   * once and opened again after the switch was moved would be drawn the old way — the
+   * cache outliving the setting it was built from.
+   */
+  paired: boolean;
+  /**
    * The gallery's chapters, placed in the order the pages came back in.
    *
    * Placed once, at the only moment the order is known — a gallery is fetched when

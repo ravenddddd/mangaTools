@@ -331,6 +331,7 @@ function loadGallery(id: string): void {
         id,
         pages: answer.pages,
         images: answer.images,
+        paired: settings.doublePage,
         screens: layout(answer.pages, {
           ...settings,
           offset,
@@ -467,6 +468,18 @@ function sync(lightbox: Element): void {
   // Where the reader is, once: the lightbox says which image it is showing, and this
   // plugin's pages say where that image is. After this the position is this plugin's
   // own — a turn moves it, a chapter sets it, and Stash's index is never asked again.
+  // The screens are a function of the pairing, so a gallery laid out under the other
+  // setting is laid out again here rather than drawn the old way.
+  if (gallery.paired !== settings.doublePage) {
+    gallery.screens = layout(gallery.pages, {
+      ...settings,
+      offset,
+      double: settings.doublePage,
+    });
+    gallery.paired = settings.doublePage;
+    shownAt = -1;
+  }
+
   if (place < 0) {
     place = placeOf(gallery, lightbox);
 
@@ -552,6 +565,7 @@ function chromeState(
               offset,
               double: settings.doublePage,
             }),
+            paired: settings.doublePage,
           });
           shownAt = -1;
           sync(lightbox);
