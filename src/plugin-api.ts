@@ -113,6 +113,13 @@ export interface MangaToolsNamespace {
   /** Whether a gallery's custom fields declare it the original text. */
   isOriginal(customFields: unknown): boolean;
   /**
+   * Whether this plugin's store says a gallery is manga — null before it has
+   * answered. See the note where it is defined in the tools half.
+   */
+  markedInStore(galleryId: string | null | undefined): boolean | null;
+  /** Runs a function whenever the store is refreshed; returns the way to stop. */
+  watchStore(fn: () => void): () => void;
+  /**
    * Where this plugin keeps a gallery's chapters — a JSON string, read and
    * written by the reader half's chapters.ts and by nothing else.
    */

@@ -71,6 +71,10 @@ export function syncChaptersTab(): void {
     return;
   }
 
+  // Manga only, and told by the store rather than by a query: a tab on any other
+  // gallery is Stash's, untouched and unasked about.
+  if (NS.markedInStore(id) !== true) return;
+
   const panel = findPanel();
   if (!panel) return;
 

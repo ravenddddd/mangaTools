@@ -38,6 +38,24 @@ const client = {
     state.queries.push({ query: String(query), variables, fetchPolicy });
     if (state.failing) return Promise.reject(new Error("no answer from Stash"));
 
+    // The tools half's gallery map, told apart by having no variables at all: it bakes
+    // its filter into the document, and every query the reader makes names a gallery.
+    // Its answer is what tells this plugin a gallery is manga — see markedInStore —
+    // so the worlds here are the marked ones, and a fixture marked `manga: false` is
+    // the gallery this plugin is meant to leave alone.
+    if (!variables) {
+      const marked = Object.keys(state.galleries)
+        .filter((id) => state.galleries[id].manga !== false)
+        .map((id) => ({
+          id,
+          custom_fields: { "plugin.mangaTools.manga": "true" },
+        }));
+
+      return Promise.resolve({
+        data: { findGalleries: { count: marked.length, galleries: marked } },
+      });
+    }
+
     const gallery = state.galleries[variables.galleryId] || { images: [] };
     // Answered by the sort that was asked for, as Stash does — a stub that gave the
     // same list whatever it was asked for could not tell a reader that follows the
@@ -190,10 +208,6 @@ console.error = (...args) => {
   loggedErrors.push(args.map((a) => String(a)).join(" "));
   realConsoleError.apply(console, args);
 };
-
-require(BUNDLE);
-
-const NR = global.window.MangaReader;
 
 // ── The runner ─────────────────────────────────────────────────────
 
@@ -617,11 +631,19 @@ const STASH_CHAPTERS = {
 };
 
 dom.window.location.pathname = "/";
+
+// In place before the bundle loads, not merely before the sections run: the tools
+// half's first refresh happens as it loads, and that refresh is what tells the reader
+// which galleries are manga. A fixture registered afterwards would be a gallery the
+// store had never heard of.
 state.galleries["7"] = GALLERY_WITH_A_SPREAD;
 state.galleries["8"] = PLAIN_GALLERY;
 state.galleries["11"] = TWO_PAGES;
 state.galleries["12"] = ONE_PAGE;
 state.galleries["13"] = STAMPED_GALLERY;
+// Registered so it is a gallery this plugin reads, with the failure injected instead
+// of its answer — which is what that section is about.
+state.galleries["9"] = PLAIN_GALLERY;
 state.galleries["21"] = ORDER_GALLERY;
 state.galleries["22"] = ORDER_GALLERY;
 state.galleries["23"] = ORDER_GALLERY;
@@ -641,10 +663,31 @@ state.galleries["43"] = OWN_CHAPTERS;
 state.galleries["33"] = OWN_CHAPTERS;
 state.galleries["34"] = OWN_CHAPTERS;
 state.galleries["51"] = NAMED_GALLERY;
+// A gallery this plugin has no business on: marked `manga: false`, which is what keeps
+// it out of the store — and the store is what the reader half asks.
+state.galleries["61"] = {
+  images: numbered(CHAPTERS_VIEW),
+  pathImages: numbered(CHAPTERS_PATH),
+  manga: false,
+  gallery: {
+    id: "61",
+    custom_fields: {},
+    chapters: [{ title: "第一話", image_index: 1 }],
+  },
+};
+
+require(BUNDLE);
+
+const NR = global.window.MangaReader;
 
 // ── Sections ───────────────────────────────────────────────────────
 
 async function main() {
+  // The tools half's gallery map is fetched as the bundle loads, and it is what tells
+  // the reader which galleries are manga — so nothing here is marked until its answer
+  // lands, which is a promise and therefore after a turn.
+  await settle();
+
   await runSection("the plugin loads and watches for a lightbox", () => {
     assert.ok(NR, "the bundle should publish window.MangaReader");
     assert.strictEqual(typeof NR.layout, "function");
@@ -908,6 +951,9 @@ async function main() {
       counterText,
       search = "",
       ids = null,
+      // A page with no gallery, or a gallery this plugin does not touch, has no
+      // switch of ours — and a section about that would be asking for the wrong thing.
+      expectSwitch = true,
     } = options || {};
 
     for (const child of dom.body.children.slice()) child.remove();
@@ -927,9 +973,17 @@ async function main() {
     dom.flush();
 
     const input = popover.querySelector("#manga-reader-double-page");
-    assert.ok(input, "the switch should be in the lightbox's own options menu");
-    input.checked = on;
-    input.dispatch("change");
+    if (expectSwitch) {
+      assert.ok(
+        input,
+        "the switch should be in the lightbox's own options menu"
+      );
+    }
+
+    if (input) {
+      input.checked = on;
+      input.dispatch("change");
+    }
     await settle();
 
     return { box, input, popover };
@@ -1964,7 +2018,11 @@ async function main() {
     // The lightbox shows every kind of image in Stash; the mode is for reading a
     // gallery, so anywhere else it draws nothing — even switched on, as here.
     const asked = imageQueries().length;
-    const { box } = await startReader({ galleryId: null, on: true });
+    const { box } = await startReader({
+      galleryId: null,
+      on: true,
+      expectSwitch: false,
+    });
 
     assert.strictEqual(container(), null, "nothing is drawn");
     assert.strictEqual(

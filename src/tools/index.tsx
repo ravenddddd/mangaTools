@@ -1270,6 +1270,23 @@ function isMarkedNow(
 }
 
 /**
+ * Whether this plugin's store holds a gallery — and, before it has answered, that it
+ * does not know.
+ *
+ * The reader half's gate, and the reason asking costs nothing: the store is filled
+ * from a query that filters on the manga mark *itself* (`refresh` below), so a
+ * gallery in it is a gallery marked manga and a gallery without the mark is in
+ * nobody's answer. Null is the third answer — before the first fetch — and it means
+ * "not yet" rather than "no", which is what keeps a marked gallery from being drawn
+ * on in the second before the answer arrives.
+ */
+NS.markedInStore = (galleryId: string | null | undefined): boolean | null =>
+  store === null || !galleryId ? null : storedIsManga(galleryId);
+
+/** Runs `fn` whenever the store is refreshed, and returns the way to stop. */
+NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
+
+/**
  * Whether Stash's edit form has changes that have not been saved.
  *
  * Read out of the DOM because that is the only place it shows. The panel's own

@@ -240,10 +240,21 @@ function step(): void {
     handedFor = null;
   }
 
-  injectSwitch(lightbox);
-
   const wantedId = galleryIdFromPath(window.location.pathname);
   if (!wantedId) return;
+
+  // **Manga first, and nothing of this plugin's anywhere else.** The mark is what
+  // says a gallery is this plugin's business, and the store knows it without asking —
+  // see markedInStore. An unmarked gallery gets no switch in its lightbox, no
+  // chapters in its tab, and nothing drawn over it; a gallery the store has not
+  // answered for yet gets nothing either, and is looked at again when it does.
+  const marked = NS.markedInStore(wantedId);
+  if (marked !== true) {
+    if (marked === false) leaveUnmarked(lightbox);
+    return;
+  }
+
+  injectSwitch(lightbox);
 
   // Read whether or not the mode is on: the chapters are what the lightbox is handed
   // once this gallery is in hand, and a reader who never turns the spread view on
@@ -267,11 +278,28 @@ function step(): void {
 
 /** Whether the reader should be drawing, as far as can be told without asking */
 function wanted(): boolean {
+  const id = galleryIdFromPath(window.location.pathname);
   return (
     settings.doublePage &&
     root !== null &&
-    galleryIdFromPath(window.location.pathname) !== null
+    id !== null &&
+    NS.markedInStore(id) === true
   );
+}
+
+/**
+ * Takes this plugin's switch back out of a lightbox on a gallery that is not manga.
+ *
+ * Rare but worth having: the mark can be removed from a gallery whose lightbox is
+ * open, and the switch is the one thing of ours that is *added* rather than drawn —
+ * a container is taken away by deactivating, and this is the same errand for a menu
+ * entry.
+ */
+function leaveUnmarked(lightbox: Element): void {
+  if (container || root !== lightbox) deactivate();
+
+  const group = lightbox.querySelector("." + CLASS_OPTIONS);
+  if (group) group.remove();
 }
 
 /** The pages of the gallery being read, if they are in hand */
@@ -1386,6 +1414,11 @@ export function install(): void {
   // Before the first pass, so that a gallery read in the same tick has somewhere
   // to hand its chapters. See handOverChapters.
   installBridge();
+
+  // The store answers a moment after the page loads, and until it does nothing here
+  // knows whether a gallery is manga. So the pass that the answer makes possible runs
+  // when it arrives, rather than waiting for something else to change the page.
+  NS.watchStore(() => step());
 
   // The switch is a setting, not a mode: nothing is drawn until the reader turns it
   // on, but the observer has to be running for the switch to be there at all.
