@@ -24,7 +24,6 @@
  * null rather than guessing, and a null turns the mode off and says so. The worst
  * case is a reader who has to press a switch again, never a blank screen.
  */
-import { stringFor } from "../i18n";
 // The field plumbing both halves share: this one reads the same custom fields the
 // tools half writes, under the same names, through the same helpers.
 import { NS } from "../tools/fields";
@@ -41,7 +40,6 @@ import {
 import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderGallery, MangaReaderSettings } from "./namespace";
 import {
-  FADE_MAX_MS,
   readOffset,
   readSettings,
   writeOffset,
@@ -53,7 +51,6 @@ import {
   CLASS_NAVBUTTON,
   SELECTOR_DISPLAY,
   SELECTOR_LIGHTBOX,
-  SELECTOR_POPOVER_BODY,
   type GalleryAnswer,
   carouselImage,
   fetchGallery,
@@ -71,21 +68,15 @@ import {
  * when it finds nothing, which is the right behaviour for a message that is
  * missing and the wrong one for a name that was never spelled right.
  */
-type ReaderLabel = "doublePage" | "fade" | "noChapter" | "offset";
 
-const labelFor = (locale: string | null | undefined, key: ReaderLabel) =>
-  stringFor(locale, `mangaReader.${key}`);
+/** A screen of one page, which the stylesheet lays out differently */
+const CLASS_SINGLE = "is-single";
 
 /** Class on Stash's lightbox while this plugin is drawing inside it */
 const CLASS_ACTIVE = "manga-reader-active";
 /** This plugin's own container, and the pages in it */
 const CLASS_SPREAD = "manga-reader-spread";
 const CLASS_PAGE = "manga-reader-page";
-const CLASS_SINGLE = "is-single";
-/** The switches this plugin adds to the lightbox's options menu */
-const SWITCH_ID = "manga-reader-double-page";
-const FADE_ID = "manga-reader-fade";
-const OFFSET_ID = "manga-reader-offset";
 /**
  * On the lightbox while this plugin has taken it over: its carousel, its header and
  * its footer are hidden by the stylesheet, and the pages and the header in their place
@@ -822,15 +813,6 @@ function preload(at: number): void {
 function screenNow(gallery: MangaReaderGallery): number {
   if (place < 0) return -1;
   return screenAt(gallery.screens, place);
-}
-
-/**
- * Turns the mode on, from the key that does it — the switch itself writes the setting
- * and re-lays the pages, in chrome.ts, and this is the same errand from a keyboard.
- */
-function activate(): void {
-  settings = writeSettings({ doublePage: true });
-  step();
 }
 
 /**

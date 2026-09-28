@@ -111,6 +111,16 @@ export function removeChrome(lightbox: Element): void {
 /** The state the buttons read when they are pressed, which is the last one drawn */
 let latest: ChromeState | null = null;
 
+/**
+ * The labels, kept by reference.
+ *
+ * They were looked up by `[for=…]`, which is a selector the tests' DOM stub does not
+ * understand — so the lookup returned null, the label was never rewritten, and a
+ * section about the wording passed for the wrong reason: nothing was being written
+ * either way.
+ */
+let labels: { [key: string]: HTMLElement } = {};
+
 /** Whether the header's menus are open, and which */
 let openMenu: "chapters" | "settings" | null = null;
 
@@ -215,6 +225,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     box.className = "form-check-label";
     box.htmlFor = DOUBLE_PAGE_ID;
 
+    labels.doublePage = box;
     wrap.appendChild(input);
     wrap.appendChild(box);
     panel.appendChild(wrap);
@@ -233,6 +244,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     const shiftLabel = document.createElement("label");
     shiftLabel.className = "form-check-label";
     shiftLabel.htmlFor = OFFSET_ID;
+    labels.offset = shiftLabel;
     shift.appendChild(shiftInput);
     shift.appendChild(shiftLabel);
     panel.appendChild(shift);
@@ -242,6 +254,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
     const fadeLabel = document.createElement("label");
     fadeLabel.htmlFor = FADE_ID;
+    labels.fade = fadeLabel;
 
     const range = document.createElement("input");
     range.type = "range";
@@ -268,9 +281,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   if (check && check.checked !== state.settings.doublePage) {
     check.checked = state.settings.doublePage;
   }
-  const name = panel.querySelector("label[for='" + DOUBLE_PAGE_ID + "']");
-  if (name && name.textContent !== label("mangaReader.doublePage")) {
-    name.textContent = label("mangaReader.doublePage");
+  const doubleName = label("mangaReader.doublePage");
+  if (labels.doublePage && labels.doublePage.textContent !== doubleName) {
+    labels.doublePage.textContent = doubleName;
   }
 
   const offset = panel.querySelector(
@@ -279,9 +292,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   if (offset && offset.checked !== (state.offset === 1)) {
     offset.checked = state.offset === 1;
   }
-  const offsetName = panel.querySelector("label[for='" + OFFSET_ID + "']");
-  if (offsetName && offsetName.textContent !== label("mangaReader.offset")) {
-    offsetName.textContent = label("mangaReader.offset");
+  const offsetName = label("mangaReader.offset");
+  if (labels.offset && labels.offset.textContent !== offsetName) {
+    labels.offset.textContent = offsetName;
   }
 
   const range = panel.querySelector("#" + FADE_ID) as HTMLInputElement | null;
@@ -291,9 +304,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const readout = panel.querySelector(".manga-reader-readout");
   const shown = state.settings.fadeMs + " ms";
   if (readout && readout.textContent !== shown) readout.textContent = shown;
-  const fadeName = panel.querySelector("label[for='" + FADE_ID + "']");
-  if (fadeName && fadeName.textContent !== label("mangaReader.fade")) {
-    fadeName.textContent = label("mangaReader.fade");
+  const fadeName = label("mangaReader.fade");
+  if (labels.fade && labels.fade.textContent !== fadeName) {
+    labels.fade.textContent = fadeName;
   }
 }
 

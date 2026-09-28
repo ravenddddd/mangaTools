@@ -713,6 +713,8 @@ state.galleries["43"] = OWN_CHAPTERS;
 state.galleries["33"] = OWN_CHAPTERS;
 state.galleries["34"] = OWN_CHAPTERS;
 state.galleries["51"] = NAMED_GALLERY;
+// For the sections about the pairing shift, which is remembered per gallery.
+state.galleries["36"] = PLAIN_GALLERY;
 // A gallery this plugin has no business on: marked `manga: false`, which is what keeps
 // it out of the store — and the store is what the reader half asks.
 state.galleries["61"] = {
@@ -1077,47 +1079,66 @@ async function main() {
     dom.flush();
   }
 
-  await runSection("nothing is drawn until the mode is turned on", async () => {
-    const { box } = await startReader({ on: false });
-
-    assert.strictEqual(container(), null, "no container while the mode is off");
-    assert.strictEqual(
-      box.lightbox.classList.contains("manga-reader-active"),
-      false,
-      "and the lightbox untouched"
-    );
-
-    stopReader(box);
-  });
-
+  /**
+   * The switch is one page or two now, not draw or not. What decides whether a gallery
+   * is this plugin's to draw is the mark on the gallery — see markedInStore — so a
+   * reader with the switch off gets single pages rather than Stash's lightbox.
+   */
   await runSection(
-    "the switch is added to the lightbox's own options",
+    "a marked gallery is drawn with the switch off too",
     async () => {
-      const { box, input, popover } = await startReader({ on: false });
+      const { box } = await startReader({ galleryId: "8", on: false });
 
-      assert.strictEqual(input.type, "checkbox");
-      assert.strictEqual(
-        input.checked,
-        false,
-        "off, because the mode is off — the switch shows the state, it does not set it"
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/401/image"],
+        "one page at a time, since the pairing is off"
       );
-
-      const label = popover.querySelector("label");
-      assert.strictEqual(label.htmlFor, "manga-reader-double-page");
       assert.strictEqual(
-        label.textContent,
-        "Double page",
-        "in English, because no gallery has been read yet and Stash's interface " +
-          "language is only known from its answer"
-      );
-      assert.ok(
-        popover.querySelector(".form-check"),
-        "and in Stash's own markup, so it reads as one of its options"
+        box.lightbox.classList.contains("manga-reader-active"),
+        true,
+        "and the reader is drawing in the lightbox either way"
       );
 
       stopReader(box);
     }
   );
+
+  await runSection("the switches are in the reader's own header", async () => {
+    const { box, input } = await startReader({ on: false });
+
+    assert.strictEqual(input.type, "checkbox");
+    assert.strictEqual(
+      input.checked,
+      false,
+      "off, because the mode is off — the switch shows the state, it does not set it"
+    );
+
+    // In the reader's own header, which is the only home it has: the one that used
+    // to be injected into Stash's options popover was inside the very header the
+    // reader hides, so a reader could turn the reader off from a menu it could not
+    // see it had.
+    const inChrome = (node) => {
+      for (let at = node; at; at = at.parentNode) {
+        if (at.classList && at.classList.contains("manga-reader-chrome")) {
+          return true;
+        }
+      }
+      return false;
+    };
+    assert.strictEqual(
+      inChrome(input),
+      true,
+      "in the reader's own header, not in somebody else's menu"
+    );
+    assert.strictEqual(
+      box.lightbox.querySelector(".manga-reader-chrome .form-check") !== null,
+      true,
+      "and in Stash's own markup, so it reads as one of its settings"
+    );
+
+    stopReader(box);
+  });
 
   await runSection(
     "the switch speaks the interface language once it is known",
@@ -1133,10 +1154,11 @@ async function main() {
         language: "zh-TW",
       });
 
-      const reopened = box.openPopover();
-      dom.flush();
+      const label = box.lightbox.querySelector(
+        ".manga-reader-chrome .form-check-label"
+      );
       assert.strictEqual(
-        reopened.querySelector("label").textContent,
+        label.textContent,
         "雙頁閱讀",
         "a traditional-Chinese interface reads the traditional wording"
       );
@@ -1732,9 +1754,9 @@ async function main() {
       // The value is shown beside the label — the readout inside the label is where
       // the number lives, so it is readable from the menu without a render.
       assert.strictEqual(
-        fade.parentNode.children[0].children[0].textContent,
+        fade.parentNode.querySelector(".manga-reader-readout").textContent,
         "140 ms",
-        "and showing what it is set to"
+        "and showing what it is set to, beside it"
       );
 
       // Dragging it changes what the next screen does, which is the only way to tell
@@ -1777,7 +1799,7 @@ async function main() {
   );
 
   await runSection("the offset key re-pairs the gallery", async () => {
-    const { box } = await startReader({ galleryId: "8", on: true });
+    const { box } = await startReader({ galleryId: "36", on: true });
 
     // On the second screen, which is where the two layouts differ: without the offset
     // its screen is 2+3, and with it page 2 stands alone.
@@ -1808,7 +1830,7 @@ async function main() {
   await runSection(
     "the offset is a switch, and is remembered for the gallery",
     async () => {
-      const { box } = await startReader({ galleryId: "8", on: true });
+      const { box } = await startReader({ galleryId: "36", on: true });
 
       const offsetSwitch = box.lightbox.querySelector("#manga-reader-offset");
       assert.ok(
@@ -1834,7 +1856,7 @@ async function main() {
         JSON.parse(
           dom.window.localStorage.getItem("plugin.mangaTools.offsets")
         ),
-        { 8: 1 },
+        { 36: 1 },
         "and the gallery's shift is remembered, so it need not be set again"
       );
 
@@ -1861,58 +1883,45 @@ async function main() {
   );
 
   await runSection(
-    "turning the switch off puts the lightbox back",
+    "turning the pairing off leaves one page a screen",
     async () => {
-      const { box, input } = await startReader({ on: true });
-      assert.ok(container(), "drawing first");
+      const { box, input } = await startReader({ galleryId: "8", on: true });
+      turn(box);
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image", "/image/403/image"],
+        "drawing pairs first"
+      );
 
       input.checked = false;
       input.dispatch("change");
 
-      assert.strictEqual(container(), null, "the container is gone");
-      assert.strictEqual(
-        box.lightbox.classList.contains("manga-reader-active"),
-        false,
-        "the carousel is visible again"
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image"],
+        "and with the pairing off the page the reader is in stands alone"
       );
       assert.strictEqual(
-        box.display.style.position,
-        "",
-        "and the display is as Stash had it"
+        box.lightbox.classList.contains("manga-reader-active"),
+        true,
+        "in the same lightbox, still drawn by this plugin"
       );
 
       stopReader(box);
-      assert.strictEqual(
-        container(),
-        null,
-        "and closing the lightbox leaves nothing behind"
-      );
     }
   );
 
-  await runSection("the mode is not used off a gallery page", async () => {
-    // The lightbox shows every kind of image in Stash; the mode is for reading a
-    // gallery, so anywhere else it draws nothing — even switched on, as here.
-    const asked = imageQueries().length;
-    const { box } = await startReader({
-      galleryId: null,
-      on: true,
-      expectSwitch: false,
-    });
-
-    assert.strictEqual(container(), null, "nothing is drawn");
-    assert.strictEqual(
-      imageQueries().length,
-      asked,
-      "and no gallery's pages are asked for"
-    );
-
-    stopReader(box);
-  });
-
   await runSection("the mode is remembered for the next session", async () => {
-    const { box } = await startReader({ on: true });
-    assert.ok(container(), "on, and drawing");
+    // Off first, so turning it on is a change — which is what a switch reports, and
+    // what makes it write anything at all.
+    const off = await startReader({ galleryId: "8", on: false });
+    stopReader(off.box);
+
+    const { box, input } = await startReader({ galleryId: "8", on: false });
+    assert.ok(container(), "drawing either way");
+
+    input.checked = true;
+    input.dispatch("change");
 
     assert.deepStrictEqual(
       JSON.parse(dom.window.localStorage.getItem("plugin.mangaTools.settings")),
@@ -2184,7 +2193,7 @@ async function main() {
         1,
         "the lightbox was handed a list, once"
       );
-      const { props, chapters } = shown[0];
+      const { props } = shown[0];
 
       assert.strictEqual(
         props.images.length,
@@ -2231,7 +2240,6 @@ async function main() {
         ids: CHAPTERS_VIEW.map(String),
       });
 
-      const { chapters } = shown[0];
       assert.deepStrictEqual(
         chapterMenu(box),
         ["第二話", "第一話"],
@@ -2336,10 +2344,10 @@ async function main() {
         ids: CHAPTERS_VIEW.map(String),
       });
 
-      assert.strictEqual(
-        container(),
-        null,
-        "nothing is drawn: the spread view is off, and the mode is what decides that"
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/701/image"],
+        "one page at a time: the pairing is off, and the mark is what decides the rest"
       );
       assert.strictEqual(
         shown.length,
