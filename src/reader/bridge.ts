@@ -32,10 +32,24 @@ export interface LightboxTakeover {
    */
   chapters: MangaReaderPlacedChapter[];
   totalCount: number;
+  /**
+   * Where to start, for opening a lightbox that is closed. Left out when handing a
+   * list to one that is already up, where the reader is looking at something and
+   * must go on looking at it.
+   */
+  at?: number;
 }
 
-/** The handle the mounted component publishes, or null while there is none. */
-let handle: { takeOver(request: LightboxTakeover): void } | null = null;
+/**
+ * The handles the mounted components publish, newest first.
+ *
+ * More than one bridge is mounted at a time — a gallery's page has a header and an
+ * images tab, and either can be on screen when the lightbox is wanted — and each
+ * one is a different component in Stash's tree with the same context behind it. A
+ * single variable would be cleared by whichever unmounted first, so the last one
+ * mounted is the one asked, and every one of them cleans up only itself.
+ */
+const handles: { takeOver(request: LightboxTakeover): void }[] = [];
 
 /**
  * Whether a bridge is mounted — which is the question the reader has to ask
@@ -43,7 +57,7 @@ let handle: { takeOver(request: LightboxTakeover): void } | null = null;
  * handing it over and would leave the menu as Stash's own empty one.
  */
 export function bridged(): boolean {
-  return handle !== null;
+  return handles.length > 0;
 }
 
 /**
@@ -54,7 +68,7 @@ export function bridged(): boolean {
  * chapters — the ones it was opened with — are already there and already right.
  */
 export function takeOver(request: LightboxTakeover): void {
-  handle?.takeOver(request);
+  handles[handles.length - 1]?.takeOver(request);
 }
 
 /**
@@ -79,7 +93,7 @@ function LightboxBridge(): null {
   const show = api.hooks.useLightbox({}, entries);
 
   React.useEffect(() => {
-    handle = {
+    const mine = {
       takeOver(request: LightboxTakeover) {
         entries.splice(0, entries.length, ...entriesFor(request));
         show({
@@ -90,12 +104,17 @@ function LightboxBridge(): null {
           pages: 1,
           pageSize: request.images.length,
           totalCount: request.totalCount,
+          // Only read when the lightbox mounts, which is how a chapter clicked on
+          // the gallery page opens one — see the chapters tab.
+          initialIndex: request.at,
         });
       },
     };
 
+    handles.push(mine);
     return () => {
-      handle = null;
+      const at = handles.indexOf(mine);
+      if (at !== -1) handles.splice(at, 1);
     };
   }, [entries, show, api]);
 
@@ -146,7 +165,21 @@ export function installBridge(): void {
   const api = requirePluginApi();
   const React = api.React;
 
-  api.patch.after("ImageList", (...args: unknown[]) => {
+  // Two places, because the two things that want a lightbox are not on the same
+  // page: the images list is what a gallery's lightbox is opened from, and the
+  // header is on every detail page — including the Chapters tab, where this plugin
+  // renders the chapters and has to be able to open the lightbox itself.
+  for (const target of ["ImageList", "HeaderImage"]) {
+    installAgainst(api, React, target);
+  }
+}
+
+function installAgainst(
+  api: ReturnType<typeof requirePluginApi>,
+  React: ReturnType<typeof requirePluginApi>["React"],
+  target: string
+): void {
+  api.patch.after(target, (...args: unknown[]) => {
     // The rendered result of the component this wrapped — see the note on `after`
     // in plugin-api.ts for why it is the last argument rather than the first.
     const result = args[args.length - 1] as React.ReactNode;

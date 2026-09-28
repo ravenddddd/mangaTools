@@ -32,6 +32,7 @@ const state = {
   failing: false,
 };
 
+const mutations = [];
 const client = {
   query: ({ query, variables, fetchPolicy }) => {
     state.queries.push({ query: String(query), variables, fetchPolicy });
@@ -68,6 +69,13 @@ const client = {
         },
       },
     });
+  },
+  // Stash's writes, recorded rather than performed: this plugin is not allowed to
+  // make any — see the note on never touching Stash's own data — and a stub that
+  // simply had no mutate would hide a write that tried.
+  mutate: (options) => {
+    mutations.push(options);
+    return Promise.resolve({ data: {} });
   },
 };
 
@@ -437,6 +445,45 @@ const mountBridge = () => {
   assert.ok(bridge, "and render something beside it");
   bridge.type(bridge.props);
 };
+
+/**
+ * Stash's Chapters tab, as far as this plugin can see it: a button, and a container
+ * of rows beside it. The rows are Stash's own shape — an `<hr>` and a `btn-link` in
+ * a `.row` — because that is what the plugin replaces them with.
+ */
+const buildChaptersTab = (chapters) => {
+  const panel = dom.makeElement("div");
+  const button = dom.makeElement("button");
+  button.className = "btn btn-primary";
+  button.textContent = "Create chapters";
+
+  const container = dom.makeElement("div");
+  container.className = "container";
+  for (const chapter of chapters) {
+    const wrap = dom.makeElement("div");
+    wrap.appendChild(dom.makeElement("hr"));
+    const line = dom.makeElement("div");
+    line.className = "row";
+    const row = dom.makeElement("button");
+    row.className = "btn btn-link";
+    row.textContent = `${chapter.title} - #${chapter.image_index}`;
+    line.appendChild(row);
+    wrap.appendChild(line);
+    container.appendChild(wrap);
+  }
+
+  panel.appendChild(button);
+  panel.appendChild(container);
+  dom.body.appendChild(panel);
+
+  return { panel, button, container, close: () => panel.remove() };
+};
+
+/** The rows this plugin drew in Stash's container */
+const drawnRows = (container) =>
+  [...container.children].map(
+    (wrap) => wrap.children[1].children[0].textContent
+  );
 
 /** The container this plugin draws in, if it is drawing */
 const container = () => dom.body.querySelector(".manga-reader-spread");
@@ -894,6 +941,13 @@ async function main() {
   /** Closes the lightbox and lets the reader notice */
   function stopReader(box) {
     box.close();
+    dom.flush();
+  }
+
+  /** Puts the chapters tab away, the way leaving the page would */
+  function stopTab(tab) {
+    tab.close();
+    dom.window.location.pathname = "/";
     dom.flush();
   }
 
@@ -2282,6 +2336,90 @@ async function main() {
       );
 
       stopReader(box);
+    }
+  );
+
+  /**
+   * The gallery page's own Chapters tab, which this plugin renders from its own
+   * chapters. Stash's rows are read for as long as they are all that knows where a
+   * chapter is, and are never written — the point of taking the tab over is that
+   * the plugin's field becomes the one that says where chapters are.
+   */
+  await runSection(
+    "the chapters tab is drawn from this plugin's chapters",
+    async () => {
+      mountBridge();
+      const at = mutations.length;
+      dom.window.location.pathname = "/galleries/32";
+      const tab = buildChaptersTab([
+        { title: "第一話", image_index: 1 },
+        { title: "第二話", image_index: 5 },
+      ]);
+
+      dom.flush();
+      await settle();
+
+      assert.strictEqual(
+        tab.button.getAttribute("data-manga-reader-hidden"),
+        "",
+        "Stash's own button goes, since this plugin is what would edit them now — " +
+          "attributes seen: " +
+          JSON.stringify(tab.button.attributes)
+      );
+      assert.deepStrictEqual(
+        drawnRows(tab.container),
+        ["第一話 - #1", "第二話 - #5"],
+        "and the rows are Stash's chapters, counted in path order — the order this " +
+          "tab has always counted in, and the order it is listed in"
+      );
+      assert.deepStrictEqual(
+        mutations.slice(at),
+        [],
+        "reading a gallery's chapters does not write anything, least of all Stash's rows"
+      );
+
+      stopTab(tab);
+    }
+  );
+
+  await runSection(
+    "a chapter in the tab opens the lightbox there",
+    async () => {
+      mountBridge();
+      shown.length = 0;
+      dom.window.location.pathname = "/galleries/32";
+      const tab = buildChaptersTab([
+        { title: "第一話", image_index: 1 },
+        { title: "第二話", image_index: 5 },
+      ]);
+      dom.flush();
+      await settle();
+
+      // The second row is 第二話, which begins at path position 4 — the tab lists
+      // path order, so that is both what the row says and where the click goes.
+      dom.click(tab.container.children[1].children[1].children[0]);
+
+      assert.strictEqual(shown.length, 1, "the lightbox was asked to open");
+      assert.strictEqual(
+        shown[0].props.initialIndex,
+        4,
+        "at the page that chapter begins on"
+      );
+      assert.strictEqual(
+        shown[0].props.images.length,
+        8,
+        "with the gallery's images, so the reader and the lightbox agree"
+      );
+      assert.deepStrictEqual(
+        shown[0].chapters.map((c) => [c.title, c.image_index]),
+        [
+          ["第一話", 1],
+          ["第二話", 5],
+        ],
+        "and its chapters, so the menu is there from the first page"
+      );
+
+      stopTab(tab);
     }
   );
 

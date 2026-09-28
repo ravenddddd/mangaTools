@@ -29,6 +29,7 @@ import { stringFor } from "../i18n";
 // tools half writes, under the same names, through the same helpers.
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
+import { syncChaptersTab } from "./chapters-tab";
 import {
   type MangaReaderChapter,
   chaptersFromStash,
@@ -206,6 +207,12 @@ let attempts = 0;
  * happens once per gallery, in `loadGallery`.
  */
 function step(): void {
+  // The gallery page's own Chapters tab, which is a different surface with the same
+  // chapters — and is on screen exactly when there is *no* lightbox, so it is
+  // watched before the lightbox is looked for. See chapters-tab.ts for what it does
+  // and what it will not.
+  syncChaptersTab();
+
   const lightbox = document.querySelector(SELECTOR_LIGHTBOX);
 
   if (!lightbox) {

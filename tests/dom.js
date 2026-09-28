@@ -93,6 +93,16 @@ function makeElement(tagName) {
       if (el.parentNode) detach(el.parentNode, el);
     },
 
+    /**
+     * The sibling before this one, elements only — the chapters tab is found by the
+     * button Stash renders beside it.
+     */
+    get previousElementSibling() {
+      if (!el.parentNode) return null;
+      const at = el.parentNode.children.indexOf(el);
+      return at > 0 ? el.parentNode.children[at - 1] : null;
+    },
+
     /** Whether the node is this element or below it — how a menu knows a click was inside it */
     contains(node) {
       for (let at = node; at; at = at.parentNode) {
@@ -289,7 +299,9 @@ function createDom() {
   const document = {
     body,
     querySelector: (sel) => body.querySelector(sel),
-    querySelectorAll: () => [],
+    // Real, over the body: the plugin now looks for Stash's chapters panel by shape
+    // rather than by an id, so an empty answer would be a page it cannot read.
+    querySelectorAll: (sel) => body.querySelectorAll(sel),
     getElementById: (id) => body.querySelector("#" + String(id)),
     createElement: (tag) =>
       String(tag).toLowerCase() === "img" ? imageElement() : makeElement(tag),
