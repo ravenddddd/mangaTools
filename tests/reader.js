@@ -1120,7 +1120,7 @@ async function main() {
     // see it had.
     const inChrome = (node) => {
       for (let at = node; at; at = at.parentNode) {
-        if (at.classList && at.classList.contains("manga-reader-chrome")) {
+        if (at.classList?.contains("manga-reader-chrome")) {
           return true;
         }
       }
