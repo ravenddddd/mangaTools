@@ -3179,7 +3179,8 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   //
   // The censorship row comes first, then the language, then the group: the
   // censorship is about the copy in hand — what was or was not done to the scans —
-  // and the other two are about where the text came from.
+  // and the other two are about where the text came from. The raw mark is not a
+  // row at all: it rides on the language, when there is one.
   const body = (
     <div className="manga-tools-panel-body">
       {mark ? (
@@ -3198,6 +3199,19 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
           ) : null}
           {showFlag ? " " : null}
           {language.name}
+          {/*
+            The raw mark rides on this row rather than having one of its own. It
+            answers a question about the language — the text is in it, untranslated
+            — and as a row of its own under the *group's* label it read like a group
+            called "raw", which is the reading this field exists to avoid.
+
+            The space in front of it is part of the string, not a text node of its
+            own like the flag's: English wants one before a bracket and Chinese
+            takes none, so the catalog is where that difference belongs.
+          */}
+          {original
+            ? t(intl, "mangaTools.translationGroup.originalInline")
+            : null}
         </h6>
       ) : null}
       {group ? (
@@ -3209,13 +3223,12 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
           {group}
         </h6>
       ) : null}
-      {original ? (
-        // Under the same label as the group, because it answers the same question:
-        // this gallery was not translated. The wording carries that — a bare "原文"
-        // under "Translation group:" would read like a group called that, which is
-        // the reading this field exists to avoid.
+      {original && !language ? (
+        // Raw with no language to carry the mark, so it stands on its own — and
+        // without the group's label, for the reason above. The wording carries the
+        // rest: a bare "原文" under that label would read like a group called that,
+        // which is why the string says what it does.
         <h6 className="manga-tools-detail">
-          {t(intl, "mangaTools.translationGroup.heading") + ": "}
           {t(intl, "mangaTools.translationGroup.originalDetail")}
         </h6>
       ) : null}

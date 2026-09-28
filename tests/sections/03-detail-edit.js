@@ -180,6 +180,47 @@ module.exports = () => {
     'without a flag there must not be a double space in "语言:  klingon"'
   );
 
+  // A raw gallery: the mark rides on the language row, in the same parentheses it
+  // is written with, and there is no row under the *group's* label — which is what
+  // it used to be, and what made it read like a group called "raw".
+  //
+  // The rows are taken from the body rather than searched for, because how many
+  // there are is the point: one, not two.
+  const rowsIn = (portal) =>
+    find(
+      portal.node,
+      (n) => n.props?.className === "manga-tools-panel-body"
+    ).props.children.filter(
+      (c) => c && c.props?.className === "manga-tools-detail"
+    );
+
+  r9 = detail({
+    "plugin.mangaTools.language": "zh-Hant",
+    "plugin.mangaTools.original": "true",
+  });
+  const rawRows = rowsIn(r9.portal);
+  assert.strictEqual(rawRows.length, 1, "raw draws one row, not two");
+  assert.deepStrictEqual(
+    rawRows[0].props.children.filter((c) => typeof c === "string"),
+    ["语言: ", " ", "繁体中文", "（生肉）"],
+    "the mark should follow the name on the language row"
+  );
+
+  // Raw with no language to carry it: the mark stands on its own, and still
+  // without that label. It is the one row left, so the panel keeps drawing.
+  r9 = detail({ "plugin.mangaTools.original": "true" });
+  const loneRows = rowsIn(r9.portal);
+  assert.strictEqual(loneRows.length, 1, "and still one row without it");
+  assert.strictEqual(
+    loneRows[0].props.children,
+    "生肉（无翻译组）",
+    "with no language the mark is the whole row, with no label in front of it"
+  );
+  assert.ok(
+    !hasText(r9.portal.node, "翻译组"),
+    "and the group's label is nowhere on it"
+  );
+
   // Label i18n: follows the UI language, falls back to English
   state.currentLocale = "ja-JP";
   assert.ok(

@@ -21,7 +21,7 @@ the page, a reader can still read.
 | **Language** | A language attribute on galleries, surfaced as a flag badge, an edit-page dropdown, a bulk-edit row and a localised detail row |
 | **Censorship** | Whether a gallery is censored or not, surfaced as a mark on the gallery card and a row in the detail page's Manga info panel |
 | **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and, in both directions, the language its galleries usually carry: a button on the language row, and the menu's order and flag hint |
-| **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a 生肉/熟肉 toggle on the group row, and a row in the details panel |
+| **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a 生肉/熟肉 toggle on the group row, and a `（生肉）` after the language in the details panel |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
 | **Reading** | A two-page (spread) view for the image lightbox, with the pages paired the way a manga is printed — see [Reading](#reading-two-pages-at-a-time) |
@@ -399,7 +399,7 @@ Who translated the comic: `plugin.mangaTools.translationGroup`, as free text.
 
 | Where | Effect |
 |---|---|
-| Gallery detail page | A row in the Manga info panel: the label and the name, and nothing else. Unset draws no row |
+| Gallery detail page | A row in the Manga info panel: the label and the name, and nothing else. Unset draws no row. A raw gallery draws **no row here at all** — the mark rides on the language row instead, and on a raw gallery with no language it stands alone as *raw (no translation group)* |
 | Gallery edit page | A box in the Manga info block, drawn as the same select the language and censorship fields are, with the groups already in use in its menu and a typed name offered as a new one. What it holds decides the language row's suggestion button — see below |
 
 **Free text, and that is the whole of its design.** The other fields here pick
@@ -489,8 +489,9 @@ does apply. Both files are masked rather than inlined, like the manga mark: the
 file supplies the shape, the stylesheet supplies the colour.
 
 While a gallery is marked raw its group box is **disabled**, and says why: it
-carries the same wording the details panel uses (*raw (no translation group)*,
-worded that way so it cannot be taken for a group with that name). Disabled rather
+carries *raw (no translation group)*, the wording a raw gallery with no language
+also uses in the details panel — the same sentence, worded that way so it cannot
+be taken for a group with that name. Disabled rather
 than left live, because an empty box means "nobody has said" and this is not that
 — this is "not applicable" — and rather than replaced by a line of text, because
 the row would then be a different shape from the two above it. The button beside
