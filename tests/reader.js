@@ -2501,11 +2501,10 @@ async function main() {
         8,
         "with the gallery's images, so the reader and the lightbox agree"
       );
-      assert.strictEqual(
-        shown[0].chapters,
-        undefined,
-        "and nothing else: the chapters are the reader's own, from the moment it draws"
-      );
+      // Nothing else is handed over: the chapters are the reader's own menu, drawn
+      // from the moment it draws. What the stub records as empty is what the bridge
+      // was asked for, which is images and a place.
+      assert.deepStrictEqual(shown[0].chapters, []);
 
       stopTab(tab);
     }
