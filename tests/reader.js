@@ -1665,8 +1665,7 @@ async function main() {
     // Counted, not compared against one: the animations are the container's own
     // history, and the container outlives the screens drawn into it.
     const before = spread.animations.length;
-    box.move(2);
-    dom.flush();
+    turn(box);
     assert.strictEqual(
       spread.animations.length,
       before + 1,
@@ -1677,7 +1676,7 @@ async function main() {
     // dissolve — decoration does not get to overrule that.
     dom.prefersReducedMotion(true);
     const quiet = spread.animations.length;
-    box.move(4);
+    turn(box, 2);
     dom.flush();
     assert.strictEqual(
       spread.animations.length,
@@ -1697,9 +1696,9 @@ async function main() {
   await runSection(
     "the fade is a setting, in the menu beside the switch",
     async () => {
-      const { box, popover } = await startReader({ galleryId: "8", on: true });
+      const { box } = await startReader({ galleryId: "8", on: true });
 
-      const fade = popover.querySelector("#manga-reader-fade");
+      const fade = box.lightbox.querySelector("#manga-reader-fade");
       assert.ok(fade, "the options menu offers the fade length as a slider");
       assert.strictEqual(
         fade.type,
@@ -1725,8 +1724,7 @@ async function main() {
       const before = container().animations.length;
       fade.value = "600";
       fade.dispatch("input");
-      box.move(2);
-      dom.flush();
+      turn(box);
 
       const animations = container().animations;
       assert.strictEqual(
@@ -1761,12 +1759,11 @@ async function main() {
   );
 
   await runSection("the offset key re-pairs the gallery", async () => {
-    const { box, popover } = await startReader({ galleryId: "8", on: true });
+    const { box } = await startReader({ galleryId: "8", on: true });
 
-    // At page 2, which is where the two layouts differ: without the offset its
-    // screen is 2+3, and with it page 2 stands alone.
-    box.move(2);
-    dom.flush();
+    // On the second screen, which is where the two layouts differ: without the offset
+    // its screen is 2+3, and with it page 2 stands alone.
+    turn(box);
     const before = drawn();
     assert.deepStrictEqual(before, ["/image/402/image", "/image/403/image"]);
 
@@ -1778,7 +1775,7 @@ async function main() {
         "that was taken for a spread and was not one"
     );
     assert.strictEqual(
-      popover.querySelector("#manga-reader-offset").checked,
+      box.lightbox.querySelector("#manga-reader-offset").checked,
       true,
       "and the switch in the options menu says so, because both routes go through " +
         "the one place that sets it"
@@ -1793,9 +1790,9 @@ async function main() {
   await runSection(
     "the offset is a switch, and is remembered for the gallery",
     async () => {
-      const { box, popover } = await startReader({ galleryId: "8", on: true });
+      const { box } = await startReader({ galleryId: "8", on: true });
 
-      const offsetSwitch = popover.querySelector("#manga-reader-offset");
+      const offsetSwitch = box.lightbox.querySelector("#manga-reader-offset");
       assert.ok(
         offsetSwitch,
         "the options menu offers the offset while a gallery is in hand"
@@ -1806,8 +1803,7 @@ async function main() {
         "and it starts unshifted"
       );
 
-      box.move(2);
-      dom.flush();
+      turn(box);
       offsetSwitch.checked = true;
       offsetSwitch.dispatch("change");
 
@@ -1830,13 +1826,12 @@ async function main() {
       // left it.
       const again = await startReader({ galleryId: "8", on: true });
       assert.strictEqual(
-        again.popover.querySelector("#manga-reader-offset").checked,
+        again.box.lightbox.querySelector("#manga-reader-offset").checked,
         true,
         "the gallery opens with the shift it was given"
       );
 
-      again.box.move(2);
-      dom.flush();
+      turn(again.box);
       assert.deepStrictEqual(
         drawn(),
         ["/image/402/image"],
@@ -1931,30 +1926,44 @@ async function main() {
     }
   );
 
+  /**
+   * The header used to be how the reader knew where it was, so one it could not read
+   * was a lightbox it must not draw over. The place comes from *which image is
+   * showing* now, and the header is not read at all — so a header this plugin cannot
+   * make sense of is nothing to it.
+   */
   await runSection(
-    "a lightbox whose header cannot be read is not drawn over",
+    "a header this plugin cannot read is not its business",
     async () => {
-      // Several pages and a header with no counter: Stash's markup has moved on.
-      // The plugin cannot know where it is, so it must not draw at all.
       const at = loggedErrors.length;
       const { box } = await startReader({ galleryId: "11", on: true });
+
+      // A header with no counter in it: several pages, and nothing that says "N / M".
       box.counter.textContent = "1";
       dom.flush();
 
-      assert.strictEqual(container(), null, "nothing is drawn");
-      assert.ok(
-        errorsSince(at).some((line) => /header could not be read/.test(line)),
-        "and it says which assumption failed"
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/201/image"],
+        "the pages are drawn all the same"
+      );
+      assert.deepStrictEqual(
+        errorsSince(at),
+        [],
+        "and nothing is reported: the counter is not what the reader reads"
       );
 
       stopReader(box);
     }
   );
 
-  await runSection("a one-page gallery is quiet", async () => {
-    // The counter is drawn only when there is more than one image, so this looks
-    // exactly like markup that has changed — unless the page count says otherwise,
-    // which is why the plugin reads its own page list before deciding.
+  /**
+   * A gallery of one page: nothing to pair, and nothing wrong with it either. The
+   * header's counter is drawn only when there is more than one image, which is what
+   * used to make this look like markup that had changed — it is drawn now by this
+   * plugin, and the page count is its own.
+   */
+  await runSection("a one-page gallery is drawn, and is quiet", async () => {
     const at = loggedErrors.length;
     const { box } = await startReader({
       galleryId: "12",
@@ -1962,7 +1971,11 @@ async function main() {
       on: true,
     });
 
-    assert.strictEqual(container(), null, "nothing is drawn");
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/301/image"],
+      "the one page is drawn"
+    );
     assert.deepStrictEqual(
       errorsSince(at),
       [],
