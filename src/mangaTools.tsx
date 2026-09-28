@@ -1010,8 +1010,14 @@ const TOOLBAR_HOST_CLASS = "manga-tools-toolbar-host";
  * import of `src/core/StashService`), so a version without `getClient` is the
  * only way the lookup fails, and on such a version the toolbar gets nothing
  * rather than a switch that cannot work.
+ *
+ * Read defensively, with a Stash that has no API at all in mind: this line is in
+ * the module body, so it is evaluated while the bundle loads, and this half
+ * shares a bundle with the reader's — which must not be taken down by anything
+ * that happens here.
  */
-const CAN_WRITE = typeof PluginApi.utils.StashService.getClient === "function";
+const CAN_WRITE =
+  typeof PluginApi.utils?.StashService?.getClient === "function";
 
 if (!CAN_WRITE) {
   console.error(
@@ -3076,30 +3082,54 @@ function BulkFieldsRow() {
  * render by unmounting the tree, which is what left the app sitting on "Loading"
  * while this was being built. A boundary turns that into a log line naming the
  * block.
+ *
+ * Built on first use rather than where it is written, and that is about the
+ * bundle rather than about React. A class body is evaluated where it stands, so
+ * `extends React.Component` resolves the API *while the file loads* — and this
+ * half shares a bundle with the reader's, whose half must not be taken down by
+ * anything that happens during this one's load. Inside a render, a throw costs
+ * one block; at load it costs both halves.
  */
-class GuardedBlock extends React.Component<
-  { name: string; children?: ReactNode },
-  { failed: boolean }
+type GuardedBlockProps = { name: string; children?: ReactNode };
+type GuardedBlockState = { failed: boolean };
+
+let guardedBlockClass: React.ComponentClass<
+  GuardedBlockProps,
+  GuardedBlockState
+> | null = null;
+
+/** The error boundary, made once and reused. Call it from inside a render. */
+function guardedBlock(): React.ComponentClass<
+  GuardedBlockProps,
+  GuardedBlockState
 > {
-  state = { failed: false };
+  if (guardedBlockClass) return guardedBlockClass;
 
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
+  guardedBlockClass = class extends (
+    React.Component<GuardedBlockProps, GuardedBlockState>
+  ) {
+    state = { failed: false };
 
-  componentDidCatch(error: unknown) {
-    console.error(
-      "[mangaTools] the " +
-        this.props.name +
-        " threw while rendering, so it is " +
-        "not on the page. Everything else the plugin does is unaffected.",
-      error
-    );
-  }
+    static getDerivedStateFromError() {
+      return { failed: true };
+    }
 
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
+    componentDidCatch(error: unknown) {
+      console.error(
+        "[mangaTools] the " +
+          this.props.name +
+          " threw while rendering, so it is " +
+          "not on the page. Everything else the plugin does is unaffected.",
+        error
+      );
+    }
+
+    render() {
+      return this.state.failed ? null : this.props.children;
+    }
+  };
+
+  return guardedBlockClass;
 }
 
 /**
@@ -3579,6 +3609,10 @@ registerPatch("instead", "CustomFields", (...args: unknown[]) => {
   // button off a scene's or a performer's detail page.
   const galleryId = currentGalleryId();
 
+  // Made here rather than at module scope, for the reason on guardedBlock: one
+  // class, made once, so the block below is not remounted on every render.
+  const Guard = guardedBlock();
+
   // Nothing to lift out and no toolbar to put a button in: hand the original
   // component its own props object back, unwrapped. This is the common case on
   // every non-gallery entity.
@@ -3598,9 +3632,9 @@ registerPatch("instead", "CustomFields", (...args: unknown[]) => {
         out entirely when none of its three fields is set.
       */}
       {galleryId && isMarkedNow(galleryId, values) ? (
-        <GuardedBlock name="manga panel">
+        <Guard name="manga panel">
           <MangaDetailsPanel values={values} />
-        </GuardedBlock>
+        </Guard>
       ) : null}
       {/*
         Rendered whether or not this gallery carries the field yet, and that is
@@ -3751,4 +3785,21 @@ registerPatch("after", "RatingSystem", (...args: unknown[]) => {
   );
 });
 
-start();
+/**
+ * Brings the tools half up: the settings refresh, the store's first fetch, the
+ * poll behind it, and the location listener.
+ *
+ * The patches above had no part in this — they registered themselves as the file
+ * loaded, and each one is guarded on its own (see registerPatch), so none of them
+ * can throw. This is the whole of what a caller has to *do*.
+ *
+ * It is called at the bottom of this file today, because this file is the entry.
+ * When this half is bundled with the reader's, that bundle's entry is the caller
+ * instead, and it calls this inside its own guard — so a Stash this half cannot
+ * start on costs the tools and not the reader.
+ */
+export function install(): void {
+  start();
+}
+
+install();
