@@ -397,33 +397,37 @@ async function loadPages(
 ): Promise<GalleryAnswer> {
   const answer = await fetchGallery(id, order);
 
-  // Where the lightbox is, counted the way its own counter counts: an image's place
-  // in the whole list, not in the page of it that happens to be loaded.
-  const position = readPosition(lightbox);
+  // Where the reader is, found by *which image* the lightbox is showing rather than by
+  // counting to it: the carousel says what its current image is, and this plugin's
+  // pages say where that image is in the list it fetched. No assumption about the
+  // order stands between the two — the same image is the same image in any order.
+  //
+  // A carousel that cannot be read concludes nothing, and the list stands as fetched.
   const shown = carouselImage(lightbox);
-  const at = position ? position.current - 1 : -1;
-  if (!shown || at < 0 || answer.pages[at]?.id === shown.id) return answer;
+  if (!shown) return answer;
 
-  if (order.sort === "path") {
+  if (!answer.pages.some((page) => page.id === shown.id)) {
     throw new Error(
       "[mangaReader] the lightbox is showing image " +
         shown.id +
-        " where a path-ordered list has " +
-        (answer.pages[shown.at]?.id ?? "nothing") +
-        " — the list behind it is filtered, so its pages cannot be paired"
+        ", which is not among the pages this plugin read — the list behind it is " +
+        "filtered, so its pages cannot be paired"
     );
   }
 
-  const fallback = await fetchGallery(id, { sort: "path", direction: "ASC" });
-  const still = carouselImage(lightbox);
-  if (still && fallback.pages[at]?.id !== still.id) {
-    throw new Error(
-      "[mangaReader] the pages could not be matched to the lightbox in either " +
-        "order, so the spread view would pair the wrong ones"
-    );
+  return answer;
+}
+
+/** Where the image the lightbox is showing sits in a gallery's pages, or -1 */
+function placeOf(gallery: MangaReaderGallery, lightbox: Element): number {
+  const shown = carouselImage(lightbox);
+  if (!shown) return -1;
+
+  for (let i = 0; i < gallery.pages.length; i++) {
+    if (gallery.pages[i].id === shown.id) return i;
   }
 
-  return fallback;
+  return -1;
 }
 
 /**
@@ -483,13 +487,16 @@ function sync(lightbox: Element): void {
     return;
   }
 
-  const at = screenAt(gallery.screens, position.current - 1);
+  // The screen is worked out from *which image* the lightbox is showing, not from a
+  // count of how far in it is — see placeOf. The header is read above because the
+  // move is still Stash's to make, and knowing when it has landed is what a press
+  // waits for; where the drawing goes is a question about images.
+  const place = placeOf(gallery, lightbox);
+  const at = place < 0 ? -1 : screenAt(gallery.screens, place);
   if (at < 0) {
     console.error(
-      "[mangaReader] the lightbox is at page " +
-        position.current +
-        ", which is not among the pages this plugin read — turning the spread " +
-        "view off"
+      "[mangaReader] the lightbox is showing an image this plugin did not read, so " +
+        "the spread view cannot follow it — turning itself off"
     );
     deactivate();
     return;

@@ -965,7 +965,20 @@ async function main() {
     state.language = language;
     dom.flush();
 
-    const box = buildLightbox(at, total, ids);
+    // What the carousel is showing, unless the section says otherwise: the gallery's
+    // own images, which is what Stash would have loaded. The reader finds its place by
+    // matching that image against its list, so any order of the same images does.
+    const showing =
+      ids ||
+      (state.galleries[galleryId]
+        ? (
+            state.galleries[galleryId].pathImages ||
+            state.galleries[galleryId].images ||
+            []
+          ).map((i) => String(i.id))
+        : null);
+
+    const box = buildLightbox(at, total, showing);
     // Some lightboxes have no counter at all — Stash draws it only for more than one
     // image — and that has to be true before the mode is turned on, not after.
     if (counterText !== undefined) box.counter.textContent = counterText;
@@ -1279,175 +1292,55 @@ async function main() {
    * it is checked against the image actually on screen and thrown away if it does
    * not match.
    */
-  await runSection(
-    "a fetched order is checked against the lightbox, not trusted from the URL",
-    async () => {
-      const pathIds = CHAPTERS_PATH.map(String);
-      const titleIds = CHAPTERS_VIEW.map(String);
-
-      // The lightbox is showing path order; the URL claims title.
-      const before = imageQueries().length;
-      let { box } = await startReader({
-        galleryId: "41",
-        on: true,
-        total: 8,
-        search: "?sortby=title&perPage=500",
-        ids: pathIds,
-      });
-
-      assert.deepStrictEqual(
-        imageQueries()
-          .slice(before)
-          .map((q) => q.variables.sort),
-        ["title", "path"],
-        "the order the URL named is asked for first, and path when it does not match"
-      );
-
-      // Two round trips, so one settle is not enough for the drawing to be there.
-      await settle();
-      assert.deepStrictEqual(
-        drawn(),
-        ["/image/708/image"],
-        "and the pages drawn are the ones the lightbox is actually showing"
-      );
-      stopReader(box);
-
-      // The lightbox is showing what the URL said — the ordinary case, and the one
-      // that must not cost a second fetch.
-      const agreed = imageQueries().length;
-      box = (
-        await startReader({
-          galleryId: "42",
-          on: true,
-          total: 8,
-          search: "?sortby=title&perPage=500",
-          ids: titleIds,
-        })
-      ).box;
-
-      assert.deepStrictEqual(
-        imageQueries()
-          .slice(agreed)
-          .map((q) => q.variables.sort),
-        ["title"],
-        "an order that matches is not asked for twice"
-      );
-      assert.deepStrictEqual(
-        drawn(),
-        ["/image/701/image"],
-        "and the drawing follows the list's order, as it did before"
-      );
-      stopReader(box);
-
-      // A carousel that cannot be read concludes nothing: the URL's order stands.
-      const unreadable = imageQueries().length;
-      box = (
-        await startReader({
-          galleryId: "43",
-          on: true,
-          total: 8,
-          search: "?sortby=title&perPage=500",
-        })
-      ).box;
-
-      assert.deepStrictEqual(
-        imageQueries()
-          .slice(unreadable)
-          .map((q) => q.variables.sort),
-        ["title"],
-        "with nothing to check against, the guess is not second-guessed"
-      );
-      stopReader(box);
-    }
-  );
-
   /**
-   * The pages have to be fetched in the order the lightbox is *showing* them, and
-   * that order is not always path: only the lightbox opened from the gallery
-   * page's Chapters tab is Stash's own and path-sorted. The one opened from the
-   * Images tab holds the list's images in the list's own sort, which lives in the
-   * URL. Pairing the wrong order draws the wrong pages and puts every index the
-   * plugin computes off by however much they disagree.
+   * The place is found by *which image* is showing, not by counting or by trusting the
+   * order a URL named. The same image is the same image in any order, so this is the
+   * one thing that cannot be wrong — and the reason nothing here has to agree with
+   * Stash about how a gallery is sorted.
    */
-  await runSection(
-    "the order the lightbox is showing is the order it is fetched in",
-    async () => {
-      // The rules are Stash's own, from configureFromDecodedParams in
-      // models/list-filter/filter.ts — including the two that are easy to get
-      // wrong: an absent `sortdir` means descending only for `date`, and a random
-      // sort is a seeded name that has to be passed back verbatim or the shuffle
-      // comes out different.
-      assert.deepStrictEqual(
-        NR.lightboxOrder("?sortby=title&perPage=500&disp=2&z=2"),
-        { sort: "title", direction: "ASC" },
-        "the list's own sort, however the URL spells it"
-      );
-      assert.deepStrictEqual(
-        NR.lightboxOrder(""),
-        { sort: "path", direction: "ASC" },
-        "and path when there is no list behind the lightbox"
-      );
-      assert.deepStrictEqual(
-        NR.lightboxOrder("?sortby=title&sortdir=desc"),
-        { sort: "title", direction: "DESC" },
-        "descending when the list says so"
-      );
-      assert.deepStrictEqual(
-        NR.lightboxOrder("?sortby=date"),
-        { sort: "date", direction: "DESC" },
-        "descending by default for date, which Stash decided in #3559"
-      );
-      assert.deepStrictEqual(
-        NR.lightboxOrder("?sortby=date&sortdir=asc"),
-        { sort: "date", direction: "ASC" },
-        "…unless the list asked for ascending after all"
-      );
-      assert.deepStrictEqual(
-        NR.lightboxOrder("?sortby=random_12345"),
-        { sort: "random_12345", direction: "ASC" },
-        "and a seeded shuffle is a sort name to be handed back, not re-rolled"
-      );
+  await runSection("the place is found by which image is showing", async () => {
+    const before = imageQueries().length;
+    const { box } = await startReader({
+      galleryId: "41",
+      on: true,
+      total: 8,
+      // The URL names title order while the carousel is showing path order — the case
+      // that used to cost a second fetch, and now costs nothing, because where the
+      // reader is has nothing to do with either order.
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_PATH.map(String),
+    });
 
-      // What the server is actually asked. A mismatch here is invisible until a
-      // reader notices the page they clicked is not the one that opened.
-      //
-      // A gallery each, because a gallery is fetched once and remembered: asking
-      // the same one twice would assert on the first fetch's variables.
-      const asked = () => imageQueries().slice(-1)[0].variables;
+    assert.deepStrictEqual(
+      imageQueries()
+        .slice(before)
+        .map((q) => q.variables.sort),
+      ["title"],
+      "the list is fetched in the order the URL names, and that is all it is used for"
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/708/image"],
+      "and what is drawn is the screen around the image the lightbox is showing"
+    );
+    stopReader(box);
 
-      let box = (
-        await startReader({
-          galleryId: "21",
-          on: true,
-          total: 2,
-          search: "?sortby=title&perPage=500",
-        })
-      ).box;
-      assert.strictEqual(asked().sort, "title", "asked for in the URL's sort");
-      assert.strictEqual(asked().direction, "ASC", "and its direction");
-      stopReader(box);
+    // The same gallery, the other way round: the pages drawn follow the carousel.
+    const again = await startReader({
+      galleryId: "42",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
 
-      box = (
-        await startReader({
-          galleryId: "22",
-          on: true,
-          total: 2,
-          search: "?sortby=rating&sortdir=desc",
-        })
-      ).box;
-      assert.strictEqual(asked().sort, "rating");
-      assert.strictEqual(asked().direction, "DESC");
-      stopReader(box);
-
-      box = (await startReader({ galleryId: "23", on: true, total: 2 })).box;
-      assert.strictEqual(
-        asked().sort,
-        "path",
-        "and path for the entry with no list behind it"
-      );
-      stopReader(box);
-    }
-  );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/701/image"],
+      "whichever image it is showing is the one whose screen is drawn"
+    );
+    stopReader(again.box);
+  });
 
   await runSection(
     "the arrows move by screen, one press at a time",
@@ -2385,16 +2278,16 @@ async function main() {
   );
 
   await runSection(
-    "a gallery whose pages cannot be matched is drawn from neither order",
+    "a carousel showing images this plugin never read",
     async () => {
       shown.length = 0;
       mountBridge();
       const at = loggedErrors.length;
 
-      // A carousel showing some other gallery's images: neither the order the URL
-      // names nor path order can account for what is on screen, so there is nothing
-      // this plugin can say about where a chapter is — and it says nothing rather
-      // than pairing pages against a lightbox it cannot follow.
+      // A carousel showing some other gallery's images. Finding its place by identity
+      // is the one thing this plugin does to know where it is, so an image it never
+      // read is a lightbox it cannot follow — and it says so rather than drawing
+      // whatever happens to sit at that number.
       const { box } = await startReader({
         galleryId: "33",
         on: true,
@@ -2411,8 +2304,10 @@ async function main() {
         "and nothing is handed over, so Stash's own menu — or none — stands"
       );
       assert.ok(
-        errorsSince(at).some((line) => /either order/.test(line)),
-        "and the reader says which of the two it could not do"
+        errorsSince(at).some((line) =>
+          /not among the pages this plugin read/.test(line)
+        ),
+        "and the reader says what it could not find"
       );
 
       stopReader(box);
