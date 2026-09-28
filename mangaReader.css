@@ -67,14 +67,17 @@
 }
 
 /*
- * Stash's own header and footer, while this plugin draws its own.
+ * Stash's own header, while this plugin draws its own.
  *
  * `:not(.manga-reader-chrome)` because this plugin's header wears the same class — it
  * is a `Lightbox-header`, so that Stash's own stylesheet is what makes it look like
  * one. What is hidden is Stash's copy of it and nothing else.
+ *
+ * The footer stays. It is the image's own name and the way back to the gallery it
+ * came from, which is Stash's to say and not this plugin's to replace — and the
+ * numbers this plugin does keep are in its own header, not down there.
  */
-.Lightbox.manga-reader-takeover .Lightbox-header:not(.manga-reader-chrome),
-.Lightbox.manga-reader-takeover .Lightbox-footer {
+.Lightbox.manga-reader-takeover .Lightbox-header:not(.manga-reader-chrome) {
   display: none;
 }
 

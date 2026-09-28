@@ -350,6 +350,15 @@ module.exports = () => {
     "mangaReader.css should lay the spread over the display: in the flow it takes " +
       "the width of its pages, and squeezes Stash's own arrows against the edges"
   );
+
+  // The footer, which stays. It carries the image's own name and the link back to
+  // the gallery it came from — Stash's to say, not this plugin's to replace — so a
+  // rule that hides it is a whole row of the lightbox going missing.
+  assert.ok(
+    !/\.Lightbox-footer[^{]*\{[^}]*display:\s*none/.test(readerCss),
+    "mangaReader.css should not hide Stash's footer: the image's name and the way " +
+      "back to its gallery are down there"
+  );
   console.log(
     "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"
   );

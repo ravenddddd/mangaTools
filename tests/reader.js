@@ -2521,6 +2521,80 @@ async function main() {
       "and says what Stash's own says"
     );
 
+    // Fullscreen, which Stash offers where the browser has it and this header has
+    // to offer the same way — including asking for it of the lightbox, since that
+    // is what fills the screen rather than the browser's own chrome coming back.
+    const full = chrome.querySelector(".manga-reader-fullscreen");
+    assert.ok(
+      full,
+      "the header should draw a fullscreen button where the browser has one"
+    );
+    assert.ok(
+      owns(full, "btn", "btn-link"),
+      "the fullscreen button is one of the link buttons too"
+    );
+    assert.strictEqual(full.dataset.icon, "faExpand");
+    assert.ok(
+      chrome.querySelector(".Lightbox-header-right").contains(full),
+      "drawn in the group that ends the row, where Stash draws its own"
+    );
+    assert.strictEqual(dom.document.fullscreenElement, null);
+    dom.click(full);
+    assert.strictEqual(
+      dom.document.fullscreenElement,
+      box.lightbox,
+      "pressing it fills the screen with the lightbox"
+    );
+    dom.click(full);
+    assert.strictEqual(
+      dom.document.fullscreenElement,
+      null,
+      "and pressing it again gives the screen back — read at the click, so leaving " +
+        "fullscreen with Esc does not leave the button pointing the wrong way"
+    );
+
+    // The settings panel, which is a `popover` because that is what Stash's own
+    // options menu is: a heading, a body, and a `form-group` around each control.
+    // Without the body the controls sit against the border, with no gap between
+    // them and none to the edge.
+    const settings = chrome.querySelector(".manga-reader-menu-settings");
+    assert.ok(
+      settings.classList.contains("popover") &&
+        settings.classList.contains("manga-reader-settings"),
+      "the settings are a popover"
+    );
+    const header = settings.querySelector(".popover-header");
+    assert.ok(
+      header,
+      "the panel should have a heading, as Stash's own options popover does"
+    );
+    assert.strictEqual(
+      header.textContent,
+      "Options",
+      "worded as Stash words its own"
+    );
+    const body = settings.querySelector(".popover-body");
+    assert.ok(body, "and a body, which is where its padding comes from");
+    for (const id of [
+      "#manga-reader-double-page",
+      "#manga-reader-offset",
+      "#manga-reader-fade",
+    ]) {
+      const control = settings.querySelector(id);
+      assert.ok(control, `${id} should be in the panel`);
+      assert.ok(
+        body.contains(control),
+        `${id} should be inside the body rather than beside it`
+      );
+      assert.ok(
+        [...body.querySelectorAll(".form-group")].some((group) =>
+          group.contains(control)
+        ),
+        `${id} should have a form-group of its own — that is where the gap between ` +
+          "one control and the next comes from"
+      );
+    }
+
     assert.strictEqual(
       chapterButton.dataset.icon,
       "faBars",

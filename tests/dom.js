@@ -20,6 +20,16 @@ function detach(parent, child) {
   if (child.parentNode === parent) child.parentNode = null;
 }
 
+/**
+ * Fullscreen, as the document and the elements it hands out share it.
+ *
+ * The header draws a fullscreen button only where `document.fullscreenEnabled` says
+ * there is one, and asks the lightbox for it — so the test world needs both halves,
+ * and needs the element to become the document's fullscreen element, which is what
+ * the button reads to decide which way it is going.
+ */
+const fullscreen = { element: null };
+
 /** An element, with the handful of properties the plugin reads and writes. */
 function makeElement(tagName) {
   const el = {
@@ -221,6 +231,11 @@ function makeElement(tagName) {
      * this can see: it leaves no DOM behind, which is the point of animating a
      * property rather than a class.
      */
+    /** Asked for by the header's fullscreen button, of the lightbox itself */
+    requestFullscreen() {
+      fullscreen.element = el;
+      return Promise.resolve();
+    },
     animations: [],
     animate(keyframes, options) {
       el.animations.push({ keyframes, options });
@@ -298,6 +313,16 @@ function createDom() {
 
   const document = {
     body,
+    // The two sides of fullscreen the plugin reads: whether a button is worth
+    // drawing at all, and which way the one that is drawn goes.
+    fullscreenEnabled: true,
+    get fullscreenElement() {
+      return fullscreen.element;
+    },
+    exitFullscreen() {
+      fullscreen.element = null;
+      return Promise.resolve();
+    },
     querySelector: (sel) => body.querySelector(sel),
     // Real, over the body: the plugin now looks for Stash's chapters panel by shape
     // rather than by an id, so an empty answer would be a page it cannot read.

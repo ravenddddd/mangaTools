@@ -38,6 +38,8 @@ export const CLASS_OPTIONS_ICON = "Lightbox-header-options-icon";
 export const CLASS_OPTIONS_ANCHOR = "manga-reader-options-anchor";
 /** The cross at the end of the header */
 export const CLASS_CLOSE = "manga-reader-close";
+/** The fullscreen toggle, which Stash draws between the gear and the cross */
+export const CLASS_FULLSCREEN = "manga-reader-fullscreen";
 export const CLASS_MENU = "manga-reader-menu";
 export const CLASS_MENU_BUTTON = "manga-reader-menu-button";
 export const CLASS_MENU_PANEL = "manga-reader-menu-panel";
@@ -160,6 +162,12 @@ export function ensureChrome(
     anchor.appendChild(panel("settings", "popover"));
     options.appendChild(anchor);
     right.appendChild(options);
+    // Fullscreen, if this browser has it at all — which is the condition Stash draws
+    // its own under. It is asked for of the lightbox, so the pages are what fills the
+    // screen, exactly as its button does.
+    if (document.fullscreenEnabled) {
+      right.appendChild(fullscreenButton(lightbox));
+    }
     // Inside the right-hand group rather than after it, which is where Stash puts
     // its own: that group is what holds the end of the row.
     right.appendChild(closeButton());
@@ -294,9 +302,12 @@ function drawChapters(panel: HTMLElement, state: ChromeState): void {
 /**
  * The switches, which used to live in Stash's options popover.
  *
- * They are the same three settings, drawn the same way they were — a `form-check` and
- * a range input, in Stash's own markup, so they read as the settings they are. What is
- * different is whose menu they are in.
+ * They are the same three settings, drawn the same way they were — a `form-check`, a
+ * range input, and Stash's own `form-group` between one control and the next. What is
+ * different is whose menu they are in, and that this panel is built by hand rather
+ * than by react-bootstrap: Stash's popover gets its heading and its padding from
+ * `Popover.Title` and `Popover.Content`, and a `popover` without those two has its
+ * contents against the border with nothing between them.
  */
 function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const label = (id: string) => stringFor(state.locale, id);
@@ -312,6 +323,19 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     panel.classList.add(CLASS_SETTINGS);
     panel.textContent = "";
 
+    const heading = document.createElement("div");
+    heading.className = "popover-header";
+    labels.options = heading;
+    panel.appendChild(heading);
+
+    const body = document.createElement("div");
+    body.className = "popover-body";
+    panel.appendChild(body);
+
+    // A `form-group` per control, which is what holds one off the next: Stash wraps
+    // each of its own in one, and `.form-group` is where the gap comes from.
+    const pageGroup = document.createElement("div");
+    pageGroup.className = "form-group";
     const wrap = document.createElement("div");
     wrap.className = "form-check";
 
@@ -330,10 +354,13 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     labels.doublePage = box;
     wrap.appendChild(input);
     wrap.appendChild(box);
-    panel.appendChild(wrap);
+    pageGroup.appendChild(wrap);
+    body.appendChild(pageGroup);
 
     // The pairing shift, which is not a reading preference like the two above it: it
     // is about this gallery's pages, so it is remembered for the gallery.
+    const shiftGroup = document.createElement("div");
+    shiftGroup.className = "form-group";
     const shift = document.createElement("div");
     shift.className = "form-check";
     const shiftInput = document.createElement("input");
@@ -349,7 +376,8 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     labels.offset = shiftLabel;
     shift.appendChild(shiftInput);
     shift.appendChild(shiftLabel);
-    panel.appendChild(shift);
+    shiftGroup.appendChild(shift);
+    body.appendChild(shiftGroup);
 
     const fade = document.createElement("div");
     fade.className = "form-group";
@@ -374,7 +402,12 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     fade.appendChild(fadeLabel);
     fade.appendChild(range);
     fade.appendChild(readout);
-    panel.appendChild(fade);
+    body.appendChild(fade);
+  }
+
+  const heading = label("mangaReader.options");
+  if (labels.options && labels.options.textContent !== heading) {
+    labels.options.textContent = heading;
   }
 
   const check = panel.querySelector(
@@ -494,6 +527,29 @@ function drawIcon(host: HTMLElement, name: string): void {
   if (!Icon || !icon || !render) return;
 
   render(api.React.createElement(Icon, { icon }), host);
+}
+
+/**
+ * The fullscreen toggle, drawn only where the browser has fullscreen to offer.
+ *
+ * From the lightbox itself rather than the document, because that is what Stash asks
+ * — and because asking it of the document would put the browser's chrome back over a
+ * header that is trying to be the whole screen.
+ */
+function fullscreenButton(lightbox: Element): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = CLASS_ICON_BUTTON + " " + CLASS_FULLSCREEN;
+  button.title = "Toggle Fullscreen";
+  setIcon(button, "faExpand");
+  button.addEventListener("click", () => {
+    openMenu = null;
+    // Read at the click rather than remembered: the reader can leave fullscreen with
+    // Esc, and a button that thought it was still in it would only ever exit.
+    if (document.fullscreenElement) document.exitFullscreen();
+    else lightbox.requestFullscreen();
+  });
+  return button;
 }
 
 /**
