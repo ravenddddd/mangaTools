@@ -20,6 +20,7 @@
  * the header this hides), and a chapter menu of its own, which is where the numbering
  * and the "in no chapter" answer finally say what this plugin means by them.
  */
+import { requirePluginApi } from "../plugin-api";
 import { stringFor } from "../i18n";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderSettings } from "./namespace";
@@ -28,8 +29,11 @@ import type { LightboxImage } from "./stash-lightbox";
 
 /** This plugin's own header, and the menus inside it */
 export const CLASS_CHROME = "manga-reader-chrome";
-export const CLASS_TITLE = "manga-reader-title";
+/** The chapter the reader is in, in the indicator's first span */
+export const CLASS_CHAPTER = "manga-reader-chapter";
 export const CLASS_COUNTER = "manga-reader-counter";
+/** Stash's own class for the gear's icon, which is where its options sit */
+export const CLASS_OPTIONS_ICON = "Lightbox-header-options-icon";
 export const CLASS_MENU = "manga-reader-menu";
 export const CLASS_MENU_BUTTON = "manga-reader-menu-button";
 export const CLASS_MENU_PANEL = "manga-reader-menu-panel";
@@ -81,23 +85,54 @@ export function ensureChrome(
   state: ChromeState
 ): HTMLElement {
   latest = state;
+
   let chrome = lightbox.querySelector("." + CLASS_CHROME) as HTMLElement | null;
 
   if (!chrome) {
     chrome = document.createElement("div");
-    chrome.className = CLASS_CHROME;
-    lightbox.appendChild(chrome);
+    // Stash's own classes, so its own stylesheet is what this looks like: the header
+    // is `Lightbox-header`, the menus are its dropdown and its popover, and the
+    // buttons are its `minimal` ones. Nothing here invents a look.
+    chrome.className = "Lightbox-header " + CLASS_CHROME;
 
-    chrome.appendChild(menuButton("chapters", "☰"));
-    chrome.appendChild(text(CLASS_TITLE));
-    chrome.appendChild(text(CLASS_COUNTER));
-    chrome.appendChild(menuButton("settings", "⚙"));
+    // Where Stash's own header is, so the row is in the same place on the screen: the
+    // carousel above it, the footer below it. Appending would have put ours under the
+    // footer, which is a header at the bottom of the lightbox.
+    const stash = lightbox.querySelector(
+      ".Lightbox-header:not(." + CLASS_CHROME + ")"
+    );
+    if (stash?.parentNode) stash.parentNode.insertBefore(chrome, stash);
+    else lightbox.appendChild(chrome);
 
-    chrome.appendChild(panel("chapters"));
-    chrome.appendChild(panel("settings"));
+    const left = document.createElement("div");
+    left.className = "Lightbox-header-left-spacer";
+    left.appendChild(
+      menuButton("chapters", "faBars", "Lightbox-header-chapter-button")
+    );
+    left.appendChild(
+      panel("chapters", "dropdown-menu Lightbox-header-chapters")
+    );
+    chrome.appendChild(left);
+
+    const indicator = document.createElement("div");
+    indicator.className = "Lightbox-header-indicator";
+    indicator.appendChild(text(CLASS_CHAPTER));
+    indicator.appendChild(text(CLASS_COUNTER, "b"));
+    chrome.appendChild(indicator);
+
+    const right = document.createElement("div");
+    right.className = "Lightbox-header-right";
+    const options = document.createElement("div");
+    options.className = "Lightbox-header-options";
+    options.appendChild(menuButton("settings", "faCog", CLASS_OPTIONS_ICON));
+    options.appendChild(panel("settings", "popover"));
+    right.appendChild(options);
+    chrome.appendChild(right);
+
     chrome.appendChild(closeButton());
   }
 
+  chromeNode = chrome;
   update(chrome, state);
   return chrome;
 }
@@ -106,10 +141,26 @@ export function ensureChrome(
 export function removeChrome(lightbox: Element): void {
   const chrome = lightbox.querySelector("." + CLASS_CHROME);
   if (chrome) chrome.remove();
+  if (chrome === chromeNode) chromeNode = null;
 }
 
 /** The state the buttons read when they are pressed, which is the last one drawn */
 let latest: ChromeState | null = null;
+
+/**
+ * The header itself, so a button can redraw it.
+ *
+ * A menu opening is a change to what is drawn and to nothing else — no setting, no
+ * page, nothing the rest of the plugin has an opinion about — so the button that
+ * opens it has to say so itself. Without this the state changed and nothing redrew:
+ * the buttons looked dead, because to the reader they were.
+ */
+let chromeNode: HTMLElement | null = null;
+
+/** Draws the header again from the last state it was given */
+function redraw(): void {
+  if (chromeNode && latest) update(chromeNode, latest);
+}
 
 /**
  * The labels, kept by reference.
@@ -132,11 +183,13 @@ let openMenu: "chapters" | "settings" | null = null;
  * while it is open.
  */
 function update(chrome: HTMLElement, state: ChromeState): void {
-  const title = chrome.querySelector("." + CLASS_TITLE) as HTMLElement;
+  const chapter = chrome.querySelector("." + CLASS_CHAPTER) as HTMLElement;
   const counter = chrome.querySelector("." + CLASS_COUNTER) as HTMLElement;
 
-  const name = imageName(state.image);
-  if (title.textContent !== name) title.textContent = name;
+  // What Stash's indicator holds: the chapter this image is in, and where the reader
+  // is — in the order it is being read, which is this plugin's own numbering.
+  const name = state.chapter?.title || "";
+  if (chapter.textContent !== name) chapter.textContent = name;
 
   const count = state.number + " / " + state.total;
   if (counter.textContent !== count) counter.textContent = count;
@@ -171,7 +224,9 @@ function drawChapters(panel: HTMLElement, state: ChromeState): void {
     for (const chapter of state.placed) {
       const item = document.createElement("button");
       item.type = "button";
-      item.className = CLASS_MENU_ITEM;
+      // Stash's own class for an entry in its chapter menu, plus this plugin's so the
+      // tests can find them.
+      item.className = "dropdown-item " + CLASS_MENU_ITEM;
       item.dataset.at = String(chapter.at);
       // A chapter with no name is named by its place, which is what the reader sees in
       // the list — the same number the jump goes to.
@@ -179,6 +234,8 @@ function drawChapters(panel: HTMLElement, state: ChromeState): void {
         chapter.title || "#" + (state.placed.indexOf(chapter) + 1);
       item.addEventListener("click", () => {
         openMenu = null;
+        // The jump lays a screen out, and the pass after it draws the header again —
+        // so this one only has to say what it wants.
         state.handlers.onChapter(chapter.at);
       });
       panel.appendChild(item);
@@ -317,45 +374,61 @@ const DOUBLE_PAGE_ID = "manga-reader-double-page";
 const OFFSET_ID = "manga-reader-offset";
 const FADE_ID = "manga-reader-fade";
 
-/** The file's own name, which is what an image with no title is called */
-function imageName(image: LightboxImage | null): string {
-  if (!image) return "";
-
-  const path = image.visual_files?.[0]?.path || "";
-  return image.title || path.replace(/^.*[\\/]/, "") || "";
-}
-
-function text(className: string): HTMLElement {
-  const node = document.createElement("span");
+function text(className: string, tag = "span"): HTMLElement {
+  const node = document.createElement(tag);
   node.className = className;
   return node;
 }
 
 function menuButton(
   opens: "chapters" | "settings",
-  glyph: string
+  icon: string,
+  extra: string
 ): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "minimal " + CLASS_MENU_BUTTON;
+  button.className = "minimal " + extra + " " + CLASS_MENU_BUTTON;
   button.dataset.opens = opens;
   button.setAttribute("aria-haspopup", "true");
   button.setAttribute("aria-expanded", "false");
-  button.textContent = glyph;
+  // Stash's own icon, drawn by Stash's own React component: the same three bars and
+  // the same cog its header uses, so the header reads as itself.
+  drawIcon(button, icon);
   button.addEventListener("click", () => {
     openMenu = openMenu === opens ? null : opens;
+    redraw();
   });
   return button;
 }
 
-function panel(opens: "chapters" | "settings"): HTMLElement {
+function panel(opens: "chapters" | "settings", extra: string): HTMLElement {
   const node = document.createElement("div");
-  node.className =
-    CLASS_MENU_PANEL +
-    " " +
-    (opens === "chapters" ? CLASS_MENU_CHAPTERS : CLASS_MENU_SETTINGS);
+  node.className = [
+    extra,
+    CLASS_MENU_PANEL,
+    opens === "chapters" ? CLASS_MENU_CHAPTERS : CLASS_MENU_SETTINGS,
+  ].join(" ");
   node.dataset.menu = opens;
   return node;
+}
+
+/**
+ * Stash's FontAwesome icon, through Stash's own component.
+ *
+ * This half is DOM work and has no React of its own, but the plugin API hands both
+ * React and ReactDOM over, and `components.Icon` is the one thing that draws an icon
+ * the way every other icon on the page is drawn. A glyph typed as text would be a
+ * different font in a different size, and would look like a plugin.
+ */
+function drawIcon(host: HTMLElement, name: string): void {
+  const api = requirePluginApi();
+  const Solid = api.libraries.FontAwesomeSolid || {};
+  const Icon = api.components.Icon;
+  const icon = Solid[name];
+  const render = api.ReactDOM?.render;
+  if (!Icon || !icon || !render) return;
+
+  render(api.React.createElement(Icon, { icon }), host);
 }
 
 function closeButton(): HTMLElement {

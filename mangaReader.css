@@ -20,147 +20,52 @@
 }
 
 /*
- * And Stash's own header and footer, while this plugin draws its own.
+ * Stash's own header and footer, while this plugin draws its own.
  *
- * `display: none` rather than removed: React owns them, and it puts them back the way
- * it left them — which is what makes turning the mode off leave nothing behind.
+ * `:not(.manga-reader-chrome)` because this plugin's header wears the same class — it
+ * is a `Lightbox-header`, so that Stash's own stylesheet is what makes it look like
+ * one. What is hidden is Stash's copy of it and nothing else.
  */
-.Lightbox.manga-reader-takeover .Lightbox-header,
+.Lightbox.manga-reader-takeover .Lightbox-header:not(.manga-reader-chrome),
 .Lightbox.manga-reader-takeover .Lightbox-footer {
   display: none;
 }
 
 /*
- * This plugin's header, in the row Stash's occupied: the image's name and where it is
- * in the gallery on the left, the two menus and the close button on the right.
+ * The two menus are Stash's own: a `dropdown-menu` under the chapter button, and a
+ * `popover` under the gear. Bootstrap hides both until they are shown, which is all
+ * the styling either of them needs.
  */
-.manga-reader-chrome {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: var(--manga-reader-chrome, rgba(0, 0, 0, 0.6));
-  color: inherit;
-  position: relative;
-}
-
-.manga-reader-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.manga-reader-counter {
-  opacity: 0.7;
-  margin-right: auto;
-}
-
-.manga-reader-menu {
-  position: relative;
-}
-
-.manga-reader-menu-panel {
+.manga-reader-chrome .popover,
+.manga-reader-chrome .dropdown-menu {
   display: none;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 20;
-  min-width: 14rem;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 0.5rem;
-  text-align: left;
-  background: var(--manga-reader-panel, rgba(20, 20, 20, 0.98));
-  border: 1px solid var(--manga-reader-divider, #444);
-  border-radius: 3px;
 }
 
-.manga-reader-menu-panel.show {
+.manga-reader-chrome .popover.show,
+.manga-reader-chrome .dropdown-menu.show {
   display: block;
 }
 
-.manga-reader-menu-item {
-  display: block;
-  width: 100%;
-  padding: 0.25rem 0.5rem;
-  text-align: left;
-  background: none;
-  border: 0;
-  color: inherit;
-}
-
-.manga-reader-menu-item:hover,
-.manga-reader-menu-item.active {
-  background: rgba(255, 255, 255, 0.12);
-}
-
 /*
- * The two pages. Fills the display area, which takeover.ts makes a containing
- * block for it.
+ * The fade length, read off the slider. The switches themselves are Stash's own
+ * `form-check`s and its range input, so they are drawn by its stylesheet; this is only
+ * the number beside them.
  */
-.manga-reader-spread {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-/*
- * Reading order is what the DOM holds — the earlier page first — and a manga is
- * read right to left, so the earlier page is the *right-hand* one. One rule, and
- * the whole direction question is answered.
- */
-.manga-reader-spread {
-  flex-direction: row-reverse;
-}
-
-/*
- * One page, or half the width when there are two. `contain` is what keeps a page
- * whole: a spread of two tall pages has to shrink to fit the height, not be
- * cropped to fill the width.
- */
-.manga-reader-page {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  max-width: 50%;
-  flex: 0 1 auto;
-}
-
-/* A single page takes the middle of the screen on its own */
-.manga-reader-spread.is-single .manga-reader-page {
-  max-width: 100%;
-}
-
-.manga-reader-page img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-/*
- * This plugin's switch, in the lightbox's options menu. Separated from the options
- * above it by the same rule Stash uses between groups of its own.
- */
-.manga-reader-options {
-  margin-top: 8px;
-  border-top: 1px solid var(--manga-reader-divider, #444);
-  padding-top: 8px;
+.manga-reader-readout {
+  margin-left: 0.5rem;
+  opacity: 0.7;
 }
 
 /*
  * Stash's own controls that this plugin stands in for.
  *
- * The chapters tab's Create button, for now: this plugin is what will edit chapters,
- * and its editing is not written yet — so the button that would open Stash's editor,
- * and write Stash's rows, is marked by the plugin and hidden here.
+ * The chapters tab's Create button: this plugin is what will edit chapters, and its
+ * editing is not written yet — so the button that would open Stash's editor, and write
+ * Stash's rows, is marked by the plugin and hidden here.
  *
- * An attribute and a rule rather than an inline style, because the tab is rebuilt by
- * React and the marking has to survive that: the plugin sets it on whatever button it
- * finds, and this is what makes setting it mean something.
+ * An attribute and a rule rather than an inline style, because that tab is rebuilt by
+ * React: the plugin sets the mark on whatever button it finds, and this is what makes
+ * setting it mean anything.
  */
 [data-manga-reader-hidden] {
   display: none;

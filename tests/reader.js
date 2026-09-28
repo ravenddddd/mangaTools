@@ -190,6 +190,9 @@ dom.window.PluginApi = {
     after: (target, fn) => patched.push({ target, fn }),
   },
   components: {},
+  // Stash's own React, and the DOM renderer that puts one of its components inside
+  // markup this plugin built. Inert here: what the icons look like is Stash's business.
+  ReactDOM: { render: () => {} },
   libraries: {
     Apollo: { gql: (text) => ({ __document: text }) },
     Intl: {
@@ -2371,6 +2374,71 @@ async function main() {
    * chapter is, and are never written — the point of taking the tab over is that
    * the plugin's field becomes the one that says where chapters are.
    */
+  /**
+   * The two menus in the reader's own header. Nothing else asserts that they open —
+   * which is how they shipped dead: the state changed on a click and nothing redrew,
+   * so a reader pressing either of them saw nothing at all.
+   */
+  await runSection("the header's two menus open and close", async () => {
+    const { box } = await startReader({
+      galleryId: "31",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
+
+    const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+    const menu = (which) => chrome.querySelector(".manga-reader-menu-" + which);
+    const toggle = (which) =>
+      [...chrome.querySelectorAll(".manga-reader-menu-button")].find(
+        (button) => button.dataset.opens === which
+      );
+
+    assert.strictEqual(
+      menu("chapters").classList.contains("show"),
+      false,
+      "the chapter menu starts closed"
+    );
+
+    dom.click(toggle("chapters"));
+    assert.strictEqual(
+      menu("chapters").classList.contains("show"),
+      true,
+      "and the button in the header opens it"
+    );
+    assert.deepStrictEqual(
+      [...menu("chapters").children].map((item) => item.textContent),
+      ["開幕", "中盤"],
+      "onto the gallery's chapters"
+    );
+
+    dom.click(toggle("settings"));
+    assert.strictEqual(
+      menu("settings").classList.contains("show"),
+      true,
+      "the other button opens the settings"
+    );
+    assert.strictEqual(
+      menu("chapters").classList.contains("show"),
+      false,
+      "and only one menu is open at a time"
+    );
+    assert.ok(
+      menu("settings").querySelector("#manga-reader-double-page"),
+      "which holds the switches"
+    );
+
+    dom.click(toggle("settings"));
+    assert.strictEqual(
+      menu("settings").classList.contains("show"),
+      false,
+      "and pressing it again puts the menu away"
+    );
+
+    stopReader(box);
+  });
+
   /**
    * Paging past what the lightbox has loaded makes it fetch, and while it fetches it
    * shows a spinner *instead of* its header and its carousel. That is not a lightbox

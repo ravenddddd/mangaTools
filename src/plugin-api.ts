@@ -14,7 +14,12 @@
  * UI plugin API is possible but pointless: an inaccurate declaration is worse
  * than none, since it would type-check code that fails at runtime.
  */
-import type { ComponentType, ReactNode, ReactPortal } from "react";
+import type {
+  ComponentType,
+  ReactElement,
+  ReactNode,
+  ReactPortal,
+} from "react";
 
 /** One entry of the language table in languages.ts */
 export interface MangaToolsLanguage {
@@ -580,6 +585,13 @@ export interface IPluginApi {
 
   ReactDOM: {
     createPortal(children: ReactNode, container: Element): ReactPortal;
+    /**
+     * The whole of `react-dom`, which Stash hands over as the module namespace — so a
+     * plugin that draws DOM of its own can put a React component from
+     * `components.Icon` inside it. Optional because only one caller needs it, and a
+     * Stash that did not have it would be one missing an icon rather than a header.
+     */
+    render?: (element: ReactElement, container: Element) => unknown;
   };
 
   /** Used as a fallback source for `gql` if libraries.Apollo has none */
