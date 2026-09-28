@@ -5,40 +5,53 @@
  * spreads.ts, and for the same reason — the rules are what is worth pinning down,
  * and the code that draws them is DOM surgery inside Stash's own lightbox.
  *
- * **A CHAPTER IS A NAME AND AN IMAGE, NOT A NUMBER.** Stash keeps a chapter as
- * `GalleryChapter { title, image_index }`, an integer that means "the Nth image"
+ * **A CHAPTER IS A NAME AND A SET OF IMAGES, NOT A NUMBER.** Stash keeps a chapter
+ * as `GalleryChapter { title, image_index }`, an integer that means "the Nth image"
  * — and the N counts in path order, because that is the order Stash's own lightbox
  * reads a gallery in. Everything else follows from that. Sort the same gallery by
  * title and the integer points somewhere else; add an image near the front and
  * every chapter after it is off by one. Stash's own code says as much by refusing
  * to hand its chapters to a lightbox that is not in path order.
  *
- * So this half keeps its own list, under `plugin.mangaTools.chapters`, storing the
- * *id* of the image each chapter starts at. Identity does not move when the order
- * does, so the same list is correct in every sort, and survives images being added
- * and removed around it. Its ranges stay implicit — a chapter runs to wherever the
- * next one starts — and that is deliberate: with the start anchored to an image
- * rather than a position, a new page dropped into the middle of a chapter joins
- * that chapter instead of what used to be the next one.
+ * So this half keeps its own list, under `plugin.mangaTools.chapters`: each chapter
+ * is a name and the ids of the images in it. Identity does not move when the order
+ * does, so the same list is right in every sort, and survives images being added
+ * and removed around it.
  *
- * A gallery with no such field is read the old way, by translating Stash's
- * integer against the path order — see chaptersFromStash. Nothing is written
- * until somebody edits a gallery's chapters, so opening one changes nothing.
+ * **Which images are in a chapter is a fact about the images, so it is stored; what
+ * order they are in is a fact about the view, so it is not.** The ids are written
+ * in path order only to keep the file stable and diffable — the reader places each
+ * chapter wherever its *earliest* image lands on screen, so the same list reads
+ * correctly under a title sort, a path sort, or anything else.
+ *
+ * An image in no chapter is normal rather than a gap to be filled: a cover, a
+ * divider, a page somebody has not decided about yet. Which is also why a chapter
+ * does not "run to wherever the next one starts" any more — its pages are the ones
+ * that say they are its, and a page that says nothing is in none of them.
+ *
+ * A gallery with no such field is read the old way, by expanding Stash's integer
+ * runs into those sets — see chaptersFromStash. Nothing is written until somebody
+ * edits a gallery's chapters, so opening one changes nothing.
  */
 import { NR } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
 
-/** A chapter as this plugin stores it: a name, and the image it starts at. */
+/** A chapter as this plugin stores it: a name, and the images that are in it. */
 export interface MangaReaderChapter {
   /** May be empty — Stash allows a chapter with no name, and so does this. */
   title: string;
-  /** The id of the image the chapter starts at, as a string. */
-  start: string;
+  /**
+   * The ids of this chapter's images, as strings.
+   *
+   * A set, not a sequence: the order they are written in is not read as meaning
+   * anything. See the note at the top of the file.
+   */
+  images: string[];
 }
 
 /** A chapter placed in the order currently on screen. */
 export interface MangaReaderPlacedChapter extends MangaReaderChapter {
-  /** Index into the page list on screen of this chapter's first page */
+  /** Index into the page list on screen of this chapter's *earliest* page */
   at: number;
 }
 
@@ -69,9 +82,10 @@ interface StoredChapters {
  * available and never wrong — while an empty *array* is a gallery whose chapters
  * were deliberately cleared, and is meant to draw nothing.
  *
- * Entries without a usable `start` are dropped rather than defaulted: a chapter
- * that does not say where it begins is not a chapter, and inventing a position for
- * it would put a boundary somewhere nothing meant.
+ * Entries are kept as far as they can be read: a chapter with no name is a
+ * chapter, and one with no images is kept too — it has a name and a place in the
+ * list, and drawing it is the caller's decision rather than this function's. What
+ * is dropped is what cannot be an id at all.
  */
 export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
   if (!raw) return null;
@@ -92,13 +106,19 @@ export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
   const chapters: MangaReaderChapter[] = [];
   for (const entry of stored.chapters) {
     if (!entry || typeof entry !== "object") continue;
-    const row = entry as { title?: unknown; start?: unknown };
-    const start = row.start;
-    if (typeof start !== "string" && typeof start !== "number") continue;
+    const row = entry as { title?: unknown; images?: unknown };
+    if (!Array.isArray(row.images)) continue;
+
+    const images: string[] = [];
+    for (const id of row.images) {
+      if (typeof id === "string" || typeof id === "number") {
+        images.push(String(id));
+      }
+    }
 
     chapters.push({
       title: typeof row.title === "string" ? row.title : "",
-      start: String(start),
+      images,
     });
   }
 
@@ -109,64 +129,90 @@ export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
  * Stash's own chapters, translated into this plugin's shape.
  *
  * `pathIds` is the gallery's image ids in path order — the order `image_index`
- * counts in, and the whole reason the caller has to fetch that list. Entries
- * whose index falls outside it are dropped: that is a chapter whose images are no
- * longer in the gallery, and there is no image to point at.
+ * counts in, and the whole reason the caller has to fetch that list.
+ *
+ * Stash's shape gives each chapter a start and nothing else, so a chapter's images
+ * are the run from its own start up to the next one's: the ranges Stash infers at
+ * read time, written out once. Expanding them here rather than inferring them
+ * later is what lets one rule — "the chapter that lists this image" — serve both
+ * sources, and it is what the stored form of a translated gallery would look like.
+ *
+ * Entries whose start falls outside `pathIds` are dropped: that is a chapter whose
+ * images are no longer in the gallery, and there is nothing to point at.
  *
  * This is a translation, not a migration: nothing is written. A gallery stays on
- * this path until somebody edits its chapters, and a gallery nobody edits is
- * never written to at all.
+ * this path until somebody edits its chapters, and a gallery nobody edits is never
+ * written to at all.
  */
 export function chaptersFromStash(
   rows: { title?: unknown; image_index?: unknown }[] | null | undefined,
   pathIds: string[]
 ): MangaReaderChapter[] {
-  const chapters: MangaReaderChapter[] = [];
-  if (!Array.isArray(rows)) return chapters;
+  if (!Array.isArray(rows)) return [];
 
+  // By start, because the runs are read off consecutive pairs — and Stash's own
+  // order is not something to rely on for that.
+  const starts: { title: string; index: number }[] = [];
   for (const row of rows) {
     const index = Number(row?.image_index);
     if (!Number.isInteger(index) || index < 1 || index > pathIds.length)
       continue;
 
-    chapters.push({
+    starts.push({
       title: typeof row?.title === "string" ? row.title : "",
-      start: String(pathIds[index - 1]),
+      index,
     });
   }
 
-  return chapters;
+  starts.sort((a, b) => a.index - b.index);
+
+  return starts.map((start, i) => {
+    const next = starts[i + 1];
+    const end = next ? next.index - 1 : pathIds.length;
+
+    return {
+      title: start.title,
+      images: pathIds.slice(start.index - 1, end),
+    };
+  });
 }
 
 /**
  * Where each chapter falls in the order on screen.
  *
- * The list on screen is the authority on order, and this asks it where each
- * chapter's first page is. Chapters whose image is not on screen at all are
- * dropped — a chapter pointing at an image that has left the gallery, or at one
- * another entry point is not showing — and the caller can say so; what it must
- * not do is place them somewhere plausible, because a boundary drawn at the wrong
- * page is worse than one that is missing.
+ * A chapter is placed at its **earliest** page in this order — the page a jump to
+ * it should land on, and the page the menu has to point at. Everything after it
+ * belongs to it or does not, and that is a fact the chapter already holds.
  *
- * Ties keep the input order, which is Stash's own order for a translated list and
- * the stored order for ours — so two chapters that start at the same image are
- * shown in the order they were written rather than in whatever order a sort
+ * Chapters with nothing on screen at all are dropped: an image that has left the
+ * gallery, or one another entry point is showing instead. The caller can say so;
+ * what it must not do is place them somewhere plausible, because a boundary drawn
+ * at the wrong page is worse than one that is missing.
+ *
+ * Ties keep the input order — the stored order for this plugin's own list, and
+ * Stash's order for a translated one — so two chapters that begin on the same page
+ * are shown in the order they were written rather than in whatever order a sort
  * happens to leave them.
  */
 export function placeChapters(
   chapters: MangaReaderChapter[],
   pages: MangaReaderPage[]
 ): MangaReaderPlacedChapter[] {
-  const at = new Map<string, number>();
+  const position = new Map<string, number>();
   for (let i = 0; i < pages.length; i++) {
-    if (!at.has(pages[i].id)) at.set(pages[i].id, i);
+    if (!position.has(pages[i].id)) position.set(pages[i].id, i);
   }
 
   const placed: MangaReaderPlacedChapter[] = [];
   for (const chapter of chapters) {
-    const index = at.get(chapter.start);
-    if (index === undefined) continue;
-    placed.push({ title: chapter.title, start: chapter.start, at: index });
+    let at = -1;
+    for (const id of chapter.images) {
+      const index = position.get(id);
+      if (index !== undefined && (at < 0 || index < at)) at = index;
+    }
+
+    if (at < 0) continue;
+    placed.push({ title: chapter.title, images: chapter.images, at });
   }
 
   placed.sort((a, b) => a.at - b.at);
@@ -174,22 +220,26 @@ export function placeChapters(
 }
 
 /**
- * The chapter the page at `index` is in, or null when it is before the first one.
+ * The chapter an image is in, or null when it is in none.
  *
- * "In" means from its own start up to the next chapter's, which is the implicit
- * range the whole design rests on.
+ * Null is a real answer rather than a failure: a cover, a divider, a page nobody
+ * has put in a chapter. The menu says so, which is also how a page that still
+ * needs a chapter becomes visible.
+ *
+ * Which chapter that is comes from the chapter's own list of images — not from
+ * where it sits between its neighbours. That is the whole difference between this
+ * shape and Stash's: an image says whose it is, and one that says nothing is in
+ * nothing.
  */
 export function chapterAt(
   placed: MangaReaderPlacedChapter[],
-  index: number
+  pageId: string
 ): MangaReaderPlacedChapter | null {
-  let found: MangaReaderPlacedChapter | null = null;
   for (const chapter of placed) {
-    if (chapter.at > index) break;
-    found = chapter;
+    if (chapter.images.includes(pageId)) return chapter;
   }
 
-  return found;
+  return null;
 }
 
 // Published for the smoke test, which reaches them through the window — see the

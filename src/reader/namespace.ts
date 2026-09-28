@@ -127,10 +127,10 @@ export interface MangaReaderNamespace {
     chapters: MangaReaderChapter[],
     pages: MangaReaderPage[]
   ): MangaReaderPlacedChapter[];
-  /** The chapter a page is in, or null before the first one */
+  /** The chapter an image is in, or null when it is in none */
   chapterAt(
     placed: MangaReaderPlacedChapter[],
-    index: number
+    pageId: string
   ): MangaReaderPlacedChapter | null;
   screenAt(screens: MangaReaderScreen[], pageIndex: number): number;
   stepsToAdjacent(

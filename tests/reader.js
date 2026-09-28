@@ -413,7 +413,17 @@ const CHAPTERS_VIEW = [701, 702, 703, 704, 705, 706, 707, 708];
 const CHAPTERS_PATH = [708, 707, 706, 705, 704, 703, 702, 701];
 const numbered = (ids) => ids.map((id) => image(String(id), 1000, 1500));
 
-/** A gallery whose chapters this plugin keeps itself */
+/**
+ * A gallery whose chapters this plugin keeps itself.
+ *
+ * The first two pages are in no chapter at all — a cover and a title page, the
+ * pages nobody would put in one — which is the difference this shape has over
+ * Stash's: with Stash's numbers a page between two chapters belongs to the one
+ * before it, and here a page nobody claimed is in nothing.
+ *
+ * The ids are written out of order too, since the array is a set: what places a
+ * chapter is its earliest page on screen, not the order it was written in.
+ */
 const OWN_CHAPTERS = {
   images: numbered(CHAPTERS_VIEW),
   pathImages: numbered(CHAPTERS_PATH),
@@ -423,8 +433,8 @@ const OWN_CHAPTERS = {
       "plugin.mangaTools.chapters": JSON.stringify({
         v: 1,
         chapters: [
-          { title: "開幕", start: "701" },
-          { title: "中盤", start: "705" },
+          { title: "開幕", images: ["704", "703"] },
+          { title: "中盤", images: ["708", "705", "706", "707"] },
         ],
       }),
     },
@@ -434,9 +444,11 @@ const OWN_CHAPTERS = {
 
 /**
  * And one still on Stash's own numbers: no field of ours, two chapters whose
- * indices count in path order. Translated against CHAPTERS_PATH they land at view
- * positions 7 and 3 — so the menu has to show 第二話 *before* 第一話, which is what
- * "the list is in the order on screen" means.
+ * starts count in path order. Expanded against CHAPTERS_PATH, the first one holds
+ * the four images at the *end* of the reversed path — so on screen its earliest
+ * page is fifth, while the second chapter's earliest is the first page of all.
+ * The menu has to show 第二話 before 第一話, which is what "the list is in the
+ * order on screen" means.
  */
 const STASH_CHAPTERS = {
   images: numbered(CHAPTERS_VIEW),
@@ -1766,28 +1778,27 @@ async function main() {
   // ── Chapters ──────────────────────────────────────────────────────
 
   /**
-   * The rules, called directly. What a chapter is here is a name and an image id,
-   * and every one of these is about keeping that rather than a position — Stash's
-   * own shape, and the reason this plugin keeps its own list at all.
+   * The rules, called directly. What a chapter is here is a name and the images
+   * that are in it, and every one of these is about keeping that rather than a
+   * position — Stash's own shape is the opposite, and the reason this plugin keeps
+   * a list of its own at all.
    */
   await runSection(
     "what a stored chapter list is, and what it is not",
     async () => {
-      const stored = (value) => JSON.stringify(value);
-      const chapters = (value) =>
-        NR.parseChapters(typeof value === "string" ? value : stored(value));
+      const chapters = (value) => NR.parseChapters(JSON.stringify(value));
 
       assert.deepStrictEqual(
         chapters({
           v: 1,
           chapters: [
-            { title: "開幕", start: "701" },
-            { title: "中盤", start: 705 },
+            { title: "開幕", images: ["703", "701"] },
+            { title: "中盤", images: [705] },
           ],
         }),
         [
-          { title: "開幕", start: "701" },
-          { title: "中盤", start: "705" },
+          { title: "開幕", images: ["703", "701"] },
+          { title: "中盤", images: ["705"] },
         ],
         "a list this plugin wrote is read back, ids as strings either way they were written"
       );
@@ -1797,7 +1808,7 @@ async function main() {
         "an empty list is a gallery whose chapters were cleared, and draws nothing"
       );
       assert.strictEqual(
-        chapters({ v: 2, chapters: [{ start: "1" }] }),
+        chapters({ v: 2, chapters: [{ images: ["1"] }] }),
         null,
         "a version this build does not know is unreadable, not best-effort"
       );
@@ -1815,26 +1826,46 @@ async function main() {
       assert.deepStrictEqual(
         chapters({
           v: 1,
-          chapters: [{ title: "x" }, { start: "9" }, "nonsense", null],
+          chapters: [
+            { title: "x" },
+            { title: "kept", images: [] },
+            { title: "mixed", images: ["9", null, "10"] },
+            "nonsense",
+            null,
+          ],
         }),
-        [{ title: "", start: "9" }],
-        "a chapter that does not say where it starts is not a chapter"
+        [
+          { title: "kept", images: [] },
+          { title: "mixed", images: ["9", "10"] },
+        ],
+        "a chapter is kept as far as it can be read, and one that is not a chapter is not"
       );
 
-      // Stash's own numbers, translated against the order they count in.
+      // Stash's own numbers, expanded against the order they count in. Stash gives
+      // each chapter a start and nothing else, so a chapter's images are the run
+      // from its own start up to the next one's — written out once, here, so that
+      // one rule can serve both sources.
       assert.deepStrictEqual(
         NR.chaptersFromStash(
           [
-            { title: "一", image_index: 1 },
             { title: "二", image_index: 5 },
+            { title: "一", image_index: 1 },
           ],
           ["708", "707", "706", "705", "704", "703", "702", "701"]
         ),
         [
-          { title: "一", start: "708" },
-          { title: "二", start: "704" },
+          { title: "一", images: ["708", "707", "706", "705"] },
+          { title: "二", images: ["704", "703", "702", "701"] },
         ],
-        "a chapter index counts from one, in the order it is counted against"
+        "a chapter index counts from one, and its images run to the next chapter's"
+      );
+      assert.deepStrictEqual(
+        NR.chaptersFromStash(
+          [{ title: "only", image_index: 3 }],
+          ["a", "b", "c", "d"]
+        ),
+        [{ title: "only", images: ["c", "d"] }],
+        "and the last chapter runs to the end"
       );
       assert.deepStrictEqual(
         NR.chaptersFromStash(
@@ -1850,54 +1881,54 @@ async function main() {
         "and a gallery with none translates to none"
       );
 
-      // Where they fall on screen.
+      // Where they fall on screen: at the chapter's earliest page in this order.
       const pages = numbered(CHAPTERS_VIEW).map((i) => page(String(i.id)));
       const placed = NR.placeChapters(
         [
-          { title: "開幕", start: "701" },
-          { title: "中盤", start: "705" },
-          { title: "not here", start: "999" },
+          // Written out of order on purpose: the array is a set, so which id is
+          // first in it means nothing.
+          { title: "開幕", images: ["704", "702"] },
+          { title: "中盤", images: ["708", "705", "706"] },
+          { title: "not here", images: ["999"] },
+          { title: "empty", images: [] },
         ],
         pages
       );
       assert.deepStrictEqual(
         placed.map((c) => [c.title, c.at]),
         [
-          ["開幕", 0],
+          ["開幕", 1],
           ["中盤", 4],
         ],
-        "placed where the pages on screen put them, and one with no image is not placed"
+        "each chapter at its earliest page in this order, and one with nothing here is not placed"
       );
       assert.deepStrictEqual(
         NR.placeChapters(
           [
-            { title: "後", start: "705" },
-            { title: "前", start: "701" },
+            { title: "後", images: ["705"] },
+            { title: "前", images: ["701"] },
           ],
           pages
         ).map((c) => c.title),
         ["前", "後"],
         "the list's own order does not decide — the screen does"
       );
+
+      // Which chapter a page is in, by what the chapter lists.
       assert.strictEqual(
-        NR.chapterAt(placed, 0)?.title,
+        NR.chapterAt(placed, "704")?.title,
         "開幕",
-        "a page in the first chapter is in it"
+        "a page its chapter lists is in it"
       );
       assert.strictEqual(
-        NR.chapterAt(placed, 3)?.title,
-        "開幕",
-        "…right up to the next"
-      );
-      assert.strictEqual(
-        NR.chapterAt(placed, 4)?.title,
-        "中盤",
-        "…and then the next"
-      );
-      assert.strictEqual(
-        NR.chapterAt([{ title: "x", start: "1", at: 2 }], 1),
+        NR.chapterAt(placed, "703"),
         null,
-        "and a page before the first chapter is in none"
+        "a page no chapter lists is in none — between two chapters, or before the first"
+      );
+      assert.strictEqual(
+        NR.chapterAt(placed, "705")?.title,
+        "中盤",
+        "and the next chapter's own pages are its own"
       );
     }
   );
@@ -1921,8 +1952,8 @@ async function main() {
         menu().querySelector("." + "manga-reader-chapters-list").children;
       assert.strictEqual(
         toggle().textContent,
-        "開幕",
-        "and it says which chapter the reader is in"
+        "No chapter",
+        "the first page is in no chapter, and the menu says so rather than guessing"
       );
       assert.deepStrictEqual(
         items().map((i) => i.textContent),
@@ -1930,26 +1961,33 @@ async function main() {
         "the list is the gallery's chapters"
       );
       assert.ok(
-        items()[0].classList.contains("active"),
-        "with the current one marked"
+        !items().some((i) => i.classList.contains("active")),
+        "and none is marked while the reader is in none of them"
       );
 
-      // The reader turns a page, and the menu follows — a chapter boundary lands
-      // mid-screen here, which is the case where the drawing does not change.
-      box.move(5);
+      // The reader turns a page, and the menu follows — page by page, which is not
+      // the same as screen by screen: the mark follows the *lightbox*, and can move
+      // while the drawing does not. That is why the menu is updated before the
+      // drawing's own early return rather than after it.
+      box.move(3);
       dom.flush();
       assert.strictEqual(
         toggle().textContent,
-        "中盤",
-        "the label follows the reader"
+        "開幕",
+        "the label follows the reader to the first chapter"
       );
       assert.ok(
-        items()[1].classList.contains("active"),
+        items()[0].classList.contains("active"),
         "and so does the mark"
       );
+
+      box.move(5);
+      dom.flush();
+      assert.strictEqual(toggle().textContent, "中盤", "…and on to the next");
+      assert.ok(items()[1].classList.contains("active"), "…marking it instead");
       assert.ok(
         !items()[0].classList.contains("active"),
-        "…and only the current one is marked"
+        "…and only the current one"
       );
 
       // Opening and closing: the toggle shows the list, a click elsewhere in the
@@ -1971,7 +2009,11 @@ async function main() {
       input.dispatch("change");
       dom.flush();
 
-      assert.strictEqual(menu(), null, "turning the mode off takes the menu with it");
+      assert.strictEqual(
+        menu(),
+        null,
+        "turning the mode off takes the menu with it"
+      );
       assert.ok(
         box.lightbox.parentNode,
         "precondition: the lightbox is still open"
@@ -2107,8 +2149,8 @@ async function main() {
       );
       assert.deepStrictEqual(
         items.map((i) => i.dataset.at),
-        ["3", "7"],
-        "each carrying the view position its own start image is at"
+        ["0", "4"],
+        "each carrying the position of its earliest image in this order"
       );
 
       stopReader(box);

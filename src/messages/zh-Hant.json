@@ -1,7 +1,7 @@
 {
-  "mangaReader.chapters": "章節",
   "mangaReader.doublePage": "雙頁閱讀",
   "mangaReader.fade": "淡入",
+  "mangaReader.noChapter": "無章節",
   "mangaReader.offset": "配對偏移一格",
 
   "mangaTools.select.placeholder": "選擇語言…",

@@ -71,7 +71,7 @@ import {
  * when it finds nothing, which is the right behaviour for a message that is
  * missing and the wrong one for a name that was never spelled right.
  */
-type ReaderLabel = "chapters" | "doublePage" | "fade" | "offset";
+type ReaderLabel = "doublePage" | "fade" | "noChapter" | "offset";
 
 const labelFor = (locale: string | null | undefined, key: ReaderLabel) =>
   stringFor(locale, `mangaReader.${key}`);
@@ -900,9 +900,20 @@ function buildChapterList(gallery: MangaReaderGallery): void {
 function markCurrentChapter(gallery: MangaReaderGallery, at: number): void {
   if (!chaptersHost) return;
 
-  const chapter = chapterAt(gallery.chapters, at);
+  // By id, because which chapter a page is in is a fact the chapter holds — see
+  // chapterAt. A page no chapter lists is in none, and says so.
+  const pageId = gallery.pages[at]?.id;
+  const chapter =
+    pageId === undefined ? null : chapterAt(gallery.chapters, pageId);
   const toggle = chaptersHost.querySelector("." + CLASS_CHAPTERS_TOGGLE);
-  const label = chapter?.title || labelFor(language, "chapters");
+  // A chapter with no name of its own, and a page in no chapter at all, are
+  // different answers: the first is named by its place on screen — which is the
+  // number the list shows it under — and the second says so. `indexOf` is against
+  // the placed list, and the chapter came out of it, so the two agree.
+  const order = chapter ? gallery.chapters.indexOf(chapter) + 1 : 0;
+  const label = chapter
+    ? chapter.title || "#" + order
+    : labelFor(language, "noChapter");
   if (toggle && toggle.textContent !== label) {
     toggle.textContent = label;
     // In full, since the button itself is bounded and may be clipping it.

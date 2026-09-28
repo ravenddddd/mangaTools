@@ -799,18 +799,24 @@ chapters at all** unless the list behind it is in path order — the chapter men
 simply is not there in a gallery sorted any other way.
 
 So this plugin keeps its own list, under `plugin.mangaTools.chapters`: a title and
-the **id of the image** the chapter starts at. Identity does not move when the
-order does, so the same list is right in every sort, and it survives images being
-added and removed around it. Each chapter runs to wherever the next one starts,
-which is the range Stash infers too — and with the start anchored to an image, a
-new page dropped into the middle of a chapter joins *that* chapter rather than
-what used to be the next one.
+the **ids of the images in it**. Identity does not move when the order does, so the
+same list is right in every sort, and it survives images being added and removed
+around it.
+
+**Which images are in a chapter is a fact about the images, so it is stored; what
+order they are in is a fact about the view, so it is not.** The ids are written in
+path order only to keep the field stable and diffable — a chapter is placed at
+whichever of its images comes *first* on screen, so the same list reads correctly
+under a title sort, a path sort, or anything else. And an image in no chapter is
+an ordinary thing to have: a cover, a divider, a page nobody has decided about
+yet. The button says so rather than guessing, which is how a page that still needs
+a chapter becomes visible.
 
 **The menu stands where Stash's own stands — and only when Stash's own is not
 there.** When it is, its numbers are right and this plugin adds nothing: anything
 it does not own is handed straight back. When it is not, the header carries this
-plugin's list, in the order the lightbox is showing, with the chapter the reader is
-in named on the button.
+plugin's list, in the order the lightbox is showing. The button names the chapter
+the reader is in, or says that the page they are on is in none of them.
 
 **A jump is a click on Stash's own thumbnail.** The nav strip along the bottom is
 one thumbnail per image the lightbox holds, and clicking one is Stash's own way of
@@ -821,10 +827,12 @@ loaded at once, and the console says so rather than moving somewhere approximate
 
 **Nothing is written until you edit a gallery's chapters.** A gallery with no list
 of its own — which is every gallery to begin with, including the ones whose
-chapters you made by hand in Stash — is read from Stash's own numbers, translated
-against path order on the spot. So opening a gallery changes nothing, the plugin's
-own list appears only for galleries whose chapters somebody actually edited, and
-deleting that one custom field puts a gallery back exactly where it was.
+chapters you made by hand in Stash — is read from Stash's own numbers instead:
+Stash gives each chapter a start and nothing else, so its ranges (each chapter up
+to the next one's start) are expanded into sets of images, against path order, on
+the spot. So opening a gallery changes nothing, the plugin's own list appears only
+for galleries whose chapters somebody actually edited, and deleting that one
+custom field puts a gallery back exactly where it was.
 
 ### What is not here yet
 
