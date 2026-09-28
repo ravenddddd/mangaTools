@@ -152,7 +152,9 @@ dom.window.PluginApi = {
     useRef: (init) => ({ current: init }),
   },
   hooks: {
-    useLightbox: (state, chapters) => (props) => {
+    // The state argument is ignored on purpose: this plugin passes nothing it
+    // wants kept, and the hook's own state is what Stash's lightbox already has.
+    useLightbox: (_state, chapters) => (props) => {
       shown.push({ props, chapters: (chapters || []).slice() });
     },
   },

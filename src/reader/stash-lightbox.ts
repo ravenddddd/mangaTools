@@ -14,7 +14,7 @@
  * mode off. A reader that cannot tell where it is must not draw anything.
  */
 import { gqlDoc, requirePluginApi } from "../plugin-api";
-import { NR, type MangaReaderOrder, type MangaReaderStrip } from "./namespace";
+import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
 
 /** The root element's class. Everything else is a child of it. */
