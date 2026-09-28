@@ -685,12 +685,33 @@ const PluginApi = {
   },
 };
 
+/**
+ * A `localStorage` that behaves, for the half of the plugin that keeps its
+ * reading settings there.
+ *
+ * In memory rather than absent: the reader reports an unreadable store on the
+ * console *by design* (its settings are a preference, not a requirement), so an
+ * absent one would be an error the sections have to ignore rather than a store
+ * they can exercise.
+ */
+const storedValues = new Map();
+
 global.window = {
   location: { pathname: "/galleries" },
   setInterval: () => 0,
   // Reported as a fine pointer, so the focus code runs rather than being skipped
   // as it would be on a touch device.
   matchMedia: () => ({ matches: false }),
+  // The reader takes its arrow keys here, in the capture phase, in front of
+  // Stash's own handler. Which keys it takes is what its own suite checks; what
+  // this world needs is only that the listener can be added at all.
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  localStorage: {
+    getItem: (key) => (storedValues.has(key) ? storedValues.get(key) : null),
+    setItem: (key, value) => storedValues.set(key, String(value)),
+    removeItem: (key) => storedValues.delete(key),
+  },
 };
 // The plugin watches the DOM for the filter dialog's card, because opening it is
 // Stash's state change and React never reports it — see the observer in
