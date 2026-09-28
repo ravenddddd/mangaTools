@@ -2440,6 +2440,115 @@ async function main() {
   });
 
   /**
+   * What this header looks like is Stash's stylesheet's business, which means the
+   * markup has to be Stash's own: every class asserted here is one its own lightbox
+   * header puts on the same element, read off its `LightboxHeader`. A class of this
+   * plugin's own would be styled by nothing and would read as a plugin's header,
+   * which is the one thing this half exists not to be.
+   *
+   * The icon names are asserted for the same reason: the stub has no Font Awesome
+   * to draw with, so the name the button asks for is the whole of what a test can
+   * see — and it is also the part that was wrong, when the header drew its own
+   * three bars and its own cross out of characters.
+   */
+  await runSection("the header is Stash's own markup", async () => {
+    const { box } = await startReader({
+      galleryId: "31",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
+
+    const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+    const toggle = (which) =>
+      [...chrome.querySelectorAll(".manga-reader-menu-button")].find(
+        (button) => button.dataset.opens === which
+      );
+    const owns = (el, ...names) =>
+      names.every((name) => el.classList.contains(name));
+
+    const chapterButton = toggle("chapters");
+    assert.ok(
+      owns(
+        chapterButton,
+        "minimal",
+        "Lightbox-header-chapter-button",
+        "dropdown-toggle",
+        "btn",
+        "btn-primary"
+      ),
+      "the chapter button is the Dropdown.Toggle Stash's own header draws"
+    );
+    const dropdown = chrome.querySelector(".dropdown");
+    assert.ok(
+      dropdown.contains(chapterButton),
+      "inside the wrapper a dropdown menu is positioned against — without it the " +
+        "menu is positioned against the page, and opens off the bottom of it"
+    );
+    assert.ok(
+      dropdown.contains(chrome.querySelector(".Lightbox-header-chapters")),
+      "and the menu is in that same wrapper, which is what positions it"
+    );
+
+    const gear = toggle("settings");
+    assert.ok(
+      owns(gear, "btn", "btn-link"),
+      "the gear is one of the link buttons Stash draws the rest of its header with"
+    );
+    const anchor = chrome.querySelector(".Lightbox-header-options-icon");
+    assert.ok(
+      anchor.contains(gear) &&
+        anchor.contains(chrome.querySelector(".popover")),
+      "and it sits in the options box its popover is measured from"
+    );
+    assert.strictEqual(
+      chrome.querySelector(".manga-reader-options-anchor"),
+      anchor,
+      "which this plugin also names, because the measuring is the one thing it adds"
+    );
+
+    const close = chrome.querySelector(".manga-reader-close");
+    assert.strictEqual(close.tagName, "BUTTON");
+    assert.ok(owns(close, "btn", "btn-link"), "the cross is one too");
+    assert.ok(
+      chrome.querySelector(".Lightbox-header-right").contains(close),
+      "at the end of the group that ends the row"
+    );
+    assert.strictEqual(
+      close.title,
+      "Close Lightbox",
+      "and says what Stash's own says"
+    );
+
+    assert.strictEqual(
+      chapterButton.dataset.icon,
+      "faBars",
+      "the chapter button asks for bars while the chapters are away"
+    );
+    dom.click(chapterButton);
+    assert.strictEqual(
+      chapterButton.dataset.icon,
+      "faTimes",
+      "and for a cross while they are open, as Stash's own does"
+    );
+    dom.click(chapterButton);
+    assert.strictEqual(
+      chapterButton.dataset.icon,
+      "faBars",
+      "and for bars again once they are put away"
+    );
+    assert.strictEqual(gear.dataset.icon, "faCog", "the gear is always a cog");
+    assert.strictEqual(
+      close.dataset.icon,
+      "faTimes",
+      "and the cross is always a cross"
+    );
+
+    stopReader(box);
+  });
+
+  /**
    * Paging past what the lightbox has loaded makes it fetch, and while it fetches it
    * shows a spinner *instead of* its header and its carousel. That is not a lightbox
    * this plugin cannot read — it is one that is busy — and reading it as the former is

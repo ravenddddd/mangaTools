@@ -20,6 +20,53 @@
 }
 
 /*
+ * The two pages. Fills the display area, which takeover.ts makes a containing
+ * block for it.
+ */
+.manga-reader-spread {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+/*
+ * Reading order is what the DOM holds — the earlier page first — and a manga is
+ * read right to left, so the earlier page is the *right-hand* one. One rule, and
+ * the whole direction question is answered.
+ */
+.manga-reader-spread {
+  flex-direction: row-reverse;
+}
+
+/*
+ * One page, or half the width when there are two. `contain` is what keeps a page
+ * whole: a spread of two tall pages has to shrink to fit the height, not be
+ * cropped to fill the width.
+ */
+.manga-reader-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  max-width: 50%;
+  flex: 0 1 auto;
+}
+
+/* A single page takes the middle of the screen on its own */
+.manga-reader-spread.is-single .manga-reader-page {
+  max-width: 100%;
+}
+
+.manga-reader-page img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/*
  * Stash's own header and footer, while this plugin draws its own.
  *
  * `:not(.manga-reader-chrome)` because this plugin's header wears the same class — it
@@ -44,6 +91,26 @@
 .manga-reader-chrome .popover.show,
 .manga-reader-chrome .dropdown-menu.show {
   display: block;
+}
+
+/*
+ * Where each menu sits. The chapter menu needs nothing: it is a Bootstrap
+ * `dropdown-menu` inside a `div.dropdown`, and that is the pair Bootstrap positions.
+ * The options popover needs this much — Stash renders its own into the lightbox and
+ * places it with a library, and this header has none, so the popover is measured
+ * from the box it is drawn in, centred under the gear. Without a positioned box to
+ * be measured from it is measured from the page, and `top: 100%` of a page is below
+ * the bottom of the screen.
+ */
+.manga-reader-options-anchor {
+  position: relative;
+}
+
+.manga-reader-chrome .popover.show {
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  z-index: 20;
 }
 
 /*

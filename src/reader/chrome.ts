@@ -32,8 +32,12 @@ export const CLASS_CHROME = "manga-reader-chrome";
 /** The chapter the reader is in, in the indicator's first span */
 export const CLASS_CHAPTER = "manga-reader-chapter";
 export const CLASS_COUNTER = "manga-reader-counter";
-/** Stash's own class for the gear's icon, which is where its options sit */
+/** Stash's own class for the box the gear sits in, which is where its options sit */
 export const CLASS_OPTIONS_ICON = "Lightbox-header-options-icon";
+/** This plugin's own name for that same box, which it also anchors its popover to */
+export const CLASS_OPTIONS_ANCHOR = "manga-reader-options-anchor";
+/** The cross at the end of the header */
+export const CLASS_CLOSE = "manga-reader-close";
 export const CLASS_MENU = "manga-reader-menu";
 export const CLASS_MENU_BUTTON = "manga-reader-menu-button";
 export const CLASS_MENU_PANEL = "manga-reader-menu-panel";
@@ -42,6 +46,20 @@ export const CLASS_SETTINGS = "manga-reader-settings";
 /** Each menu's panel, by class: a selector the tests' DOM stub understands too */
 const CLASS_MENU_CHAPTERS = "manga-reader-menu-chapters";
 const CLASS_MENU_SETTINGS = "manga-reader-menu-settings";
+
+/**
+ * What Stash's own header puts on each of the three buttons it has, copied from it
+ * rather than approximated: the look is in these. Its chapter button is a
+ * `Dropdown.Toggle`, which react-bootstrap renders as a `minimal` `dropdown-toggle
+ * btn btn-primary`; its gear and its cross are the `btn btn-link`s it draws its
+ * other buttons with. A class of this plugin's own would be a look of its own.
+ */
+const CLASS_CHAPTER_TOGGLE =
+  "minimal Lightbox-header-chapter-button dropdown-toggle btn btn-primary";
+const CLASS_ICON_BUTTON = "btn btn-link";
+
+/** The two menus this header has */
+type Menu = "chapters" | "settings";
 
 /** What the header shows, and what its buttons do */
 export interface ChromeHandlers {
@@ -106,12 +124,18 @@ export function ensureChrome(
 
     const left = document.createElement("div");
     left.className = "Lightbox-header-left-spacer";
-    left.appendChild(
-      menuButton("chapters", "faBars", "Lightbox-header-chapter-button")
+    // Stash's chapter menu is a `Dropdown`, which renders a `div.dropdown` holding the
+    // toggle and the menu — and a `dropdown-menu` is positioned against that wrapper.
+    // Without one the menu is positioned against the header, which is where it landed.
+    const chapters = document.createElement("div");
+    chapters.className = "dropdown";
+    chapters.appendChild(
+      menuButton("chapters", CLASS_CHAPTER_TOGGLE, "faBars")
     );
-    left.appendChild(
+    chapters.appendChild(
       panel("chapters", "dropdown-menu Lightbox-header-chapters")
     );
+    left.appendChild(chapters);
     chrome.appendChild(left);
 
     const indicator = document.createElement("div");
@@ -124,12 +148,22 @@ export function ensureChrome(
     right.className = "Lightbox-header-right";
     const options = document.createElement("div");
     options.className = "Lightbox-header-options";
-    options.appendChild(menuButton("settings", "faCog", CLASS_OPTIONS_ICON));
-    options.appendChild(panel("settings", "popover"));
+    // Stash's own box for the gear, and the one thing this header adds to it: a
+    // position. Stash renders its options popover into the lightbox and places it
+    // with a library, which is a library this header has not got — so the popover
+    // is measured from this box instead, and the box has to be what it is measured
+    // from. Without that it is measured from the page, and lands off the bottom of
+    // it. See the popover rule in mangaReader.css.
+    const anchor = document.createElement("div");
+    anchor.className = CLASS_OPTIONS_ICON + " " + CLASS_OPTIONS_ANCHOR;
+    anchor.appendChild(menuButton("settings", CLASS_ICON_BUTTON, "faCog"));
+    anchor.appendChild(panel("settings", "popover"));
+    options.appendChild(anchor);
     right.appendChild(options);
+    // Inside the right-hand group rather than after it, which is where Stash puts
+    // its own: that group is what holds the end of the row.
+    right.appendChild(closeButton());
     chrome.appendChild(right);
-
-    chrome.appendChild(closeButton());
   }
 
   chromeNode = chrome;
@@ -202,9 +236,14 @@ function update(chrome: HTMLElement, state: ChromeState): void {
   ) as HTMLElement;
   if (!chapterPanel || !settingsPanel) return;
 
-  for (const button of chrome.querySelectorAll("." + CLASS_MENU_BUTTON)) {
-    const which = button.getAttribute("data-opens");
-    button.setAttribute("aria-expanded", which === openMenu ? "true" : "false");
+  for (const node of chrome.querySelectorAll("." + CLASS_MENU_BUTTON)) {
+    const button = node as HTMLElement;
+    const which = button.dataset.opens as Menu;
+    const open = which === openMenu;
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    // Stash's own chapter button turns into a cross while its menu is open, and
+    // the gear does not turn into anything.
+    setIcon(button, iconFor(which, open));
   }
 
   chapterPanel.classList.toggle("show", openMenu === "chapters");
@@ -243,8 +282,11 @@ function drawChapters(panel: HTMLElement, state: ChromeState): void {
   }
 
   for (const item of panel.querySelectorAll("." + CLASS_MENU_ITEM)) {
+    // Read back the way it was written: `dataset` is the same attribute as
+    // `data-at`, and a read that spells it differently is a read that only the
+    // browser's own leniency makes work — the tests' DOM is not lenient.
     const mine =
-      item.getAttribute("data-at") === String(state.chapter?.at ?? -1);
+      (item as HTMLElement).dataset.at === String(state.chapter?.at ?? -1);
     item.classList.toggle("active", mine);
   }
 }
@@ -380,20 +422,22 @@ function text(className: string, tag = "span"): HTMLElement {
   return node;
 }
 
-function menuButton(
-  opens: "chapters" | "settings",
-  icon: string,
-  extra: string
-): HTMLElement {
+/**
+ * One of the header's menu buttons.
+ *
+ * The classes come from the caller, which passes the ones Stash's own header uses
+ * for that button — see CLASS_CHAPTER_TOGGLE and CLASS_ICON_BUTTON. The icon is
+ * Stash's own too, drawn by Stash's own React component: the same three bars and the
+ * same cog its header uses, so the header reads as itself.
+ */
+function menuButton(opens: Menu, classes: string, icon: string): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "minimal " + extra + " " + CLASS_MENU_BUTTON;
+  button.className = classes + " " + CLASS_MENU_BUTTON;
   button.dataset.opens = opens;
   button.setAttribute("aria-haspopup", "true");
   button.setAttribute("aria-expanded", "false");
-  // Stash's own icon, drawn by Stash's own React component: the same three bars and
-  // the same cog its header uses, so the header reads as itself.
-  drawIcon(button, icon);
+  setIcon(button, icon);
   button.addEventListener("click", () => {
     openMenu = openMenu === opens ? null : opens;
     redraw();
@@ -401,7 +445,28 @@ function menuButton(
   return button;
 }
 
-function panel(opens: "chapters" | "settings", extra: string): HTMLElement {
+/** The icon a menu shows: the bars open into a cross, and the cog stays a cog */
+function iconFor(opens: Menu, open: boolean): string {
+  if (opens !== "chapters") return "faCog";
+  return open ? "faTimes" : "faBars";
+}
+
+/**
+ * Draws a button's icon, once.
+ *
+ * Once, because drawing one is a React render into the button, and the pass that
+ * keeps this header up to date runs on every change the lightbox makes: a render per
+ * pass would be a change per pass, which is the one thing a pass must not be. The
+ * name is kept on the button for the same reason — it is what says whether the icon
+ * on it is already the icon it should have.
+ */
+function setIcon(host: HTMLElement, name: string): void {
+  if (host.dataset.icon === name) return;
+  host.dataset.icon = name;
+  drawIcon(host, name);
+}
+
+function panel(opens: Menu, extra: string): HTMLElement {
   const node = document.createElement("div");
   node.className = [
     extra,
@@ -431,11 +496,21 @@ function drawIcon(host: HTMLElement, name: string): void {
   render(api.React.createElement(Icon, { icon }), host);
 }
 
+/**
+ * The cross that closes the lightbox.
+ *
+ * Stash's own button, down to the icon and the tooltip: a `btn btn-link` with a
+ * `faTimes` in it, which is what its header ends with. A typed "✕" was a different
+ * glyph in a different font at a different size, and it sat a few pixels off the end
+ * of the row.
+ */
 function closeButton(): HTMLElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "minimal manga-reader-close";
-  button.textContent = "✕";
+  button.className = CLASS_ICON_BUTTON + " " + CLASS_CLOSE;
+  // Stash's own words for it, which are not translated there either.
+  button.title = "Close Lightbox";
+  setIcon(button, "faTimes");
   button.addEventListener("click", () => {
     openMenu = null;
     latest?.handlers.onClose();

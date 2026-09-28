@@ -322,6 +322,34 @@ module.exports = () => {
     "mangaReader.css should hide what the reader marks with data-manga-reader-hidden: " +
       "the chapters tab's own button is marked, and a mark with no rule behind it hides nothing"
   );
+
+  // The header's options popover, which this plugin places itself: Stash renders its
+  // own into the lightbox and moves it there with a library, and this header has no
+  // library. So it is positioned from the box it is drawn in, and that box has to be
+  // one an absolutely-positioned child can be measured from — without it the popover
+  // is measured from the page, and `top: 100%` of a page is below the bottom of the
+  // screen. Which is where it went, and why it looked like a menu that did not open.
+  assert.ok(
+    /\.manga-reader-options-anchor\s*\{[^}]*position:\s*relative/.test(
+      readerCss
+    ),
+    "mangaReader.css should make the options box the popover's own box: measured " +
+      "from the page instead, the popover opens below the bottom of it"
+  );
+  assert.ok(
+    /\.manga-reader-chrome \.popover\.show\s*\{[^}]*top:\s*100%/.test(
+      readerCss
+    ),
+    "and should place that popover under the gear that opened it"
+  );
+  // And the same, the other way round, for the pages: the spread is measured from
+  // the display it is drawn into, which is what makes it the size of the screen
+  // rather than the size of its own contents.
+  assert.ok(
+    /\.manga-reader-spread\s*\{[^}]*position:\s*absolute/.test(readerCss),
+    "mangaReader.css should lay the spread over the display: in the flow it takes " +
+      "the width of its pages, and squeezes Stash's own arrows against the edges"
+  );
   console.log(
     "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"
   );
