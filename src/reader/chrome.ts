@@ -45,6 +45,8 @@ export interface ChromeHandlers {
   onChapter(at: number): void;
   /** A setting changed — written by the caller, which owns them */
   onSetting(next: Partial<MangaReaderSettings>): void;
+  /** The pairing shift, which belongs to the gallery rather than to the reader */
+  onOffset(next: 0 | 1): void;
   /** Close, by Stash's own path */
   onClose(): void;
 }
@@ -61,6 +63,8 @@ export interface ChromeState {
   chapters: MangaReaderChapter[];
   placed: MangaReaderPlacedChapter[];
   settings: MangaReaderSettings;
+  /** The pairing shift for this gallery: 0, or 1 to pair everything one page over */
+  offset: 0 | 1;
   locale: string | null;
   handlers: ChromeHandlers;
 }
@@ -215,6 +219,24 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     wrap.appendChild(box);
     panel.appendChild(wrap);
 
+    // The pairing shift, which is not a reading preference like the two above it: it
+    // is about this gallery's pages, so it is remembered for the gallery.
+    const shift = document.createElement("div");
+    shift.className = "form-check";
+    const shiftInput = document.createElement("input");
+    shiftInput.type = "checkbox";
+    shiftInput.className = "form-check-input";
+    shiftInput.id = OFFSET_ID;
+    shiftInput.addEventListener("change", () => {
+      latest?.handlers.onOffset(shiftInput.checked ? 1 : 0);
+    });
+    const shiftLabel = document.createElement("label");
+    shiftLabel.className = "form-check-label";
+    shiftLabel.htmlFor = OFFSET_ID;
+    shift.appendChild(shiftInput);
+    shift.appendChild(shiftLabel);
+    panel.appendChild(shift);
+
     const fade = document.createElement("div");
     fade.className = "form-group";
 
@@ -251,6 +273,17 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     name.textContent = label("mangaReader.doublePage");
   }
 
+  const offset = panel.querySelector(
+    "#" + OFFSET_ID
+  ) as HTMLInputElement | null;
+  if (offset && offset.checked !== (state.offset === 1)) {
+    offset.checked = state.offset === 1;
+  }
+  const offsetName = panel.querySelector("label[for='" + OFFSET_ID + "']");
+  if (offsetName && offsetName.textContent !== label("mangaReader.offset")) {
+    offsetName.textContent = label("mangaReader.offset");
+  }
+
   const range = panel.querySelector("#" + FADE_ID) as HTMLInputElement | null;
   if (range && range.value !== String(state.settings.fadeMs)) {
     range.value = String(state.settings.fadeMs);
@@ -265,6 +298,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 }
 
 const DOUBLE_PAGE_ID = "manga-reader-double-page";
+const OFFSET_ID = "manga-reader-offset";
 const FADE_ID = "manga-reader-fade";
 
 /** The file's own name, which is what an image with no title is called */

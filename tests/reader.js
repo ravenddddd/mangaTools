@@ -522,6 +522,22 @@ const drawnRows = (container) =>
     (wrap) => wrap.children[1].children[0].textContent
   );
 
+/**
+ * Turns the reader by a screen, the way a reader does: a click on one of Stash's own
+ * chevrons, which this plugin intercepts.
+ *
+ * A section used to move the lightbox and expect the reader to follow it. The reader's
+ * place is its own now — that is what taking the lightbox over meant — so a section
+ * that wants it somewhere else turns to get there. One click is one screen, which is
+ * also why the sections that used to press twice no longer do.
+ */
+const turn = (box, screens = 1) => {
+  for (let i = 0; i < screens; i++) {
+    dom.click(box.navRight);
+    dom.flush();
+  }
+};
+
 /** The container this plugin draws in, if it is drawing */
 const container = () => dom.body.querySelector(".manga-reader-spread");
 
@@ -1162,11 +1178,9 @@ async function main() {
         "and the pages of the next screen are warmed, so a turn does not wait"
       );
 
-      // Stash moves and the reader follows — through the one code path every other
-      // way of moving takes, which is the point of reading its header rather than
-      // keeping a second idea of the current page.
-      box.move(2);
-      dom.flush();
+      // Every way of turning ends in the same place: this is a click on Stash's own
+      // chevron, and the reader's own position is what moves.
+      turn(box);
       assert.deepStrictEqual(
         drawn(),
         ["/image/102/image"],
@@ -1174,16 +1188,14 @@ async function main() {
           "left half of a screen"
       );
 
-      box.move(3);
-      dom.flush();
+      turn(box);
       assert.deepStrictEqual(
         drawn(),
         ["/image/103/image"],
         "the spread takes a screen of its own"
       );
 
-      box.move(4);
-      dom.flush();
+      turn(box);
       assert.deepStrictEqual(
         drawn(),
         ["/image/104/image", "/image/105/image"],
@@ -1207,8 +1219,7 @@ async function main() {
 
       // Held from here: the next turn's images are coming, and are not here.
       dom.holdImages();
-      box.move(4);
-      dom.flush();
+      turn(box, 3);
       assert.deepStrictEqual(
         drawn(),
         ["/image/101/image"],
@@ -1233,8 +1244,7 @@ async function main() {
     async () => {
       const { box } = await startReader({ on: true });
       dom.holdImages();
-      box.move(2);
-      dom.flush();
+      turn(box);
       assert.deepStrictEqual(
         drawn(),
         ["/image/101/image"],
@@ -1264,10 +1274,9 @@ async function main() {
       const { box } = await startReader({ on: true });
 
       dom.holdImages();
-      box.move(2);
-      dom.flush();
-      box.move(4);
-      dom.flush();
+      turn(box);
+      turn(box);
+      turn(box);
 
       dom.settleImages();
       await settle();

@@ -547,6 +547,7 @@ function chromeState(
     chapters: gallery.chapters,
     placed: gallery.chapters,
     settings,
+    offset,
     locale: language,
     handlers: {
       onChapter: (to: number) => {
@@ -556,6 +557,11 @@ function chromeState(
       onSetting: (next: Partial<MangaReaderSettings>) => {
         settings = writeSettings(next);
         if (next.doublePage === false) deactivate();
+      },
+      onOffset: (next) => {
+        setOffset(gallery, next);
+        shownAt = -1;
+        sync(lightbox);
       },
       onClose: () => pressEscape(),
     },
@@ -1231,10 +1237,9 @@ function turnBy(lightbox: Element, direction: 1 | -1): boolean {
   if (steps === 0) return false;
 
   // Straight to it: the pages are all here, so a turn is where the reader is going
-  // rather than a errand aimed at a lightbox that has to be waited for.
+  // rather than an errand aimed at a lightbox that has to be waited for. `sync` draws
+  // the screen the new place is in.
   place += steps;
-  draw(gallery.screens[screenNow(gallery)], screenNow(gallery));
-  void at;
   sync(lightbox);
   return true;
 }
