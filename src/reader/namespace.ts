@@ -12,6 +12,7 @@
  * so a smoke test can reach the functions without a bundler of its own. Nothing
  * at runtime reads it — the plugin ships as one file, with its imports inlined.
  */
+import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 
 /**
@@ -21,6 +22,13 @@ import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 export interface MangaReaderOrder {
   sort: string;
   direction: "ASC" | "DESC";
+}
+
+/** Where the lightbox's strip of thumbnails starts, and which one is current */
+export interface MangaReaderStrip {
+  start: number;
+  count: number;
+  selected: number;
 }
 
 /** Just the settings the reader keeps. See settings.ts. */
@@ -41,11 +49,19 @@ export interface MangaReaderSettings {
   fadeMs: number;
 }
 
-/** What is being read: the pages, and where the reader is. */
+/** What is being read: the pages, where the reader is, and where its chapters are. */
 export interface MangaReaderGallery {
   id: string;
   pages: MangaReaderPage[];
   screens: MangaReaderScreen[];
+  /**
+   * The gallery's chapters, placed in the order the pages came back in.
+   *
+   * Placed once, at the only moment the order is known — a gallery is fetched when
+   * the lightbox opens, and changing the list's sort behind it reopens it. See
+   * placeChapters.
+   */
+  chapters: MangaReaderPlacedChapter[];
 }
 
 /**
@@ -74,6 +90,12 @@ export interface MangaReaderNamespace {
   galleryIdFromPath(pathname: string): string | null;
   /** The order the lightbox is showing its images in, read from the URL */
   lightboxOrder(search: string): MangaReaderOrder;
+  /** The thumbnails the lightbox is holding, and which of them is current */
+  readStrip(lightbox: Element): MangaReaderStrip | null;
+  /** Goes straight to an image by clicking its thumbnail, if it is held */
+  clickStrip(lightbox: Element, index: number): boolean;
+  /** Whether Stash's own chapter menu is on screen */
+  hasOwnChapterMenu(lightbox: Element): boolean;
   isWideSpreadPage(page: MangaReaderPage): boolean;
   /**
    * How long a screen may be held back waiting for its images, in milliseconds.
@@ -91,6 +113,25 @@ export interface MangaReaderNamespace {
       detectSpreads: boolean;
     }>
   ): MangaReaderScreen[];
+  /** The stored shape's version. See chapters.ts. */
+  CHAPTERS_VERSION: number;
+  /** This gallery's stored chapters, or null when there are none to read */
+  parseChapters(raw: string | null): MangaReaderChapter[] | null;
+  /** Stash's own chapters, translated against the path-ordered image ids */
+  chaptersFromStash(
+    rows: { title?: unknown; image_index?: unknown }[] | null | undefined,
+    pathIds: string[]
+  ): MangaReaderChapter[];
+  /** Where each chapter falls in the order on screen */
+  placeChapters(
+    chapters: MangaReaderChapter[],
+    pages: MangaReaderPage[]
+  ): MangaReaderPlacedChapter[];
+  /** The chapter a page is in, or null before the first one */
+  chapterAt(
+    placed: MangaReaderPlacedChapter[],
+    index: number
+  ): MangaReaderPlacedChapter | null;
   screenAt(screens: MangaReaderScreen[], pageIndex: number): number;
   stepsToAdjacent(
     screens: MangaReaderScreen[],

@@ -280,6 +280,22 @@ NS.isOriginal = (customFields: unknown): boolean =>
   NS.pickField(customFields, NS.ORIGINAL_FIELD_NAME) !== "";
 
 /**
+ * Where this plugin keeps a gallery's chapters.
+ *
+ * A JSON string — the only shape a custom field can hold: Stash rejects arrays
+ * and objects outright (`getSQLValueFromCustomFieldInput` in
+ * `pkg/sqlite/custom_fields.go`). What is inside it is `chapters.ts` in the
+ * reader half, which is the only thing that reads or writes it.
+ *
+ * Not one of the fields above: those are *attributes of a gallery* that Stash
+ * draws rows for. This is this plugin's own record of where a chapter starts —
+ * a fact Stash keeps too (its `GalleryChapter.image_index`) and keeps in the only
+ * way it can, as a position in the order the images happen to be in. See the note
+ * on the reader's chapters.ts for why this plugin keeps identity instead.
+ */
+NS.CHAPTER_FIELD_NAME = "plugin.mangaTools.chapters";
+
+/**
  * Which of this plugin's fields a custom-field key names, or "" for any other.
  *
  * One list, asked by everything that has to recognise a key of ours. It exists
@@ -316,6 +332,10 @@ NS.ownField = (key: unknown): string => {
     NS.MANGA_FIELD_NAME,
     NS.TRANSLATION_GROUP_FIELD_NAME,
     NS.ORIGINAL_FIELD_NAME,
+    // Recognised but never drawn: no row, no sidebar section, no bulk entry.
+    // What it means is the reader half's business — a key of this plugin's must
+    // not be left behind in Stash's own custom-field rows either way.
+    NS.CHAPTER_FIELD_NAME,
   ];
   for (let i = 0; i < names.length; i++) {
     if (names[i].toLowerCase() === k) return names[i];

@@ -42,6 +42,23 @@ function makeElement(tagName) {
       return el.children.length;
     },
 
+    /**
+     * Attributes, for the ones the plugin sets that are not classes or text — the
+     * `aria-expanded` on its menu's toggle, and the `title` carrying a chapter name
+     * the button may be clipping. `data-*` is the `dataset` above, the way the real
+     * element splits them.
+     */
+    attributes: {},
+    setAttribute(name, value) {
+      el.attributes[name] = String(value);
+    },
+    getAttribute(name) {
+      return Object.hasOwn(el.attributes, name) ? el.attributes[name] : null;
+    },
+    removeAttribute(name) {
+      delete el.attributes[name];
+    },
+
     get classList() {
       return {
         contains: (name) => el.className.split(/\s+/).includes(name),
@@ -76,6 +93,15 @@ function makeElement(tagName) {
       if (el.parentNode) detach(el.parentNode, el);
     },
 
+    /** Whether the node is this element or below it — how a menu knows a click was inside it */
+    contains(node) {
+      for (let at = node; at; at = at.parentNode) {
+        if (at === el) return true;
+      }
+
+      return false;
+    },
+
     /**
      * Only the selector shapes the plugin uses: `.cls`, `.outer .inner`, `#id`, and
      * a bare tag name — each matching at any depth below the element it is asked of,
@@ -108,6 +134,36 @@ function makeElement(tagName) {
       return search(el, selector.trim().split(/\s+/));
     },
 
+    /**
+     * Every descendant matching, in document order — the plural of `querySelector`
+     * above, with the same single-class/hash/tag matcher and the same refusal to
+     * guess at anything else.
+     *
+     * One class only, as the plugin uses it: a selector of several classes is a
+     * stub that would match the wrong thing rather than fail.
+     */
+    querySelectorAll(selector) {
+      const sel = selector.trim();
+      if (/\s/.test(sel) || sel.split(".").length > 2) return [];
+
+      const match = (node) => {
+        if (sel.startsWith("#")) return node.id === sel.slice(1);
+        if (sel.startsWith(".")) return node.classList.contains(sel.slice(1));
+        return node.tagName === sel.toUpperCase();
+      };
+
+      const found = [];
+      const walk = (node) => {
+        for (const child of node.children) {
+          if (match(child)) found.push(child);
+          walk(child);
+        }
+      };
+      walk(el);
+
+      return found;
+    },
+
     addEventListener(type, fn) {
       if (!el.listeners[type]) el.listeners[type] = [];
       el.listeners[type].push(fn);
@@ -125,6 +181,27 @@ function makeElement(tagName) {
     /** Fires the listeners this stub holds — the test's way of clicking things. */
     dispatch(type, event) {
       for (const fn of el.listeners[type] || []) fn(event || { type });
+    },
+
+    /**
+     * The DOM's own dispatch, for the events the *plugin* sends — a click on one
+     * of Stash's thumbnails, which is how a chapter jump is made.
+     *
+     * Bubbling, as the real one does, because Stash's handlers are delegated: a
+     * click on a thumbnail in the nav strip is handled by whatever is listening
+     * above it, not by the thumbnail. Same walk as `click` below, which is the
+     * test's way of clicking.
+     */
+    dispatchEvent(event) {
+      event.target = el;
+      for (let node = el; node; node = node.parentNode) {
+        const listener = node.listeners[event.type];
+        if (typeof listener === "function") listener(event);
+        else if (Array.isArray(listener)) for (const fn of listener) fn(event);
+        if (event.propagationStopped) break;
+      }
+
+      return true;
     },
 
     /**

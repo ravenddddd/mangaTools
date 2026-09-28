@@ -14,7 +14,7 @@
  * mode off. A reader that cannot tell where it is must not draw anything.
  */
 import { gqlDoc, requirePluginApi } from "../plugin-api";
-import { NR, type MangaReaderOrder } from "./namespace";
+import { NR, type MangaReaderOrder, type MangaReaderStrip } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
 
 /** The root element's class. Everything else is a child of it. */
@@ -24,6 +24,22 @@ export const CLASS_CAROUSEL = "Lightbox-carousel";
 export const CLASS_INDICATOR = "Lightbox-header-indicator";
 export const CLASS_OPTIONS_ICON = "Lightbox-header-options-icon";
 export const CLASS_POPOVER_BODY = "popover-body";
+/**
+ * Where Stash puts its chapter menu, and the menu itself.
+ *
+ * Read, never written: Stash draws its own there when it has chapters to show, and
+ * *only* then — it hands the lightbox an empty list whenever the list behind it is
+ * not sorted by path, because its chapter numbers count in path order and would
+ * point at the wrong images. So the presence of this button is also the answer to
+ * "is Stash's own chapter navigation on screen", which is what decides whether
+ * this plugin adds its own.
+ */
+export const CLASS_HEADER_LEFT_SPACER = "Lightbox-header-left-spacer";
+export const CLASS_CHAPTER_BUTTON = "Lightbox-header-chapter-button";
+/** The strip of thumbnails along the bottom, one per image the lightbox holds */
+export const CLASS_NAV = "Lightbox-nav";
+export const CLASS_NAV_IMAGE = "Lightbox-nav-image";
+export const CLASS_NAV_SELECTED = "Lightbox-nav-selected";
 
 /** The selectors, spelled once so a page of Stash's markup is read the same way everywhere */
 export const SELECTOR_LIGHTBOX = ".Lightbox";
@@ -32,6 +48,9 @@ export const SELECTOR_CAROUSEL = ".Lightbox-carousel";
 export const SELECTOR_INDICATOR = ".Lightbox-header-indicator";
 export const SELECTOR_OPTIONS_ICON = ".Lightbox-header-options-icon";
 export const SELECTOR_POPOVER_BODY = ".popover .popover-body";
+export const SELECTOR_HEADER_LEFT_SPACER = ".Lightbox-header-left-spacer";
+export const SELECTOR_CHAPTER_BUTTON = ".Lightbox-header-chapter-button";
+export const SELECTOR_NAV = ".Lightbox-nav";
 
 /**
  * Stash's own next/previous buttons, the chevrons either side of the image.
@@ -193,13 +212,21 @@ export function lightboxOrder(search: string): MangaReaderOrder {
  * ask for an order the lightbox is not showing.
  */
 export const GALLERY_QUERY_TEXT = [
-  "query MangaReaderGallery($galleryId: ID!, $sort: String, $direction: SortDirectionEnum) {",
+  "query MangaReaderGallery($galleryId: ID!, $sort: String, $direction: SortDirectionEnum, $withPathIds: Boolean!) {",
   "  configuration {",
   "    interface {",
   "      language",
   "    }",
   "  }",
-  "  findImages(",
+  "  findGallery(id: $galleryId) {",
+  "    id",
+  "    custom_fields",
+  "    chapters {",
+  "      title",
+  "      image_index",
+  "    }",
+  "  }",
+  "  pages: findImages(",
   "    image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }",
   "    filter: { per_page: -1, sort: $sort, direction: $direction }",
   "  ) {",
@@ -216,27 +243,140 @@ export const GALLERY_QUERY_TEXT = [
   "      }",
   "    }",
   "  }",
+  "  byPath: findImages(",
+  "    image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }",
+  '    filter: { per_page: -1, sort: "path", direction: ASC }',
+  "  ) @include(if: $withPathIds) {",
+  "    images {",
+  "      id",
+  "    }",
+  "  }",
   "}",
 ].join("\n");
 
 let galleryQuery: unknown = null;
 
 /** What the gallery query returns, as far as this plugin cares */
+/**
+ * Where the strip of thumbnails starts, how long it is, and which one is current.
+ *
+ * The strip is one thumbnail per image the lightbox is *holding* — the page it
+ * fetched, not the whole gallery — and clicking one is Stash's own way of going
+ * straight to an image: `selectIndex(index)` in its lightbox, which is the one
+ * thing here that reaches the index directly rather than by pressing an arrow.
+ * That is what makes a chapter jump one click instead of three hundred.
+ *
+ * All three numbers are 0-based, against the strip. `start` is the global index of
+ * its first thumbnail, worked out from the header's own count of where the
+ * lightbox is: the counter says which image is current, and the selected thumbnail
+ * says how far into the strip that is.
+ */
+/** The thumbnails the lightbox is holding, or null when it is not holding any */
+export function readStrip(lightbox: Element): MangaReaderStrip | null {
+  const thumbs = stripThumbs(lightbox);
+  if (!thumbs) return null;
+
+  const selected = thumbs.findIndex((thumb) =>
+    thumb.classList.contains(CLASS_NAV_SELECTED)
+  );
+  if (selected < 0) return null;
+
+  const position = readPosition(lightbox);
+  if (!position) return null;
+
+  // The counter is 1-based and global; the strip is 0-based and local.
+  const start = position.current - 1 - selected;
+  if (start < 0) return null;
+
+  return { start, count: thumbs.length, selected };
+}
+
+/**
+ * Goes straight to an image by clicking its thumbnail, if the lightbox is holding
+ * it. False when it is not — a target on a page the lightbox has not fetched, which
+ * is a jump this cannot make rather than one it should guess at.
+ */
+export function clickStrip(lightbox: Element, index: number): boolean {
+  const strip = readStrip(lightbox);
+  if (!strip) return false;
+
+  const at = index - strip.start;
+  if (at < 0 || at >= strip.count) return false;
+
+  const thumb = stripThumbs(lightbox)?.[at];
+  if (!thumb) return false;
+
+  // A real click on Stash's own element, so its handler runs the way it would for
+  // a reader's click — no second idea of how the lightbox moves.
+  thumb.dispatchEvent(
+    new MouseEvent("click", { bubbles: true, cancelable: true })
+  );
+
+  return true;
+}
+
+/** The thumbnails, in the order the lightbox is holding them */
+function stripThumbs(lightbox: Element): Element[] | null {
+  const nav = lightbox.querySelector(SELECTOR_NAV);
+  if (!nav) return null;
+
+  // `children` and a class test rather than `querySelectorAll`: the stub the tests
+  // run against has no selector engine below the root, and this is the same answer
+  // without needing one.
+  const thumbs = Array.from(nav.children).filter((child) =>
+    child.classList.contains(CLASS_NAV_IMAGE)
+  );
+
+  return thumbs.length > 0 ? thumbs : null;
+}
+
+/**
+ * Whether Stash's own chapter menu is on screen.
+ *
+ * Its absence is not a fault: it means the lightbox was handed an empty chapter
+ * list, which Stash does whenever the list behind it is not in path order. See the
+ * note on CLASS_CHAPTER_BUTTON.
+ */
+export function hasOwnChapterMenu(lightbox: Element): boolean {
+  return lightbox.querySelector(SELECTOR_CHAPTER_BUTTON) !== null;
+}
+
 interface GalleryPayload {
   configuration?: { interface?: { language?: string } };
-  findImages?: {
+  findGallery?: {
+    id?: string;
+    custom_fields?: unknown;
+    chapters?: Array<{ title?: string; image_index?: number }>;
+  };
+  pages?: {
     images?: Array<{
       id: string;
       visual_files?: Array<{ width?: number; height?: number }>;
       paths?: { image?: string };
     }>;
   };
+  /** Only asked for when the order is not path — see fetchGallery */
+  byPath?: { images?: Array<{ id: string }> };
 }
 
 export interface GalleryAnswer {
   /** The interface language, or null when Stash did not say */
   language: string | null;
   pages: MangaReaderPage[];
+  /** This gallery's custom fields, as Stash holds them */
+  customFields: unknown;
+  /** Stash's own chapters, in the shape its own field has */
+  stashChapters: { title?: string; image_index?: number }[];
+  /**
+   * The gallery's image ids in path order, or null when they were not asked for.
+   *
+   * Asked for only when the pages themselves are not in path order, because that
+   * is the only case that needs them: Stash's chapter numbers count in path order,
+   * so translating one into an image means counting that way. When the pages *are*
+   * path-ordered they are that list already, and asking twice would be the same
+   * answer at twice the price.
+   */
+  pathIds: string[] | null;
 }
 
 /**
@@ -257,6 +397,10 @@ export async function fetchGallery(
   const query = galleryQuery;
   if (!query) throw new Error("[mangaReader] no gallery query document");
 
+  // The path-ordered ids are needed to translate Stash's chapter numbers, and are
+  // only worth asking for when the pages are not already in that order.
+  const pathIdsNeeded = order.sort !== "path";
+
   const data = await requirePluginApi()
     .utils.StashService.getClient()
     // no-cache: this is read once per gallery opened and nothing else in the page
@@ -269,35 +413,42 @@ export async function fetchGallery(
         galleryId,
         sort: order.sort,
         direction: order.direction,
+        withPathIds: pathIdsNeeded,
       },
       fetchPolicy: "no-cache",
     })
     .then((res) => res?.data as GalleryPayload | undefined);
 
-  const pages: MangaReaderPage[] = (data?.findImages?.images || []).map(
-    (image) => {
-      const file = (image.visual_files || []).find(
-        (f) => typeof f?.width === "number" && typeof f?.height === "number"
-      );
+  const pages: MangaReaderPage[] = (data?.pages?.images || []).map((image) => {
+    const file = (image.visual_files || []).find(
+      (f) => typeof f?.width === "number" && typeof f?.height === "number"
+    );
 
-      return {
-        id: String(image.id),
-        width: file?.width || 0,
-        height: file?.height || 0,
-        // Stash's own URL for the image, kept for the query on it — which is a
-        // version stamp, and is the whole reason this field is fetched at all. See
-        // pageUrl in takeover.ts.
-        url: image.paths?.image || "",
-      };
-    }
-  );
+    return {
+      id: String(image.id),
+      width: file?.width || 0,
+      height: file?.height || 0,
+      // Stash's own URL for the image, kept for the query on it — which is a
+      // version stamp, and is the whole reason this field is fetched at all. See
+      // pageUrl in takeover.ts.
+      url: image.paths?.image || "",
+    };
+  });
 
   return {
     language: data?.configuration?.interface?.language || null,
     pages,
+    customFields: data?.findGallery?.custom_fields || {},
+    stashChapters: data?.findGallery?.chapters || [],
+    pathIds: pathIdsNeeded
+      ? (data?.byPath?.images || []).map((image) => String(image.id))
+      : null,
   };
 }
 
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
 NR.lightboxOrder = lightboxOrder;
+NR.readStrip = readStrip;
+NR.clickStrip = clickStrip;
+NR.hasOwnChapterMenu = hasOwnChapterMenu;

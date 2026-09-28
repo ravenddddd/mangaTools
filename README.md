@@ -788,6 +788,44 @@ since two pages of text superimposed are illegible soup for as long as it lasts.
 starts only once the images are there, so it is never a wait in disguise, and it
 does not happen at all for a reader whose system asks for less motion.
 
+### Chapters, in the order you are reading
+
+Stash keeps a chapter as a title and a **number** — the Nth image — and that N
+counts in **path order**, because that is the order its own lightbox reads a
+gallery in. Everything follows from that: sort the same gallery by title and the
+number points somewhere else, add an image near the front and every chapter after
+it is off by one. Stash knows this, which is why it hands the lightbox **no
+chapters at all** unless the list behind it is in path order — the chapter menu
+simply is not there in a gallery sorted any other way.
+
+So this plugin keeps its own list, under `plugin.mangaTools.chapters`: a title and
+the **id of the image** the chapter starts at. Identity does not move when the
+order does, so the same list is right in every sort, and it survives images being
+added and removed around it. Each chapter runs to wherever the next one starts,
+which is the range Stash infers too — and with the start anchored to an image, a
+new page dropped into the middle of a chapter joins *that* chapter rather than
+what used to be the next one.
+
+**The menu stands where Stash's own stands — and only when Stash's own is not
+there.** When it is, its numbers are right and this plugin adds nothing: anything
+it does not own is handed straight back. When it is not, the header carries this
+plugin's list, in the order the lightbox is showing, with the chapter the reader is
+in named on the button.
+
+**A jump is a click on Stash's own thumbnail.** The nav strip along the bottom is
+one thumbnail per image the lightbox holds, and clicking one is Stash's own way of
+going straight to it — so a chapter three hundred pages away is one click, not
+three hundred presses of an arrow. A chapter the lightbox is *not* holding cannot
+be jumped to: that is a gallery with more images than the list behind the lightbox
+loaded at once, and the console says so rather than moving somewhere approximate.
+
+**Nothing is written until you edit a gallery's chapters.** A gallery with no list
+of its own — which is every gallery to begin with, including the ones whose
+chapters you made by hand in Stash — is read from Stash's own numbers, translated
+against path order on the spot. So opening a gallery changes nothing, the plugin's
+own list appears only for galleries whose chapters somebody actually edited, and
+deleting that one custom field puts a gallery back exactly where it was.
+
 ### What is not here yet
 
 - **No zoom or pan in spread mode.** Stash's zoom acts on the carousel, which is
@@ -1254,6 +1292,13 @@ The reading half's own:
   the second time the menu is opened in a session.
 - **Reading progress is not tracked.** That needs a viewer of our own rather than a
   takeover of Stash's.
+- **A chapter cannot be jumped to from outside the loaded page.** The nav strip is
+  what a jump clicks, and it holds what the list behind the lightbox fetched — a
+  page's worth, unless the list is set to load the gallery whole. It is not a
+  limitation of the menu, which lists every chapter wherever it is.
+- **Chapters are read, not yet edited, from the lightbox.** The list this plugin
+  keeps is what the reader reads and falls back to; making one — a button that
+  says "this image starts a chapter" — is the next piece.
 
 ## Extending
 

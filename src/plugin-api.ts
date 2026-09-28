@@ -112,6 +112,11 @@ export interface MangaToolsNamespace {
   ORIGINAL_VALUE: string;
   /** Whether a gallery's custom fields declare it the original text. */
   isOriginal(customFields: unknown): boolean;
+  /**
+   * Where this plugin keeps a gallery's chapters — a JSON string, read and
+   * written by the reader half's chapters.ts and by nothing else.
+   */
+  CHAPTER_FIELD_NAME: string;
   /** A gallery's translation group, trimmed, or "" when it has none. */
   translationGroupOf(customFields: unknown): string;
   /** Whether two group names are the same one: trimmed, case-insensitively. */
