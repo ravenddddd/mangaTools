@@ -14,6 +14,7 @@
  */
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
+import type { LightboxImage } from "./stash-lightbox";
 
 /**
  * The order the lightbox is showing its images in — see lightboxOrder in
@@ -53,6 +54,12 @@ export interface MangaReaderSettings {
 export interface MangaReaderGallery {
   id: string;
   pages: MangaReaderPage[];
+  /**
+   * The same pages in the shape Stash's lightbox reads, kept so that the handover
+   * needs nothing but the gallery: a lightbox opens again and again on a gallery
+   * already read, and every one of those is a lightbox to hand the chapters to.
+   */
+  images: LightboxImage[];
   screens: MangaReaderScreen[];
   /**
    * The gallery's chapters, placed in the order the pages came back in.

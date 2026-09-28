@@ -638,6 +638,8 @@ const NAMED_GALLERY = {
 state.galleries["41"] = OWN_CHAPTERS;
 state.galleries["42"] = OWN_CHAPTERS;
 state.galleries["43"] = OWN_CHAPTERS;
+state.galleries["33"] = OWN_CHAPTERS;
+state.galleries["34"] = OWN_CHAPTERS;
 state.galleries["51"] = NAMED_GALLERY;
 
 // ── Sections ───────────────────────────────────────────────────────
@@ -998,8 +1000,14 @@ async function main() {
     async () => {
       // The language comes from Stash's answer to the gallery query, so the wording
       // is right from the *second* time the menu is opened — which is all it can be,
-      // and worth saying out loud.
-      const { box } = await startReader({ on: true, language: "zh-TW" });
+      // and worth saying out loud. A gallery no earlier section has opened, since a
+      // gallery already read is remembered and would not be asked about again.
+      const { box } = await startReader({
+        galleryId: "51",
+        total: 2,
+        on: true,
+        language: "zh-TW",
+      });
 
       const reopened = box.openPopover();
       dom.flush();
@@ -1016,17 +1024,22 @@ async function main() {
   await runSection(
     "turning it on draws the pages the lightbox is showing",
     async () => {
+      // Read whether or not the mode is on — the chapters go to the lightbox either
+      // way — so by the time this section runs the gallery has been read already, and
+      // what is worth pinning is that turning the mode on does not ask again.
+      const before = imageQueries().length;
       const { box } = await startReader({ on: true });
 
       assert.deepStrictEqual(
-        imageQueries().map((q) => q.variables.galleryId),
-        ["7"],
-        "the pages are asked for once, for the gallery in the path"
+        imageQueries().slice(before),
+        [],
+        "a gallery already read is not asked for again when the mode is turned on"
       );
       assert.strictEqual(
         imageQueries()[0].fetchPolicy,
         "no-cache",
-        "and not written into Apollo's cache, where the lightbox's own query lives"
+        "…and what was read is not written into Apollo's cache, where the lightbox's " +
+          "own query lives"
       );
 
       const drawnBox = container();
@@ -2314,25 +2327,77 @@ async function main() {
   );
 
   await runSection(
-    "a list that does not match the lightbox is not handed over",
+    "a gallery whose pages cannot be matched is drawn from neither order",
     async () => {
       shown.length = 0;
       mountBridge();
+      const at = loggedErrors.length;
+
+      // A carousel showing some other gallery's images: neither the order the URL
+      // names nor path order can account for what is on screen, so there is nothing
+      // this plugin can say about where a chapter is — and it says nothing rather
+      // than pairing pages against a lightbox it cannot follow.
       const { box } = await startReader({
-        galleryId: "31",
+        galleryId: "33",
         on: true,
-        // The lightbox says it is showing three images while the gallery has
-        // eight: a list behind it that is not the whole gallery, which is the one
-        // thing a handover would make worse rather than better.
-        total: 3,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: ["901", "902", "903", "904", "905", "906", "907", "908"],
+      });
+      await settle();
+
+      assert.strictEqual(container(), null, "nothing is drawn");
+      assert.deepStrictEqual(
+        shown,
+        [],
+        "and nothing is handed over, so Stash's own menu — or none — stands"
+      );
+      assert.ok(
+        errorsSince(at).some((line) => /either order/.test(line)),
+        "and the reader says which of the two it could not do"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "the chapters go to the lightbox with the mode off",
+    async () => {
+      // Twice, and the first one is what makes the second mean anything: startReader
+      // turns the switch off *after* it has built a lightbox, so its own flush happens
+      // with the mode still on from the section before — and a read already begun
+      // finishes whatever the mode says by then.
+      const first = await startReader({ galleryId: "33", on: false, total: 8 });
+      stopReader(first.box);
+
+      // A gallery neither call has read, so the read in this one happens with the mode
+      // already off — which is the whole question.
+      shown.length = 0;
+      mountBridge();
+      const { box } = await startReader({
+        galleryId: "34",
+        on: false,
+        total: 8,
         search: "?sortby=title&perPage=500",
         ids: CHAPTERS_VIEW.map(String),
       });
 
+      assert.strictEqual(
+        container(),
+        null,
+        "nothing is drawn: the spread view is off, and the mode is what decides that"
+      );
+      assert.strictEqual(
+        shown.length,
+        1,
+        "and the lightbox has the chapters anyway, since a reader who never turns the " +
+          "spread view on still wants them"
+      );
       assert.deepStrictEqual(
-        shown,
-        [],
-        "nothing was handed over, so Stash's own menu — or none — stands"
+        shown[0].chapters.map((c) => c.title),
+        ["開幕", "中盤"],
+        "…the gallery's chapters, in the order on screen"
       );
 
       stopReader(box);

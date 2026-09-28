@@ -175,6 +175,16 @@ let clickRoot: Element | null = null;
 let pending: string | null = null;
 
 /**
+ * The lightbox the chapters were last handed to, and the gallery they were.
+ *
+ * A handover belongs to a lightbox: Stash builds a new one every time it is opened,
+ * with no chapters of its own, so the gallery being read already is not a reason to
+ * skip it. It is a reason to skip it *twice* for the same one, which is what this
+ * remembers.
+ */
+let handedFor: { lightbox: Element; gallery: string } | null = null;
+
+/**
  * Where the lightbox is being moved to, while it is on the way there.
  *
  * A turn of a screen is several pages, and the lightbox only moves one page per
@@ -227,19 +237,26 @@ function step(): void {
     shownAt = -1;
     reinsers = 0;
     logged = false;
+    handedFor = null;
   }
 
   injectSwitch(lightbox);
 
-  if (!wanted()) return;
-
   const wantedId = galleryIdFromPath(window.location.pathname);
   if (!wantedId) return;
 
+  // Read whether or not the mode is on: the chapters are what the lightbox is handed
+  // once this gallery is in hand, and a reader who never turns the spread view on
+  // still wants them. The mode decides what is *drawn*, and nothing else.
   if (galleryId !== wantedId || !loaded.has(wantedId)) {
     loadGallery(wantedId);
     return;
   }
+
+  const gallery = current();
+  if (gallery) handOverChapters(lightbox, gallery);
+
+  if (!wanted()) return;
 
   sync(lightbox);
 
@@ -303,14 +320,11 @@ function loadGallery(id: string): void {
       const gallery: MangaReaderGallery = {
         id,
         pages: answer.pages,
+        images: answer.images,
         screens: layout(answer.pages, { ...settings, offset }),
         chapters: placeChapters(chaptersOf(answer), answer.pages),
       };
       remember(id, gallery);
-
-      // Stash's own chapter menu is the one that jumps — see handOverChapters for
-      // what it takes to make its numbers mean this plugin's chapters.
-      handOverChapters(forLightbox, gallery, answer);
 
       language = answer.language;
       galleryId = id;
@@ -355,8 +369,12 @@ async function loadPages(
 ): Promise<GalleryAnswer> {
   const answer = await fetchGallery(id, order);
 
+  // Where the lightbox is, counted the way its own counter counts: an image's place
+  // in the whole list, not in the page of it that happens to be loaded.
+  const position = readPosition(lightbox);
   const shown = carouselImage(lightbox);
-  if (!shown || answer.pages[shown.at]?.id === shown.id) return answer;
+  const at = position ? position.current - 1 : -1;
+  if (!shown || at < 0 || answer.pages[at]?.id === shown.id) return answer;
 
   if (order.sort === "path") {
     throw new Error(
@@ -370,7 +388,7 @@ async function loadPages(
 
   const fallback = await fetchGallery(id, { sort: "path", direction: "ASC" });
   const still = carouselImage(lightbox);
-  if (still && fallback.pages[still.at]?.id !== still.id) {
+  if (still && fallback.pages[at]?.id !== still.id) {
     throw new Error(
       "[mangaReader] the pages could not be matched to the lightbox in either " +
         "order, so the spread view would pair the wrong ones"
@@ -852,6 +870,8 @@ function deactivate(): void {
 }
 
 function closeLightbox(): void {
+  handedFor = null;
+
   if (clickRoot) {
     clickRoot.removeEventListener("click", onNavClick, true);
     clickRoot = null;
@@ -888,21 +908,17 @@ function closeLightbox(): void {
  */
 function handOverChapters(
   lightbox: Element,
-  gallery: MangaReaderGallery,
-  answer: GalleryAnswer
+  gallery: MangaReaderGallery
 ): void {
   if (!bridged()) return;
+  if (handedFor?.lightbox === lightbox && handedFor.gallery === gallery.id)
+    return;
 
-  // The count is the last thing that could differ: a filtered list at the same
-  // order would still be a shorter one, and every number after the first gap
-  // would be off.
-  const position = readPosition(lightbox);
-  if (!position || position.total !== answer.images.length) return;
-
+  handedFor = { lightbox, gallery: gallery.id };
   takeOver({
-    images: answer.images,
+    images: gallery.images,
     chapters: gallery.chapters,
-    totalCount: answer.images.length,
+    totalCount: gallery.images.length,
   });
 }
 
