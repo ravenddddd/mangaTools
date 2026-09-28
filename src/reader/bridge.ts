@@ -20,22 +20,24 @@
  * renders null, so a Stash with a thousand galleries looks exactly as it did.
  */
 import { requirePluginApi } from "../plugin-api";
-import type { MangaReaderPlacedChapter } from "./chapters";
 import type { LightboxImage } from "./stash-lightbox";
 
-/** What the reader asks the lightbox to show. */
+/**
+ * What the reader asks the lightbox to show: its images, and where to start.
+ *
+ * The chapters are not part of it any more. They were — Stash's own menu was the only
+ * one there was, and its numbers had to be made to mean this plugin's — but the reader
+ * draws its own menu now, so all that is left to say is *which image the lightbox
+ * should be on*: the reader takes its place from that, and the chapter follows from
+ * the place.
+ */
 export interface LightboxTakeover {
   images: LightboxImage[];
-  /**
-   * The chapters, already placed in that list — `at` is the index each one begins
-   * at, which is the only thing the lightbox needs to be told where it starts.
-   */
-  chapters: MangaReaderPlacedChapter[];
   totalCount: number;
   /**
    * Where to start, for opening a lightbox that is closed. Left out when handing a
-   * list to one that is already up, where the reader is looking at something and
-   * must go on looking at it.
+   * list to one that is already up, where the reader is looking at something and must
+   * go on looking at it.
    */
   at?: number;
 }
@@ -88,24 +90,22 @@ export function takeOver(request: LightboxTakeover): void {
 function LightboxBridge(): null {
   const api = requirePluginApi();
   const React = api.React;
-  const entries = React.useRef<Entry[]>([]).current;
 
-  const show = api.hooks.useLightbox({}, entries);
+  const show = api.hooks.useLightbox();
 
   React.useEffect(() => {
     const mine = {
       takeOver(request: LightboxTakeover) {
-        entries.splice(0, entries.length, ...entriesFor(request));
         show({
           images: request.images,
-          // One page of everything, so the lightbox never asks for another: this
-          // list is the whole gallery, and a page callback would be a second way of
-          // saying which images it holds.
+          // One page of everything, so the lightbox never asks for another: this list
+          // is the whole gallery, and a page callback would be a second way of saying
+          // which images it holds.
           pages: 1,
           pageSize: request.images.length,
           totalCount: request.totalCount,
-          // Only read when the lightbox mounts, which is how a chapter clicked on
-          // the gallery page opens one — see the chapters tab.
+          // Only read when the lightbox mounts, which is how a chapter clicked on the
+          // gallery's own page opens one — see the chapters tab.
           initialIndex: request.at,
         });
       },
@@ -116,36 +116,9 @@ function LightboxBridge(): null {
       const at = handles.indexOf(mine);
       if (at !== -1) handles.splice(at, 1);
     };
-  }, [entries, show, api]);
+  }, [show, api]);
 
   return null;
-}
-
-/**
- * The list, as Stash's own chapter entries.
- *
- * The number is one-based and counts in the images handed over, because that is
- * what `gotoPage` does with it — so it is exactly what makes Stash's own jump land
- * on the page this plugin means. Only chapters that were placed are here at all:
- * one whose every image is off the current screen has no place to jump to, and the
- * menu can only offer what it can reach.
- */
-type Entry = { id: string; title: string; image_index: number };
-
-function entriesFor(request: LightboxTakeover): Entry[] {
-  const entries: Entry[] = [];
-
-  for (let i = 0; i < request.chapters.length; i++) {
-    const chapter = request.chapters[i];
-
-    entries.push({
-      id: "plugin.mangaTools.chapter." + i,
-      title: chapter.title,
-      image_index: chapter.at + 1,
-    });
-  }
-
-  return entries;
 }
 
 /**

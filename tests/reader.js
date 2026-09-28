@@ -516,6 +516,17 @@ const buildChaptersTab = (chapters) => {
   return { panel, button, container, close: () => panel.remove() };
 };
 
+/**
+ * What the reader's own chapter menu offers, in the order it offers it.
+ *
+ * The chapters are not handed to Stash's lightbox any more — they are this plugin's
+ * own menu, in its own header — so this is where a section looks for them.
+ */
+const chapterMenu = (box) =>
+  [...box.lightbox.querySelectorAll(".manga-reader-menu-item")].map(
+    (item) => item.textContent
+  );
+
 /** The rows this plugin drew in Stash's container */
 const drawnRows = (container) =>
   [...container.children].map(
@@ -1024,7 +1035,11 @@ async function main() {
     const popover = box.openPopover();
     dom.flush();
 
-    const input = popover.querySelector("#manga-reader-double-page");
+    // The switch is the reader's own now, in its own header — see chrome.ts. It is
+    // there for a marked gallery whether or not the mode is on, because the mode is
+    // not what puts the reader on a gallery: the mark is.
+    await settle();
+    const input = box.lightbox.querySelector("#manga-reader-double-page");
     if (expectSwitch) {
       assert.ok(
         input,
@@ -2187,12 +2202,9 @@ async function main() {
       );
 
       assert.deepStrictEqual(
-        chapters,
-        [
-          { id: "plugin.mangaTools.chapter.0", title: "開幕", image_index: 3 },
-          { id: "plugin.mangaTools.chapter.1", title: "中盤", image_index: 5 },
-        ],
-        "and the chapters, numbered by where each one begins on screen"
+        chapterMenu(box),
+        ["開幕", "中盤"],
+        "and the chapters, in the order they begin on screen"
       );
 
       stopReader(box);
@@ -2214,12 +2226,9 @@ async function main() {
 
       const { chapters } = shown[0];
       assert.deepStrictEqual(
-        chapters.map((c) => [c.title, c.image_index]),
-        [
-          ["第二話", 1],
-          ["第一話", 5],
-        ],
-        "a gallery still on Stash's numbers is handed over in the order it is read"
+        chapterMenu(box),
+        ["第二話", "第一話"],
+        "a gallery still on Stash's numbers is listed in the order it is read"
       );
 
       stopReader(box);
@@ -2331,7 +2340,7 @@ async function main() {
           "spread view on still wants them"
       );
       assert.deepStrictEqual(
-        shown[0].chapters.map((c) => c.title),
+        chapterMenu(box),
         ["開幕", "中盤"],
         "…the gallery's chapters, in the order on screen"
       );
@@ -2492,13 +2501,10 @@ async function main() {
         8,
         "with the gallery's images, so the reader and the lightbox agree"
       );
-      assert.deepStrictEqual(
-        shown[0].chapters.map((c) => [c.title, c.image_index]),
-        [
-          ["第一話", 1],
-          ["第二話", 5],
-        ],
-        "and its chapters, so the menu is there from the first page"
+      assert.strictEqual(
+        shown[0].chapters,
+        undefined,
+        "and nothing else: the chapters are the reader's own, from the moment it draws"
       );
 
       stopTab(tab);

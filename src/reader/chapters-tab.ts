@@ -228,7 +228,6 @@ function row(
   button.addEventListener("click", () => {
     takeOver({
       images: gallery.images,
-      chapters: gallery.chapters,
       totalCount: gallery.images.length,
       at: chapter.at,
     });

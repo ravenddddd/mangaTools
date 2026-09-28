@@ -272,15 +272,18 @@ function step(): void {
   sync(lightbox);
 }
 
-/** Whether the reader should be drawing, as far as can be told without asking */
+/**
+ * Whether the reader should be drawing, as far as can be told without asking.
+ *
+ * The mode is not part of this any more. It used to be — with the switch off, Stash's
+ * own lightbox was left to draw — and taking the lightbox over is what removes the
+ * distinction: on a gallery that is manga, this plugin draws, and the switch only says
+ * whether a screen is one page or two. A reader who wants none of it unmarks the
+ * gallery; that is the gate, and the only one.
+ */
 function wanted(): boolean {
   const id = galleryIdFromPath(window.location.pathname);
-  return (
-    settings.doublePage &&
-    root !== null &&
-    id !== null &&
-    NS.markedInStore(id) === true
-  );
+  return root !== null && id !== null && NS.markedInStore(id) === true;
 }
 
 /**
@@ -548,7 +551,18 @@ function chromeState(
       },
       onSetting: (next: Partial<MangaReaderSettings>) => {
         settings = writeSettings(next);
-        if (next.doublePage === false) deactivate();
+
+        // One page or two is a question about how the pages are laid out, so the
+        // gallery is laid out again and the screen redrawn — the place is a page, and
+        // it does not move because the pairing did.
+        if (galleryId && loaded.has(galleryId)) {
+          remember(galleryId, {
+            ...gallery,
+            screens: layout(gallery.pages, { ...settings, offset }),
+          });
+          shownAt = -1;
+          sync(lightbox);
+        }
       },
       onOffset: (next) => {
         setOffset(gallery, next);
@@ -906,7 +920,6 @@ function handOverChapters(
   handedFor = { lightbox, gallery: gallery.id };
   takeOver({
     images: gallery.images,
-    chapters: gallery.chapters,
     totalCount: gallery.images.length,
   });
 }
