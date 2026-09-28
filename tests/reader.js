@@ -1047,7 +1047,10 @@ async function main() {
       );
     }
 
-    if (input) {
+    if (input && input.checked !== on) {
+      // Only when it would be a change: a browser does not fire `change` for a value
+      // that was already that value, and the reader re-lays the pages when it hears
+      // one — which would be a redraw this section never asked for.
       input.checked = on;
       input.dispatch("change");
     }
@@ -1926,7 +1929,11 @@ async function main() {
       state.failing = true;
       const at = loggedErrors.length;
 
-      const { box } = await startReader({ galleryId: "9", on: true });
+      const { box } = await startReader({
+        galleryId: "9",
+        on: true,
+        expectSwitch: false,
+      });
 
       assert.strictEqual(container(), null, "nothing is drawn");
       assert.ok(
@@ -2283,6 +2290,7 @@ async function main() {
       const { box } = await startReader({
         galleryId: "33",
         on: true,
+        expectSwitch: false,
         total: 8,
         search: "?sortby=title&perPage=500",
         ids: ["901", "902", "903", "904", "905", "906", "907", "908"],

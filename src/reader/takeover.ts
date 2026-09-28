@@ -86,9 +86,6 @@ const CLASS_SINGLE = "is-single";
 const SWITCH_ID = "manga-reader-double-page";
 const FADE_ID = "manga-reader-fade";
 const OFFSET_ID = "manga-reader-offset";
-/** Class of the group holding them, so it can be found again */
-const CLASS_OPTIONS = "manga-reader-options";
-
 /**
  * On the lightbox while this plugin has taken it over: its carousel, its header and
  * its footer are hidden by the stylesheet, and the pages and the header in their place
@@ -254,8 +251,6 @@ function step(): void {
     return;
   }
 
-  injectSwitch(lightbox);
-
   // Read whether or not the mode is on: the chapters are what the lightbox is handed
   // once this gallery is in hand, and a reader who never turns the spread view on
   // still wants them. The mode decides what is *drawn*, and nothing else.
@@ -296,9 +291,6 @@ function wanted(): boolean {
  */
 function leaveUnmarked(lightbox: Element): void {
   if (container || root !== lightbox) deactivate();
-
-  const group = lightbox.querySelector("." + CLASS_OPTIONS);
-  if (group) group.remove();
 }
 
 /** The pages of the gallery being read, if they are in hand */
@@ -832,9 +824,12 @@ function screenNow(gallery: MangaReaderGallery): number {
   return screenAt(gallery.screens, place);
 }
 
+/**
+ * Turns the mode on, from the key that does it — the switch itself writes the setting
+ * and re-lays the pages, in chrome.ts, and this is the same errand from a keyboard.
+ */
 function activate(): void {
   settings = writeSettings({ doublePage: true });
-  setSwitchChecked(true);
   step();
 }
 
@@ -943,210 +938,15 @@ function handOverChapters(
  * A reader who opens the menu before this plugin has read a gallery's language
  * gets the English wording; the next opening has the right one.
  */
-function injectSwitch(lightbox: Element): void {
-  const body = lightbox.querySelector(SELECTOR_POPOVER_BODY);
-  if (!body) return;
-
-  // The group is put there once and completed afterwards: the menu can be opened
-  // before the gallery's pages have arrived — two clicks from opening the lightbox
-  // is enough — and the offset switch has nothing to offer until they have.
-  const existing = body.querySelector("." + CLASS_OPTIONS);
-  if (existing) {
-    addOffsetSwitch(existing);
-    return;
-  }
-
-  const group = document.createElement("div");
-  group.className = "form-group " + CLASS_OPTIONS;
-  group.appendChild(
-    checkbox({
-      id: SWITCH_ID,
-      label: labelFor(language, "doublePage"),
-      checked: settings.doublePage,
-      onChange: (checked) => {
-        if (checked) {
-          activate();
-        } else {
-          settings = writeSettings({ doublePage: false });
-          deactivate();
-        }
-      },
-    })
-  );
-
-  // Beside the switch, because it is the same kind of thing: a reading preference
-  // that lives with Stash's own in this menu. Its range reaches somewhere
-  // unmistakable on purpose — a reader who cannot see a short fade has to be able to
-  // find out whether it is working.
-  group.appendChild(
-    slider({
-      id: FADE_ID,
-      label: labelFor(language, "fade"),
-      value: settings.fadeMs,
-      max: FADE_MAX_MS,
-      step: 20,
-      unit: " ms",
-      onChange: (value) => {
-        settings = writeSettings({ fadeMs: value });
-      },
-    })
-  );
-
-  addOffsetSwitch(group);
-  body.appendChild(group);
-}
-
 /**
- * A number the reader picks by dragging — this plugin's one setting that is not a
- * switch.
+ * The switches are not injected into Stash's options popover any more.
  *
- * A range input rather than a number box because the value is a feel and not a
- * figure, with the figure shown beside it so that "140" can mean something. `input`
- * rather than `change`, so what it sets follows the drag and a reader can find the
- * setting that suits them by looking.
+ * They were, and that popover is inside the header this plugin hides — two homes for
+ * one setting, and the one a reader could reach was the one that turned the reader off
+ * behind its own back. There is one home now, and it is the reader's own: see
+ * chrome.ts.
  */
-function slider(option: {
-  id: string;
-  label: string;
-  value: number;
-  max: number;
-  step: number;
-  unit: string;
-  onChange: (value: number) => void;
-}): Element {
-  const row = document.createElement("div");
-  row.className = "row mb-1";
 
-  const column = document.createElement("div");
-  column.className = "col";
-
-  const label = document.createElement("label");
-  label.className = "form-label mb-0";
-  label.htmlFor = option.id;
-  label.textContent = option.label;
-
-  const readout = document.createElement("span");
-  readout.className = "ml-1";
-  readout.textContent = option.value + option.unit;
-  label.appendChild(readout);
-
-  const input = document.createElement("input");
-  input.type = "range";
-  input.className = "form-control-range";
-  input.id = option.id;
-  input.min = "0";
-  input.max = String(option.max);
-  input.step = String(option.step);
-  input.value = String(option.value);
-
-  input.addEventListener("input", () => {
-    const value = Number(input.value);
-    // The readout follows the drag rather than the next render: nothing else
-    // redraws this menu while the reader is dragging.
-    readout.textContent = value + option.unit;
-    option.onChange(value);
-  });
-
-  column.appendChild(label);
-  column.appendChild(input);
-  row.appendChild(column);
-
-  return row;
-}
-
-/** Adds the offset switch to the group, once there is a gallery to shift */
-function addOffsetSwitch(group: Element): void {
-  if (!current() || group.querySelector("#" + OFFSET_ID)) return;
-
-  group.appendChild(
-    checkbox({
-      id: OFFSET_ID,
-      label: labelFor(language, "offset"),
-      checked: offset === 1,
-      onChange: (checked) => {
-        const gallery = current();
-        if (gallery) setOffset(gallery, checked ? 1 : 0);
-      },
-    })
-  );
-}
-
-/** One option row, in Stash's own markup: a form-check inside a row's column */
-function checkbox(option: {
-  id: string;
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}): Element {
-  const row = document.createElement("div");
-  row.className = "row mb-1";
-
-  const column = document.createElement("div");
-  column.className = "col";
-
-  const check = document.createElement("div");
-  check.className = "form-check";
-
-  const input = document.createElement("input");
-  input.type = "checkbox";
-  input.className = "form-check-input";
-  input.id = option.id;
-  input.checked = option.checked;
-
-  const text = document.createElement("label");
-  text.className = "form-check-label";
-  text.htmlFor = option.id;
-  text.textContent = option.label;
-
-  input.addEventListener("change", () => option.onChange(input.checked));
-
-  check.appendChild(input);
-  check.appendChild(text);
-  column.appendChild(check);
-  row.appendChild(column);
-
-  return row;
-}
-
-/**
- * Keeps a switch in step when the state changes by another route.
- *
- * Both switches can be changed without being clicked — the mode by its own key
- * handling, the offset by `O` — and a checkbox that disagrees with what the reader
- * sees on screen is worse than no checkbox.
- */
-function setSwitchChecked(checked: boolean): void {
-  setChecked(SWITCH_ID, checked);
-}
-
-function setOffsetSwitchChecked(checked: boolean): void {
-  setChecked(OFFSET_ID, checked);
-}
-
-function setChecked(id: string, checked: boolean): void {
-  const input = document.getElementById(id) as HTMLInputElement | null;
-  if (input) input.checked = checked;
-}
-
-// ── Keys ───────────────────────────────────────────────────────────
-
-/**
- * Whether the arrow keys belong to whatever has focus.
- *
- * Only things the arrows actually *do* something to: a text field moves its caret,
- * a range input its handle. This listener is on the window, so without this it
- * would take the arrows from anything on the page.
- *
- * A **checkbox is not one of those** — the arrows do nothing to it; space is what
- * toggles it — and a checkbox is what this plugin's own switch in the lightbox's
- * options menu is. Exempting every `<input>` therefore meant that turning the mode
- * off and on *from that menu* left the focus on the switch, and the reader's next
- * arrow went straight past the reader to Stash's own handler, one page at a time:
- * "it only happens while the menu is open, and closing the menu fixes it".
- *
- * Written as the list of types that eat arrows rather than the list that does not,
- * so an input type nobody thought of leaves the arrows to the reader.
- */
 function arrowsBelongTo(target: HTMLElement | null): boolean {
   if (!target) return false;
   if (target.isContentEditable) return true;
@@ -1351,7 +1151,6 @@ function setOffset(gallery: MangaReaderGallery, next: 0 | 1): void {
   gallery.screens = layout(gallery.pages, { ...settings, offset });
   shownAt = -1;
 
-  setOffsetSwitchChecked(next === 1);
   step();
 }
 
