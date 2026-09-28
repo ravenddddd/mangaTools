@@ -27,12 +27,12 @@
  * mangaTools.tsx spells and what every existing gallery carries. It was renamed
  * once (from a bare `language`), by hand, with no compatibility branch.
  */
-import { NS } from "./languages";
+import { NS } from "../languages";
 import type {
   MangaToolsCustomFields,
   MangaToolsUsualLanguage,
   MangaToolsUsualLanguageMap,
-} from "./plugin-api";
+} from "../plugin-api";
 
 /**
  * The language field. Its value is a code from NS.LANGUAGES — see languages.ts

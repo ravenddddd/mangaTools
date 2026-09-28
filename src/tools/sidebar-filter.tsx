@@ -12,9 +12,9 @@
  * one `SidebarSection` component plus one `useSidebarSection` hook for the
  * open/closed state that goes with it.
  */
-import { NS } from "./languages";
-import { t } from "./i18n";
-import { requirePluginApi } from "./plugin-api";
+import { NS } from "../languages";
+import { t } from "../i18n";
+import { requirePluginApi } from "../plugin-api";
 import {
   adoptLanguageCriterion,
   applyCensorship,
@@ -52,7 +52,7 @@ import type {
   MangaToolsLanguageSelection,
   MangaToolsMangaState,
   MangaToolsOption,
-} from "./plugin-api";
+} from "../plugin-api";
 
 const PluginApi = requirePluginApi();
 

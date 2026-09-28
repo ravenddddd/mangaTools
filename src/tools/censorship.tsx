@@ -16,10 +16,10 @@
  * icon here at all. Absence means "nobody has said", and a selector expresses it
  * with its own clear button — the same arrangement the language dropdown has.
  */
-import { NS } from "./languages";
-import { t } from "./i18n";
-import { requirePluginApi } from "./plugin-api";
-import type { MangaToolsIntl } from "./plugin-api";
+import { NS } from "../languages";
+import { t } from "../i18n";
+import { requirePluginApi } from "../plugin-api";
+import type { MangaToolsIntl } from "../plugin-api";
 
 const PluginApi = requirePluginApi();
 

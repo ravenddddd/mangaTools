@@ -32,8 +32,8 @@
  * Conditions are combined with AND, so include and exclude compose: "equals X
  * AND not-equals Y" is exactly "included X, excluded Y".
  */
-import { NS } from "./languages";
-import { t } from "./i18n";
+import { NS } from "../languages";
+import { t } from "../i18n";
 import type {
   MangaToolsCriterionOption,
   MangaToolsCustomFieldCondition,
@@ -43,7 +43,7 @@ import type {
   MangaToolsIntl,
   MangaToolsLanguageSelection,
   MangaToolsMangaState,
-} from "./plugin-api";
+} from "../plugin-api";
 
 /** The `type` Stash's ListFilterOptions gives the custom-fields criterion */
 const CUSTOM_FIELDS_TYPE = "custom_fields";

@@ -1,8 +1,18 @@
 # Manga Tools
 
-A toolbox that adapts Stash galleries to manga/comic management. It **does not
-modify Stash core code** — everything goes through the UI plugin API, so Stash
-upgrades never produce merge conflicts.
+One Stash plugin for manga, in two halves: it **manages** a manga library — which
+languages, which translation groups, what is censored, what is read raw — and it
+**reads** one, two pages at a time in the lightbox. It **does not modify Stash
+core code**: everything goes through the UI plugin API, so Stash upgrades never
+produce merge conflicts.
+
+The two halves were separate plugins until they were found to keep arriving at
+the same questions — which image is this, what order are the pages in, what does
+this gallery say about itself — and two answers to those is the bug that takes
+longest to find. They are one bundle now, but they are still installed one at a
+time and each inside its own guard, so a Stash that cannot start one still runs
+the other. Reading is the half that has to survive: whatever else is wrong with
+the page, a reader can still read.
 
 ## Features
 
@@ -14,6 +24,7 @@ upgrades never produce merge conflicts.
 | **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a 生肉/熟肉 toggle on the group row, and a row in the details panel |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
 | **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
+| **Reading** | A two-page (spread) view for the image lightbox, with the pages paired the way a manga is printed — see [Reading](#reading-two-pages-at-a-time) |
 
 Each feature occupies its own section below, and each keeps to the same rule:
 anything it does not own is handed straight back to Stash untouched.
@@ -639,29 +650,180 @@ the value is simply no longer offered as a new choice. This is react-select's
 `value`/`options` split: the selected value is rendered from `value`, which is
 never filtered, while only the option *list* is filtered.
 
+## Reading: two pages at a time
+
+A two-page (**spread**) view for Stash's image lightbox, for reading manga the way
+it was printed: two pages side by side, the earlier one on the right. **Off until
+you turn it on.** Open any gallery, open an image, open the lightbox's options
+menu — the one behind the gear icon in its header — and there is a **Double page**
+switch at the bottom with the rest of the options.
+
+While the switch is on, and while you are reading a **gallery**:
+
+| | |
+|---|---|
+| **Two pages at once** | Laid out to fit the screen, in reading order, the earlier page on the right |
+| **Spreads** | A page wider than it is tall is taken for one image spanning two pages, and stands alone |
+| **The cover** | Stands alone. A cover is not the left half of anything |
+| **Arrows and chevrons** | Left and right move a *screen*, not a page — so a pair advances together. The keyboard arrows and Stash's own chevrons both go through the same turn |
+| **Clicks** | Clicking a page turns it, right half forward and left half back, exactly as Stash's own image click does. Clicking the space around the pages still closes the lightbox |
+| **Shift the pairing** | A second switch in the options menu, or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
+| **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. A slider in the options menu sets how long, down to 0 for none. Nothing is animated for a reader who has asked their system for less motion |
+| **Everything else** | Untouched. The header counter, the chapters, the nav strip, Escape, fullscreen, the slideshow — all still Stash's, and all still work, because the lightbox is still what says which page you are on |
+
+All of it is remembered per browser, like the lightbox options the controls sit
+beside — except the shift, which is remembered *per gallery*, because that is what
+it belongs to: one scan's pages need shifting and the gallery next to it does not.
+
+The fade length is a **slider rather than a number box**, with the value shown beside
+it, and its range reaches 1000 ms on purpose: a reader who cannot see a short fade
+has to be able to push it somewhere unmistakable and find out whether it is doing
+anything at all. 0 is a setting too — the screen is drawn at once.
+
+Off a gallery page — an image list, a scene's stills — the mode draws nothing, even
+switched on: pairing pages only means something inside a gallery.
+
+### The three things worth knowing
+
+**It is DOM surgery, not a React patch.** Stash's lightbox is `LightboxComponent`,
+a plain `React.FC` with no `PatchComponent` wrapper, so `PluginApi.patch` cannot
+reach it. What this half does instead is watch the document for a lightbox
+appearing, put a container of its own **beside** Stash's carousel — never in place
+of it, so React can re-render its own subtree without ours going with it — hide
+that carousel with a class, and drive the lightbox through its own interface: it
+reads where the lightbox is from its header, and moves it with its own arrow keys
+rather than keeping a second idea of the current page that could drift from the
+first.
+
+The approach follows
+[kokkengMangaViewer](https://github.com/kokkeng1/stash_plugin_custom/tree/main/plugins/kokkengMangaViewer),
+which does the same thing in the wild for a scrolling view.
+
+**Keys are pressed one at a time, and that is not a detail.** A turn of a screen is
+two pages, and the lightbox moves one page per press — but it *drops* a press that
+arrives while the page before it is still swapping (`isSwitchingPageRef` in Stash's
+lightbox: "rapid inputs are dropped"). Two presses in the same tick therefore move
+one page rather than two, intermittently, since a cached page swaps fast enough for
+it not to happen. So a move is an errand: press once, wait for the header to say it
+landed, press again — and send it again if the wait runs out, because a dropped
+press changes nothing in the DOM for anything else to notice.
+
+**Everything it depends on is in one file.** `src/reader/stash-lightbox.ts` holds
+the class names, the header format and the image query — the whole of what this half
+assumes about Stash's markup. If a Stash release renames any of it, the reader stops
+drawing and says so in the console rather than drawing something wrong: a canvas
+that cannot tell where it is must not paint. The same goes for a gallery Stash
+cannot answer for, or one whose page count no longer matches what the lightbox is
+showing.
+
+### Stash's own ways of turning a page go through this half's turn
+
+There are three of them and none of them can be left alone once the pages are
+paired:
+
+- the **keyboard arrows**, taken in the capture phase on the window, in front of
+  Stash's own handler;
+- the **chevrons** either side of the image, which are Stash's buttons and move one
+  page — in a two-page view the same screen, so a reader clicking one sees nothing
+  happen. The click is stopped before Stash's React handler sees it and the same
+  errand an arrow press starts is started instead;
+- the **click on a page**, which Stash reads per image (the right half forward, the
+  left half back) and this half reads the same way.
+
+Every one of them ends in `turnBy`, so the three cannot disagree about what a turn
+is. The exception is the click *around* the pages: Stash closes the lightbox when a
+click reaches the slide its images sit in, and this half's container covers that
+slide — so a click there is turned back into what Stash would have done with it, an
+`Escape`, which is Stash's own closing path and not a second idea of closing.
+
+### A screen goes up whole, and both of its images are asked for the way Stash asks
+
+Those are two halves of one problem: two pages that arrive separately read as a
+flicker rather than as a page, and the reason they arrived separately was mostly
+self-inflicted.
+
+Stash publishes each image's URL with a **version stamp** on it —
+`/image/<id>/image?t=<mtime>` — and its own lightbox uses that URL. This half used
+to build `/image/<id>/image` by hand, without the stamp, and the two are **different
+browser cache entries**:
+
+| URL | what the server answers with |
+|---|---|
+| `/image/<id>/image?t=<mtime>` | `private, max-age=31536000, immutable` |
+| `/image/<id>/image` | `no-cache` |
+
+So the hand-built URL did not merely miss a version: it threw away the caching
+Stash's own lightbox had already paid for, and every page was fetched twice — once
+by Stash's carousel, once by the reader — with nothing making the two halves of a
+screen finish together. The fix is one field in the query (`paths { image }`), whose
+query is lifted onto the reader's own relative path: same resource, same cache
+entry, and now the pages Stash has already loaded are there the moment they are
+asked for.
+
+What remains is genuinely cold: the first screen, a jump, a slow disk. For those,
+the screen is built **detached** and shown in one step — the reader keeps whatever
+is already on screen until both images can be painted (the browser is asked with
+`decode()`, not guessed at) — and a **budget of 300 ms** caps the wait, so a page
+that never arrives cannot leave the reader looking at one they have already turned.
+A turn that overtakes a screen still waiting takes its place: a counter decides
+which draw owns the container, so the older one cannot land on top of it.
+
+That one step is then **faded in**, over about 140 ms: a pair of pages filling the
+display is a large area to change between two frames, and at a turn that reads as a
+flash. The fade is against the lightbox's own background rather than over the page
+before it — a cross-fade is smoother on a photograph and worse on everything else,
+since two pages of text superimposed are illegible soup for as long as it lasts. It
+starts only once the images are there, so it is never a wait in disguise, and it
+does not happen at all for a reader whose system asks for less motion.
+
+### What is not here yet
+
+- **No zoom or pan in spread mode.** Stash's zoom acts on the carousel, which is
+  hidden while this half draws. Pages are fitted to the screen and that is all.
+- **Two of the pairing rules are settings without a UI**: `coverAlone` and
+  `detectSpreads` are stored and honoured, but the options menu offers only the
+  mode, the fade and the shift. Both default to what a manga wants.
+- **The switches are worded in English the first time.** Their language comes from
+  Stash's own configuration, which is read with the gallery — so the wording is
+  right from the second time the menu is opened in a session.
+- **Reading progress** is not tracked. That needs a viewer of our own rather than a
+  takeover of Stash's.
+
 ## Files
 
 ```
 mangaTools/
 ├── src/
-│   ├── mangaTools.tsx        Badge, panels, dropdown, bulk row, toolbar switch, settings, patches
-│   ├── filter-model.ts       Criterion read/write for all three fields (pure, no DOM)
-│   ├── filter-ui.tsx         The rows and tag DOM both filter surfaces share
-│   ├── sidebar-filter.tsx    The three sidebar filter sections
-│   ├── dialog-filter.tsx     The dialog's language card
+│   ├── mangaTools.tsx        Entry: loads Stash's API, then starts each half inside its own guard
+│   ├── plugin-api.ts         Stash's API as far as either half uses it, and the one gql lookup
+│   ├── i18n.ts               Both halves' strings, resolved per key from the catalogs below
 │   ├── languages.ts          Codes, flags, and the name lookup (pure, no DOM)
-│   ├── fields.ts             The custom fields this plugin owns, and how to
+│   ├── messages/             One JSON catalog per locale: en / zh-Hans / zh-Hant
+│   ├── tools/                The managing half
+│   │   ├── index.tsx         Badge, panels, dropdown, bulk row, toolbar switch, settings, patches
+│   │   ├── filter-model.ts   Criterion read/write for all three fields (pure, no DOM)
+│   │   ├── filter-ui.tsx     The rows and tag DOM both filter surfaces share
+│   │   ├── sidebar-filter.tsx  The three sidebar filter sections
+│   │   ├── dialog-filter.tsx   The dialog's language card
+│   │   ├── censorship.tsx    The censorship vocabulary and its icons
+│   │   └── fields.ts         The custom fields this plugin owns, and how to
 │   │                         read and write one (pure, no DOM)
-│   ├── i18n.ts               The plugin's own strings, per locale
-│   ├── messages/             One JSON catalog per language
-│   └── plugin-api.ts         Types for PluginApi and the namespace above
+│   └── reader/               The reading half
+│       ├── takeover.ts       The reader itself: the observer, the drawing, the keys
+│       ├── spreads.ts        The pairing rules (pure, no DOM)
+│       ├── settings.ts       What is remembered, and how it is parsed
+│       ├── stash-lightbox.ts   Everything that assumes something about Stash's markup
+│       └── namespace.ts      The reader's own types, and window.MangaReader
 ├── tests/
-│   ├── smoke.js              The runner, and the entry point `pnpm test` names
-│   ├── helpers.js            The stubs, the fixtures, and the loaded bundle
+│   ├── smoke.js              The managing half's runner
+│   ├── helpers.js            Its stubs, its fixtures, and the loaded bundle
 │   ├── renders.js            The two surfaces more than one section drives
-│   └── sections/             One file per area, in the order they run
+│   ├── sections/             One file per area, in the order they run
+│   ├── reader.js             The reading half's runner, against the same bundle
+│   └── dom.js                A fake DOM: only the parts the reader touches
 ├── mangaTools.yml            Plugin config (the file name is the plugin ID)
-├── mangaTools.css            Styles
+├── mangaTools.css            The managing half's styles
+├── mangaReader.css           The reading half's styles
 ├── build.mjs                 The bundler's entry point
 ├── tsconfig.json             Compiler options, inlined (nothing is shared)
 ├── biome.jsonc               Lint and format rules — Stash's own, in full
@@ -671,9 +833,18 @@ mangaTools/
 ```
 
 `ui.javascript` names **one** file. esbuild bundles `src/mangaTools.tsx` together
-with everything it imports into `dist/mangaTools.js`, loaded by Stash through a
-plain `<script>` tag — hence `format: "iife"` in `build.mjs`. The source files
-talk to each other by importing, not through the window.
+with everything it imports — both halves and the shared modules — into
+`dist/mangaTools.js`, loaded by Stash through a plain `<script>` tag — hence
+`format: "iife"` in `build.mjs`. The source files talk to each other by importing,
+not through the window. `ui.css` names two, because the halves' stylesheets are
+kept apart rather than concatenated.
+
+**One bundle means one load, which is why the entry starts the halves one at a
+time and each inside its own guard.** What that guard cannot catch is anything
+evaluated in a module *body* — a class derived from `React.Component` at the top
+of a file, a startup call made where it stands — so neither half resolves Stash's
+API there. That is the whole reason `guardedBlock` in `tools/index.tsx` is a
+factory rather than a class.
 
 `languages.ts` and `fields.ts` still publish themselves at `window.MangaTools` as
 well, because that is the handle `tests/helpers.js` uses to call the pure
@@ -682,7 +853,14 @@ object, each adding its own members — which is why `fields.ts` holds the field
 *names* while `languages.ts` holds the table of language codes they can point at.
 The four filter modules do the same, each publishing the members it owns at the
 end of its own file; that is what keeps the sidebar and dialog from having to
-import each other.
+import each other. The reader half keeps to the same arrangement at
+`window.MangaReader`, with its own types in `reader/namespace.ts`.
+
+The reader half's settings are **not** in the plugin config. They are this
+browser's, under `plugin.mangaTools.settings` and `plugin.mangaTools.offsets` in
+`localStorage`, beside the lightbox options they sit next to in that menu — see
+`reader/settings.ts` for why, and for the fallback that reads the keys this half
+wrote when it was a plugin of its own.
 
 `tsc` plays no part in producing that file — it only type-checks, and esbuild
 strips types without reading them, so a name that does not exist compiles fine
@@ -715,6 +893,14 @@ Then tick Manga Tools → **Install** → **Reload Plugins**.
 
 To update later: **Installed Plugins → Update**.
 
+**Coming from the separate Manga Reader** (this plugin's reading half until
+0.7.0): uninstall Manga Reader and update Manga Tools. Two plugins shipping the
+same reader would both install it. Nothing is lost in the move — the reading
+settings and the per-gallery shifts are read from the keys the old plugin wrote
+(`mangaReader.settings`, `mangaReader.offsets`) and copied to
+`plugin.mangaTools.*` the first time this plugin reads them, and if you have not
+uninstalled the old one yet you can still go back.
+
 > To install manually instead: copy the whole `mangaTools/` directory into
 > `<Stash config dir>/plugins/` and hit Reload Plugins. Note the js/css paths in
 > the `.yml` are relative to the `.yml`, so the directory has to stay complete —
@@ -730,14 +916,20 @@ pnpm lint           # biome lint
 pnpm format         # biome format --write, when the check below complains
 pnpm typecheck      # tsc over the sources
 pnpm build          # bundle into dist/ (no type-check)
-pnpm test           # lint, format check, type-check, build, then the smoke suite
+pnpm test           # lint, format check, type-check, build, then both suites
 ```
 
 `pnpm test` runs the tests against the **bundled** plugin in `dist/`, which is
 why it builds before them rather than relying on a build that happens to be
 there: they then exercise exactly the file that gets published. A type error
-would not reach them — esbuild strips types without reading them — which is the
-second reason `pnpm test` runs `tsc` first.
+would not reach them — esbuild types are stripped without being read — which is
+the second reason `pnpm test` runs `tsc` first.
+
+There are two suites, one per half, and they run as two processes: each builds its
+own fake world and loads the bundle into it, and the two worlds disagree about
+almost everything (one renders React components, the other drives a fake DOM and a
+fake lightbox). Both load the *same* bundle, though, so each world has to satisfy
+both halves — which is itself worth having, since it is the same thing a page does.
 
 They cover value normalisation, the unknown-value fallback, route scoping,
 write/clear semantics, badge rendering, the generic field read/write rules, the
@@ -747,11 +939,13 @@ the filter's read/merge/replace/clear rules and the sidebar section it renders,
 the shape of the bundle (one file, no module syntax, JSX really transformed), and
 the string/CSS surface of every patched component.
 
-They are split by area. `tests/smoke.js` is the runner — what runs, in what order,
-and what failed — and `tests/sections/` holds one file per area, in the order
-they run. What the sections share lives in `tests/helpers.js` (the stubs, the
-fixtures, and the loaded bundle) and `tests/renders.js` (the two surfaces more
-than one of them drives).
+They are split by area. `tests/smoke.js` is the managing half's runner — what
+runs, in what order, and what failed — and `tests/sections/` holds one file per
+area, in the order they run. What the sections share lives in `tests/helpers.js`
+(the stubs, the fixtures, and the loaded bundle) and `tests/renders.js` (the two
+surfaces more than one of them drives). `tests/reader.js` is the reading half's
+runner, against `tests/dom.js` — a fake DOM holding only the parts that half
+touches, and a fake lightbox built the way Stash's is.
 
 Two things about that split are load-bearing. The sections that read the gallery
 map the plugin fetches as it loads run in a timer, so the ones that do not care
@@ -1036,6 +1230,19 @@ canonical spelling.
 - **Fetch size scales with the number of tagged galleries**, not the library
   size. Verified working against a 1194-gallery library.
 
+The reading half's own:
+
+- **No zoom or pan in spread mode.** Stash's zoom acts on the carousel, which is
+  hidden while the reader draws. Pages are fitted to the screen and that is all.
+- **Two of the pairing rules are settings without a UI**: `coverAlone` and
+  `detectSpreads` are stored and honoured, but the options menu offers only the
+  mode, the fade and the shift.
+- **The switches are worded in English the first time.** Their language comes from
+  Stash's own configuration, read with the gallery — so the wording is right from
+  the second time the menu is opened in a session.
+- **Reading progress is not tracked.** That needs a viewer of our own rather than a
+  takeover of Stash's.
+
 ## Extending
 
 **Adding a language**: add one line to `NS.LANGUAGES` in `src/languages.ts` — a
@@ -1176,10 +1383,17 @@ deliberately faulted, to prove the rest still register.
 
 ### Translating
 
-The plugin's own strings are the fourteen in `src/messages/en.json` — the edit-page
-placeholder, the three settings blocks, and the six names a censorship state has
-(current, and what a click would make it). Everything else it puts on screen comes
-from Stash's messages, which Stash already translates.
+The plugin's own strings are the ids in `src/messages/en.json` — the edit-page
+placeholder, the field headings, the settings blocks, the names a censorship state
+has (current, and what a click would make it), and the reading half's three (the
+two switches in the lightbox's options menu and the fade slider). Everything else
+either half puts on screen comes from Stash's messages, which Stash already
+translates.
+
+The reading half's ids are prefixed `mangaReader.` where the managing half's are
+`mangaTools.`, and nothing else about them differs: they are read from the same
+catalogs by the same lookup. It takes a locale rather than an `intl` object
+because that half draws outside React — see `stringFor` in `src/i18n.ts`.
 
 **Adding a language** is two lines and a file:
 
@@ -1200,6 +1414,12 @@ translated sentences rather than ids.
 Locales are matched by tag, dropping subtags one at a time — `zh-Hant-HK` reads the
 `zh-Hant` catalog — and a bare `zh` reads the Simplified one, matching how a bare
 value in the language field is read. Anything with no catalog reads English.
+
+Region tags for Chinese are mapped to a script before that walk, in `ALIASES`:
+Stash reports a region, and what this plugin has is one catalog per script. That
+list came in with the reading half, which had it right — reading Traditional text
+in Simplified characters is unmissable — and it fixed the managing half, which had
+been sending `zh-TW` down the subtag walk to `zh` and so to Simplified.
 
 `mangaTools.yml` is not translated, and cannot be: its `displayName`/`description`
 are what Stash's own settings UI would render. The plugin replaces that UI with its

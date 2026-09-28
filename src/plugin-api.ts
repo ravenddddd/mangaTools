@@ -314,6 +314,11 @@ export interface MangaToolsNamespace {
 
   /** One of this plugin's own strings, in the reader's Stash language. */
   t(intl: MangaToolsIntl, id: string): string;
+  /**
+   * The same string from a bare locale, for the reader half, which draws outside
+   * React and so has the locale rather than an `intl` to look it up with.
+   */
+  stringFor(locale: string | null | undefined, id: string): string;
   /** The message catalog a locale reads from — see i18n.ts for the chain. */
   catalogFor(locale: string): { [id: string]: string };
   /** Every catalog, by tag */
@@ -362,6 +367,11 @@ export interface MangaToolsIntl {
 export interface MangaToolsApolloClient {
   query(options: {
     query: unknown;
+    /**
+     * The query's variables. The tools half's own queries bake theirs into the
+     * document, so it never passes any; the reader half asks for a gallery by id.
+     */
+    variables?: Record<string, unknown>;
     fetchPolicy?: string;
   }): Promise<{ data?: { [key: string]: unknown } }>;
 
@@ -631,4 +641,31 @@ export function requirePluginApi(): IPluginApi {
     );
   }
   return api;
+}
+
+/**
+ * `gql`, wherever this Stash keeps it.
+ *
+ * The tag normally comes off the Apollo library Stash loads; the fallback is the
+ * plugin API's own GQL namespace, which is a different object with the same
+ * function on it. Whichever answers builds the document — handing Apollo a plain
+ * string instead does not work, and fails quietly enough to have shipped once
+ * (see MARK_QUERY_TEXT).
+ *
+ * Null, with a log, when neither is there. Every caller has to handle that anyway
+ * (there is nothing to send), and `what` is what the log says it could not build.
+ *
+ * Here rather than in either half because both ask: the tools half builds its
+ * gallery queries and its mark mutation with it, the reader half its one gallery
+ * query. It was the tools half's until the two were bundled.
+ */
+export function gqlDoc(text: string, what: string): unknown {
+  const api = requirePluginApi();
+  const gql = api.libraries.Apollo?.gql || api.GQL?.gql;
+  if (!gql) {
+    console.error("[mangaTools] gql not available, cannot " + what);
+    return null;
+  }
+
+  return gql(text);
 }

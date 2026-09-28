@@ -36,10 +36,27 @@ const CATALOGS: { [locale: string]: MangaToolsCatalog } = {
 /**
  * Locales whose own tag no catalog uses, mapped to the one that covers them.
  *
+ * Chinese needs the whole list, because Stash reports a *region* while what this
+ * plugin has is a *script*: `zh-TW` is a tag no catalog is named for, and letting
+ * the subtag-dropping below finish the job would land it on `zh` — which is
+ * simplified for a Taiwanese reader, in every string this plugin writes. That was
+ * the behaviour of the tools half alone until the reader half's own table was
+ * merged in here; the reader had it right, because reading in the wrong script is
+ * unmissable there.
+ *
  * A bare `zh` means simplified — the same reading this plugin gives a bare value
  * in the language field, and the same one its own docs describe.
  */
-const ALIASES: { [locale: string]: string } = { zh: "zh-Hans" };
+const ALIASES: { [locale: string]: string } = {
+  zh: "zh-Hans",
+  "zh-CN": "zh-Hans",
+  "zh-SG": "zh-Hans",
+  "zh-Hans": "zh-Hans",
+  "zh-TW": "zh-Hant",
+  "zh-HK": "zh-Hant",
+  "zh-MO": "zh-Hant",
+  "zh-Hant": "zh-Hant",
+};
 
 /**
  * The catalog to read a locale from.
@@ -77,11 +94,28 @@ export function catalogFor(locale: string): MangaToolsCatalog {
  * translated it reads the English one.
  */
 export function t(intl: MangaToolsIntl, id: string): string {
-  return catalogFor(intl.locale)[id] ?? CATALOGS.en[id] ?? id;
+  return stringFor(intl.locale, id);
+}
+
+/**
+ * The same lookup from a bare locale, for the half that has no `intl` to hand.
+ *
+ * The reader draws outside React — it is DOM work beside Stash's carousel — so
+ * what it has is the locale Stash's configuration reports, not the object the
+ * tools half's components are rendered with. Two entry points, one lookup: the
+ * alternative was a second catalog table for three strings, which is how the two
+ * halves came to disagree about `zh-TW` in the first place.
+ */
+export function stringFor(
+  locale: string | null | undefined,
+  id: string
+): string {
+  return catalogFor(locale ?? "")[id] ?? CATALOGS.en[id] ?? id;
 }
 
 // Published on the namespace alongside the rest of the plugin's pure logic, so
 // the smoke tests can exercise the fallback chain without rendering anything.
 NS.t = t;
+NS.stringFor = stringFor;
 NS.catalogFor = catalogFor;
 NS.catalogs = catalogs;

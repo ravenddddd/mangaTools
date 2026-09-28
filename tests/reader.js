@@ -1,0 +1,1638 @@
+/**
+ * Manga Reader smoke test.
+ *
+ * What is under test is the *bundled* plugin, not the sources — the tests load
+ * dist/mangaTools.js, the one file Stash loads, so a broken build shows up here
+ * rather than in a browser. `pnpm test` from the repository root builds first.
+ *
+ * Two halves, tested differently and honestly so:
+ *
+ *   - the pairing rules are pure functions, called directly (see spreads.ts);
+ *   - the reader is DOM work against Stash's own markup, so the tests drive it
+ *     through a fake DOM (tests/dom.js) and a fake lightbox built the way Stash's
+ *     is. What that cannot cover is whether Stash's markup is still what this
+ *     plugin thinks it is — no test of ours can know that, which is why the plugin
+ *     turns itself off rather than draw wrongly when it stops matching.
+ */
+const assert = require("node:assert");
+const path = require("node:path");
+const { createDom } = require("./dom.js");
+
+const BUNDLE = path.join(__dirname, "..", "dist", "mangaTools.js");
+
+// ── The environment the bundle loads into ──────────────────────────
+
+const dom = createDom();
+
+/** What the fake Stash answers with, per gallery, and what it was asked. */
+const state = {
+  language: null,
+  galleries: {},
+  queries: [],
+  failing: false,
+};
+
+const client = {
+  query: ({ query, variables, fetchPolicy }) => {
+    state.queries.push({ query: String(query), variables, fetchPolicy });
+    if (state.failing) return Promise.reject(new Error("no answer from Stash"));
+
+    const gallery = state.galleries[variables.galleryId] || { images: [] };
+    return Promise.resolve({
+      data: {
+        configuration: { interface: { language: state.language } },
+        findImages: { images: gallery.images },
+      },
+    });
+  },
+};
+
+/**
+ * The gallery queries this half made, out of everything the client was asked.
+ *
+ * The reader half is no longer alone with this client: the tools half shares the
+ * page now, and asks for its own gallery map as it starts. So what the reader
+ * asked for is picked out by its distinguishing feature rather than by position —
+ * a gallery id among the variables, which the tools half never passes, since its
+ * queries bake theirs into the document.
+ *
+ * Not by the query text: this suite's `gql` stub hands back an opaque object
+ * rather than the source, so there is no text to match on here.
+ */
+const imageQueries = () =>
+  state.queries.filter(
+    (q) => q.variables && q.variables.galleryId !== undefined
+  );
+
+global.window = dom.window;
+global.document = dom.document;
+global.MutationObserver = dom.MutationObserver;
+global.Image = dom.window.Image;
+// The plugin dispatches key events at the lightbox and ignores any that are not
+// `isTrusted`, which is how it tells its own apart from a reader's. Trusting an
+// event is exactly what this lets a test do.
+global.KeyboardEvent = function KeyboardEvent(type, init) {
+  return dom.makeEvent(type, init);
+};
+
+/**
+ * The API the bundle loads against.
+ *
+ * The reader itself uses a small part of this — `libraries.Apollo` and the
+ * client — but the plugin ships as **one bundle**, so the other half's load-time
+ * reads are here too: it derives a class from `React.Component`, registers its
+ * patches through `patch`, and reads the locale through `libraries.Intl` as it
+ * starts. Absent, those are not a quieter test: they are a bundle that throws
+ * before the reader ever installs, which is exactly what this stub found.
+ *
+ * The patches are inert and nothing here renders, so registering them is the
+ * whole of what this world has to make possible.
+ */
+dom.window.PluginApi = {
+  React: {
+    Component: class {
+      constructor(props) {
+        this.props = props || {};
+        this.state = {};
+      }
+    },
+  },
+  patch: { before: () => {}, instead: () => {}, after: () => {} },
+  components: {},
+  libraries: {
+    Apollo: { gql: (text) => ({ __document: text }) },
+    Intl: {
+      useIntl: () => ({ locale: "en-US", formatMessage: ({ id }) => id }),
+    },
+  },
+  utils: { StashService: { getClient: () => client } },
+};
+
+// The reader reports through the console, and some of what it says is visible
+// nowhere else — a failure it recovers from by turning itself off, above all.
+// Recorded *and* forwarded, the way mangaTools' suite does it.
+const realConsoleError = console.error;
+const loggedErrors = [];
+console.error = (...args) => {
+  loggedErrors.push(args.map((a) => String(a)).join(" "));
+  realConsoleError.apply(console, args);
+};
+
+require(BUNDLE);
+
+const NR = global.window.MangaReader;
+
+// ── The runner ─────────────────────────────────────────────────────
+
+const failures = [];
+
+/**
+ * Runs one section, reporting rather than rethrowing so the rest still run.
+ *
+ * Async, because half of this plugin is a promise: the pages are fetched, and
+ * everything after that happens in a `then`.
+ */
+async function runSection(name, body) {
+  try {
+    await body();
+    console.log(`✓ ${name}`);
+  } catch (err) {
+    failures.push(name);
+    console.error(`\n✗ ${name}`);
+    console.error(err?.stack ? err.stack : String(err));
+  }
+}
+
+/** Lets the bundle's promise chain run: one turn of the event loop is enough. */
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+
+const errorsSince = (at) => loggedErrors.slice(at);
+
+// ── Fixtures ───────────────────────────────────────────────────────
+
+/** A page of the usual shape: taller than it is wide. */
+const page = (id, width = 1000, height = 1500) => ({ id, width, height });
+
+/** A page that spans two of them. */
+const wide = (id) => page(id, 2000, 1500);
+
+/** A page as Stash's GraphQL answers with it: a size inside `visual_files` */
+const image = (id, width, height) => ({
+  id,
+  visual_files: [{ width, height }],
+});
+
+/**
+ * The same, with the URL Stash publishes for it — which carries the file's version
+ * stamp in its query. The reader lifts that query onto its own relative path, so
+ * the two are one cache entry rather than two; see pageUrl.
+ */
+const stamped = (id, width, height, t) => ({
+  ...image(id, width, height),
+  paths: {
+    image: "http://stash.example.com:9998/image/" + id + "/image?t=" + t,
+  },
+});
+
+/** A screen list as ids, `+` between the pages that share one. */
+const shape = (screens) =>
+  screens.map((s) => s.pages.map((p) => p.id).join("+"));
+
+/** Pages a, b, c, … */
+const pagesOf = (...ids) => ids.map((id) => page(String(id)));
+
+/**
+ * A lightbox, built the way Stash's is: a display area holding a carousel, and a
+ * header holding the counter that says where it is.
+ */
+function buildLightbox(current = 1, total = 5) {
+  const lightbox = dom.makeElement("div");
+  lightbox.className = "Lightbox";
+
+  const display = dom.makeElement("div");
+  display.className = "Lightbox-display";
+
+  // Stash's own chevrons, either side of the carousel and the same component
+  // twice — what tells them apart is the Font Awesome icon inside each, which is
+  // what the plugin reads.
+  const navButton = (icon) => {
+    const button = dom.makeElement("button");
+    button.className = "Lightbox-navbutton d-none d-lg-block btn btn-link";
+    const svg = dom.makeElement("svg");
+    svg.dataset.icon = icon;
+    button.appendChild(svg);
+    return button;
+  };
+  const navLeft = navButton("chevron-left");
+  const navRight = navButton("chevron-right");
+
+  const carousel = dom.makeElement("div");
+  carousel.className = "Lightbox-carousel";
+  display.appendChild(navLeft);
+  display.appendChild(carousel);
+  display.appendChild(navRight);
+
+  const header = dom.makeElement("div");
+  header.className = "Lightbox-header";
+  const indicator = dom.makeElement("div");
+  indicator.className = "Lightbox-header-indicator";
+  const counter = dom.makeElement("b");
+  counter.textContent = `${current} / ${total}`;
+  indicator.appendChild(counter);
+  header.appendChild(indicator);
+
+  const footer = dom.makeElement("div");
+  footer.className = "Lightbox-footer";
+
+  lightbox.appendChild(display);
+  lightbox.appendChild(header);
+  lightbox.appendChild(footer);
+  dom.body.appendChild(lightbox);
+
+  return {
+    lightbox,
+    display,
+    carousel,
+    navLeft,
+    navRight,
+    counter,
+    /** What a reader sees as the lightbox moves — Stash rewrites this text */
+    move: (at) => {
+      counter.textContent = `${at} / ${total}`;
+    },
+    openPopover: () => {
+      // Stash unmounts the popover when it closes and builds a new one next time,
+      // which is why the label is worked out at injection time.
+      const previous = lightbox.querySelector(".popover");
+      if (previous) previous.remove();
+      const popover = dom.makeElement("div");
+      popover.className = "popover";
+      const body = dom.makeElement("div");
+      body.className = "popover-body";
+      popover.appendChild(body);
+      lightbox.appendChild(popover);
+      return body;
+    },
+    close: () => lightbox.remove(),
+  };
+}
+
+/** The container this plugin draws in, if it is drawing */
+const container = () => dom.body.querySelector(".manga-reader-spread");
+
+/** What is drawn, as image paths */
+const drawn = () =>
+  (container()?.children || []).map((box) => box.children[0].src);
+
+/** A key press a reader made, rather than one the plugin dispatched */
+const press = (key) => {
+  const event = dom.makeEvent("keydown", { key, isTrusted: true });
+  dom.window.dispatchEvent(event);
+  return event;
+};
+
+// ── What Stash answers with ────────────────────────────────────────
+//
+// Every fixture is in place before the first section runs. The plugin keeps the
+// page list it is given, so a gallery asked for before its fixture existed would
+// be remembered as an empty one for the rest of the run.
+
+/** Five pages with a spread in the middle: 101 | 102 | 103(wide) | 104+105 */
+const GALLERY_WITH_A_SPREAD = {
+  images: [
+    image("101", 1000, 1500),
+    image("102", 1000, 1500),
+    image("103", 2000, 1500),
+    image("104", 1000, 1500),
+    image("105", 1000, 1500),
+  ],
+};
+
+/** Five ordinary pages: 401 | 402+403 | 404+405 */
+const PLAIN_GALLERY = {
+  images: [
+    image("401", 1000, 1500),
+    image("402", 1000, 1500),
+    image("403", 1000, 1500),
+    image("404", 1000, 1500),
+    image("405", 1000, 1500),
+  ],
+};
+
+/** Two ordinary pages, for the header that cannot be read */
+const TWO_PAGES = {
+  images: [image("201", 1000, 1500), image("202", 1000, 1500)],
+};
+
+/** One page, which has no counter at all — Stash draws it only for more than one */
+const ONE_PAGE = { images: [image("301", 1000, 1500)] };
+
+/** Two pages Stash published URLs for, version stamp and all */
+const STAMPED_GALLERY = {
+  images: [
+    stamped("501", 1000, 1500, 1700000001),
+    stamped("502", 1000, 1500, 1700000002),
+  ],
+};
+
+dom.window.location.pathname = "/";
+state.galleries["7"] = GALLERY_WITH_A_SPREAD;
+state.galleries["8"] = PLAIN_GALLERY;
+state.galleries["11"] = TWO_PAGES;
+state.galleries["12"] = ONE_PAGE;
+state.galleries["13"] = STAMPED_GALLERY;
+
+// ── Sections ───────────────────────────────────────────────────────
+
+async function main() {
+  await runSection("the plugin loads and watches for a lightbox", () => {
+    assert.ok(NR, "the bundle should publish window.MangaReader");
+    assert.strictEqual(typeof NR.layout, "function");
+    assert.strictEqual(
+      dom.observerCount(),
+      1,
+      "one observer on the document, which is how the lightbox is found"
+    );
+    assert.strictEqual(
+      (dom.window.listeners.keydown || []).length,
+      1,
+      "and one key listener, on the window, so it runs before Stash's own"
+    );
+  });
+
+  await runSection("settings are parsed defensively", () => {
+    const defaults = {
+      doublePage: false,
+      coverAlone: true,
+      detectSpreads: true,
+      fadeMs: 140,
+    };
+
+    assert.deepStrictEqual(
+      NR.parseSettings(null),
+      defaults,
+      "a browser that has never been asked gets the defaults — the mode off"
+    );
+    assert.deepStrictEqual(
+      NR.parseSettings('{"doublePage":true}'),
+      { ...defaults, doublePage: true },
+      "a stored object may be missing a field: the rest are defaults"
+    );
+    assert.deepStrictEqual(
+      NR.parseSettings('{"doublePage":"yes"}'),
+      defaults,
+      "and a value of the wrong type is not a setting"
+    );
+    assert.deepStrictEqual(
+      NR.parseSettings("not json"),
+      defaults,
+      "nor is something else's value under our key"
+    );
+
+    // The fade is the one setting that is a number, and it ends up as a duration in
+    // a Web Animation: something that is not a finite number of milliseconds would
+    // be a screen that never arrives, so it is checked rather than trusted.
+    const fade = (raw) => NR.parseSettings(raw).fadeMs;
+    assert.strictEqual(fade('{"fadeMs":250}'), 250, "a number is a setting");
+    assert.strictEqual(
+      fade('{"fadeMs":0}'),
+      0,
+      "and 0 is one — no fade at all"
+    );
+    assert.strictEqual(
+      fade('{"fadeMs":-40}'),
+      0,
+      "a negative one is clamped, not obeyed"
+    );
+    assert.strictEqual(
+      fade('{"fadeMs":99999}'),
+      NR.FADE_MAX_MS,
+      "and an absurd one is capped at what the slider offers"
+    );
+    assert.strictEqual(
+      fade('{"fadeMs":"140"}'),
+      140,
+      "a string is not a number"
+    );
+    assert.strictEqual(fade('{"fadeMs":null}'), 140, "nor is null");
+  });
+
+  await runSection("the lightbox header is read as a position", () => {
+    assert.deepStrictEqual(NR.parseIndicator("3 / 12"), {
+      current: 3,
+      total: 12,
+    });
+    assert.deepStrictEqual(
+      NR.parseIndicator(" 1 / 2 "),
+      { current: 1, total: 2 },
+      "whitespace is not part of the number"
+    );
+    assert.strictEqual(NR.parseIndicator(""), null, "no counter at all");
+    assert.strictEqual(NR.parseIndicator("Chapter 3"), null);
+    assert.strictEqual(
+      NR.parseIndicator("0 / 12"),
+      null,
+      "a page number out of range is not a position to draw from"
+    );
+    assert.strictEqual(NR.parseIndicator("13 / 12"), null);
+  });
+
+  await runSection("the gallery is read out of the path", () => {
+    assert.strictEqual(NR.galleryIdFromPath("/galleries/7"), "7");
+    assert.strictEqual(NR.galleryIdFromPath("/galleries/7/images"), "7");
+    assert.strictEqual(
+      NR.galleryIdFromPath("/galleries"),
+      null,
+      "the gallery list is not one gallery"
+    );
+    assert.strictEqual(NR.galleryIdFromPath("/scenes/7"), null);
+    assert.strictEqual(
+      NR.galleryIdFromPath("/images/7"),
+      null,
+      "an image's own page has no gallery to pair"
+    );
+  });
+
+  await runSection("what counts as a spread", () => {
+    assert.strictEqual(NR.isWideSpreadPage(page("tall")), false);
+    assert.strictEqual(NR.isWideSpreadPage(wide("w")), true);
+    assert.strictEqual(
+      NR.isWideSpreadPage(page("square", 1000, 1000)),
+      false,
+      "the ratio is strictly greater than one"
+    );
+    assert.strictEqual(
+      NR.isWideSpreadPage(page("unknown", 0, 0)),
+      false,
+      "a page with no size reported is not evidence of a spread"
+    );
+  });
+
+  await runSection("the cover, and the pairs that follow it", () => {
+    assert.deepStrictEqual(NR.layout([]), []);
+
+    assert.deepStrictEqual(shape(NR.layout(pagesOf("a"))), ["a"]);
+
+    assert.deepStrictEqual(
+      shape(NR.layout(pagesOf("a", "b", "c", "d", "e"))),
+      ["a", "b+c", "d+e"],
+      "the cover stands alone and the rest pair up"
+    );
+
+    assert.deepStrictEqual(
+      shape(NR.layout(pagesOf("a", "b", "c", "d", "e"), { coverAlone: false })),
+      ["a+b", "c+d", "e"],
+      "without a cover to respect, the odd page is the last one"
+    );
+
+    assert.deepStrictEqual(
+      shape(
+        NR.layout(pagesOf("a", "b", "c", "d", "e"), {
+          coverAlone: true,
+          offset: 1,
+        })
+      ),
+      ["a", "b", "c+d", "e"],
+      "the offset strands one more page, which puts a wrongly-grouped gallery's " +
+        "pairs back"
+    );
+
+    // The layout must not touch what it was given: the page list is a fetched
+    // answer that is kept for the rest of the session.
+    const pages = pagesOf("a", "b");
+    const before = JSON.stringify(pages);
+    NR.layout(pages);
+    assert.strictEqual(JSON.stringify(pages), before, "and it is not mutated");
+  });
+
+  await runSection("a page that spans two of them", () => {
+    assert.deepStrictEqual(
+      shape(
+        NR.layout([page("a"), page("b"), wide("w"), page("c"), page("d")], {
+          coverAlone: false,
+        })
+      ),
+      ["a+b", "w", "c+d"],
+      "a spread takes a screen of its own, and the pairing carries on after it"
+    );
+
+    assert.deepStrictEqual(
+      shape(
+        NR.layout([page("a"), wide("w"), page("b"), page("c")], {
+          coverAlone: false,
+        })
+      ),
+      ["a", "w", "b+c"],
+      "a page whose neighbour is a spread stands alone — the case that leaves a " +
+        "single page in the middle of a book. If the pairing after it is then " +
+        "wrong for a book, the offset is what puts it right"
+    );
+
+    assert.deepStrictEqual(
+      shape(
+        NR.layout([page("a"), page("b"), wide("w"), page("c")], {
+          coverAlone: false,
+          detectSpreads: false,
+        })
+      ),
+      ["a+b", "w+c"],
+      "with the detection off a wide page is just a page"
+    );
+
+    assert.deepStrictEqual(
+      shape(NR.layout([wide("x"), wide("y")], { coverAlone: false })),
+      ["x", "y"],
+      "two spreads in a row are two screens"
+    );
+  });
+
+  await runSection("where a screen starts, and how far to move", () => {
+    const screens = NR.layout(pagesOf("a", "b", "c", "d", "e"));
+
+    screens.forEach((screen, at) => {
+      screen.pages.forEach((_page, offset) => {
+        assert.strictEqual(NR.screenAt(screens, screen.start + offset), at);
+      });
+    });
+    assert.deepStrictEqual(
+      screens.flatMap((s) => s.pages.map((p) => p.id)),
+      ["a", "b", "c", "d", "e"],
+      "every page is on exactly one screen, in order"
+    );
+    assert.strictEqual(NR.screenAt(screens, 99), -1);
+    assert.strictEqual(NR.screenAt([], 0), -1);
+
+    assert.strictEqual(NR.stepsToAdjacent(screens, 0, 1), 1);
+    assert.strictEqual(
+      NR.stepsToAdjacent(screens, 1, 1),
+      2,
+      "forward from the first page of a pair skips both its pages"
+    );
+    assert.strictEqual(
+      NR.stepsToAdjacent(screens, 2, 1),
+      1,
+      "and from the second page of one only moves on by that one"
+    );
+    assert.strictEqual(NR.stepsToAdjacent(screens, 0, -1), 0);
+    assert.strictEqual(NR.stepsToAdjacent(screens, 4, 1), 0);
+    assert.strictEqual(
+      NR.stepsToAdjacent(screens, 4, -1),
+      -3,
+      "backwards lands on the first page of the screen behind, which from the " +
+        "last pair is three pages away"
+    );
+  });
+
+  // ── The reader itself ────────────────────────────────────────────
+  //
+  // Every section below puts the page back to a known state before it does
+  // anything, and that is not tidiness: one failing assertion would otherwise leave
+  // a lightbox behind with the mode still on, and every section after it would be
+  // testing that instead of what it says. A test that fails should fail alone.
+
+  /**
+   * A lightbox on a gallery page, with this plugin's switch set where the section
+   * needs it, and the pages fetched.
+   *
+   * The mode is set by *using the switch*, which is the only way to change it from
+   * outside the bundle — the plugin's copy of the settings is module state, and
+   * writing localStorage behind its back would be testing a state it never reads.
+   */
+  async function startReader(options) {
+    const {
+      galleryId = "7",
+      at = 1,
+      total = 5,
+      on = true,
+      language = null,
+      counterText,
+    } = options || {};
+
+    for (const child of dom.body.children.slice()) child.remove();
+    dom.window.location.pathname = galleryId ? `/galleries/${galleryId}` : "/";
+    state.language = language;
+    dom.flush();
+
+    const box = buildLightbox(at, total);
+    // Some lightboxes have no counter at all — Stash draws it only for more than one
+    // image — and that has to be true before the mode is turned on, not after.
+    if (counterText !== undefined) box.counter.textContent = counterText;
+    const popover = box.openPopover();
+    dom.flush();
+
+    const input = popover.querySelector("#manga-reader-double-page");
+    assert.ok(input, "the switch should be in the lightbox's own options menu");
+    input.checked = on;
+    input.dispatch("change");
+    await settle();
+
+    return { box, input, popover };
+  }
+
+  /**
+   * A gallery of five ordinary pages: screens are [1] [2+3] [4+5], so a pair is
+   * something the arrows and the offset can be seen against. Gallery 8 in these
+   * fixtures has a spread in it, which changes what the pairing does.
+   */
+  /** Closes the lightbox and lets the reader notice */
+  function stopReader(box) {
+    box.close();
+    dom.flush();
+  }
+
+  await runSection("nothing is drawn until the mode is turned on", async () => {
+    const { box } = await startReader({ on: false });
+
+    assert.strictEqual(container(), null, "no container while the mode is off");
+    assert.strictEqual(
+      box.lightbox.classList.contains("manga-reader-active"),
+      false,
+      "and the lightbox untouched"
+    );
+
+    stopReader(box);
+  });
+
+  await runSection(
+    "the switch is added to the lightbox's own options",
+    async () => {
+      const { box, input, popover } = await startReader({ on: false });
+
+      assert.strictEqual(input.type, "checkbox");
+      assert.strictEqual(
+        input.checked,
+        false,
+        "off, because the mode is off — the switch shows the state, it does not set it"
+      );
+
+      const label = popover.querySelector("label");
+      assert.strictEqual(label.htmlFor, "manga-reader-double-page");
+      assert.strictEqual(
+        label.textContent,
+        "Double page",
+        "in English, because no gallery has been read yet and Stash's interface " +
+          "language is only known from its answer"
+      );
+      assert.ok(
+        popover.querySelector(".form-check"),
+        "and in Stash's own markup, so it reads as one of its options"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "the switch speaks the interface language once it is known",
+    async () => {
+      // The language comes from Stash's answer to the gallery query, so the wording
+      // is right from the *second* time the menu is opened — which is all it can be,
+      // and worth saying out loud.
+      const { box } = await startReader({ on: true, language: "zh-TW" });
+
+      const reopened = box.openPopover();
+      dom.flush();
+      assert.strictEqual(
+        reopened.querySelector("label").textContent,
+        "雙頁閱讀",
+        "a traditional-Chinese interface reads the traditional wording"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "turning it on draws the pages the lightbox is showing",
+    async () => {
+      const { box } = await startReader({ on: true });
+
+      assert.deepStrictEqual(
+        imageQueries().map((q) => q.variables.galleryId),
+        ["7"],
+        "the pages are asked for once, for the gallery in the path"
+      );
+      assert.strictEqual(
+        imageQueries()[0].fetchPolicy,
+        "no-cache",
+        "and not written into Apollo's cache, where the lightbox's own query lives"
+      );
+
+      const drawnBox = container();
+      assert.ok(drawnBox, "and a container to draw them in");
+      assert.strictEqual(
+        drawnBox.parentNode,
+        box.display,
+        "inside the display area"
+      );
+      assert.ok(
+        box.display.children.indexOf(drawnBox) >
+          box.display.children.indexOf(box.carousel),
+        "beside Stash's carousel rather than in place of it — which is what keeps " +
+          "React free to re-render its own subtree without ours going with it. " +
+          "Compared by position rather than by an index into markup this plugin " +
+          "does not own, since Stash's chevrons sit in that row too"
+      );
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-active"),
+        true,
+        "with the class that hides the carousel"
+      );
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/101/image"],
+        "the cover alone, because that is the screen page 1 is on"
+      );
+      assert.ok(
+        dom.preloaded.includes("/image/102/image"),
+        "and the pages of the next screen are warmed, so a turn does not wait"
+      );
+
+      // Stash moves and the reader follows — through the one code path every other
+      // way of moving takes, which is the point of reading its header rather than
+      // keeping a second idea of the current page.
+      box.move(2);
+      dom.flush();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/102/image"],
+        "page 2 stands alone: its neighbour is the spread, and one page is not the " +
+          "left half of a screen"
+      );
+
+      box.move(3);
+      dom.flush();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/103/image"],
+        "the spread takes a screen of its own"
+      );
+
+      box.move(4);
+      dom.flush();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/104/image", "/image/105/image"],
+        "and the pairing carries on after it — in reading order, which the " +
+          "stylesheet reverses for a right-to-left book"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a screen goes up when both of its images are there",
+    async () => {
+      const { box } = await startReader({ on: true });
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/101/image"],
+        "precondition: the cover is up"
+      );
+
+      // Held from here: the next turn's images are coming, and are not here.
+      dom.holdImages();
+      box.move(4);
+      dom.flush();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/101/image"],
+        "the reader keeps the screen it has rather than showing one page of the next — " +
+          "two images that arrive apart read as a flicker, not as a page"
+      );
+
+      dom.settleImages();
+      await settle();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/104/image", "/image/105/image"],
+        "and the pair goes up together once both are ready"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a slow image does not hold the screen forever",
+    async () => {
+      const { box } = await startReader({ on: true });
+      dom.holdImages();
+      box.move(2);
+      dom.flush();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/101/image"],
+        "precondition: waiting, with the previous screen still up"
+      );
+
+      // The budget is the plugin's own, published for this: the wait ends when it
+      // runs out, not when the bytes turn up. A page that never arrives must not be
+      // able to leave the reader on a page they have already turned.
+      await new Promise((resolve) =>
+        setTimeout(resolve, NR.REVEAL_BUDGET_MS + 50)
+      );
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/102/image"],
+        "past the budget, whatever has arrived is shown"
+      );
+
+      dom.settleImages();
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a screen the reader has left is never shown late",
+    async () => {
+      const { box } = await startReader({ on: true });
+
+      dom.holdImages();
+      box.move(2);
+      dom.flush();
+      box.move(4);
+      dom.flush();
+
+      dom.settleImages();
+      await settle();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/104/image", "/image/105/image"],
+        "only the screen the reader is on: the one they turned past does not land on " +
+          "top of it when its images finally arrive"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "the images are asked for the way Stash asks for them",
+    async () => {
+      const { box } = await startReader({
+        galleryId: "13",
+        on: true,
+        total: 2,
+      });
+
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/501/image?t=1700000001"],
+        "the relative path with the version stamp the API published — which is what " +
+          "makes it the same cache entry Stash's own lightbox fills, rather than a " +
+          "second fetch of an image the browser already has"
+      );
+      assert.ok(
+        dom.preloaded.includes("/image/502/image?t=1700000002"),
+        "and the page being warmed is asked for with its own stamp"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "the arrows move by screen, one press at a time",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+
+      // What the plugin sends the lightbox, as opposed to what it consumes: the
+      // events it dispatches are not `isTrusted`, which is how its own key handler
+      // tells them from a reader's and lets them through.
+      const sent = [];
+      dom.document.addEventListener("keydown", (event) => sent.push(event.key));
+
+      box.move(1);
+      dom.flush();
+      const forwards = press("ArrowRight");
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "forward from the cover is one page"
+      );
+      assert.strictEqual(
+        forwards.defaultPrevented,
+        true,
+        "and the press is consumed: this plugin decides where the lightbox goes"
+      );
+      assert.strictEqual(forwards.propagationStopped, true);
+
+      // A screen is two pages, and the lightbox moves one page per press — so the
+      // second press waits for the first to land rather than being sent with it.
+      // Stash drops a press that arrives while a page is still swapping, which is
+      // what "the arrows are sometimes wrong" was.
+      box.move(2);
+      dom.flush();
+      sent.length = 0;
+      press("ArrowRight");
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "the press that starts a two-page move"
+      );
+
+      // The lightbox lands on the page it was sent to, and the reader carries on.
+      box.move(3);
+      dom.flush();
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight", "ArrowRight"],
+        "and the one that finishes it, once the lightbox has said it landed"
+      );
+
+      box.move(3);
+      dom.flush();
+      sent.length = 0;
+      press("ArrowRight");
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "from the second page of a pair, the next screen is a single page on"
+      );
+
+      box.move(2);
+      dom.flush();
+      sent.length = 0;
+      press("ArrowLeft");
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowLeft"],
+        "backwards is one page, to the cover"
+      );
+
+      // The end of the book is left to Stash, which does nothing with it either:
+      // consuming the press would only be a lie about having moved.
+      box.move(5);
+      dom.flush();
+      sent.length = 0;
+      const pastTheEnd = press("ArrowRight");
+      assert.deepStrictEqual(sent, [], "nothing to move on to");
+      assert.strictEqual(pastTheEnd.defaultPrevented, false);
+
+      // A key press this plugin did not make passes straight through to the
+      // lightbox — if its own handler took these, every step would double.
+      sent.length = 0;
+      dom.document.dispatchEvent(
+        dom.makeEvent("keydown", { key: "ArrowRight", isTrusted: false })
+      );
+      assert.deepStrictEqual(sent, ["ArrowRight"]);
+
+      // Keys that are not a page turn are none of this plugin's business.
+      sent.length = 0;
+      const other = press("Escape");
+      assert.deepStrictEqual(sent, [], "Escape is left alone");
+      assert.strictEqual(other.defaultPrevented, false);
+
+      stopReader(box);
+    }
+  );
+
+  await runSection("a change elsewhere does not restart the wait", async () => {
+    // Held from before anything is drawn, which is when the two questions differ:
+    // with no previous screen to keep, the container is empty while the first one
+    // is on its way — and "empty" and "nothing drawn yet" are not the same thing.
+    dom.holdImages();
+    const { box } = await startReader({ on: true });
+
+    const before = dom.imagesAskedFor();
+    // Stash keeps changing the page while the screen is on its way: its counter is
+    // rewritten, its slides swap, the menu that was just open closes. Any of those
+    // is a DOM change, and each used to be read as "nothing has been drawn".
+    dom.flush();
+    dom.flush();
+    await settle();
+
+    assert.strictEqual(
+      dom.imagesAskedFor() - before,
+      0,
+      "the screen is asked for once, however much the page changes while it loads"
+    );
+
+    dom.settleImages();
+    await settle();
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/101/image"],
+      "and it goes up when its image is there"
+    );
+
+    stopReader(box);
+  });
+
+  await runSection(
+    "a focused field does not take the arrows from the reader",
+    async () => {
+      const { box, input } = await startReader({ galleryId: "8", on: true });
+      const sent = [];
+      dom.document.addEventListener("keydown", (event) => sent.push(event.key));
+
+      const keyTo = (target, key) =>
+        dom.dispatchTo(
+          target,
+          dom.makeEvent("keydown", { key, isTrusted: true })
+        );
+
+      // The options menu is open and the focus is on the switch the reader just
+      // clicked — a checkbox. The arrows do nothing to a checkbox (space toggles it),
+      // so a press here is still the reader's. Treating every `<input>` as a field
+      // that owns the arrows meant these went past the reader to Stash's own handler,
+      // a page at a time: "it only happens while the menu is open".
+      box.move(2);
+      dom.flush();
+      sent.length = 0;
+      const onSwitch = keyTo(input, "ArrowRight");
+      assert.strictEqual(
+        onSwitch.defaultPrevented,
+        true,
+        "a press with the switch focused is the reader's"
+      );
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "…and it starts a screen-sized move like any other"
+      );
+
+      // A text field is a different matter: the arrows are its own, and the plugin
+      // must not take them from it.
+      const field = dom.makeElement("input");
+      field.type = "text";
+      const inField = keyTo(field, "ArrowRight");
+      assert.strictEqual(
+        inField.defaultPrevented,
+        false,
+        "a text field keeps its own arrow keys"
+      );
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "…and nothing is sent for it"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "Stash's own chevrons turn a screen, not a page",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const sent = [];
+      dom.document.addEventListener("keydown", (event) => sent.push(event.key));
+
+      // Page 2 is the first of the pair 402+403, so a turn is two pages: Stash's own
+      // handler would move one, which is the same screen, and the reader would see
+      // nothing happen.
+      box.move(2);
+      dom.flush();
+      sent.length = 0;
+      const click = dom.click(box.navRight);
+      assert.strictEqual(
+        click.defaultPrevented,
+        true,
+        "the click is the reader's"
+      );
+      assert.strictEqual(
+        click.propagationStopped,
+        true,
+        "…and Stash's own button never sees it"
+      );
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "the first of the two presses"
+      );
+
+      box.move(3);
+      dom.flush();
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight", "ArrowRight"],
+        "and the second, once the lightbox has said it landed"
+      );
+
+      box.move(3);
+      dom.flush();
+      sent.length = 0;
+      const back = dom.click(box.navLeft);
+      assert.strictEqual(
+        back.propagationStopped,
+        true,
+        "the other chevron is the same"
+      );
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowLeft"],
+        "and goes back the way it came"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a click on a page turns it, as Stash's own does",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const sent = [];
+      dom.document.addEventListener("keydown", (event) => sent.push(event.key));
+
+      const page = () => container().children[0].children[0];
+      // As the browser would report it: the width of the image on screen, which is
+      // what tells the two halves apart. Set per draw, because a draw replaces the
+      // images.
+      const laidOut = () => {
+        page().offsetWidth = 100;
+      };
+
+      box.move(2);
+      dom.flush();
+      laidOut();
+      sent.length = 0;
+      const forward = dom.click(page(), { offsetX: 80 });
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "the right half of a page goes forward, like Stash's own image click"
+      );
+      assert.strictEqual(forward.propagationStopped, true);
+
+      box.move(2);
+      dom.flush();
+      laidOut();
+      sent.length = 0;
+      dom.click(page(), { offsetX: 10 });
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowLeft"],
+        "and the left half goes back"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "the space around the pages still closes the lightbox",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const keys = [];
+      dom.document.addEventListener("keydown", (event) => keys.push(event.key));
+
+      // Stash closes its lightbox when a click reaches the slide the pages sit in
+      // (Lightbox.tsx's handleClose), and every bit of that slide is behind this
+      // plugin's container — so the click is turned back into what Stash would have
+      // done with it, which is Escape. What the harness can see is the ask: its
+      // lightbox has no Escape of its own to act on it.
+      const click = dom.click(container());
+      assert.deepStrictEqual(
+        keys,
+        ["Escape"],
+        "a click on the letterbox asks Stash to close"
+      );
+      assert.strictEqual(
+        click.propagationStopped,
+        true,
+        "and nothing else sees it"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection("a screen arrives rather than snapping in", async () => {
+    const { box } = await startReader({ galleryId: "8", on: true });
+
+    const spread = container();
+    assert.strictEqual(
+      spread.animations.length,
+      1,
+      "the first screen fades in as it arrives"
+    );
+    assert.deepStrictEqual(
+      spread.animations[0].keyframes,
+      [{ opacity: 0 }, { opacity: 1 }],
+      "…from nothing to what it is: a fade, not a slide or a scale"
+    );
+
+    // Counted, not compared against one: the animations are the container's own
+    // history, and the container outlives the screens drawn into it.
+    const before = spread.animations.length;
+    box.move(2);
+    dom.flush();
+    assert.strictEqual(
+      spread.animations.length,
+      before + 1,
+      "and every screen after it does the same"
+    );
+
+    // A reader who has asked their system for less motion gets the page, not the
+    // dissolve — decoration does not get to overrule that.
+    dom.prefersReducedMotion(true);
+    const quiet = spread.animations.length;
+    box.move(4);
+    dom.flush();
+    assert.strictEqual(
+      spread.animations.length,
+      quiet,
+      "nothing is animated when reduced motion is on"
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/404/image", "/image/405/image"],
+      "…though the screen itself is still drawn"
+    );
+    dom.prefersReducedMotion(false);
+
+    stopReader(box);
+  });
+
+  await runSection(
+    "the fade is a setting, in the menu beside the switch",
+    async () => {
+      const { box, popover } = await startReader({ galleryId: "8", on: true });
+
+      const fade = popover.querySelector("#manga-reader-fade");
+      assert.ok(fade, "the options menu offers the fade length as a slider");
+      assert.strictEqual(
+        fade.type,
+        "range",
+        "a range, so it can be found by dragging"
+      );
+      assert.strictEqual(
+        fade.max,
+        "1000",
+        "and it reaches somewhere unmistakable"
+      );
+      assert.strictEqual(fade.value, "140", "starting where the default is");
+      // The value is shown beside the label — the readout inside the label is where
+      // the number lives, so it is readable from the menu without a render.
+      assert.strictEqual(
+        fade.parentNode.children[0].children[0].textContent,
+        "140 ms",
+        "and showing what it is set to"
+      );
+
+      // Dragging it changes what the next screen does, which is the only way to tell
+      // that this setting is connected to anything.
+      const before = container().animations.length;
+      fade.value = "600";
+      fade.dispatch("input");
+      box.move(2);
+      dom.flush();
+
+      const animations = container().animations;
+      assert.strictEqual(
+        animations.length,
+        before + 1,
+        "a turn after the drag still fades"
+      );
+      assert.strictEqual(
+        animations[animations.length - 1].options.duration,
+        600,
+        "…for as long as the slider says"
+      );
+
+      // Zero is a setting too, and it means what it says: the screen arrives at once.
+      fade.value = "0";
+      fade.dispatch("input");
+      box.move(4);
+      dom.flush();
+      assert.strictEqual(
+        container().animations.length,
+        before + 1,
+        "and 0 draws the screen with no animation at all"
+      );
+
+      // Put back: the setting is remembered across sections, and one left at 0 would
+      // be changing what every section after this one reads.
+      fade.value = "140";
+      fade.dispatch("input");
+
+      stopReader(box);
+    }
+  );
+
+  await runSection("the offset key re-pairs the gallery", async () => {
+    const { box, popover } = await startReader({ galleryId: "8", on: true });
+
+    // At page 2, which is where the two layouts differ: without the offset its
+    // screen is 2+3, and with it page 2 stands alone.
+    box.move(2);
+    dom.flush();
+    const before = drawn();
+    assert.deepStrictEqual(before, ["/image/402/image", "/image/403/image"]);
+
+    press("o");
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/402/image"],
+      "O shifts the pairing by one page and redraws — the escape hatch for a page " +
+        "that was taken for a spread and was not one"
+    );
+    assert.strictEqual(
+      popover.querySelector("#manga-reader-offset").checked,
+      true,
+      "and the switch in the options menu says so, because both routes go through " +
+        "the one place that sets it"
+    );
+
+    press("o");
+    assert.deepStrictEqual(drawn(), before, "and shifts it back");
+
+    stopReader(box);
+  });
+
+  await runSection(
+    "the offset is a switch, and is remembered for the gallery",
+    async () => {
+      const { box, popover } = await startReader({ galleryId: "8", on: true });
+
+      const offsetSwitch = popover.querySelector("#manga-reader-offset");
+      assert.ok(
+        offsetSwitch,
+        "the options menu offers the offset while a gallery is in hand"
+      );
+      assert.strictEqual(
+        offsetSwitch.checked,
+        false,
+        "and it starts unshifted"
+      );
+
+      box.move(2);
+      dom.flush();
+      offsetSwitch.checked = true;
+      offsetSwitch.dispatch("change");
+
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image"],
+        "turning it on re-pairs the gallery there and then"
+      );
+      assert.deepStrictEqual(
+        JSON.parse(
+          dom.window.localStorage.getItem("plugin.mangaTools.offsets")
+        ),
+        { 8: 1 },
+        "and the gallery's shift is remembered, so it need not be set again"
+      );
+
+      stopReader(box);
+
+      // Opened again — a fresh lightbox, a fresh popover — it starts where the reader
+      // left it.
+      const again = await startReader({ galleryId: "8", on: true });
+      assert.strictEqual(
+        again.popover.querySelector("#manga-reader-offset").checked,
+        true,
+        "the gallery opens with the shift it was given"
+      );
+
+      again.box.move(2);
+      dom.flush();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image"],
+        "and with the pairing it had"
+      );
+
+      stopReader(again.box);
+    }
+  );
+
+  await runSection("a press the lightbox drops is sent again", async () => {
+    // Stash ignores an arrow that arrives while the page before it is still
+    // swapping, and a dropped press changes nothing — so nothing but a clock can
+    // notice it. This is that clock: the press is sent again, and the move finishes.
+    const { box } = await startReader({ galleryId: "8", on: true });
+
+    const sent = [];
+    dom.document.addEventListener("keydown", (event) => sent.push(event.key));
+
+    box.move(2);
+    dom.flush();
+    sent.length = 0;
+    press("ArrowRight");
+    assert.deepStrictEqual(sent, ["ArrowRight"], "the first press");
+
+    // This time the lightbox does not move: the press went nowhere, so the wait
+    // ends with it being sent again.
+    await new Promise((resolve) => setTimeout(resolve, 160));
+    assert.deepStrictEqual(
+      sent,
+      ["ArrowRight", "ArrowRight"],
+      "and the same press again, after waiting for it to land"
+    );
+
+    stopReader(box);
+  });
+
+  await runSection(
+    "turning the switch off puts the lightbox back",
+    async () => {
+      const { box, input } = await startReader({ on: true });
+      assert.ok(container(), "drawing first");
+
+      input.checked = false;
+      input.dispatch("change");
+
+      assert.strictEqual(container(), null, "the container is gone");
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-active"),
+        false,
+        "the carousel is visible again"
+      );
+      assert.strictEqual(
+        box.display.style.position,
+        "",
+        "and the display is as Stash had it"
+      );
+
+      stopReader(box);
+      assert.strictEqual(
+        container(),
+        null,
+        "and closing the lightbox leaves nothing behind"
+      );
+    }
+  );
+
+  await runSection("the mode is not used off a gallery page", async () => {
+    // The lightbox shows every kind of image in Stash; the mode is for reading a
+    // gallery, so anywhere else it draws nothing — even switched on, as here.
+    const asked = imageQueries().length;
+    const { box } = await startReader({ galleryId: null, on: true });
+
+    assert.strictEqual(container(), null, "nothing is drawn");
+    assert.strictEqual(
+      imageQueries().length,
+      asked,
+      "and no gallery's pages are asked for"
+    );
+
+    stopReader(box);
+  });
+
+  await runSection("the mode is remembered for the next session", async () => {
+    const { box } = await startReader({ on: true });
+    assert.ok(container(), "on, and drawing");
+
+    assert.deepStrictEqual(
+      JSON.parse(dom.window.localStorage.getItem("plugin.mangaTools.settings")),
+      { doublePage: true, coverAlone: true, detectSpreads: true, fadeMs: 140 },
+      "the switch writes the setting it changed and leaves the rest alone"
+    );
+
+    stopReader(box);
+  });
+
+  await runSection(
+    "a gallery Stash cannot answer for is not drawn",
+    async () => {
+      state.failing = true;
+      const at = loggedErrors.length;
+
+      const { box } = await startReader({ galleryId: "9", on: true });
+
+      assert.strictEqual(container(), null, "nothing is drawn");
+      assert.ok(
+        errorsSince(at).some((line) =>
+          /could not read this gallery's pages/.test(line)
+        ),
+        "and the failure is reported rather than passed over"
+      );
+
+      state.failing = false;
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a lightbox whose header cannot be read is not drawn over",
+    async () => {
+      // Several pages and a header with no counter: Stash's markup has moved on.
+      // The plugin cannot know where it is, so it must not draw at all.
+      const at = loggedErrors.length;
+      const { box } = await startReader({ galleryId: "11", on: true });
+      box.counter.textContent = "1";
+      dom.flush();
+
+      assert.strictEqual(container(), null, "nothing is drawn");
+      assert.ok(
+        errorsSince(at).some((line) => /header could not be read/.test(line)),
+        "and it says which assumption failed"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection("a one-page gallery is quiet", async () => {
+    // The counter is drawn only when there is more than one image, so this looks
+    // exactly like markup that has changed — unless the page count says otherwise,
+    // which is why the plugin reads its own page list before deciding.
+    const at = loggedErrors.length;
+    const { box } = await startReader({
+      galleryId: "12",
+      counterText: "",
+      on: true,
+    });
+
+    assert.strictEqual(container(), null, "nothing is drawn");
+    assert.deepStrictEqual(
+      errorsSince(at),
+      [],
+      "and nothing is reported: one page is not a fault"
+    );
+
+    stopReader(box);
+  });
+
+  /**
+   * Last on purpose: it empties this browser's settings and puts the *old* keys
+   * back, which every section above depends on being absent. What it checks is
+   * the one thing the migration promises — a reader who had both switches set
+   * before the halves were bundled still has them after — and the one thing it
+   * must not do, which is take the old value away from the standalone Manga
+   * Reader that may still be installed beside this plugin.
+   */
+  await runSection(
+    "settings and shifts from before the merge are still read",
+    async () => {
+      const store = dom.window.localStorage;
+      const settings = {
+        doublePage: true,
+        coverAlone: false,
+        detectSpreads: true,
+        fadeMs: 300,
+      };
+
+      store.removeItem("plugin.mangaTools.settings");
+      store.removeItem("plugin.mangaTools.offsets");
+      store.setItem("mangaReader.settings", JSON.stringify(settings));
+      store.setItem("mangaReader.offsets", JSON.stringify({ 8: 1 }));
+
+      assert.deepStrictEqual(
+        NR.readSettings(),
+        settings,
+        "the old key's settings are the ones read"
+      );
+      assert.strictEqual(NR.readOffset("8"), 1, "…and its per gallery shifts");
+      assert.deepStrictEqual(
+        JSON.parse(store.getItem("plugin.mangaTools.settings")),
+        settings,
+        "…and they are copied to the key this plugin writes"
+      );
+      assert.deepStrictEqual(
+        JSON.parse(store.getItem("plugin.mangaTools.offsets")),
+        { 8: 1 },
+        "…shifts included, so a later write merges rather than replaces"
+      );
+      assert.ok(
+        store.getItem("mangaReader.settings") &&
+          store.getItem("mangaReader.offsets"),
+        "and the old keys are left where they are, for the plugin that still reads them"
+      );
+    }
+  );
+
+  /**
+   * Also last, and for a related reason: it loads the bundle a *second* time, in
+   * a world where the tools half cannot start, to see the one promise the merge
+   * makes. The halves share a bundle, so a throw during either one's startup
+   * would otherwise take both down — the entry starts them one at a time, each
+   * inside its own guard, and this is what that is for.
+   *
+   * A missing `setInterval` because it is one of the few things the tools half
+   * reaches for *while starting* and cannot guard against itself: it is where the
+   * poll behind its store begins. What the reader half has to show for it is that
+   * it is still there — still watching the document, still taking the arrow keys.
+   *
+   * Take the guard out of the entry and this section is not what fails: the bundle
+   * throws at the first load, near the top of this file, and the run dies there.
+   * Both are red, which is what matters — but the message here is the readable one,
+   * and it is only readable because the guard is doing its job.
+   */
+  await runSection(
+    "a tools half that cannot start leaves the reader readable",
+    async () => {
+      const window = dom.window;
+      const realSetInterval = window.setInterval;
+      const errorsAt = loggedErrors.length;
+      const keysAt = (window.listeners.keydown || []).length;
+
+      window.setInterval = undefined;
+      delete require.cache[require.resolve(BUNDLE)];
+      require(BUNDLE);
+      window.setInterval = realSetInterval;
+
+      assert.ok(
+        errorsSince(errorsAt).some((line) =>
+          /tools half could not be started/.test(line)
+        ),
+        "the half that failed says which one it was"
+      );
+      assert.ok(
+        (window.listeners.keydown || []).length > keysAt,
+        "and the reader half is running anyway"
+      );
+    }
+  );
+
+  // ── The tally ────────────────────────────────────────────────────
+
+  if (failures.length === 0) {
+    console.log("\nAll mangaReader smoke tests passed");
+  } else {
+    console.error(
+      `\n${failures.length} section(s) failed: ${failures.join(", ")}`
+    );
+    process.exitCode = 1;
+  }
+}
+
+main().catch((e) => {
+  console.error("the smoke test itself failed:", e);
+  process.exitCode = 1;
+});

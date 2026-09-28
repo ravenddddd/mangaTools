@@ -159,18 +159,28 @@ module.exports = () => {
     }).props.children[0];
     return el.type(el.props);
   };
+  // Counted as a delta from this render rather than as a total: the reader half
+  // observes the document as well, from its own install at load, and it has
+  // nothing to do with how many watchers this card mounts. What the card has to
+  // do is add exactly one — not none, and not a second one per render.
+  const watchingBefore = observed.length;
   renderDialogCard([
     { field: "plugin.mangaTools.language", modifier: "EQUALS", value: ["ja"] },
   ]);
+  const watching = observed[observed.length - 1];
 
-  assert.strictEqual(observed.length, 1, "the card should watch the DOM once");
   assert.strictEqual(
-    observed[0].target,
+    observed.length - watchingBefore,
+    1,
+    "the card should watch the DOM once"
+  );
+  assert.strictEqual(
+    watching.target,
     global.document.body,
     "…on the document, because Stash mounts the dialog outside the list"
   );
   assert.strictEqual(
-    observed[0].options.subtree,
+    watching.options.subtree,
     true,
     "…and into what is inside the dialog, not just the dialog itself"
   );

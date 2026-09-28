@@ -1,20 +1,30 @@
-# Manga Tools — a toolbox that adapts Stash galleries to manga/comic management.
+# Manga Tools — one plugin for managing a manga library in Stash and reading it.
 #
 # The plugin ID comes from this file's name (mangaTools), not from a config
 # field. Paths under ui.javascript are relative to this file and are loaded in
-# array order. There is only one entry: the bundled output of
-# src/mangaTools.tsx, with src/languages.ts inlined into it by esbuild (see
-# build.mjs), so there is no load order to get wrong.
+# array order. There is only one entry: the bundled output of src/mangaTools.tsx,
+# the two halves of the plugin and the modules they share inlined into it by
+# esbuild (see build.mjs), so there is no load order to get wrong.
+#
+# The two halves are why this file's `settings:` block does not cover everything
+# the plugin remembers. What is here is the tools half's — library policy, stored
+# in Stash's own configuration. The reader half's settings are the browser's,
+# beside the lightbox options they sit next to in that menu, and are not
+# configurable from here at all. See src/reader/settings.ts for why.
 name: Manga Tools
-description: Adapts Stash galleries to manga/comic management.
+description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.6.2
+version: 0.7.0
 ui:
   javascript:
     - mangaTools.js
   css:
+    # The tools half's, then the reader's. Kept apart rather than concatenated:
+    # each names its own classes and the browser can cache the one that did not
+    # change.
     - mangaTools.css
+    - mangaReader.css
   # The things this plugin ships that are not code: the icon for the mark that
   # makes a gallery manga, and the two steaks the original-text button draws
   # (raw.svg for 生肉, cooked.svg for 熟肉). Stash serves a mapped directory at

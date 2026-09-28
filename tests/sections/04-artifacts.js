@@ -296,6 +296,17 @@ module.exports = () => {
         "packaged is a mask over a 404, which draws an empty box and logs nothing"
     );
   }
+
+  // Both halves' stylesheets, for the same reason as the artwork: ui.css names
+  // them one by one, so a file the manifest lists and the build does not copy is a
+  // half that draws wrong with a 404 to explain it. Named here rather than read
+  // from the yml, so that dropping one from the manifest fails here too.
+  for (const name of ["mangaTools.css", "mangaReader.css"]) {
+    assert.ok(
+      fs.existsSync(path.join(PLUGIN, name)),
+      `dist/ should carry ${name}: ui.css in the yml names it`
+    );
+  }
   console.log(
     "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"
   );

@@ -7,8 +7,8 @@
  * row saying what the card's working copy holds, which is not the same thing the
  * list's own row says.
  */
-import { NS } from "./languages";
-import { requirePluginApi } from "./plugin-api";
+import { NS } from "../languages";
+import { requirePluginApi } from "../plugin-api";
 import {
   EMPTY_SELECTION,
   LANGUAGE_TYPE,
@@ -38,7 +38,7 @@ import {
 import type {
   MangaToolsFilterModel,
   MangaToolsLanguageSelection,
-} from "./plugin-api";
+} from "../plugin-api";
 
 const PluginApi = requirePluginApi();
 

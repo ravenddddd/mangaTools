@@ -1,4 +1,8 @@
 {
+  "mangaReader.doublePage": "双页阅读",
+  "mangaReader.fade": "淡入",
+  "mangaReader.offset": "配对偏移一格",
+
   "mangaTools.select.placeholder": "选择语言…",
 
   "mangaTools.settings.enabledLanguages.heading": "启用的语言",

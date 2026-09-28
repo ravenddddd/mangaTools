@@ -1,4 +1,8 @@
 {
+  "mangaReader.doublePage": "Double page",
+  "mangaReader.fade": "Fade in",
+  "mangaReader.offset": "Shift the pairing by one page",
+
   "mangaTools.select.placeholder": "Select language…",
 
   "mangaTools.settings.enabledLanguages.heading": "Enabled languages",

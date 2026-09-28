@@ -11,15 +11,15 @@
  * and `isLanguageTag` is read by both; duplicating them across two modules would
  * let the two surfaces stop recognising each other's tags.
  */
-import { NS } from "./languages";
-import { requirePluginApi } from "./plugin-api";
+import { NS } from "../languages";
+import { requirePluginApi } from "../plugin-api";
 import { message } from "./filter-model";
 import type { ReactElement } from "react";
 import type {
   MangaToolsIntl,
   MangaToolsLanguageSelection,
   MangaToolsOption,
-} from "./plugin-api";
+} from "../plugin-api";
 
 const PluginApi = requirePluginApi();
 

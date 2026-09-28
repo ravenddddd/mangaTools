@@ -27,8 +27,20 @@ const DIST = path.join(ROOT, "dist");
 /** The plugin's ID: its entry point's name, and the name of the bundle */
 const ID = "mangaTools";
 
-/** Copied as they are: a file the manifest names, or the README */
-const FILES = ["mangaTools.yml", "mangaTools.css", "README.md"];
+/**
+ * Copied as they are: a file the manifest names, or the README.
+ *
+ * Two stylesheets because there are two halves — the tools half's and the
+ * reader's, which `ui.css` lists in that order. They are kept apart rather than
+ * concatenated: neither is large, both name their own classes, and a browser
+ * caching the one that did not change is worth more than one file.
+ */
+const FILES = [
+  "mangaTools.yml",
+  "mangaTools.css",
+  "mangaReader.css",
+  "README.md",
+];
 
 /** Copied whole: the directory the manifest maps at `ui.assets` */
 const DIRECTORIES = ["assets"];
