@@ -307,6 +307,21 @@ module.exports = () => {
       `dist/ should carry ${name}: ui.css in the yml names it`
     );
   }
+
+  // The reader half hides Stash's own chapter button by marking it, not by styling
+  // it, so the marking only means anything if this rule shipped. It is checked here
+  // because it is the shape of failure the DOM stub cannot see: the test world can
+  // read an attribute, and it has no idea whether a browser would hide it — which is
+  // exactly how a marked-but-visible button shipped once.
+  const readerCss = fs.readFileSync(
+    path.join(PLUGIN, "mangaReader.css"),
+    "utf8"
+  );
+  assert.ok(
+    /\[data-manga-reader-hidden\]\s*\{[^}]*display:\s*none/.test(readerCss),
+    "mangaReader.css should hide what the reader marks with data-manga-reader-hidden: " +
+      "the chapters tab's own button is marked, and a mark with no rule behind it hides nothing"
+  );
   console.log(
     "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"
   );

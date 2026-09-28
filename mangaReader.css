@@ -75,3 +75,18 @@
   border-top: 1px solid var(--manga-reader-divider, #444);
   padding-top: 8px;
 }
+
+/*
+ * Stash's own controls that this plugin stands in for.
+ *
+ * The chapters tab's Create button, for now: this plugin is what will edit chapters,
+ * and its editing is not written yet — so the button that would open Stash's editor,
+ * and write Stash's rows, is marked by the plugin and hidden here.
+ *
+ * An attribute and a rule rather than an inline style, because the tab is rebuilt by
+ * React and the marking has to survive that: the plugin sets it on whatever button it
+ * finds, and this is what makes setting it mean something.
+ */
+[data-manga-reader-hidden] {
+  display: none;
+}
