@@ -315,12 +315,26 @@ const STAMPED_GALLERY = {
   ],
 };
 
+/**
+ * Two ordinary pages, for the tests that need a gallery nobody else has opened.
+ *
+ * Each of these is fetched once per gallery and remembered, so an assertion about
+ * what was *asked for* needs a gallery that has not been asked for yet — three
+ * more of these are registered under their own ids below.
+ */
+const ORDER_GALLERY = {
+  images: [image("601", 1000, 1500), image("602", 1000, 1500)],
+};
+
 dom.window.location.pathname = "/";
 state.galleries["7"] = GALLERY_WITH_A_SPREAD;
 state.galleries["8"] = PLAIN_GALLERY;
 state.galleries["11"] = TWO_PAGES;
 state.galleries["12"] = ONE_PAGE;
 state.galleries["13"] = STAMPED_GALLERY;
+state.galleries["21"] = ORDER_GALLERY;
+state.galleries["22"] = ORDER_GALLERY;
+state.galleries["23"] = ORDER_GALLERY;
 
 // ── Sections ───────────────────────────────────────────────────────
 
@@ -586,10 +600,15 @@ async function main() {
       on = true,
       language = null,
       counterText,
+      search = "",
     } = options || {};
 
     for (const child of dom.body.children.slice()) child.remove();
     dom.window.location.pathname = galleryId ? `/galleries/${galleryId}` : "/";
+    // Cleared every time, not left as the last test set it: the order is read from
+    // the URL as the gallery is fetched, so a leftover would be a section reading
+    // another section's sort.
+    dom.window.location.search = search;
     state.language = language;
     dom.flush();
 
@@ -869,6 +888,94 @@ async function main() {
         "and the page being warmed is asked for with its own stamp"
       );
 
+      stopReader(box);
+    }
+  );
+
+  /**
+   * The pages have to be fetched in the order the lightbox is *showing* them, and
+   * that order is not always path: only the lightbox opened from the gallery
+   * page's Chapters tab is Stash's own and path-sorted. The one opened from the
+   * Images tab holds the list's images in the list's own sort, which lives in the
+   * URL. Pairing the wrong order draws the wrong pages and puts every index the
+   * plugin computes off by however much they disagree.
+   */
+  await runSection(
+    "the order the lightbox is showing is the order it is fetched in",
+    async () => {
+      // The rules are Stash's own, from configureFromDecodedParams in
+      // models/list-filter/filter.ts — including the two that are easy to get
+      // wrong: an absent `sortdir` means descending only for `date`, and a random
+      // sort is a seeded name that has to be passed back verbatim or the shuffle
+      // comes out different.
+      assert.deepStrictEqual(
+        NR.lightboxOrder("?sortby=title&perPage=500&disp=2&z=2"),
+        { sort: "title", direction: "ASC" },
+        "the list's own sort, however the URL spells it"
+      );
+      assert.deepStrictEqual(
+        NR.lightboxOrder(""),
+        { sort: "path", direction: "ASC" },
+        "and path when there is no list behind the lightbox"
+      );
+      assert.deepStrictEqual(
+        NR.lightboxOrder("?sortby=title&sortdir=desc"),
+        { sort: "title", direction: "DESC" },
+        "descending when the list says so"
+      );
+      assert.deepStrictEqual(
+        NR.lightboxOrder("?sortby=date"),
+        { sort: "date", direction: "DESC" },
+        "descending by default for date, which Stash decided in #3559"
+      );
+      assert.deepStrictEqual(
+        NR.lightboxOrder("?sortby=date&sortdir=asc"),
+        { sort: "date", direction: "ASC" },
+        "…unless the list asked for ascending after all"
+      );
+      assert.deepStrictEqual(
+        NR.lightboxOrder("?sortby=random_12345"),
+        { sort: "random_12345", direction: "ASC" },
+        "and a seeded shuffle is a sort name to be handed back, not re-rolled"
+      );
+
+      // What the server is actually asked. A mismatch here is invisible until a
+      // reader notices the page they clicked is not the one that opened.
+      //
+      // A gallery each, because a gallery is fetched once and remembered: asking
+      // the same one twice would assert on the first fetch's variables.
+      const asked = () => imageQueries().slice(-1)[0].variables;
+
+      let box = (
+        await startReader({
+          galleryId: "21",
+          on: true,
+          total: 2,
+          search: "?sortby=title&perPage=500",
+        })
+      ).box;
+      assert.strictEqual(asked().sort, "title", "asked for in the URL's sort");
+      assert.strictEqual(asked().direction, "ASC", "and its direction");
+      stopReader(box);
+
+      box = (
+        await startReader({
+          galleryId: "22",
+          on: true,
+          total: 2,
+          search: "?sortby=rating&sortdir=desc",
+        })
+      ).box;
+      assert.strictEqual(asked().sort, "rating");
+      assert.strictEqual(asked().direction, "DESC");
+      stopReader(box);
+
+      box = (await startReader({ galleryId: "23", on: true, total: 2 })).box;
+      assert.strictEqual(
+        asked().sort,
+        "path",
+        "and path for the entry with no list behind it"
+      );
       stopReader(box);
     }
   );

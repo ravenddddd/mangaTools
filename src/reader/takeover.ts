@@ -43,6 +43,7 @@ import {
   SELECTOR_POPOVER_BODY,
   fetchGallery,
   galleryIdFromPath,
+  lightboxOrder,
   pressArrow,
   pressEscape,
   readPosition,
@@ -252,7 +253,10 @@ function loadGallery(id: string): void {
 
   const forLightbox = root;
 
-  fetchGallery(id)
+  // Read here rather than remembered: the order belongs to the list the lightbox
+  // was opened from, and opening another gallery — or the same one after changing
+  // the list's sort — is a different order. See lightboxOrder.
+  fetchGallery(id, lightboxOrder(window.location.search))
     .then((answer) => {
       // The lightbox can have been closed — or another opened — while that was in
       // flight, and an answer for the previous one must not be drawn over this one.

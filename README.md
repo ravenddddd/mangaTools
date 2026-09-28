@@ -761,6 +761,17 @@ query is lifted onto the reader's own relative path: same resource, same cache
 entry, and now the pages Stash has already loaded are there the moment they are
 asked for.
 
+**And in the order the lightbox is showing them.** Which is not always path: the
+lightbox opened from the gallery page's Chapters tab is Stash's own and path-sorted,
+but the one opened from the **Images** tab holds *the list's* images, in the list's
+own sort — and the list keeps that sort in the URL (`?sortby=title&perPage=500`).
+Pairing path-ordered pages against a title-ordered carousel draws the wrong pages,
+and puts every index the reader computes off by however much the two orders
+disagree. So the sort and direction are read from the URL and asked for back, with
+Stash's own rules for them — including that an absent direction means descending
+for `date` and nothing else, and that a seeded `random_…` is a sort name to hand
+back rather than a shuffle to roll again.
+
 What remains is genuinely cold: the first screen, a jump, a slow disk. For those,
 the screen is built **detached** and shown in one step — the reader keeps whatever
 is already on screen until both images can be painted (the browser is asked with

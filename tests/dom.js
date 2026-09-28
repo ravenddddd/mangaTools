@@ -272,7 +272,10 @@ function createDom() {
 
   const window = {
     document,
-    location: { pathname: "/" },
+    // `search` is what the reader reads the lightbox's order from — the list the
+    // lightbox was opened from keeps its filter there, and the reader has to fetch
+    // the pages in that same order. A test sets it; see startReader in reader.js.
+    location: { pathname: "/", search: "" },
     matchMedia: (query) => ({
       matches: /prefers-reduced-motion/.test(query) && reducedMotion,
       media: query,

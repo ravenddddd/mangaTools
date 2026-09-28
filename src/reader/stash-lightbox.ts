@@ -14,7 +14,7 @@
  * mode off. A reader that cannot tell where it is must not draw anything.
  */
 import { gqlDoc, requirePluginApi } from "../plugin-api";
-import { NR } from "./namespace";
+import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
 
 /** The root element's class. Everything else is a child of it. */
@@ -134,6 +134,46 @@ export function pressEscape(): void {
 }
 
 /**
+ * Reads the order the lightbox is showing its images in, from the URL.
+ *
+ * **The pages have to be fetched in the order they are being shown.** The lightbox
+ * opened from the gallery page's Chapters tab is Stash's own and always path — but
+ * the one opened from the Images tab holds *the list's* images, in the list's own
+ * sort, and that is a list the reader never sees. Pairing path-ordered pages
+ * against a title-ordered carousel draws the wrong pages, and puts every index
+ * this plugin computes — which page a screen starts at, which thumbnail to click
+ * to reach a chapter — off by however much the two orders disagree.
+ *
+ * The URL is where the list keeps its filter (`?sortby=title&perPage=500`), and
+ * Stash clears it when you leave the tab that owns it — so an absent `sortby` is
+ * the case with no list behind it, which is the Chapters-tab lightbox and its path
+ * order. Both read correctly, which is the only property that matters here.
+ *
+ * The direction rule is Stash's own, from `configureFromDecodedParams` in
+ * `models/list-filter/filter.ts`: absent means ascending, *except* for `date`,
+ * which means descending. Reproduced rather than simplified — a `date` list sorted
+ * the other way would be a mismatch like any other.
+ *
+ * Filtered lists — a search term, a criterion in `c=` — are a mismatch this cannot
+ * see, and they fail the check the caller already makes: the lightbox's own count
+ * of how many images it is showing no longer matches the pages fetched here, so
+ * nothing is drawn.
+ */
+export function lightboxOrder(search: string): MangaReaderOrder {
+  const params = new URLSearchParams(search || "");
+  const sort = params.get("sortby") || "path";
+  const direction = params.get("sortdir");
+
+  return {
+    sort,
+    direction:
+      direction === "desc" || (direction === null && sort === "date")
+        ? "DESC"
+        : "ASC",
+  };
+}
+
+/**
  * One query for everything opening a gallery needs.
  *
  * Two things, one round trip: the pages, and the language this Stash's interface
@@ -142,12 +182,18 @@ export function pressEscape(): void {
  * whatever the interface is set to).
  *
  * The image filter is copied from GalleryViewer, which is the list the lightbox is
- * opened with: `per_page: -1, sort: "path"` and nothing else. **The sort has to
- * match**, because the pairing is only meaningful against the order the reader is
- * being shown.
+ * opened with: `per_page: -1` and the order the lightbox is being shown in. **The
+ * sort has to match**, because the pairing is only meaningful against that order —
+ * see lightboxOrder for where it comes from.
+ *
+ * The sort and the direction are *variables* rather than text spliced into the
+ * query, because they come from the URL: a `sortby` with a quote in it would
+ * otherwise be able to write GraphQL. Both are always sent — the server's default
+ * when `sort` is unset is `title`, not `path`, so leaving one out would silently
+ * ask for an order the lightbox is not showing.
  */
 export const GALLERY_QUERY_TEXT = [
-  "query MangaReaderGallery($galleryId: ID!) {",
+  "query MangaReaderGallery($galleryId: ID!, $sort: String, $direction: SortDirectionEnum) {",
   "  configuration {",
   "    interface {",
   "      language",
@@ -155,7 +201,7 @@ export const GALLERY_QUERY_TEXT = [
   "  }",
   "  findImages(",
   "    image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }",
-  '    filter: { per_page: -1, sort: "path" }',
+  "    filter: { per_page: -1, sort: $sort, direction: $direction }",
   "  ) {",
   "    images {",
   "      id",
@@ -201,7 +247,10 @@ export interface GalleryAnswer {
  * the one place a missing size matters, and it is why spreads.ts treats an unknown
  * size as an ordinary page rather than as a spread.
  */
-export async function fetchGallery(galleryId: string): Promise<GalleryAnswer> {
+export async function fetchGallery(
+  galleryId: string,
+  order: MangaReaderOrder
+): Promise<GalleryAnswer> {
   if (!galleryQuery) {
     galleryQuery = gqlDoc(GALLERY_QUERY_TEXT, "build the gallery query");
   }
@@ -214,7 +263,15 @@ export async function fetchGallery(galleryId: string): Promise<GalleryAnswer> {
     // wants it in Apollo's normalised cache — the lightbox's own query is the one
     // that belongs there, and two writers of the same Image objects is how a
     // cache starts disagreeing with itself.
-    .query({ query, variables: { galleryId }, fetchPolicy: "no-cache" })
+    .query({
+      query,
+      variables: {
+        galleryId,
+        sort: order.sort,
+        direction: order.direction,
+      },
+      fetchPolicy: "no-cache",
+    })
     .then((res) => res?.data as GalleryPayload | undefined);
 
   const pages: MangaReaderPage[] = (data?.findImages?.images || []).map(
@@ -243,3 +300,4 @@ export async function fetchGallery(galleryId: string): Promise<GalleryAnswer> {
 
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
+NR.lightboxOrder = lightboxOrder;

@@ -14,6 +14,15 @@
  */
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 
+/**
+ * The order the lightbox is showing its images in — see lightboxOrder in
+ * stash-lightbox.ts for where it comes from and why it is not always path.
+ */
+export interface MangaReaderOrder {
+  sort: string;
+  direction: "ASC" | "DESC";
+}
+
 /** Just the settings the reader keeps. See settings.ts. */
 export interface MangaReaderSettings {
   /** The mode itself. Off until somebody turns it on. */
@@ -63,6 +72,8 @@ export interface MangaReaderNamespace {
   readOffset(galleryId: string): 0 | 1;
   parseIndicator(text: string): { current: number; total: number } | null;
   galleryIdFromPath(pathname: string): string | null;
+  /** The order the lightbox is showing its images in, read from the URL */
+  lightboxOrder(search: string): MangaReaderOrder;
   isWideSpreadPage(page: MangaReaderPage): boolean;
   /**
    * How long a screen may be held back waiting for its images, in milliseconds.
