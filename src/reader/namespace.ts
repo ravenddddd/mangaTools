@@ -118,7 +118,6 @@ export interface MangaReaderNamespace {
    * that do, and for the day one of them changes.
    */
   readStrip(lightbox: Element): MangaReaderStrip | null;
-  readStrip(lightbox: Element): MangaReaderStrip | null;
   isWideSpreadPage(page: MangaReaderPage): boolean;
   /**
    * How long a screen may be held back waiting for its images, in milliseconds.

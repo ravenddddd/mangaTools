@@ -1374,97 +1374,68 @@ async function main() {
     stopReader(again.box);
   });
 
+  /**
+   * The arrows move the *reader* now, not the lightbox: a press is a screen, and
+   * nothing is sent anywhere. That is what taking the lightbox over bought — the old
+   * shape was a press aimed at Stash's index, waiting for its header to say the press
+   * had landed and retrying if it did not, with the whole errand to hold it together.
+   */
   await runSection(
-    "the arrows move by screen, one press at a time",
+    "the arrows move by screen, and drive nothing else",
     async () => {
       const { box } = await startReader({ galleryId: "8", on: true });
 
-      // What the plugin sends the lightbox, as opposed to what it consumes: the
-      // events it dispatches are not `isTrusted`, which is how its own key handler
-      // tells them from a reader's and lets them through.
+      // What the plugin sends the lightbox, as opposed to what it consumes. It dispatches
+      // nothing at all now; this is the listener that would see it if it did.
       const sent = [];
       dom.document.addEventListener("keydown", (event) => sent.push(event.key));
 
-      box.move(1);
-      dom.flush();
       const forwards = press("ArrowRight");
       assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image", "/image/403/image"],
+        "a press moves by a screen, not by a page"
+      );
+      assert.deepStrictEqual(
         sent,
-        ["ArrowRight"],
-        "forward from the cover is one page"
+        [],
+        "and the lightbox is not driven to get there: its pages are this plugin's"
       );
       assert.strictEqual(
         forwards.defaultPrevented,
         true,
-        "and the press is consumed: this plugin decides where the lightbox goes"
+        "and the press is consumed, so Stash's own handler does not take it too"
       );
       assert.strictEqual(forwards.propagationStopped, true);
 
-      // A screen is two pages, and the lightbox moves one page per press — so the
-      // second press waits for the first to land rather than being sent with it.
-      // Stash drops a press that arrives while a page is still swapping, which is
-      // what "the arrows are sometimes wrong" was.
-      box.move(2);
-      dom.flush();
-      sent.length = 0;
-      press("ArrowRight");
-      assert.deepStrictEqual(
-        sent,
-        ["ArrowRight"],
-        "the press that starts a two-page move"
-      );
-
-      // The lightbox lands on the page it was sent to, and the reader carries on.
-      box.move(3);
-      dom.flush();
-      assert.deepStrictEqual(
-        sent,
-        ["ArrowRight", "ArrowRight"],
-        "and the one that finishes it, once the lightbox has said it landed"
-      );
-
-      box.move(3);
-      dom.flush();
-      sent.length = 0;
-      press("ArrowRight");
-      assert.deepStrictEqual(
-        sent,
-        ["ArrowRight"],
-        "from the second page of a pair, the next screen is a single page on"
-      );
-
-      box.move(2);
-      dom.flush();
       sent.length = 0;
       press("ArrowLeft");
       assert.deepStrictEqual(
-        sent,
-        ["ArrowLeft"],
-        "backwards is one page, to the cover"
+        drawn(),
+        ["/image/401/image"],
+        "backwards is a screen too, back to the cover"
       );
+      assert.deepStrictEqual(sent, [], "and still nothing is sent");
 
       // The end of the book is left to Stash, which does nothing with it either:
       // consuming the press would only be a lie about having moved.
-      box.move(5);
-      dom.flush();
+      turn(box, 3);
       sent.length = 0;
       const pastTheEnd = press("ArrowRight");
       assert.deepStrictEqual(sent, [], "nothing to move on to");
       assert.strictEqual(pastTheEnd.defaultPrevented, false);
 
-      // A key press this plugin did not make passes straight through to the
-      // lightbox — if its own handler took these, every step would double.
+      // A key press this plugin did not make passes straight through to the lightbox —
+      // if its own handler took these, every step would double.
       sent.length = 0;
       dom.document.dispatchEvent(
         dom.makeEvent("keydown", { key: "ArrowRight", isTrusted: false })
       );
-      assert.deepStrictEqual(sent, ["ArrowRight"]);
-
-      // Keys that are not a page turn are none of this plugin's business.
-      sent.length = 0;
-      const other = press("Escape");
-      assert.deepStrictEqual(sent, [], "Escape is left alone");
-      assert.strictEqual(other.defaultPrevented, false);
+      assert.deepStrictEqual(
+        sent,
+        ["ArrowRight"],
+        "an untrusted press is not ours"
+      );
 
       stopReader(box);
     }
@@ -1520,8 +1491,7 @@ async function main() {
       // so a press here is still the reader's. Treating every `<input>` as a field
       // that owns the arrows meant these went past the reader to Stash's own handler,
       // a page at a time: "it only happens while the menu is open".
-      box.move(2);
-      dom.flush();
+      turn(box);
       sent.length = 0;
       const onSwitch = keyTo(input, "ArrowRight");
       assert.strictEqual(
@@ -1530,9 +1500,14 @@ async function main() {
         "a press with the switch focused is the reader's"
       );
       assert.deepStrictEqual(
+        drawn(),
+        ["/image/404/image", "/image/405/image"],
+        "…and it turns the reader by a screen like any other"
+      );
+      assert.deepStrictEqual(
         sent,
-        ["ArrowRight"],
-        "…and it starts a screen-sized move like any other"
+        [],
+        "…without sending anything to the lightbox, since nothing needs it to move"
       );
 
       // A text field is a different matter: the arrows are its own, and the plugin
@@ -1547,8 +1522,8 @@ async function main() {
       );
       assert.deepStrictEqual(
         sent,
-        ["ArrowRight"],
-        "…and nothing is sent for it"
+        [],
+        "…and nothing is sent for it either: the lightbox is not what moves"
       );
 
       stopReader(box);
@@ -1562,11 +1537,9 @@ async function main() {
       const sent = [];
       dom.document.addEventListener("keydown", (event) => sent.push(event.key));
 
-      // Page 2 is the first of the pair 402+403, so a turn is two pages: Stash's own
-      // handler would move one, which is the same screen, and the reader would see
-      // nothing happen.
-      box.move(2);
-      dom.flush();
+      // The pair 402+403 is the second screen, so a click on Stash's chevron is a turn
+      // — where Stash's own handler would move one page, which is the same screen and
+      // would look like nothing happening.
       sent.length = 0;
       const click = dom.click(box.navRight);
       assert.strictEqual(
@@ -1580,21 +1553,16 @@ async function main() {
         "…and Stash's own button never sees it"
       );
       assert.deepStrictEqual(
-        sent,
-        ["ArrowRight"],
-        "the first of the two presses"
+        drawn(),
+        ["/image/402/image", "/image/403/image"],
+        "and it turned a screen, not a page"
       );
-
-      box.move(3);
-      dom.flush();
       assert.deepStrictEqual(
         sent,
-        ["ArrowRight", "ArrowRight"],
-        "and the second, once the lightbox has said it landed"
+        [],
+        "…without driving the lightbox to do it"
       );
 
-      box.move(3);
-      dom.flush();
       sent.length = 0;
       const back = dom.click(box.navLeft);
       assert.strictEqual(
@@ -1602,11 +1570,7 @@ async function main() {
         true,
         "the other chevron is the same"
       );
-      assert.deepStrictEqual(
-        sent,
-        ["ArrowLeft"],
-        "and goes back the way it came"
-      );
+      assert.deepStrictEqual(sent, [], "and it drives nothing either");
 
       stopReader(box);
     }
@@ -1627,26 +1591,27 @@ async function main() {
         page().offsetWidth = 100;
       };
 
-      box.move(2);
-      dom.flush();
       laidOut();
       sent.length = 0;
       const forward = dom.click(page(), { offsetX: 80 });
       assert.deepStrictEqual(
-        sent,
-        ["ArrowRight"],
+        drawn(),
+        ["/image/402/image", "/image/403/image"],
         "the right half of a page goes forward, like Stash's own image click"
       );
       assert.strictEqual(forward.propagationStopped, true);
+      assert.deepStrictEqual(
+        sent,
+        [],
+        "and the lightbox is not driven to do it"
+      );
 
-      box.move(2);
-      dom.flush();
       laidOut();
       sent.length = 0;
       dom.click(page(), { offsetX: 10 });
       assert.deepStrictEqual(
-        sent,
-        ["ArrowLeft"],
+        drawn(),
+        ["/image/401/image"],
         "and the left half goes back"
       );
 
@@ -1881,33 +1846,6 @@ async function main() {
       stopReader(again.box);
     }
   );
-
-  await runSection("a press the lightbox drops is sent again", async () => {
-    // Stash ignores an arrow that arrives while the page before it is still
-    // swapping, and a dropped press changes nothing — so nothing but a clock can
-    // notice it. This is that clock: the press is sent again, and the move finishes.
-    const { box } = await startReader({ galleryId: "8", on: true });
-
-    const sent = [];
-    dom.document.addEventListener("keydown", (event) => sent.push(event.key));
-
-    box.move(2);
-    dom.flush();
-    sent.length = 0;
-    press("ArrowRight");
-    assert.deepStrictEqual(sent, ["ArrowRight"], "the first press");
-
-    // This time the lightbox does not move: the press went nowhere, so the wait
-    // ends with it being sent again.
-    await new Promise((resolve) => setTimeout(resolve, 160));
-    assert.deepStrictEqual(
-      sent,
-      ["ArrowRight", "ArrowRight"],
-      "and the same press again, after waiting for it to land"
-    );
-
-    stopReader(box);
-  });
 
   await runSection(
     "turning the switch off puts the lightbox back",

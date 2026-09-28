@@ -29,12 +29,7 @@ import { stringFor } from "../i18n";
 // tools half writes, under the same names, through the same helpers.
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
-import {
-  type ChromeState,
-  ensureChrome,
-  forgetOpenMenu,
-  removeChrome,
-} from "./chrome";
+import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
 import {
   type MangaReaderChapter,
@@ -65,9 +60,7 @@ import {
   lightboxIsLoading,
   galleryIdFromPath,
   lightboxOrder,
-  pressArrow,
   pressEscape,
-  readPosition,
 } from "./stash-lightbox";
 
 /**
@@ -212,7 +205,6 @@ let handedFor: { lightbox: Element; gallery: string } | null = null;
  * -1 until the gallery is read and the lightbox has said which image it is showing.
  */
 let place = -1;
-let attempts = 0;
 
 // ── The loop ───────────────────────────────────────────────────────
 
