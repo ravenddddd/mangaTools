@@ -243,6 +243,16 @@ const stamped = (id, width, height, t) => ({
 const shape = (screens) =>
   screens.map((s) => s.pages.map((p) => p.id).join("+"));
 
+/**
+ * An image as Stash's API answers for one: a title it may or may not have, and the
+ * file it is, which is what its lightbox falls back to when the title is empty.
+ */
+const named = (id, title, path) => ({
+  ...image(id, 1000, 1500),
+  title,
+  visual_files: [{ __typename: "ImageFile", path, width: 1000, height: 1500 }],
+});
+
 /** Pages a, b, c, … */
 const pagesOf = (...ids) => ids.map((id) => page(String(id)));
 
@@ -570,9 +580,18 @@ state.galleries["22"] = ORDER_GALLERY;
 state.galleries["23"] = ORDER_GALLERY;
 state.galleries["31"] = OWN_CHAPTERS;
 state.galleries["32"] = STASH_CHAPTERS;
+/** Two named images, for the fields Stash's lightbox names an image by */
+const NAMED_GALLERY = {
+  images: [
+    named("901", "第二話", "/manga/author/002.jpg"),
+    named("902", "", "/manga/author/003.jpg"),
+  ],
+};
+
 state.galleries["41"] = OWN_CHAPTERS;
 state.galleries["42"] = OWN_CHAPTERS;
 state.galleries["43"] = OWN_CHAPTERS;
+state.galleries["51"] = NAMED_GALLERY;
 
 // ── Sections ───────────────────────────────────────────────────────
 
@@ -2200,6 +2219,40 @@ async function main() {
           ["第一話", 5],
         ],
         "a gallery still on Stash's numbers is handed over in the order it is read"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "the images carry what Stash names them by, and it does the naming",
+    async () => {
+      shown.length = 0;
+      mountBridge();
+      const { box } = await startReader({
+        galleryId: "51",
+        on: true,
+        total: 2,
+        search: "?sortby=title&perPage=500",
+      });
+
+      const [first, second] = shown[0].props.images;
+      assert.strictEqual(
+        first.title,
+        "第二話",
+        "a title comes through as it is"
+      );
+      assert.strictEqual(
+        first.visual_files[0].path,
+        "/manga/author/002.jpg",
+        "…and so does the file it is"
+      );
+      assert.strictEqual(second.title, "", "an image with no title has none");
+      assert.strictEqual(
+        second.visual_files[0].path,
+        "/manga/author/003.jpg",
+        "…and still says which file it is, which is what Stash shows instead"
       );
 
       stopReader(box);

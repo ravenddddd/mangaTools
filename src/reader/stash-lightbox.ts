@@ -213,12 +213,15 @@ export const GALLERY_QUERY_TEXT = [
   "  ) {",
   "    images {",
   "      id",
+  "      title",
   "      visual_files {",
   "        __typename",
   "        ... on VideoFile {",
+  "          path",
   "          video_codec",
   "        }",
   "        ... on ImageFile {",
+  "          path",
   "          width",
   "          height",
   "        }",
@@ -294,8 +297,10 @@ interface GalleryPayload {
   pages?: {
     images?: Array<{
       id: string;
+      title?: string;
       visual_files?: Array<{
         __typename?: string;
+        path?: string;
         video_codec?: string;
         width?: number;
         height?: number;
@@ -307,13 +312,22 @@ interface GalleryPayload {
   byPath?: { images?: Array<{ id: string }> };
 }
 
-/** An image as Stash's lightbox reads one — see the bridge and the takeover. */
+/**
+ * An image as Stash's lightbox reads one — see the bridge and the takeover.
+ *
+ * The fields are Stash's own, and the ones that matter beyond drawing are the two
+ * its display reads: `title`, and the `path` it falls back to when there is no
+ * title — `imageTitle` in `src/core/files.ts` is title-else-filename, and it says
+ * "No File Name" only when there is no path at all. Handing over an image without
+ * one is a lightbox that cannot name what it is showing.
+ */
 export interface LightboxImage {
   id: string;
   title: string;
   paths: { image: string };
   visual_files: Array<{
     __typename: string;
+    path: string;
     video_codec?: string;
     width: number;
     height: number;
@@ -409,17 +423,24 @@ export async function fetchGallery(
     const sized = files.find(
       (f) => typeof f?.width === "number" && typeof f?.height === "number"
     );
+    // A file with no size still names the image, so the name comes from whichever
+    // file the API listed first, not from the one that was measured.
+    const file = files[0];
 
     return {
       id: String(image.id),
-      // Stash shows this nowhere this plugin can see, but the shape is Stash's and
-      // an image without a title is the ordinary case rather than a missing field.
-      title: "",
+      // Passed through as it came: Stash's lightbox shows a title when there is one
+      // and the file's name when there is not, and telling it which is which is the
+      // whole of this plugin's part in that.
+      title: String(image.title ?? ""),
       paths: { image: image.paths?.image || "" },
       visual_files: [
         {
-          __typename: String(sized?.__typename || "ImageFile"),
-          video_codec: sized?.video_codec,
+          __typename: String(
+            sized?.__typename || file?.__typename || "ImageFile"
+          ),
+          path: String(sized?.path ?? file?.path ?? ""),
+          video_codec: sized?.video_codec ?? file?.video_codec,
           width: sized?.width || 0,
           height: sized?.height || 0,
         },
