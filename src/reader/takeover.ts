@@ -35,7 +35,7 @@ import {
   parseChapters,
   placeChapters,
 } from "./chapters";
-import { NR } from "./namespace";
+import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderGallery, MangaReaderSettings } from "./namespace";
 import {
   FADE_MAX_MS,
@@ -48,6 +48,7 @@ import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import { layout, screenAt, stepsToAdjacent } from "./spreads";
 import {
   CLASS_NAVBUTTON,
+  carouselImage,
   SELECTOR_DISPLAY,
   SELECTOR_HEADER_LEFT_SPACER,
   SELECTOR_LIGHTBOX,
@@ -170,6 +171,16 @@ let logged = false;
  */
 let clickRoot: Element | null = null;
 
+/**
+ * The gallery whose pages are on their way, if any.
+ *
+ * `loadGallery` is called from every pass over the document, and the answer takes
+ * a round trip — during which any DOM change runs another pass, finds no gallery
+ * in hand, and asks again. One fetch per opening is what it should be, so the
+ * gallery being fetched is remembered and a second ask for it is dropped.
+ */
+let pending: string | null = null;
+
 /** This plugin's chapter menu, while it is on screen */
 let chaptersHost: HTMLElement | null = null;
 /** The gallery its list was built for, so it is rebuilt when another is opened */
@@ -279,13 +290,22 @@ function loadGallery(id: string): void {
     return;
   }
 
+  if (pending === id) return;
+
   const forLightbox = root;
+  if (!forLightbox) return;
+  pending = id;
 
   // Read here rather than remembered: the order belongs to the list the lightbox
   // was opened from, and opening another gallery — or the same one after changing
   // the list's sort — is a different order. See lightboxOrder.
-  fetchGallery(id, lightboxOrder(window.location.search))
+  loadPages(id, lightboxOrder(window.location.search), forLightbox)
     .then((answer) => {
+      // Another gallery was asked for while this was in flight: its answer is the
+      // one that matters, and this one must not be drawn over it.
+      if (pending !== id) return;
+      pending = null;
+
       // The lightbox can have been closed — or another opened — while that was in
       // flight, and an answer for the previous one must not be drawn over this one.
       if (root !== forLightbox) return;
@@ -303,6 +323,7 @@ function loadGallery(id: string): void {
       step();
     })
     .catch((e) => {
+      if (pending === id) pending = null;
       console.error(
         "[mangaReader] could not read this gallery's pages, turning the spread " +
           "view off:",
@@ -310,6 +331,58 @@ function loadGallery(id: string): void {
       );
       deactivate();
     });
+}
+
+/**
+ * The gallery's pages, in the order the lightbox is actually showing them.
+ *
+ * The order is *guessed* from the URL, and the URL is not always right: Stash's
+ * gallery page keeps its inner tabs in component state, so switching from the
+ * Images tab to the Chapters tab leaves `?sortby=title` in the address bar while
+ * the lightbox that tab opens is Stash's own, and always path. Fetching a
+ * title-ordered list for a path-ordered lightbox pairs the wrong pages and puts
+ * every index this plugin computes off by however much the two orders disagree.
+ *
+ * So the guess is checked against the one thing that cannot be wrong — the image
+ * actually on screen — and a list that disagrees is thrown away and asked for
+ * again in path order, which is what the lightbox is in when the URL's order is
+ * not it. If that disagrees too, nothing here fits and the caller is told so
+ * rather than drawing pages that do not match the lightbox.
+ *
+ * A lightbox whose carousel cannot be read concludes nothing: the check is skipped
+ * and the guess stands, because a reader that cannot verify an assumption is not
+ * entitled to fail on it either.
+ */
+async function loadPages(
+  id: string,
+  order: MangaReaderOrder,
+  lightbox: Element
+): Promise<GalleryAnswer> {
+  const answer = await fetchGallery(id, order);
+
+  const shown = carouselImage(lightbox);
+  if (!shown || answer.pages[shown.at]?.id === shown.id) return answer;
+
+  if (order.sort === "path") {
+    throw new Error(
+      "[mangaReader] the lightbox is showing image " +
+        shown.id +
+        " where a path-ordered list has " +
+        (answer.pages[shown.at]?.id ?? "nothing") +
+        " — the list behind it is filtered, so its pages cannot be paired"
+    );
+  }
+
+  const fallback = await fetchGallery(id, { sort: "path", direction: "ASC" });
+  const still = carouselImage(lightbox);
+  if (still && fallback.pages[still.at]?.id !== still.id) {
+    throw new Error(
+      "[mangaReader] the pages could not be matched to the lightbox in either " +
+        "order, so the spread view would pair the wrong ones"
+    );
+  }
+
+  return fallback;
 }
 
 /**

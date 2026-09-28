@@ -258,6 +258,48 @@ let galleryQuery: unknown = null;
 
 /** What the gallery query returns, as far as this plugin cares */
 /**
+ * Where the lightbox is and which image is there, read from its carousel.
+ *
+ * The carousel is not a library: Stash renders one child per image and slides them
+ * by setting the container's `left` to `-N * 100vw`, so both the index and the
+ * image at it are readable — the child at that offset is the one that was given an
+ * `<img>` (only the current image and its neighbours are rendered).
+ *
+ * This is what makes it possible to check that a list fetched from a *guess* about
+ * the order is the order actually on screen. The guess comes from the URL, and the
+ * URL is not always right: Stash's gallery page keeps its inner tabs in component
+ * state, so switching from the Images tab to the Chapters tab leaves
+ * `?sortby=title` in the address bar while the lightbox that tab opens is Stash's
+ * own, and always path.
+ *
+ * Null when any of it cannot be read — no carousel, a `left` that is not the shape
+ * expected, nothing rendered where the offset points. A reader that cannot tell
+ * which image it is looking at does not get to conclude anything from it.
+ */
+export function carouselImage(
+  lightbox: Element
+): { at: number; id: string } | null {
+  const carousel = lightbox.querySelector(
+    SELECTOR_CAROUSEL
+  ) as HTMLElement | null;
+  if (!carousel) return null;
+
+  const offset = /^(-?\d+(?:\.\d+)?)vw$/.exec(carousel.style?.left || "");
+  if (!offset) return null;
+
+  const at = Math.round(-Number(offset[1]) / 100);
+  if (!Number.isFinite(at) || at < 0) return null;
+
+  const slide = carousel.children[at];
+  const media = slide?.querySelector("img") || slide?.querySelector("video");
+  const src = (media as HTMLImageElement | HTMLVideoElement | null)?.src || "";
+  const id = /\/image\/([^/]+)\//.exec(src)?.[1];
+  if (!id) return null;
+
+  return { at, id };
+}
+
+/**
  * Where the strip of thumbnails starts, how long it is, and which one is current.
  *
  * The strip is one thumbnail per image the lightbox is *holding* — the page it
@@ -449,6 +491,7 @@ export async function fetchGallery(
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
 NR.lightboxOrder = lightboxOrder;
+NR.carouselImage = carouselImage;
 NR.readStrip = readStrip;
 NR.clickStrip = clickStrip;
 NR.hasOwnChapterMenu = hasOwnChapterMenu;

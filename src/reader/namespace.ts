@@ -90,6 +90,12 @@ export interface MangaReaderNamespace {
   galleryIdFromPath(pathname: string): string | null;
   /** The order the lightbox is showing its images in, read from the URL */
   lightboxOrder(search: string): MangaReaderOrder;
+  /**
+   * Where the lightbox is and which image is there, read from its carousel — see
+   * carouselImage, which is also how a fetched order is checked against what is on
+   * screen.
+   */
+  carouselImage(lightbox: Element): { at: number; id: string } | null;
   /** The thumbnails the lightbox is holding, and which of them is current */
   readStrip(lightbox: Element): MangaReaderStrip | null;
   /** Goes straight to an image by clicking its thumbnail, if it is held */

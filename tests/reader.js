@@ -38,10 +38,18 @@ const client = {
     if (state.failing) return Promise.reject(new Error("no answer from Stash"));
 
     const gallery = state.galleries[variables.galleryId] || { images: [] };
+    // Answered by the sort that was asked for, as Stash does — a stub that gave the
+    // same list whatever it was asked for could not tell a reader that follows the
+    // lightbox's order from one that ignores it. Fixtures without a path order are
+    // the same list either way.
+    const pages =
+      variables.sort === "path" && gallery.pathImages
+        ? gallery.pathImages
+        : gallery.images;
     return Promise.resolve({
       data: {
         configuration: { interface: { language: state.language } },
-        pages: { images: gallery.images },
+        pages: { images: pages },
         // The gallery itself: this plugin's own custom fields, and Stash's own
         // chapters. A fixture that says nothing about either gets the empty
         // answer, which is a gallery with no chapters at all.
@@ -206,7 +214,7 @@ const pagesOf = (...ids) => ids.map((id) => page(String(id)));
  * A lightbox, built the way Stash's is: a display area holding a carousel, and a
  * header holding the counter that says where it is.
  */
-function buildLightbox(current = 1, total = 5) {
+function buildLightbox(current = 1, total = 5, ids = null) {
   const lightbox = dom.makeElement("div");
   lightbox.className = "Lightbox";
 
@@ -229,6 +237,33 @@ function buildLightbox(current = 1, total = 5) {
 
   const carousel = dom.makeElement("div");
   carousel.className = "Lightbox-carousel";
+
+  // Stash renders one child per image and slides the whole container by setting
+  // its `left`; only the current image and its neighbours are given an `<img>`.
+  // That is where `carouselImage` reads the order check from — and a lightbox built
+  // without ids is one whose carousel says nothing, which is the case the check is
+  // skipped in.
+  const slides = [];
+  const paint = (at) => {
+    carousel.style.left = `${(at - 1) * -100}vw`;
+    slides.forEach((slide, i) => {
+      slide.textContent = "";
+      if (!ids || Math.abs(i - (at - 1)) > 1) return;
+      const img = dom.makeElement("img");
+      img.src = `/image/${ids[i]}/image?t=1`;
+      slide.appendChild(img);
+    });
+  };
+  if (ids) {
+    for (let i = 0; i < total; i++) {
+      const slide = dom.makeElement("div");
+      slide.className = "Lightbox-carousel-image";
+      carousel.appendChild(slide);
+      slides.push(slide);
+    }
+    paint(current);
+  }
+
   display.appendChild(navLeft);
   display.appendChild(carousel);
   display.appendChild(navRight);
@@ -314,6 +349,7 @@ function buildLightbox(current = 1, total = 5) {
     /** What a reader sees as the lightbox moves — Stash rewrites this text */
     move: (at) => {
       counter.textContent = `${at} / ${total}`;
+      paint(at);
     },
     openPopover: () => {
       // Stash unmounts the popover when it closes and builds a new one next time,
@@ -474,6 +510,9 @@ state.galleries["22"] = ORDER_GALLERY;
 state.galleries["23"] = ORDER_GALLERY;
 state.galleries["31"] = OWN_CHAPTERS;
 state.galleries["32"] = STASH_CHAPTERS;
+state.galleries["41"] = OWN_CHAPTERS;
+state.galleries["42"] = OWN_CHAPTERS;
+state.galleries["43"] = OWN_CHAPTERS;
 
 // ── Sections ───────────────────────────────────────────────────────
 
@@ -740,6 +779,7 @@ async function main() {
       language = null,
       counterText,
       search = "",
+      ids = null,
     } = options || {};
 
     for (const child of dom.body.children.slice()) child.remove();
@@ -751,7 +791,7 @@ async function main() {
     state.language = language;
     dom.flush();
 
-    const box = buildLightbox(at, total);
+    const box = buildLightbox(at, total, ids);
     // Some lightboxes have no counter at all — Stash draws it only for more than one
     // image — and that has to be true before the mode is turned on, not after.
     if (counterText !== undefined) box.counter.textContent = counterText;
@@ -1027,6 +1067,96 @@ async function main() {
         "and the page being warmed is asked for with its own stamp"
       );
 
+      stopReader(box);
+    }
+  );
+
+  /**
+   * The order is guessed from the URL, and the URL is not always right — Stash's
+   * gallery page keeps its inner tabs in component state, so a lightbox opened
+   * from the Chapters tab is path-ordered while the address bar still says
+   * `?sortby=title` from the Images tab. A wrong guess pairs the wrong pages, so
+   * it is checked against the image actually on screen and thrown away if it does
+   * not match.
+   */
+  await runSection(
+    "a fetched order is checked against the lightbox, not trusted from the URL",
+    async () => {
+      const pathIds = CHAPTERS_PATH.map(String);
+      const titleIds = CHAPTERS_VIEW.map(String);
+
+      // The lightbox is showing path order; the URL claims title.
+      const before = imageQueries().length;
+      let { box } = await startReader({
+        galleryId: "41",
+        on: true,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: pathIds,
+      });
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(before)
+          .map((q) => q.variables.sort),
+        ["title", "path"],
+        "the order the URL named is asked for first, and path when it does not match"
+      );
+
+      // Two round trips, so one settle is not enough for the drawing to be there.
+      await settle();
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/708/image"],
+        "and the pages drawn are the ones the lightbox is actually showing"
+      );
+      stopReader(box);
+
+      // The lightbox is showing what the URL said — the ordinary case, and the one
+      // that must not cost a second fetch.
+      const agreed = imageQueries().length;
+      box = (
+        await startReader({
+          galleryId: "42",
+          on: true,
+          total: 8,
+          search: "?sortby=title&perPage=500",
+          ids: titleIds,
+        })
+      ).box;
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(agreed)
+          .map((q) => q.variables.sort),
+        ["title"],
+        "an order that matches is not asked for twice"
+      );
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/701/image"],
+        "and the drawing follows the list's order, as it did before"
+      );
+      stopReader(box);
+
+      // A carousel that cannot be read concludes nothing: the URL's order stands.
+      const unreadable = imageQueries().length;
+      box = (
+        await startReader({
+          galleryId: "43",
+          on: true,
+          total: 8,
+          search: "?sortby=title&perPage=500",
+        })
+      ).box;
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(unreadable)
+          .map((q) => q.variables.sort),
+        ["title"],
+        "with nothing to check against, the guess is not second-guessed"
+      );
       stopReader(box);
     }
   );
