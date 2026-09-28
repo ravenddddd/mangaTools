@@ -812,20 +812,27 @@ an ordinary thing to have: a cover, a divider, a page nobody has decided about
 yet. The button says so rather than guessing, which is how a page that still needs
 a chapter becomes visible.
 
-**The menu stands where Stash's own stands — and only when Stash's own is not
-there.** When it is, its numbers are right and this plugin adds nothing: anything
-it does not own is handed straight back. When it is not, the header carries this
-plugin's list, in the order the lightbox is showing. The button names the chapter
-the reader is in, or says that the page they are on is in none of them.
+**The menu is Stash's own.** Not a menu of this plugin's dressed up to look like
+one: the lightbox's own chapter control, in its own place, offering this plugin's
+chapters. What makes that possible is that both halves of Stash's rule are about
+the *numbers*, not the menu. It refuses to show chapters for a lightbox whose list
+is not in path order, because its chapter numbers count in path order and would
+point at the wrong images — so hand it a list **and** chapters numbered in that
+list, and its own menu is right in any order at all, and its own jump — `setIndex`,
+which lands instantly — is the jump.
 
-**A jump is a click on Stash's own thumbnail.** The nav strip along the bottom is
-one thumbnail per image the lightbox holds, and clicking one is Stash's own way of
-going straight to it — so a chapter three hundred pages away is one click, not
-three hundred presses of an arrow. A chapter the lightbox is *not* holding cannot
-be jumped to: that is a gallery with more images than the list behind the lightbox
-loaded at once, and the console says so rather than moving somewhere approximate.
+Which is what this plugin does, once the double-page mode is on and it has read
+the gallery: it hands the lightbox the images it is drawing and its own chapters,
+numbered by where each one begins on screen. The header's chapter name follows for
+free, since it reads the same list.
 
-**Nothing is written until you edit a gallery's chapters.** A gallery with no list
+**Only on a list it has checked.** The handover is skipped when the list is not the
+one the lightbox is showing — a filtered list behind it, say — because replacing a
+lightbox's images with a different set is not a takeover but a swap, and every
+number after the first difference would be wrong. A gallery whose pages could not
+be matched to what is on screen is not drawn at all, and nothing is handed over.
+
+**Nothing is written until you edit a gallery's chapters.****Nothing is written until you edit a gallery's chapters.** A gallery with no list
 of its own — which is every gallery to begin with, including the ones whose
 chapters you made by hand in Stash — is read from Stash's own numbers instead:
 Stash gives each chapter a start and nothing else, so its ranges (each chapter up
@@ -1300,13 +1307,14 @@ The reading half's own:
   the second time the menu is opened in a session.
 - **Reading progress is not tracked.** That needs a viewer of our own rather than a
   takeover of Stash's.
-- **A chapter cannot be jumped to from outside the loaded page.** The nav strip is
-  what a jump clicks, and it holds what the list behind the lightbox fetched — a
-  page's worth, unless the list is set to load the gallery whole. It is not a
-  limitation of the menu, which lists every chapter wherever it is.
 - **Chapters are read, not yet edited, from the lightbox.** The list this plugin
-  keeps is what the reader reads and falls back to; making one — a button that
-  says "this image starts a chapter" — is the next piece.
+  keeps is what the reader reads and hands over; making one — a button that says
+  "this image starts a chapter" — is the next piece.
+- **A page in no chapter is not marked as such.** Stash's own header names the last
+  chapter that began at or before where the reader is, which is what its numbers
+  mean, so a cover before the first chapter shows no name and a divider between two
+  shows the one before it. Saying "no chapter" would mean drawing a header of this
+  plugin's own, and the native one is worth more than the distinction.
 
 ## Extending
 

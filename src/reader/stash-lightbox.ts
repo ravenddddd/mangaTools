@@ -24,22 +24,6 @@ export const CLASS_CAROUSEL = "Lightbox-carousel";
 export const CLASS_INDICATOR = "Lightbox-header-indicator";
 export const CLASS_OPTIONS_ICON = "Lightbox-header-options-icon";
 export const CLASS_POPOVER_BODY = "popover-body";
-/**
- * Where Stash puts its chapter menu, and the menu itself.
- *
- * Read, never written: Stash draws its own there when it has chapters to show, and
- * *only* then — it hands the lightbox an empty list whenever the list behind it is
- * not sorted by path, because its chapter numbers count in path order and would
- * point at the wrong images. So the presence of this button is also the answer to
- * "is Stash's own chapter navigation on screen", which is what decides whether
- * this plugin adds its own.
- */
-export const CLASS_HEADER_LEFT_SPACER = "Lightbox-header-left-spacer";
-export const CLASS_CHAPTER_BUTTON = "Lightbox-header-chapter-button";
-/** The strip of thumbnails along the bottom, one per image the lightbox holds */
-export const CLASS_NAV = "Lightbox-nav";
-export const CLASS_NAV_IMAGE = "Lightbox-nav-image";
-export const CLASS_NAV_SELECTED = "Lightbox-nav-selected";
 
 /** The selectors, spelled once so a page of Stash's markup is read the same way everywhere */
 export const SELECTOR_LIGHTBOX = ".Lightbox";
@@ -48,9 +32,6 @@ export const SELECTOR_CAROUSEL = ".Lightbox-carousel";
 export const SELECTOR_INDICATOR = ".Lightbox-header-indicator";
 export const SELECTOR_OPTIONS_ICON = ".Lightbox-header-options-icon";
 export const SELECTOR_POPOVER_BODY = ".popover .popover-body";
-export const SELECTOR_HEADER_LEFT_SPACER = ".Lightbox-header-left-spacer";
-export const SELECTOR_CHAPTER_BUTTON = ".Lightbox-header-chapter-button";
-export const SELECTOR_NAV = ".Lightbox-nav";
 
 /**
  * Stash's own next/previous buttons, the chevrons either side of the image.
@@ -233,6 +214,10 @@ export const GALLERY_QUERY_TEXT = [
   "    images {",
   "      id",
   "      visual_files {",
+  "        __typename",
+  "        ... on VideoFile {",
+  "          video_codec",
+  "        }",
   "        ... on ImageFile {",
   "          width",
   "          height",
@@ -299,90 +284,6 @@ export function carouselImage(
   return { at, id };
 }
 
-/**
- * Where the strip of thumbnails starts, how long it is, and which one is current.
- *
- * The strip is one thumbnail per image the lightbox is *holding* — the page it
- * fetched, not the whole gallery — and clicking one is Stash's own way of going
- * straight to an image: `selectIndex(index)` in its lightbox, which is the one
- * thing here that reaches the index directly rather than by pressing an arrow.
- * That is what makes a chapter jump one click instead of three hundred.
- *
- * All three numbers are 0-based, against the strip. `start` is the global index of
- * its first thumbnail, worked out from the header's own count of where the
- * lightbox is: the counter says which image is current, and the selected thumbnail
- * says how far into the strip that is.
- */
-/** The thumbnails the lightbox is holding, or null when it is not holding any */
-export function readStrip(lightbox: Element): MangaReaderStrip | null {
-  const thumbs = stripThumbs(lightbox);
-  if (!thumbs) return null;
-
-  const selected = thumbs.findIndex((thumb) =>
-    thumb.classList.contains(CLASS_NAV_SELECTED)
-  );
-  if (selected < 0) return null;
-
-  const position = readPosition(lightbox);
-  if (!position) return null;
-
-  // The counter is 1-based and global; the strip is 0-based and local.
-  const start = position.current - 1 - selected;
-  if (start < 0) return null;
-
-  return { start, count: thumbs.length, selected };
-}
-
-/**
- * Goes straight to an image by clicking its thumbnail, if the lightbox is holding
- * it. False when it is not — a target on a page the lightbox has not fetched, which
- * is a jump this cannot make rather than one it should guess at.
- */
-export function clickStrip(lightbox: Element, index: number): boolean {
-  const strip = readStrip(lightbox);
-  if (!strip) return false;
-
-  const at = index - strip.start;
-  if (at < 0 || at >= strip.count) return false;
-
-  const thumb = stripThumbs(lightbox)?.[at];
-  if (!thumb) return false;
-
-  // A real click on Stash's own element, so its handler runs the way it would for
-  // a reader's click — no second idea of how the lightbox moves.
-  thumb.dispatchEvent(
-    new MouseEvent("click", { bubbles: true, cancelable: true })
-  );
-
-  return true;
-}
-
-/** The thumbnails, in the order the lightbox is holding them */
-function stripThumbs(lightbox: Element): Element[] | null {
-  const nav = lightbox.querySelector(SELECTOR_NAV);
-  if (!nav) return null;
-
-  // `children` and a class test rather than `querySelectorAll`: the stub the tests
-  // run against has no selector engine below the root, and this is the same answer
-  // without needing one.
-  const thumbs = Array.from(nav.children).filter((child) =>
-    child.classList.contains(CLASS_NAV_IMAGE)
-  );
-
-  return thumbs.length > 0 ? thumbs : null;
-}
-
-/**
- * Whether Stash's own chapter menu is on screen.
- *
- * Its absence is not a fault: it means the lightbox was handed an empty chapter
- * list, which Stash does whenever the list behind it is not in path order. See the
- * note on CLASS_CHAPTER_BUTTON.
- */
-export function hasOwnChapterMenu(lightbox: Element): boolean {
-  return lightbox.querySelector(SELECTOR_CHAPTER_BUTTON) !== null;
-}
-
 interface GalleryPayload {
   configuration?: { interface?: { language?: string } };
   findGallery?: {
@@ -393,7 +294,12 @@ interface GalleryPayload {
   pages?: {
     images?: Array<{
       id: string;
-      visual_files?: Array<{ width?: number; height?: number }>;
+      visual_files?: Array<{
+        __typename?: string;
+        video_codec?: string;
+        width?: number;
+        height?: number;
+      }>;
       paths?: { image?: string };
     }>;
   };
@@ -401,10 +307,31 @@ interface GalleryPayload {
   byPath?: { images?: Array<{ id: string }> };
 }
 
+/** An image as Stash's lightbox reads one — see the bridge and the takeover. */
+export interface LightboxImage {
+  id: string;
+  title: string;
+  paths: { image: string };
+  visual_files: Array<{
+    __typename: string;
+    video_codec?: string;
+    width: number;
+    height: number;
+  }>;
+}
+
 export interface GalleryAnswer {
   /** The interface language, or null when Stash did not say */
   language: string | null;
   pages: MangaReaderPage[];
+  /**
+   * The same images, in the same order, in the shape Stash's own lightbox reads.
+   *
+   * Built here rather than in the takeover because this is the file that knows
+   * what Stash's markup expects: `paths.image` is the picture, and `visual_files`
+   * is what tells a video from a still and gives the native size.
+   */
+  images: LightboxImage[];
   /** This gallery's custom fields, as Stash holds them */
   customFields: unknown;
   /** Stash's own chapters, in the shape its own field has */
@@ -477,9 +404,33 @@ export async function fetchGallery(
     };
   });
 
+  const images: LightboxImage[] = (data?.pages?.images || []).map((image) => {
+    const files = image.visual_files || [];
+    const sized = files.find(
+      (f) => typeof f?.width === "number" && typeof f?.height === "number"
+    );
+
+    return {
+      id: String(image.id),
+      // Stash shows this nowhere this plugin can see, but the shape is Stash's and
+      // an image without a title is the ordinary case rather than a missing field.
+      title: "",
+      paths: { image: image.paths?.image || "" },
+      visual_files: [
+        {
+          __typename: String(sized?.__typename || "ImageFile"),
+          video_codec: sized?.video_codec,
+          width: sized?.width || 0,
+          height: sized?.height || 0,
+        },
+      ],
+    };
+  });
+
   return {
     language: data?.configuration?.interface?.language || null,
     pages,
+    images,
     customFields: data?.findGallery?.custom_fields || {},
     stashChapters: data?.findGallery?.chapters || [],
     pathIds: pathIdsNeeded
@@ -492,6 +443,3 @@ NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
 NR.lightboxOrder = lightboxOrder;
 NR.carouselImage = carouselImage;
-NR.readStrip = readStrip;
-NR.clickStrip = clickStrip;
-NR.hasOwnChapterMenu = hasOwnChapterMenu;

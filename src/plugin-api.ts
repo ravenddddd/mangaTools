@@ -525,6 +525,37 @@ export type MangaToolsGql = (source: string) => unknown;
  */
 export type MangaToolsPatchFn = (...args: unknown[]) => unknown;
 
+/**
+ * A chapter as Stash's lightbox takes them: a name, and the number of the image it
+ * starts at.
+ *
+ * The number is an index into the images the lightbox was handed, one-based —
+ * which is what `gotoPage` counts in, and therefore what makes Stash's own chapter
+ * menu a jump this plugin can aim: see the bridge in the reader half.
+ */
+export interface MangaToolsChapterEntry {
+  id: string;
+  title: string;
+  image_index: number;
+}
+
+/**
+ * What `PluginApi.hooks.useLightbox` hands back: a function that sets the
+ * lightbox's own state.
+ *
+ * Only the parts this plugin sets are declared — the images it is to show, how
+ * they are counted, and how many there are. Everything it does not pass is left
+ * as it was.
+ */
+export type MangaToolsLightboxShow = (props: {
+  images?: unknown[];
+  pageSize?: number;
+  pages?: number;
+  totalCount?: number;
+  initialIndex?: number;
+  showNavigation?: boolean;
+}) => void;
+
 export interface IPluginApi {
   /**
    * Stash's own React. Typed as the module namespace rather than a hand-written
@@ -593,6 +624,18 @@ export interface IPluginApi {
 
   Event: {
     addEventListener(name: string, callback: (event: unknown) => void): void;
+  };
+
+  /**
+   * Stash's own hooks, for the one thing in either half that needs to be a React
+   * component: a handle on the lightbox, which is React state and reachable no
+   * other way. See the reader half's bridge.
+   */
+  hooks: {
+    useLightbox(
+      state?: unknown,
+      chapters?: MangaToolsChapterEntry[]
+    ): MangaToolsLightboxShow;
   };
 
   patch: {

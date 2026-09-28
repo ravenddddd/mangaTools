@@ -117,6 +117,16 @@ global.MouseEvent = function MouseEvent(type, init) {
  * The patches are inert and nothing here renders, so registering them is the
  * whole of what this world has to make possible.
  */
+/**
+ * What the bridge asks the lightbox to show, as the plugin asks it.
+ *
+ * The lightbox itself is a stub because there is none here: what is worth pinning
+ * is the *handover* — which images, which chapters, and the numbers that make
+ * Stash's own jump land where this plugin means it to.
+ */
+const shown = [];
+const patched = [];
+
 dom.window.PluginApi = {
   React: {
     Component: class {
@@ -125,8 +135,32 @@ dom.window.PluginApi = {
         this.state = {};
       }
     },
+    // Enough of React to run one component: elements built rather than rendered,
+    // hooks in call order, effects run when the component is called, and refs that
+    // hold what they were given.
+    Fragment: Symbol("Fragment"),
+    createElement: (type, props, ...children) => {
+      const next = Object.assign({}, props);
+      if (children.length === 1) next.children = children[0];
+      else if (children.length > 1) next.children = children;
+      return { type, props: next };
+    },
+    useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+    useEffect: (fn) => {
+      fn();
+    },
+    useRef: (init) => ({ current: init }),
   },
-  patch: { before: () => {}, instead: () => {}, after: () => {} },
+  hooks: {
+    useLightbox: (state, chapters) => (props) => {
+      shown.push({ props, chapters: (chapters || []).slice() });
+    },
+  },
+  patch: {
+    before: (target, fn) => patched.push({ target, fn }),
+    instead: (target, fn) => patched.push({ target, fn }),
+    after: (target, fn) => patched.push({ target, fn }),
+  },
   components: {},
   libraries: {
     Apollo: { gql: (text) => ({ __document: text }) },
@@ -367,6 +401,30 @@ function buildLightbox(current = 1, total = 5, ids = null) {
     close: () => lightbox.remove(),
   };
 }
+
+/**
+ * Mounts the bridge the plugin registered against Stash's image list.
+ *
+ * The plugin patches `ImageList` and puts a component beside its output; here the
+ * patch is called by hand, since this world has no React. What comes back is the
+ * element tree the patch would return, and the bridge is the function component in
+ * it — calling it is what a render does, and what publishes the handle the reader
+ * hands its chapters to.
+ */
+const mountBridge = () => {
+  const patch = patched.find((p) => p.target === "ImageList");
+  assert.ok(
+    patch,
+    "the plugin should patch the list a gallery's lightbox opens from"
+  );
+
+  const tree = patch.fn({}, "the list's own output");
+  const bridge = (tree.props?.children || []).find(
+    (child) => child && typeof child.type === "function"
+  );
+  assert.ok(bridge, "and render something beside it");
+  bridge.type(bridge.props);
+};
 
 /** The container this plugin draws in, if it is drawing */
 const container = () => dom.body.querySelector(".manga-reader-spread");
@@ -2044,158 +2102,75 @@ async function main() {
         "the list's own order does not decide — the screen does"
       );
 
-      // Which chapter a page is in, by what the chapter lists.
-      assert.strictEqual(
-        NR.chapterAt(placed, "704")?.title,
-        "開幕",
-        "a page its chapter lists is in it"
-      );
-      assert.strictEqual(
-        NR.chapterAt(placed, "703"),
-        null,
-        "a page no chapter lists is in none — between two chapters, or before the first"
-      );
-      assert.strictEqual(
-        NR.chapterAt(placed, "705")?.title,
-        "中盤",
-        "and the next chapter's own pages are its own"
-      );
-    }
-  );
-
-  await runSection(
-    "the chapter menu is this plugin's list, in the order being read",
-    async () => {
-      const { box, input } = await startReader({
-        galleryId: "31",
-        on: true,
-        total: 8,
-        search: "?sortby=title&perPage=500",
-      });
-
-      const menu = () => box.leftSpacer.querySelector(".manga-reader-chapters");
-      assert.ok(menu(), "the header carries a chapter menu");
-
-      const toggle = () =>
-        menu().querySelector(".manga-reader-chapters-toggle");
-      const items = () =>
-        menu().querySelector("." + "manga-reader-chapters-list").children;
-      assert.strictEqual(
-        toggle().textContent,
-        "No chapter",
-        "the first page is in no chapter, and the menu says so rather than guessing"
-      );
+      // What a chapter is placed at is the earliest page it lists, which is the
+      // page a jump to it should land on.
+      assert.strictEqual(placed[0].at, 1, "placed at its earliest page");
       assert.deepStrictEqual(
-        items().map((i) => i.textContent),
-        ["開幕", "中盤"],
-        "the list is the gallery's chapters"
+        placed[0].images,
+        ["704", "702"],
+        "…keeping the images it was given, in the order they were written"
       );
-      assert.ok(
-        !items().some((i) => i.classList.contains("active")),
-        "and none is marked while the reader is in none of them"
-      );
-
-      // The reader turns a page, and the menu follows — page by page, which is not
-      // the same as screen by screen: the mark follows the *lightbox*, and can move
-      // while the drawing does not. That is why the menu is updated before the
-      // drawing's own early return rather than after it.
-      box.move(3);
-      dom.flush();
-      assert.strictEqual(
-        toggle().textContent,
-        "開幕",
-        "the label follows the reader to the first chapter"
-      );
-      assert.ok(
-        items()[0].classList.contains("active"),
-        "and so does the mark"
-      );
-
-      box.move(5);
-      dom.flush();
-      assert.strictEqual(toggle().textContent, "中盤", "…and on to the next");
-      assert.ok(items()[1].classList.contains("active"), "…marking it instead");
-      assert.ok(
-        !items()[0].classList.contains("active"),
-        "…and only the current one"
-      );
-
-      // Opening and closing: the toggle shows the list, a click elsewhere in the
-      // lightbox puts it away.
-      const list = () => menu().querySelector(".manga-reader-chapters-list");
-      assert.ok(!list().classList.contains("show"), "the list starts closed");
-      dom.click(toggle());
-      assert.ok(list().classList.contains("show"), "the toggle opens it");
-      dom.click(box.counter);
-      assert.ok(!list().classList.contains("show"), "a click away closes it");
-
-      // The mode off, with the lightbox left open — the menu is the spread view's,
-      // and goes when it does. Leaving the lightbox open is the whole point of the
-      // check: closing it would take the menu away for a reason that has nothing to
-      // do with this.
-      dom.click(toggle());
-      dom.click(box.counter);
-      input.checked = false;
-      input.dispatch("change");
-      dom.flush();
-
-      assert.strictEqual(
-        menu(),
-        null,
-        "turning the mode off takes the menu with it"
-      );
-      assert.ok(
-        box.lightbox.parentNode,
-        "precondition: the lightbox is still open"
-      );
-
-      stopReader(box);
     }
   );
 
+  /**
+   * The handover: what the lightbox is given, and what it is not.
+   *
+   * This plugin does not draw a chapter menu of its own. Stash's own menu does the
+   * jumping — `gotoPage`, which is an instant `setIndex` — and the only thing it
+   * refuses is a list not in path order, because its chapter numbers count in path
+   * order. Hand it this plugin's list *and* chapters numbered in that list, and its
+   * own menu is right in any order. So what these sections pin is the handover
+   * itself: the images, the chapters, and the numbers that make the jump land.
+   */
   await runSection(
-    "a chapter jump is a click on Stash's own thumbnail",
+    "the lightbox is handed this plugin's own chapters",
     async () => {
+      mountBridge();
       const { box } = await startReader({
         galleryId: "31",
         on: true,
         total: 8,
         search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
       });
 
-      const items = () =>
-        box.leftSpacer.querySelector(".manga-reader-chapters-list").children;
-
       assert.strictEqual(
-        box.thumbs.filter((t) => t.classList.contains("Lightbox-nav-selected"))
-          .length,
+        shown.length,
         1,
-        "precondition: the lightbox is holding the gallery, on one of its images"
+        "the lightbox was handed a list, once"
       );
+      const { props, chapters } = shown[0];
 
-      dom.click(items()[1]);
       assert.strictEqual(
-        box.thumbs[4].classList.contains("Lightbox-nav-selected"),
-        true,
-        "the chapter's own image was the one asked for"
+        props.images.length,
+        8,
+        "the images are the ones the reader drew"
       );
-      assert.strictEqual(
-        box.counter.textContent,
-        "5 / 8",
-        "…by Stash's own count, since the click is Stash's own"
-      );
-
-      dom.flush();
       assert.deepStrictEqual(
-        drawn(),
-        ["/image/704/image", "/image/705/image"],
-        "and the screen follows the lightbox, as it does after any move"
+        props.images.map((i) => i.id),
+        CHAPTERS_VIEW.map(String),
+        "in the order it drew them"
       );
       assert.ok(
-        !box.leftSpacer
-          .querySelector(".manga-reader-chapters-list")
-          .classList.contains("show"),
-        "the list closes behind the jump"
+        typeof props.images[0].paths.image === "string" &&
+          props.images[0].visual_files[0].width === 1000,
+        "each in the shape Stash's lightbox reads: a picture URL and a native size"
+      );
+      assert.strictEqual(props.totalCount, 8, "counted as the lightbox counts");
+      assert.strictEqual(
+        props.pageSize,
+        8,
+        "one page of everything, so it never asks for another"
+      );
+
+      assert.deepStrictEqual(
+        chapters,
+        [
+          { id: "plugin.mangaTools.chapter.0", title: "開幕", image_index: 3 },
+          { id: "plugin.mangaTools.chapter.1", title: "中盤", image_index: 5 },
+        ],
+        "and the chapters, numbered by where each one begins on screen"
       );
 
       stopReader(box);
@@ -2203,84 +2178,52 @@ async function main() {
   );
 
   await runSection(
-    "a chapter the lightbox is not holding is not jumped to",
+    "Stash's own chapters are handed over in the order on screen",
     async () => {
-      const { box } = await startReader({
-        galleryId: "31",
-        on: true,
-        total: 8,
-        search: "?sortby=title&perPage=500",
-      });
-
-      // A lightbox holding one page of a bigger gallery — the list behind it was
-      // not loaded whole, which is the one case a jump cannot be made from. Its
-      // counter keeps counting the whole gallery, as Stash's does: what is short is
-      // the strip, not the number the header reports.
-      box.setThumbs(3, 0);
-      const at = loggedErrors.length;
-
-      dom.click(
-        box.leftSpacer.querySelector(".manga-reader-chapters-list").children[1]
-      );
-
-      assert.strictEqual(box.counter.textContent, "1 / 8", "nothing moved");
-      assert.ok(
-        errorsSince(at).some((line) => /not holding/.test(line)),
-        "and the reader is told why rather than left wondering"
-      );
-
-      stopReader(box);
-    }
-  );
-
-  await runSection("Stash's own chapter menu is left alone", async () => {
-    const { box } = await startReader({
-      galleryId: "31",
-      on: true,
-      total: 8,
-      search: "?sortby=title&perPage=500",
-    });
-    assert.ok(
-      box.leftSpacer.querySelector(".manga-reader-chapters"),
-      "precondition: this plugin's menu is there when Stash has none"
-    );
-
-    // Now Stash draws its own — which it does exactly when the list behind the
-    // lightbox is in path order, and its numbers mean what they say.
-    box.chapterButton();
-    dom.flush();
-
-    assert.strictEqual(
-      box.leftSpacer.querySelector(".manga-reader-chapters"),
-      null,
-      "and stands down rather than drawing a second one"
-    );
-
-    stopReader(box);
-  });
-
-  await runSection(
-    "Stash's chapters are read as this plugin's, in view order",
-    async () => {
+      shown.length = 0;
+      mountBridge();
       const { box } = await startReader({
         galleryId: "32",
         on: true,
         total: 8,
         search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
       });
 
-      const items = box.leftSpacer.querySelector(
-        ".manga-reader-chapters-list"
-      ).children;
+      const { chapters } = shown[0];
       assert.deepStrictEqual(
-        items.map((i) => i.textContent),
-        ["第二話", "第一話"],
-        "a chapter starting at path position 1 is last on screen, and the list says so"
+        chapters.map((c) => [c.title, c.image_index]),
+        [
+          ["第二話", 1],
+          ["第一話", 5],
+        ],
+        "a gallery still on Stash's numbers is handed over in the order it is read"
       );
+
+      stopReader(box);
+    }
+  );
+
+  await runSection(
+    "a list that does not match the lightbox is not handed over",
+    async () => {
+      shown.length = 0;
+      mountBridge();
+      const { box } = await startReader({
+        galleryId: "31",
+        on: true,
+        // The lightbox says it is showing three images while the gallery has
+        // eight: a list behind it that is not the whole gallery, which is the one
+        // thing a handover would make worse rather than better.
+        total: 3,
+        search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
+      });
+
       assert.deepStrictEqual(
-        items.map((i) => i.dataset.at),
-        ["0", "4"],
-        "each carrying the position of its earliest image in this order"
+        shown,
+        [],
+        "nothing was handed over, so Stash's own menu — or none — stands"
       );
 
       stopReader(box);

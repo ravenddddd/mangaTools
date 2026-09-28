@@ -28,10 +28,10 @@ import { stringFor } from "../i18n";
 // The field plumbing both halves share: this one reads the same custom fields the
 // tools half writes, under the same names, through the same helpers.
 import { NS } from "../tools/fields";
+import { bridged, installBridge, takeOver } from "./bridge";
 import {
   type MangaReaderChapter,
   chaptersFromStash,
-  chapterAt,
   parseChapters,
   placeChapters,
 } from "./chapters";
@@ -48,16 +48,13 @@ import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import { layout, screenAt, stepsToAdjacent } from "./spreads";
 import {
   CLASS_NAVBUTTON,
-  carouselImage,
   SELECTOR_DISPLAY,
-  SELECTOR_HEADER_LEFT_SPACER,
   SELECTOR_LIGHTBOX,
   SELECTOR_POPOVER_BODY,
   type GalleryAnswer,
-  clickStrip,
+  carouselImage,
   fetchGallery,
   galleryIdFromPath,
-  hasOwnChapterMenu,
   lightboxOrder,
   pressArrow,
   pressEscape,
@@ -89,11 +86,6 @@ const FADE_ID = "manga-reader-fade";
 const OFFSET_ID = "manga-reader-offset";
 /** Class of the group holding them, so it can be found again */
 const CLASS_OPTIONS = "manga-reader-options";
-
-/** This plugin's chapter menu, in the header where Stash's own would be */
-const CLASS_CHAPTERS = "manga-reader-chapters";
-const CLASS_CHAPTERS_LIST = "manga-reader-chapters-list";
-const CLASS_CHAPTERS_TOGGLE = "manga-reader-chapters-toggle";
 
 /**
  * How many times the container may be put back before the plugin gives up.
@@ -180,15 +172,6 @@ let clickRoot: Element | null = null;
  * gallery being fetched is remembered and a second ask for it is dropped.
  */
 let pending: string | null = null;
-
-/** This plugin's chapter menu, while it is on screen */
-let chaptersHost: HTMLElement | null = null;
-/** The gallery its list was built for, so it is rebuilt when another is opened */
-let chaptersFor: string | null = null;
-/** The list's items, in order — kept rather than searched for. See buildChapterList */
-let chapterItems: HTMLElement[] = [];
-/** Whether the list is showing. The toggle is what changes it. */
-let chaptersOpen = false;
 
 /**
  * Where the lightbox is being moved to, while it is on the way there.
@@ -310,12 +293,17 @@ function loadGallery(id: string): void {
       // flight, and an answer for the previous one must not be drawn over this one.
       if (root !== forLightbox) return;
 
-      remember(id, {
+      const gallery: MangaReaderGallery = {
         id,
         pages: answer.pages,
         screens: layout(answer.pages, { ...settings, offset }),
         chapters: placeChapters(chaptersOf(answer), answer.pages),
-      });
+      };
+      remember(id, gallery);
+
+      // Stash's own chapter menu is the one that jumps — see handOverChapters for
+      // what it takes to make its numbers mean this plugin's chapters.
+      handOverChapters(forLightbox, gallery, answer);
 
       language = answer.language;
       galleryId = id;
@@ -454,11 +442,6 @@ function sync(lightbox: Element): void {
     return;
   }
 
-  // Before the early return, because the menu's own state — which chapter the
-  // reader is in — follows the lightbox rather than the drawing, and can change
-  // while the screen does not.
-  injectChapterMenu(lightbox, gallery, position.current - 1);
-
   if (
     at === shownAt &&
     container &&
@@ -486,16 +469,9 @@ function sync(lightbox: Element): void {
 function watchClicks(lightbox: Element): void {
   if (clickRoot === lightbox) return;
 
-  if (clickRoot) {
-    clickRoot.removeEventListener("click", onNavClick, true);
-    clickRoot.removeEventListener("click", onChapterMenuOutside, true);
-  }
+  if (clickRoot) clickRoot.removeEventListener("click", onNavClick, true);
 
   lightbox.addEventListener("click", onNavClick, true);
-  // The same capture listener the nav buttons are read with, for a click anywhere
-  // in the lightbox: a menu is closed by clicking away from it, and the lightbox is
-  // the whole of "away" here.
-  lightbox.addEventListener("click", onChapterMenuOutside, true);
   clickRoot = lightbox;
 }
 
@@ -859,8 +835,6 @@ function deactivate(): void {
     container = null;
   }
 
-  removeChapterMenu();
-
   if (root) {
     root.classList.remove(CLASS_ACTIVE);
     const display = root.querySelector(SELECTOR_DISPLAY) as HTMLElement | null;
@@ -882,206 +856,47 @@ function closeLightbox(): void {
   logged = false;
 }
 
-// ── The chapter menu in the lightbox's header ──────────────────────
+// ── The lightbox's chapters ────────────────────────────────────────
 
 /**
- * Puts this plugin's chapter menu where Stash's own would be, and keeps it current.
+ * Hands the lightbox this plugin's list, and its chapters with it.
  *
- * **Only when Stash's own is not there.** Its absence is not a fault: Stash hands
- * the lightbox an empty chapter list whenever the list behind it is not sorted by
- * path, because its chapter numbers count in path order and would point at the
- * wrong images — which is precisely the case this plugin's own list is for. When
- * Stash's own menu *is* on screen, its numbers are right, and this adds nothing:
- * anything it does not own is handed straight back.
+ * Stash shows a chapter menu of its own, and jumps with it — `gotoPage`, which is
+ * `setIndex` and lands instantly. What it will not do is show that menu for a
+ * lightbox whose list is not in path order, because its chapters' numbers count in
+ * path order and would point at the wrong images. Both halves of that are about
+ * the *numbers*, not the menu: hand it a list and a set of chapters whose numbers
+ * count in that list, and its own menu is right — in any order at all.
  *
- * Called from `sync`, once per change of position, so the label follows the reader
- * — and every write here is conditional on the value differing, because this runs
- * inside a MutationObserver: an unconditional write would be a change that causes
- * a change, which is a loop.
+ * Which is what this does. The images are the ones the reader draws, in the order
+ * it drew them; the chapters are the reader's, numbered by where each begins on
+ * screen. What appears is Stash's own chapter menu, in its own place, with this
+ * plugin's chapters in it, and clicking one is Stash's own instant jump.
+ *
+ * **Only on a list that has been verified**, and only when a bridge is mounted to
+ * receive it: a list that does not match what the lightbox is showing would not be
+ * a takeover but a swap to something else, and there is no bridge on a page with no
+ * list behind the lightbox — where Stash's own chapters are already there and
+ * already right.
  */
-function injectChapterMenu(
+function handOverChapters(
   lightbox: Element,
   gallery: MangaReaderGallery,
-  at: number
+  answer: GalleryAnswer
 ): void {
-  if (hasOwnChapterMenu(lightbox) || gallery.chapters.length === 0) {
-    removeChapterMenu();
-    return;
-  }
+  if (!bridged()) return;
 
-  const spacer = lightbox.querySelector(SELECTOR_HEADER_LEFT_SPACER);
-  if (!spacer) {
-    removeChapterMenu();
-    return;
-  }
+  // The count is the last thing that could differ: a filtered list at the same
+  // order would still be a shorter one, and every number after the first gap
+  // would be off.
+  const position = readPosition(lightbox);
+  if (!position || position.total !== answer.images.length) return;
 
-  if (!chaptersHost || chaptersHost.parentNode !== spacer) {
-    removeChapterMenu();
-    chaptersHost = document.createElement("div");
-    // Stash's own dropdown classes, so it looks like the menu it stands in for —
-    // and `dropdown` is what positions the list under the button.
-    chaptersHost.className = "dropdown " + CLASS_CHAPTERS;
-    chaptersHost.addEventListener("click", onChapterClick);
-    spacer.appendChild(chaptersHost);
-  }
-
-  if (chaptersFor !== gallery.id) {
-    buildChapterList(gallery);
-  }
-
-  markCurrentChapter(gallery, at);
-}
-
-/** Builds the toggle and the list, once per gallery */
-function buildChapterList(gallery: MangaReaderGallery): void {
-  if (!chaptersHost) return;
-
-  chaptersFor = gallery.id;
-  chaptersOpen = false;
-  chaptersHost.textContent = "";
-
-  const toggle = document.createElement("button");
-  toggle.type = "button";
-  toggle.className = "minimal " + CLASS_CHAPTERS_TOGGLE;
-  toggle.setAttribute("aria-haspopup", "true");
-  toggle.setAttribute("aria-expanded", "false");
-  chaptersHost.appendChild(toggle);
-
-  const list = document.createElement("div");
-  list.className = "dropdown-menu " + CLASS_CHAPTERS_LIST;
-  chapterItems = [];
-  for (let i = 0; i < gallery.chapters.length; i++) {
-    const chapter = gallery.chapters[i];
-    const item = document.createElement("button");
-    item.type = "button";
-    item.className = "dropdown-item";
-    item.dataset.at = String(chapter.at);
-    // A chapter with no name is still a chapter, and Stash draws one the same way
-    // it draws a named one — a bare number. Numbered in the order on screen, which
-    // is the order this list is in.
-    item.textContent = chapter.title || "#" + (i + 1);
-    chapterItems.push(item);
-    list.appendChild(item);
-  }
-  chaptersHost.appendChild(list);
-}
-
-/**
- * Marks where the reader is: the chapter in the toggle, and the one highlighted in
- * the list. Both are written only when they differ — see injectChapterMenu.
- */
-function markCurrentChapter(gallery: MangaReaderGallery, at: number): void {
-  if (!chaptersHost) return;
-
-  // By id, because which chapter a page is in is a fact the chapter holds — see
-  // chapterAt. A page no chapter lists is in none, and says so.
-  const pageId = gallery.pages[at]?.id;
-  const chapter =
-    pageId === undefined ? null : chapterAt(gallery.chapters, pageId);
-  const toggle = chaptersHost.querySelector("." + CLASS_CHAPTERS_TOGGLE);
-  // A chapter with no name of its own, and a page in no chapter at all, are
-  // different answers: the first is named by its place on screen — which is the
-  // number the list shows it under — and the second says so. `indexOf` is against
-  // the placed list, and the chapter came out of it, so the two agree.
-  const order = chapter ? gallery.chapters.indexOf(chapter) + 1 : 0;
-  const label = chapter
-    ? chapter.title || "#" + order
-    : labelFor(language, "noChapter");
-  if (toggle && toggle.textContent !== label) {
-    toggle.textContent = label;
-    // In full, since the button itself is bounded and may be clipping it.
-    toggle.setAttribute("title", label);
-  }
-
-  for (const item of chapterItems) {
-    const mine = chapter !== null && item.dataset?.at === String(chapter.at);
-    if (mine !== item.classList.contains("active")) {
-      item.classList.toggle("active", mine);
-    }
-  }
-}
-
-/** Opens or closes the list, and says so on the toggle */
-function setChaptersOpen(open: boolean): void {
-  if (!chaptersHost || chaptersOpen === open) return;
-
-  chaptersOpen = open;
-  const list = chaptersHost.querySelector("." + CLASS_CHAPTERS_LIST);
-  list?.classList.toggle("show", open);
-  chaptersHost
-    .querySelector("." + CLASS_CHAPTERS_TOGGLE)
-    ?.setAttribute("aria-expanded", open ? "true" : "false");
-}
-
-/** Takes the menu away, if it is there */
-function removeChapterMenu(): void {
-  if (chaptersHost) {
-    chaptersHost.removeEventListener("click", onChapterClick);
-    chaptersHost.remove();
-    chaptersHost = null;
-  }
-
-  chaptersFor = null;
-  chaptersOpen = false;
-  chapterItems = [];
-}
-
-/**
- * A click inside the menu: the toggle opens it, a chapter jumps.
- *
- * The jump is a click on Stash's own thumbnail for that image — see clickStrip —
- * which is Stash's `selectIndex` reached the way a reader reaches it. It is the
- * only direct way to an index this plugin has: an arrow press moves one page, and
- * a chapter can be hundreds away.
- *
- * A chapter the lightbox is not holding is not jumped to. That is a gallery with
- * more images than the list behind the lightbox loaded at once, and moving
- * somewhere in the general direction of the right image would be worse than
- * staying — the header would then be counting from a page nobody chose.
- */
-function onChapterClick(event: Event): void {
-  const target = event.target as HTMLElement | null;
-  if (!target || !chaptersHost || !root) return;
-
-  if (target.classList.contains(CLASS_CHAPTERS_TOGGLE)) {
-    setChaptersOpen(!chaptersOpen);
-    return;
-  }
-
-  // The items hold nothing but text, so a click on one is a click on the button —
-  // no walking up to find what was meant.
-  if (!chapterItems.includes(target)) return;
-
-  const at = Number(target.dataset?.at);
-  if (!Number.isInteger(at)) return;
-
-  if (clickStrip(root, at)) {
-    setChaptersOpen(false);
-    return;
-  }
-
-  console.error(
-    "[mangaReader] that chapter starts at image " +
-      (at + 1) +
-      ", which the lightbox is not holding — it has " +
-      "only the images of the list's current page, so this jump was not made"
-  );
-}
-
-/**
- * Closes the list when a click lands anywhere else in the lightbox.
- *
- * The reader's own way of putting a menu away, rather than a listener on the
- * document: the lightbox is what this plugin watches, and a click outside it —
- * closing the lightbox, say — is already the end of the menu.
- */
-function onChapterMenuOutside(event: Event): void {
-  if (!chaptersOpen || !chaptersHost) return;
-
-  const target = event.target as Node | null;
-  if (target && chaptersHost.contains(target)) return;
-
-  setChaptersOpen(false);
+  takeOver({
+    images: answer.images,
+    chapters: gallery.chapters,
+    totalCount: answer.images.length,
+  });
 }
 
 // ── The switch in the lightbox's own options menu ──────────────────
@@ -1544,6 +1359,10 @@ export function install(): void {
 
   observer.observe(document.body, { childList: true, subtree: true });
   window.addEventListener("keydown", onKeyDown, true);
+
+  // Before the first pass, so that a gallery read in the same tick has somewhere
+  // to hand its chapters. See handOverChapters.
+  installBridge();
 
   // The switch is a setting, not a mode: nothing is drawn until the reader turns it
   // on, but the observer has to be running for the switch to be there at all.

@@ -96,12 +96,16 @@ export interface MangaReaderNamespace {
    * screen.
    */
   carouselImage(lightbox: Element): { at: number; id: string } | null;
-  /** The thumbnails the lightbox is holding, and which of them is current */
+  /**
+   * The thumbnails the lightbox is holding, and which of them is current.
+   *
+   * Read for the one thing a jump needs: clicking one is Stash's own
+   * `selectIndex`. Stash renders the strip only when `showNavigation` is set, which
+   * neither of the gallery lightboxes sets — so this is here for the lightboxes
+   * that do, and for the day one of them changes.
+   */
   readStrip(lightbox: Element): MangaReaderStrip | null;
-  /** Goes straight to an image by clicking its thumbnail, if it is held */
-  clickStrip(lightbox: Element, index: number): boolean;
-  /** Whether Stash's own chapter menu is on screen */
-  hasOwnChapterMenu(lightbox: Element): boolean;
+  readStrip(lightbox: Element): MangaReaderStrip | null;
   isWideSpreadPage(page: MangaReaderPage): boolean;
   /**
    * How long a screen may be held back waiting for its images, in milliseconds.
@@ -133,11 +137,6 @@ export interface MangaReaderNamespace {
     chapters: MangaReaderChapter[],
     pages: MangaReaderPage[]
   ): MangaReaderPlacedChapter[];
-  /** The chapter an image is in, or null when it is in none */
-  chapterAt(
-    placed: MangaReaderPlacedChapter[],
-    pageId: string
-  ): MangaReaderPlacedChapter | null;
   screenAt(screens: MangaReaderScreen[], pageIndex: number): number;
   stepsToAdjacent(
     screens: MangaReaderScreen[],

@@ -76,37 +76,3 @@
   padding-top: 8px;
 }
 
-/*
- * The chapter menu, standing where Stash's own stands — in the header's left
- * spacer, and only when Stash's own is not there. See injectChapterMenu.
- *
- * The button and the list are Bootstrap's own classes (`minimal`, `dropdown`,
- * `dropdown-menu`, `dropdown-item`), which is where the look comes from; what is
- * here is the two things Bootstrap cannot know: that the label is a chapter's name
- * and can be long, and that a gallery can have enough chapters to overflow.
- */
-.manga-reader-chapters {
-  display: flex;
-  align-items: center;
-  max-width: 100%;
-}
-
-/*
- * A name, not an icon — Stash's own button is three bars, and this one says which
- * chapter the reader is in. Bounded so that a long name cannot push the header's
- * counter around; the title attribute carries it in full.
- */
-.manga-reader-chapters-toggle {
-  max-width: 16rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.manga-reader-chapters-list {
-  max-height: 60vh;
-  overflow-y: auto;
-  /* Long names, for the same reason as the button: the menu widens to the longest
-     one, and a 300-page gallery can produce a very long one. */
-  max-width: 24rem;
-}
