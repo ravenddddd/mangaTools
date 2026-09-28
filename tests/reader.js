@@ -432,6 +432,21 @@ function buildLightbox(current = 1, total = 5, ids = null) {
       lightbox.appendChild(popover);
       return body;
     },
+    /**
+     * Stash replaces the whole lightbox with a spinner while it fetches or swaps a
+     * page. Everything else goes with it — the header, the carousel, the lot.
+     */
+    loading: (on) => {
+      const existing = lightbox.querySelector(".LoadingIndicator");
+      if (existing) existing.remove();
+      if (!on) return;
+
+      header.remove();
+      display.remove();
+      const spinner = dom.makeElement("div");
+      spinner.className = "LoadingIndicator";
+      lightbox.appendChild(spinner);
+    },
     close: () => lightbox.remove(),
   };
 }

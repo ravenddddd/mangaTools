@@ -41,6 +41,15 @@ export const SELECTOR_POPOVER_BODY = ".popover .popover-body";
  * tells them apart — see navDirection in takeover.ts.
  */
 export const CLASS_NAVBUTTON = "Lightbox-navbutton";
+/**
+ * Stash's own loading spinner, which it renders *instead of* the header and carousel
+ * while a page is being fetched or swapped.
+ *
+ * The difference matters: for those moments there is no header to read and no carousel
+ * to ask, and that is not the lightbox having changed under this plugin — it is the
+ * lightbox being busy. See lightboxIsLoading.
+ */
+export const CLASS_LOADING = "LoadingIndicator";
 
 /** Where the lightbox is, as far as the reader can tell. */
 export interface LightboxPosition {
@@ -463,4 +472,17 @@ export async function fetchGallery(
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
 NR.lightboxOrder = lightboxOrder;
+/**
+ * Whether the lightbox is busy: fetching the page it is on, or swapping to another.
+ *
+ * It renders a spinner in place of everything else while it is, so "no header and no
+ * carousel" is this rather than a change in its markup. The reader waits it out
+ * instead of concluding anything — the screen it drew a moment ago is still the right
+ * one, and the lightbox will be back.
+ */
+export function lightboxIsLoading(lightbox: Element): boolean {
+  return lightbox.querySelector("." + CLASS_LOADING) !== null;
+}
+
 NR.carouselImage = carouselImage;
+NR.lightboxIsLoading = lightboxIsLoading;

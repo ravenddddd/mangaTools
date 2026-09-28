@@ -104,6 +104,12 @@ export interface MangaReaderNamespace {
    */
   carouselImage(lightbox: Element): { at: number; id: string } | null;
   /**
+   * Whether the lightbox is busy fetching or swapping. It renders a spinner in place
+   * of everything while it is — see lightboxIsLoading, which is the difference between
+   * a busy lightbox and one whose markup has changed under this plugin.
+   */
+  lightboxIsLoading(lightbox: Element): boolean;
+  /**
    * The thumbnails the lightbox is holding, and which of them is current.
    *
    * Read for the one thing a jump needs: clicking one is Stash's own

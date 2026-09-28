@@ -55,6 +55,7 @@ import {
   type GalleryAnswer,
   carouselImage,
   fetchGallery,
+  lightboxIsLoading,
   galleryIdFromPath,
   lightboxOrder,
   pressArrow,
@@ -471,6 +472,12 @@ function sync(lightbox: Element): void {
   const gallery = current();
   if (!gallery) return;
 
+  // A lightbox that is fetching or swapping shows a spinner *instead of* its header
+  // and its carousel, and that is not a lightbox this plugin cannot follow — it is one
+  // that is busy. What is on screen is still the screen the reader is on, so nothing
+  // is drawn, nothing is decided, and the next pass finds it back.
+  if (lightboxIsLoading(lightbox)) return;
+
   const position = readPosition(lightbox);
   if (!position) {
     // The counter is drawn only when there is more than one image, so a gallery of
@@ -852,6 +859,12 @@ function armRetry(lightbox: Element): void {
  */
 function arrived(lightbox: Element): void {
   if (!errand) return;
+
+  // A busy lightbox is a press landing: the page it is fetching is the one the press
+  // asked for. Its header is gone while it works, so there is nothing to read and
+  // nothing to do — and ending the errand here would abandon a turn that is halfway
+  // through a page switch, which is how a spread turn lands one page short.
+  if (lightboxIsLoading(lightbox)) return;
 
   const at = currentIndex(lightbox);
   if (at === null) {
