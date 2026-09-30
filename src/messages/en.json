@@ -6,6 +6,12 @@
   "mangaReader.importChapters": "Import Stash's chapters",
   "mangaReader.reimportChapters": "Re-import Stash's chapters",
   "mangaReader.importingChapters": "Importing…",
+  "mangaReader.reimportWarning": "Replace this gallery's chapters with Stash's? The plugin's own list for it is overwritten.",
+  "mangaReader.reimportReplace": "Replace",
+  "mangaReader.reimportCancel": "Cancel",
+  "mangaReader.reimportWarning": "Replace this gallery's chapters with Stash's? The plugin's own list for it is overwritten.",
+  "mangaReader.reimportReplace": "Replace",
+  "mangaReader.reimportCancel": "Cancel",
 
   "mangaTools.select.placeholder": "Select language…",
 

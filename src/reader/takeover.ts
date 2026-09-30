@@ -41,6 +41,11 @@
 // The field plumbing both halves share: this one reads the same custom fields the
 // tools half writes, under the same names, through the same helpers.
 import { requirePluginApi } from "../plugin-api";
+// Imported for what it publishes on the reader's namespace, not for anything it
+// exports: the chapter import has no caller in this half — the settings panel asks
+// the reader half for it through `window.MangaReader` — and a module nothing
+// imports is a module whose body never runs.
+import "./chapters-import";
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
 import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";

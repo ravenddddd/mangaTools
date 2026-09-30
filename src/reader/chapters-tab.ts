@@ -67,9 +67,9 @@ let inHand: {
   locale: string | null;
 } | null = null;
 
-/** The import control and the button in it, kept between passes */
+/** The import control, kept between passes, and what it was last built as */
 let control: HTMLElement | null = null;
-let controlButton: HTMLButtonElement | null = null;
+let controlState: "offer" | "confirm" | "busy" | null = null;
 /** What that button would import, as of the last pass that drew it */
 let controlFor: {
   id: string;
@@ -78,6 +78,16 @@ let controlFor: {
 } | null = null;
 /** A write is in flight: the button says so and refuses a second click */
 let busy = false;
+/**
+ * A re-import has been asked for and not yet confirmed.
+ *
+ * A second click, not a dialog: this is a DOM takeover with no React of its own to
+ * render one into (Stash's own confirm is a react-bootstrap `Modal`, and the reader
+ * test world does not render). Two steps in one control, which is the shape the
+ * tools half's modal replaced — and it is affordable here because the render key
+ * already carries the state, so a pass cannot draw the wrong half of it.
+ */
+let confirming = false;
 
 /**
  * One pass over the document: is a Chapters tab on screen, and does it say what
@@ -239,7 +249,7 @@ function render(
     gallery.id,
     gallery.own ? "own" : "none",
     String(gallery.importable.length),
-    busy ? "busy" : "idle",
+    busy ? "busy" : confirming ? "confirm" : "idle",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
   if (key === renderedFor && panel.childElementCount > 0) return;
@@ -289,22 +299,15 @@ function drawImport(
   if (gallery.importable.length === 0) {
     control?.remove();
     control = null;
-    controlButton = null;
+    controlState = null;
     controlFor = null;
+    confirming = false;
     return;
   }
 
-  if (!control || !controlButton) {
-    controlButton = document.createElement("button");
-    controlButton.type = "button";
-    controlButton.className = "btn btn-secondary btn-sm";
-    controlButton.addEventListener("click", importChapters);
-
-    control = document.createElement("div");
-    control.id = IMPORT_ID;
-    control.className = "manga-reader-chapters-import";
-    control.appendChild(controlButton);
-  }
+  // Another gallery: whatever was being confirmed was about a different list, and
+  // confirming it here would be a write nobody asked for.
+  if (controlFor?.id !== gallery.id) confirming = false;
 
   controlFor = {
     id: gallery.id,
@@ -312,19 +315,104 @@ function drawImport(
     own: gallery.own,
   };
 
+  if (!control) {
+    control = document.createElement("div");
+    control.id = IMPORT_ID;
+    control.className = "manga-reader-chapters-import";
+  }
+
   const place = panel.parentNode;
   if (place && control.parentNode !== place) {
     place.insertBefore(control, panel.nextElementSibling);
   }
 
-  const wording = busy
-    ? "mangaReader.importingChapters"
-    : gallery.own
-      ? "mangaReader.reimportChapters"
-      : "mangaReader.importChapters";
-  const text = stringFor(gallery.locale, wording);
-  if (controlButton.textContent !== text) controlButton.textContent = text;
-  controlButton.disabled = busy;
+  const state = busy ? "busy" : confirming ? "confirm" : "offer";
+  if (state !== controlState) {
+    controlState = state;
+    control.textContent = "";
+    buildControl(control, gallery.locale, state);
+  }
+}
+
+/**
+ * Puts the control's own contents up, for the state it is in.
+ *
+ * Rebuilt on a change of state rather than updated in place, because the states
+ * differ in *shape* — one button, or a warning and two — and an update that had to
+ * reconcile those would be the thing that goes wrong. What the buttons do is read
+ * from module state rather than closed over, for the reason `controlFor` is: the
+ * control outlives the pass that built it.
+ */
+function buildControl(
+  box: HTMLElement,
+  locale: string | null,
+  state: "offer" | "confirm" | "busy"
+): void {
+  if (state === "confirm") {
+    const warning = document.createElement("div");
+    warning.className = "manga-reader-chapters-import-warning";
+    warning.textContent = stringFor(locale, "mangaReader.reimportWarning");
+    box.appendChild(warning);
+
+    box.appendChild(
+      button("btn btn-danger btn-sm", "mangaReader.reimportReplace", () => {
+        confirming = false;
+        importChapters();
+      })
+    );
+    box.appendChild(
+      button("btn btn-secondary btn-sm", "mangaReader.reimportCancel", () => {
+        confirming = false;
+        redraw();
+      })
+    );
+    return;
+  }
+
+  const wording =
+    state === "busy"
+      ? "mangaReader.importingChapters"
+      : controlFor?.own
+        ? "mangaReader.reimportChapters"
+        : "mangaReader.importChapters";
+
+  const offer = button("btn btn-secondary btn-sm", wording, askToImport);
+  offer.disabled = state === "busy";
+  box.appendChild(offer);
+}
+
+/** One of the control's buttons, worded and wired the same way */
+function button(
+  className: string,
+  wording: string,
+  onClick: () => void
+): HTMLButtonElement {
+  const node = document.createElement("button");
+  node.type = "button";
+  node.className = className;
+  node.textContent = stringFor(inHand?.locale, wording);
+  node.addEventListener("click", onClick);
+  return node;
+}
+
+/**
+ * The import that was asked for: the write, or a second question first.
+ *
+ * A gallery with no list of this plugin's own has nothing to lose, so the import
+ * goes. One that already has a list is about to have it written over, and — since
+ * the field is hidden from Stash's own custom-field editor — that list is not
+ * visible anywhere but here. So it is asked for twice.
+ */
+function askToImport(): void {
+  if (!controlFor || busy) return;
+
+  if (controlFor.own) {
+    confirming = true;
+    redraw();
+    return;
+  }
+
+  importChapters();
 }
 
 /**
@@ -365,10 +453,12 @@ function importChapters(): void {
         inHand.importable = target.importable;
       }
 
+      confirming = false;
       redraw();
     },
     (e: unknown) => {
       busy = false;
+      confirming = false;
       console.error(
         "[mangaReader] could not import this gallery's chapters:",
         e
@@ -438,6 +528,7 @@ export function forgetChaptersTab(): void {
   inHand = null;
   renderedFor = "";
   control = null;
-  controlButton = null;
+  controlState = null;
   controlFor = null;
+  confirming = false;
 }

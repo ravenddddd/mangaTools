@@ -6,6 +6,12 @@
   "mangaReader.importChapters": "导入 Stash 的章节",
   "mangaReader.reimportChapters": "重新导入 Stash 的章节",
   "mangaReader.importingChapters": "正在导入…",
+  "mangaReader.reimportWarning": "用 Stash 的章节替换这本的？插件已有的那份会被覆盖。",
+  "mangaReader.reimportReplace": "替换",
+  "mangaReader.reimportCancel": "取消",
+  "mangaReader.reimportWarning": "用 Stash 的章节替换这本的？插件已有的那份会被覆盖。",
+  "mangaReader.reimportReplace": "替换",
+  "mangaReader.reimportCancel": "取消",
 
   "mangaTools.select.placeholder": "选择语言…",
 

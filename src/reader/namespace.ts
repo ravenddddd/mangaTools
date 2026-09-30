@@ -84,10 +84,13 @@ export interface MangaReaderGallery {
 /**
  * The namespace this half publishes its logic on.
  *
- * Read by the smoke test and by nothing else: the reader's own modules import
- * each other directly, and the published copy is what lets a test call a pure
- * function without a bundler of its own — the same arrangement the tools half
- * uses at `window.MangaTools`.
+ * Read by the smoke test and, for two of its members, by the tools half: the
+ * reader's own modules import each other directly, and the published copy is what
+ * lets a test call a pure function without a bundler of its own — the same
+ * arrangement the tools half uses at `window.MangaTools`. The exception is the
+ * chapter import, which the plugin's settings panel asks for: the job is this
+ * half's, because the format is, and the panel is the tools half's, so the
+ * published copy is how the two meet without an import between them.
  */
 export interface MangaReaderNamespace {
   parseSettings(raw: string | null): MangaReaderSettings;
@@ -156,6 +159,31 @@ export interface MangaReaderNamespace {
     rows: { title?: unknown; image_index?: unknown }[] | null | undefined,
     pathIds: string[]
   ): MangaReaderChapter[];
+  /**
+   * Which marked galleries have chapters of Stash's to bring into this plugin's
+   * field, and which already have a list of their own — see chapters-import.ts. One
+   * read-only query, and no writes: what a settings panel shows before asking.
+   */
+  planChapterImports(): Promise<{
+    toImport: string[];
+    owned: string[];
+    considered: number;
+  }>;
+  /**
+   * Writes those chapters, one gallery at a time, through the tools half. Reported
+   * rather than thrown: a gallery that failed is one entry, and the rest are done.
+   */
+  runChapterImports(
+    plan: { toImport: string[]; owned: string[]; considered: number },
+    options?: {
+      reimport?: boolean;
+      onProgress?: (done: number, total: number) => void;
+    }
+  ): Promise<{
+    written: string[];
+    failed: { id: string; error: unknown }[];
+    skippedEmpty: string[];
+  }>;
   /**
    * The chapter an image is in, or null when it is in none — see chapters.ts, where
    * the answer comes from what each chapter lists rather than from its neighbours.

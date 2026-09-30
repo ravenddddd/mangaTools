@@ -45,6 +45,31 @@ const client = {
     // Its answer is what tells this plugin a gallery is manga — see markedInStore —
     // so the worlds here are the marked ones, and a fixture marked `manga: false` is
     // the gallery this plugin is meant to leave alone.
+    // The chapter import's plan: every marked gallery, with its own chapters and
+    // this plugin's field. Told apart from the tools half's map by its *variables*
+    // — that one has none at all, and this one names the field it is looking for —
+    // which is why the query takes them as variables rather than splicing them in.
+    if (variables?.field !== undefined) {
+      const galleries = Object.keys(state.galleries)
+        .filter((id) => state.galleries[id].manga !== false)
+        .map((id) => {
+          const gallery = state.galleries[id].gallery || {
+            custom_fields: {},
+            chapters: [],
+          };
+
+          return {
+            id,
+            custom_fields: gallery.custom_fields || {},
+            chapters: gallery.chapters || [],
+          };
+        });
+
+      return Promise.resolve({
+        data: { findGalleries: { count: galleries.length, galleries } },
+      });
+    }
+
     if (!variables) {
       const marked = Object.keys(state.galleries)
         .filter((id) => state.galleries[id].manga !== false)
@@ -844,6 +869,8 @@ state.galleries["61"] = {
 require(BUNDLE);
 
 const NR = global.window.MangaReader;
+/** The tools half's namespace, which the chapter import reaches its write through */
+const NS = global.window.MangaTools;
 
 // ── Sections ───────────────────────────────────────────────────────
 
@@ -4266,6 +4293,242 @@ async function main() {
       stopTab(past);
     }
   );
+
+  /**
+   * Re-importing asks first — twice over, in one control.
+   *
+   * There is no dialog to put this in: the tab is a DOM takeover, and Stash's own
+   * confirm is a react-bootstrap `Modal` the reader test world cannot render. So the
+   * control becomes the question. What makes that affordable is the render key: the
+   * confirmation is part of the state this tab is drawn from, so no pass can draw
+   * the offer while the question is up, or the question while the offer is.
+   *
+   * It has to be asked, and this is why: the field is hidden from Stash's own
+   * custom-field editor, so the list about to be written over is visible in exactly
+   * one place — this tab — and nowhere else to go and look at it.
+   */
+  /**
+   * The same import for the whole library, which is what a library that has been
+   * on Stash's own rows all along actually needs: the same job once per gallery is
+   * the tab's business, and this is the one visit that does all of them.
+   *
+   * It lives in the reader half because the format does, and is asked for by the
+   * tools half's settings panel through the namespace — so what these sections
+   * exercise is the job itself, called the way the panel calls it.
+   */
+  await runSection("the whole library can be planned for import", async () => {
+    mountBridge();
+    const plan = await NR.planChapterImports();
+
+    // Gallery 32 is on Stash's own rows, 35 has an (empty) list of this plugin's
+    // own and rows of Stash's, and 37's only chapter points past the end of it.
+    // The plan cannot tell 37 from a real one — it carries no images — which is
+    // why the run checks again before writing.
+    assert.deepStrictEqual(
+      plan.toImport.slice().sort(),
+      ["32", "37"],
+      "every gallery with rows of Stash's and no list of ours is to be imported"
+    );
+    assert.deepStrictEqual(
+      plan.owned,
+      ["35"],
+      "and one that already has a list of ours is only counted, so that a run can " +
+        "leave it alone unless it was asked not to"
+    );
+
+    const marked = Object.keys(state.galleries).filter(
+      (id) => state.galleries[id].manga !== false
+    ).length;
+    assert.strictEqual(
+      plan.considered,
+      marked,
+      "and everything marked was looked at, including the galleries with nothing " +
+        "to bring over"
+    );
+  });
+
+  await runSection(
+    "importing the library writes each gallery once",
+    async () => {
+      mountBridge();
+      const at = mutations.length;
+      const plan = await NR.planChapterImports();
+      const run = await NR.runChapterImports(plan);
+
+      assert.deepStrictEqual(
+        run.written.slice().sort(),
+        ["32"],
+        "a gallery that can be imported is"
+      );
+      assert.deepStrictEqual(
+        run.skippedEmpty,
+        ["37"],
+        "and one whose rows all point past the end of its images is not: writing " +
+          "the translation of nothing would be clearing its chapters, not importing"
+      );
+      assert.deepStrictEqual(run.failed, [], "nothing failed");
+
+      assert.strictEqual(
+        mutations.length - at,
+        1,
+        "which is one write per gallery imported, and none for the ones left alone"
+      );
+      assert.deepStrictEqual(
+        mutations[at].variables,
+        {
+          input: {
+            id: "32",
+            custom_fields: {
+              partial: {
+                "plugin.mangaTools.chapters":
+                  '{"v":1,"chapters":[{"title":"第一話","images":["708","707","706","705"]},' +
+                  '{"title":"第二話","images":["704","703","702","701"]}]}',
+              },
+            },
+          },
+        },
+        "each written as the list Stash's own rows translate to, in path order"
+      );
+
+      // Asked for, it does write over a gallery that already has one — which is the
+      // same import, and the reason the panel asks before running it this way.
+      const beforeReimport = mutations.length;
+      const again = await NR.runChapterImports(plan, { reimport: true });
+
+      assert.deepStrictEqual(
+        again.written.slice().sort(),
+        ["32", "35"],
+        "a re-import counts the galleries that already had a list of ours"
+      );
+      assert.strictEqual(
+        mutations.length - beforeReimport,
+        2,
+        "and writes them"
+      );
+    }
+  );
+
+  await runSection(
+    "and a library import says which gallery it could not write",
+    async () => {
+      mountBridge();
+      const at = mutations.length;
+      const plan = await NR.planChapterImports();
+
+      // The tools half owns the write, and a reader installed without it has no such
+      // function — which is a gallery that failed rather than a run that stopped.
+      const write = NS.importChapters;
+      delete NS.importChapters;
+      const run = await NR.runChapterImports(plan);
+      NS.importChapters = write;
+
+      assert.deepStrictEqual(run.written, [], "nothing was written");
+      assert.deepStrictEqual(
+        run.failed.map((f) => f.id),
+        ["32"],
+        "the gallery that could have been written is reported, with its own error"
+      );
+      assert.ok(
+        /tools half is not running/.test(String(run.failed[0].error)),
+        "and the error names what was missing rather than being a bare failure"
+      );
+      assert.deepStrictEqual(
+        mutations.slice(at),
+        [],
+        "and none of it reached Stash"
+      );
+    }
+  );
+
+  await runSection("re-importing asks first", async () => {
+    mountBridge();
+    const at = mutations.length;
+    dom.window.location.pathname = "/galleries/35";
+    const tab = buildChaptersTab([{ title: "第一話", image_index: 1 }]);
+
+    dom.flush();
+    await settle();
+
+    const control = () =>
+      dom.body.querySelector("#manga-reader-chapters-import");
+    const offer = () => control().children[control().children.length - 1];
+
+    dom.click(control().children[0]);
+    await settle();
+
+    assert.deepStrictEqual(
+      mutations.slice(at),
+      [],
+      "asking is not doing: the first click writes nothing"
+    );
+    assert.strictEqual(
+      control().children.length,
+      3,
+      "and the control becomes the question — a warning and two answers"
+    );
+    assert.ok(
+      /overwritten/.test(control().children[0].textContent),
+      "which say what is about to be overwritten"
+    );
+    assert.strictEqual(
+      control().children[1].textContent,
+      "Replace",
+      "the answer that writes, worded as what it does"
+    );
+    assert.strictEqual(
+      control().children[2].textContent,
+      "Cancel",
+      "and the answer that does not"
+    );
+
+    dom.click(control().children[2]);
+    await settle();
+
+    assert.deepStrictEqual(
+      mutations.slice(at),
+      [],
+      "and cancelling writes nothing"
+    );
+    assert.strictEqual(
+      control().children.length,
+      1,
+      "the question goes, and the offer is back"
+    );
+    assert.strictEqual(
+      offer().textContent,
+      "Re-import Stash's chapters",
+      "saying what it said before it was asked"
+    );
+
+    dom.click(offer());
+    await settle();
+    dom.click(control().children[1]);
+    await settle();
+
+    assert.strictEqual(
+      mutations.length - at,
+      1,
+      "and confirming is the write, once"
+    );
+    assert.deepStrictEqual(
+      mutations[at].variables,
+      {
+        input: {
+          id: "35",
+          custom_fields: {
+            partial: {
+              "plugin.mangaTools.chapters":
+                '{"v":1,"chapters":[{"title":"第一話","images":["708","707","706","705","704","703","702","701"]}]}',
+            },
+          },
+        },
+      },
+      "with Stash's rows, expanded against path order, replacing the empty list " +
+        "this gallery was keeping"
+    );
+
+    stopTab(tab);
+  });
 
   await runSection(
     "a chapter in the tab opens the lightbox there",

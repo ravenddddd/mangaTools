@@ -6,6 +6,12 @@
   "mangaReader.importChapters": "匯入 Stash 的章節",
   "mangaReader.reimportChapters": "重新匯入 Stash 的章節",
   "mangaReader.importingChapters": "正在匯入…",
+  "mangaReader.reimportWarning": "用 Stash 的章節取代這本的？外掛已有的那份會被覆蓋。",
+  "mangaReader.reimportReplace": "取代",
+  "mangaReader.reimportCancel": "取消",
+  "mangaReader.reimportWarning": "用 Stash 的章節取代這本的？外掛已有的那份會被覆蓋。",
+  "mangaReader.reimportReplace": "取代",
+  "mangaReader.reimportCancel": "取消",
 
   "mangaTools.select.placeholder": "選擇語言…",
 
