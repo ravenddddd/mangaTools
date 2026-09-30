@@ -296,6 +296,12 @@ const named = (id, title, path) => ({
   ...image(id, 1000, 1500),
   title,
   visual_files: [{ __typename: "ImageFile", path, width: 1000, height: 1500 }],
+  // Stash publishes a URL here as well, query and all, and it is not a file's name:
+  // a footer that reads a page's name out of this says "image?t=1700000009".
+  paths: {
+    image:
+      "http://stash.example.com:9998/image/" + id + "/image?t=17000000" + id,
+  },
 });
 
 /** Pages a, b, c, … */
@@ -2478,7 +2484,7 @@ async function main() {
     // A turn, and the name follows it — the title where there is one, and the file's
     // name where there is not, which is the rule Stash's own footer names a page by.
     dom.click(box.navRight);
-    assert.deepStrictEqual(drawn(), ["/image/902/image"]);
+    assert.deepStrictEqual(drawn(), ["/image/902/image?t=17000000902"]);
     assert.strictEqual(
       link.textContent,
       "003.jpg",
@@ -3176,8 +3182,17 @@ async function main() {
     ];
 
     // The track as the browser would measure it, since a pointer's x is only a
-    // fraction of something.
+    // fraction of something; and the chevrons, which the bar ends where they begin.
     track.rect = { left: 0, top: 0, width: 800, height: 4 };
+    box.navLeft.offsetWidth = 90;
+    box.navRight.offsetWidth = 90;
+    dom.flush();
+
+    assert.deepStrictEqual(
+      [bar.style.left, bar.style.right],
+      ["90px", "90px"],
+      "and it stops clear of Stash's own page-turn buttons"
+    );
 
     assert.strictEqual(read.style.width, "0.000%", "the book opens unread");
     assert.strictEqual(thumb.style.left, "0.000%");

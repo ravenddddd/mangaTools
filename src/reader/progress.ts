@@ -177,6 +177,7 @@ export function ensureProgress(
 
   if (!bar || !track || !read || !thumb || !label || !nodes) return bar;
 
+  inset(lightbox);
   watch(lightbox);
   update(state);
 
@@ -278,6 +279,28 @@ function update(state: ProgressState): void {
   const moved = !drawn || drawn.at !== state.at || drawn.total !== state.total;
   drawn = { nodes: key, at: state.at, total: state.total };
   if (moved) wake();
+}
+
+/**
+ * Stops the bar short of Stash's own page-turn buttons.
+ *
+ * Measured from the button rather than written down: the chevrons are Stash's markup
+ * and its stylesheet decides how wide they are, and a number here would be a copy of
+ * that decision, drifting the moment either changes. A lightbox with no chevrons —
+ * which is a lightbox of one image, where this bar is not drawn at all — leaves the
+ * bar the full width, which is what no inset means.
+ */
+function inset(lightbox: Element): void {
+  if (!bar) return;
+
+  const button = lightbox.querySelector(
+    ".Lightbox-navbutton"
+  ) as HTMLElement | null;
+  const width = button?.offsetWidth || 0;
+  const value = width + "px";
+
+  if (bar.style.left !== value) bar.style.left = value;
+  if (bar.style.right !== value) bar.style.right = value;
 }
 
 /** One tick per chapter, where its first page sits */

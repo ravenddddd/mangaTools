@@ -63,13 +63,20 @@ export function syncFooter(
 /**
  * What Stash's own footer would call this image: its title, or the file's name.
  *
- * Stash's `imageTitle`, which a plugin cannot call and does not have to — a title if
- * there is one, the last part of the path if there is not, and nothing when the API
- * never said either. The same rule, so the footer names a page the way it always did.
+ * Stash's `imageTitle` and its `fileNameFromPath`, which a plugin cannot call and does
+ * not have to: the title if there is one, the last part of the *file's* path if there
+ * is not, and those two words if the API never said either.
+ *
+ * The file's path, not `paths.image`: that one is a URL, and on this Stash it ends
+ * `…/image?t=1789301578`, which is what the footer said for a while — the last part
+ * of a URL read as if it were the name of a file. A name comes from the file, and
+ * the file is `visual_files`.
  */
 function titleOf(image: LightboxImage): string {
   if (image.title) return image.title;
 
-  const path = image.paths?.image || image.visual_files?.[0]?.path || "";
-  return path.split("/").pop() || "";
+  const path = image.visual_files?.[0]?.path || "";
+  // Everything up to the last separator, either kind: Stash's own regex, so a path
+  // from a Windows library names the file the same way a Linux one does.
+  return path ? path.replace(/^.*[\\/]/, "") : "No File Name";
 }
