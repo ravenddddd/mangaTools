@@ -3230,6 +3230,34 @@ async function main() {
     dom.flush();
     assert.strictEqual(track.style.width, "500px");
 
+    // The changes that are nobody's DOM mutation: a window resized, and the lightbox
+    // filling the screen or giving it back. What the pages are fitted to has changed,
+    // so what the bar measures has changed, and no pass would come for it.
+    [...container().querySelectorAll("img")].forEach((image, at) => {
+      image.offsetLeft = at * 720;
+      image.offsetWidth = 700;
+    });
+    dom.document.dispatch(
+      "fullscreenchange",
+      dom.makeEvent("fullscreenchange", {})
+    );
+    assert.strictEqual(
+      track.style.width,
+      "700px",
+      "going fullscreen re-measures at once rather than at the next drag"
+    );
+
+    [...container().querySelectorAll("img")].forEach((image) => {
+      image.offsetLeft = 0;
+      image.offsetWidth = 500;
+    });
+    dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+    assert.strictEqual(
+      track.style.width,
+      "500px",
+      "and so does the window being resized, which changes the same thing"
+    );
+
     assert.strictEqual(read.style.width, "0.000%", "the book opens unread");
     assert.strictEqual(thumb.style.left, "0.000%");
 

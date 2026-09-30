@@ -1020,6 +1020,17 @@ function closeLightbox(): void {
   logged = false;
 }
 
+/**
+ * Asks for a pass, for the changes that are nobody's DOM mutation.
+ *
+ * The pages are measured from their layout boxes, so anything that changes what they
+ * are fitted to changes what the progress bar measures — and a resize or a
+ * fullscreen change is not a change to the document for the observer to see.
+ */
+function measureAgain(): void {
+  if (root) sync(root);
+}
+
 // ── The lightbox's chapters ────────────────────────────────────────
 
 /**
@@ -1560,6 +1571,14 @@ export function install(): void {
 
   observer.observe(document.body, { childList: true, subtree: true });
   window.addEventListener("keydown", onKeyDown, true);
+
+  // Two changes that move everything the reader draws in and leave the document
+  // exactly as it was: a window resized, and the lightbox filling the screen or
+  // giving it back. What the pages are fitted to has changed, so how wide the
+  // progress bar is has changed with it — and nothing else here would notice until
+  // something else moved. See pictureWidth.
+  document.addEventListener("fullscreenchange", measureAgain);
+  window.addEventListener("resize", measureAgain);
 
   // Stash's own router, which tells plugins when the page has changed — see
   // onLocation for what this half does with it. Guarded the way the tools half
