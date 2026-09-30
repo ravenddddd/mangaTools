@@ -126,6 +126,29 @@ export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
 }
 
 /**
+ * A chapter list as the field's own JSON string — the inverse of parseChapters.
+ *
+ * The keys are written in a literal order rather than a sorted one, so the same
+ * chapters always come out as the same bytes: a value whose spelling shifted on
+ * every write would be a write that looks like an edit.
+ *
+ * Nothing is validated and nothing is dropped. This is handed a list that is
+ * already this plugin's own shape — deciding what belongs in one is
+ * chaptersFromStash's business, upstream of here. parseChapters is the tolerant
+ * half of the pair, and the two are tested against each other rather than each on
+ * its own: see the round-trip and fixed-point laws in the reader suite.
+ */
+export function serializeChapters(chapters: MangaReaderChapter[]): string {
+  return JSON.stringify({
+    v: CHAPTERS_VERSION,
+    chapters: chapters.map((chapter) => ({
+      title: typeof chapter.title === "string" ? chapter.title : "",
+      images: chapter.images.map((id) => String(id)),
+    })),
+  });
+}
+
+/**
  * Stash's own chapters, translated into this plugin's shape.
  *
  * `pathIds` is the gallery's image ids in path order — the order `image_index`
@@ -246,5 +269,6 @@ export function chapterAt(
 NR.CHAPTERS_VERSION = CHAPTERS_VERSION;
 NR.chapterAt = chapterAt;
 NR.parseChapters = parseChapters;
+NR.serializeChapters = serializeChapters;
 NR.chaptersFromStash = chaptersFromStash;
 NR.placeChapters = placeChapters;

@@ -149,6 +149,8 @@ export interface MangaReaderNamespace {
   CHAPTERS_VERSION: number;
   /** This gallery's stored chapters, or null when there are none to read */
   parseChapters(raw: string | null): MangaReaderChapter[] | null;
+  /** A chapter list as the field's JSON string — the inverse of parseChapters */
+  serializeChapters(chapters: MangaReaderChapter[]): string;
   /** Stash's own chapters, translated against the path-ordered image ids */
   chaptersFromStash(
     rows: { title?: unknown; image_index?: unknown }[] | null | undefined,

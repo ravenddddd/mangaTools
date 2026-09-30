@@ -88,6 +88,7 @@ const CENSORSHIP_FIELD_NAME = NS.CENSORSHIP_FIELD_NAME;
 const MANGA_FIELD_NAME = NS.MANGA_FIELD_NAME;
 const TRANSLATION_GROUP_FIELD_NAME = NS.TRANSLATION_GROUP_FIELD_NAME;
 const ORIGINAL_FIELD_NAME = NS.ORIGINAL_FIELD_NAME;
+const CHAPTER_FIELD_NAME = NS.CHAPTER_FIELD_NAME;
 
 const PLUGIN_ID = "mangaTools";
 
@@ -1373,6 +1374,55 @@ function writeQuietly(
     variables: { input: { id: galleryId, custom_fields: fields } },
   });
 }
+
+/**
+ * Writes a gallery's chapters into this plugin's own field.
+ *
+ * The value arrives **already serialised**, and that is the point: the shape is the
+ * reader half's — it owns the format, its version, and the tolerant parsing of it —
+ * and this half's job is to put a string where the reader says. It is also what
+ * keeps the dependency between the halves pointing one way; nothing here has to
+ * know what a chapter is.
+ *
+ * The same pairing the mark uses: the store and Stash's own form are told first, so
+ * what is on screen follows the click rather than a round trip that may yet fail,
+ * and the refresh either confirms it or puts it right. The form copy matters *more*
+ * here than it does for the mark — this key is hidden from Stash's own custom-field
+ * editor (it is one of ours, see ownField), so a Save that did not know about it is
+ * the one way its value could vanish with nothing on screen to notice.
+ *
+ * Rejects when nothing could be sent, and passes that on: the batch importer counts
+ * a gallery it could not write and carries on with the rest.
+ */
+NS.importChapters = (galleryId: string, json: string): Promise<void> => {
+  // Only when there is an entry to update: a gallery the store has never heard of
+  // is one this half is not managing, and inventing an entry for it would be the
+  // store saying it is marked.
+  const current = store?.get(galleryId);
+  if (current) {
+    store?.set(galleryId, NS.setField(current, CHAPTER_FIELD_NAME, json));
+  }
+
+  const form = editFormFor(galleryId);
+  if (form) {
+    form.onChange(NS.setField(form.values, CHAPTER_FIELD_NAME, json));
+  }
+
+  emit();
+
+  return writeQuietly(galleryId, {
+    partial: { [CHAPTER_FIELD_NAME]: json },
+  }).then(
+    () => {
+      refreshAfterWrite();
+    },
+    (e: unknown) => {
+      console.error("[mangaTools] could not write this gallery's chapters:", e);
+      refreshAfterWrite();
+      throw e;
+    }
+  );
+};
 
 function GalleryToolbar(props: { galleryId: string; values: CustomFieldsMap }) {
   useGlobalVersion();

@@ -2348,6 +2348,42 @@ async function main() {
         ["704", "702"],
         "…keeping the images it was given, in the order they were written"
       );
+
+      // The pair, from the writing side. What is written has to be what reading it
+      // back gives — and note the *fixed point* as well as the round trip. Parsing
+      // is the tolerant half: it turns numbers into strings and drops rows that
+      // cannot be ids, so a serialiser emitting something the parser then
+      // normalises would still round-trip canonical input while quietly changing
+      // the value on a second write. The fixed point is the law that catches that.
+      const list = [
+        { title: "開幕", images: ["703", "701"] },
+        { title: "中盤", images: ["705"] },
+      ];
+      assert.strictEqual(
+        NR.serializeChapters(list),
+        '{"v":1,"chapters":[{"title":"開幕","images":["703","701"]},' +
+          '{"title":"中盤","images":["705"]}]}',
+        "a list is written as the field's own JSON, in a literal key order"
+      );
+      assert.deepStrictEqual(
+        NR.parseChapters(NR.serializeChapters(list)),
+        list,
+        "and reading back what was written gives the same list"
+      );
+      assert.strictEqual(
+        NR.serializeChapters(NR.parseChapters(NR.serializeChapters(list))),
+        NR.serializeChapters(list),
+        "writing after reading writes the same bytes, which is what makes a second " +
+          "edit of the same gallery a no-op rather than a rewrite"
+      );
+
+      // A cleared list is still a list: the version is what makes it readable, and
+      // a gallery somebody emptied must not fall back to Stash's rows.
+      assert.strictEqual(
+        NR.serializeChapters([]),
+        '{"v":1,"chapters":[]}',
+        "and an empty list is written as an empty list, not as nothing"
+      );
     }
   );
 

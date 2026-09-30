@@ -182,6 +182,15 @@ export interface MangaToolsNamespace {
     value: string
   ): MangaToolsCustomFields;
 
+  /**
+   * Writes a gallery's chapters into this plugin's own field, quietly, through the
+   * same mutation the mark uses and with the same refresh after it. The caller
+   * serialises — the shape belongs to the reader half — and this rejects when
+   * nothing could be sent. Published by the tools half; the reader half calls it
+   * through the namespace and does without the button when it is not there.
+   */
+  importChapters(galleryId: string, json: string): Promise<void>;
+
   findCanonical(code?: string | null): string;
   normalize(raw: unknown): string;
   name(code: unknown, locale?: string | null): string;

@@ -22,8 +22,10 @@ const {
   galleryToolbarDom,
   globalListeners,
   hasText,
+  loggedErrors,
   makeEl,
   mutationWrites,
+  runSection,
   state,
 } = require("../helpers.js");
 const { detail, editField } = require("../renders.js");
@@ -299,6 +301,86 @@ module.exports = () => {
     "an option with no flag must not render a flag"
   );
   console.log("✓ edit write / clear / option flags and names");
+
+  // The chapters import — the one write this plugin makes that is not a mark, and
+  // the only thing that has ever filled the reader half's own chapter field. The
+  // value arrives already serialised: the format is the reader half's, and this
+  // half's job is to put a string where it says. Called through the namespace, so
+  // what is asserted here is the write alone; the reader's suite asserts the button
+  // that calls it.
+  {
+    const json = '{"v":1,"chapters":[{"title":"開幕","images":["1","2"]}]}';
+    const writesBefore = mutationWrites.length;
+
+    nav("/galleries/997");
+    const pushes = [];
+    call("CustomFieldsInput", {
+      values: { [NS.FIELD_NAME]: "ja" },
+      onChange: (next) => pushes.push(next),
+    });
+
+    NS.importChapters("997", json);
+
+    assert.deepStrictEqual(
+      mutationWrites[writesBefore].variables,
+      {
+        input: {
+          id: "997",
+          custom_fields: { partial: { [NS.CHAPTER_FIELD_NAME]: json } },
+        },
+      },
+      "the chapters go into this plugin's own field, as the string they came as"
+    );
+    assert.ok(
+      /galleryUpdate\(input: \$input\)\s*\{\s*id\s*\}/.test(
+        mutationWrites[writesBefore].mutation
+      ),
+      "…through the same quiet mutation the mark uses, asking for nothing back"
+    );
+    assert.deepStrictEqual(
+      pushes[0],
+      { [NS.FIELD_NAME]: "ja", [NS.CHAPTER_FIELD_NAME]: json },
+      "and into the open form's own map as well, so its Save — which sends the " +
+        "whole map — cannot drop them: this key is hidden from Stash's own field " +
+        "editor, so nothing on screen would say they had gone"
+    );
+  }
+
+  // A write that fails is the batch importer's business to count, so the rejection
+  // has to reach its caller and the console has to say which write it was. Deferred
+  // because the promise settles a microtask later and a section here is
+  // synchronous — the same reason the bulk section's failure check is deferred.
+  //
+  // What is *not* asserted here is the refetch that follows a failed write. That is
+  // real and is pinned in the reader's suite, where the batch importer's client is
+  // the test's own: the count of queries this half makes is shared with the bulk
+  // section's arithmetic, and a write of mine landing inside its window is a red
+  // there for a reason that has nothing to do with it.
+  const chaptersFailed = new Error("nope");
+  const chaptersCaught = [];
+  const chaptersErrors = loggedErrors.length;
+  state.galleryWriteResult = chaptersFailed;
+  NS.importChapters("997", '{"v":1,"chapters":[]}').catch((e) =>
+    chaptersCaught.push(e)
+  );
+  state.galleryWriteResult = null;
+
+  setTimeout(() => {
+    runSection("11d2 a chapter write that fails says so", () => {
+      assert.strictEqual(
+        chaptersCaught[0],
+        chaptersFailed,
+        "the rejection reaches whoever asked for the write"
+      );
+      assert.ok(
+        loggedErrors
+          .slice(chaptersErrors)
+          .some((line) => /could not write this gallery's chapters/.test(line)),
+        "and the console says which write it was"
+      );
+      console.log("✓ 11d2 a failed chapter write is reported");
+    });
+  }, 0);
 
   // ── 13b. The two display switches, and that they are independent ──
   // The panel only renders on a gallery *page* now, so the route has to be one.
