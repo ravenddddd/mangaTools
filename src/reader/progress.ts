@@ -182,6 +182,16 @@ let pending: number | null = null;
 let idle: number | null = null;
 
 /**
+ * Whether the bar was asked for while there was nothing to draw it at.
+ *
+ * A turn asks the bar to say where the reader has got to, and it cannot while the new
+ * pages are still on their way: a bar a point wide says nothing. So the asking is kept
+ * and answered when there is a width — the bar comes out as the pages arrive, rather
+ * than being left out for a turn nobody can see.
+ */
+let owed = false;
+
+/**
  * Builds the bar, or updates the one on screen.
  *
  * Built on demand and updated in place, like the header: this runs on every change
@@ -375,6 +385,12 @@ function update(state: ProgressState): void {
   // looking at the pages, and the bar is how they see where that was. Not on the
   // first pass, though — a lightbox that has just opened has said nothing yet, and a
   // bar that appears with it is a bar that has to be dismissed before it can be read.
+  // A wake that was owed, now that there is a width to draw the bar at.
+  if (owed && state.width > 0) {
+    owed = false;
+    wake();
+  }
+
   const moved =
     drawn !== null && (drawn.at !== state.at || drawn.total !== state.total);
   drawn = { nodes: key, at: state.at, total: state.total };
@@ -480,6 +496,16 @@ function takeBubbleDown(): void {
 /** Brings the bar back, and starts the clock that will put it away again */
 function wake(): void {
   if (!bar) return;
+
+  // Nothing measured yet: the pages are still on their way, and a bar a point wide is
+  // worse than no bar — least of all here, where there is no earlier width to stand
+  // on. The row keeps its place so the picture does not move; what brings the bar out
+  // is the pass an image's own `load` asks for. See the load listener in takeover.ts.
+  if ((latest?.width ?? 0) <= 0) {
+    bar.classList.add(CLASS_IDLE);
+    owed = true;
+    return;
+  }
 
   bar.classList.remove(CLASS_IDLE);
   if (idle !== null) window.clearTimeout(idle);

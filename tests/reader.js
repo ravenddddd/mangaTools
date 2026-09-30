@@ -3596,6 +3596,14 @@ async function main() {
       const track = bar.querySelector(".manga-reader-progress-track");
       const asleep = () => bar.classList.contains("is-idle");
 
+      // The pages as laid out, since a bar with nothing measured stays out of the way
+      // however much a pointer moves over it.
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+      dom.flush();
+
       // Nothing to put away and nothing yet to say: a lightbox that has just opened,
       // with a bar over it, is a bar that has to be got rid of before the picture can
       // be read.
@@ -3656,8 +3664,22 @@ async function main() {
       dom.click(box.navRight);
       assert.strictEqual(
         asleep(),
+        true,
+        "a turn with the new pages still on their way leaves it where it is: a bar " +
+          "with nothing measured is a bar a point wide"
+      );
+
+      // And when they arrive, the asking is answered: the bar comes out with a width
+      // to be drawn at. This is the pass an image's own `load` asks for, by hand.
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+      dom.flush();
+      assert.strictEqual(
+        asleep(),
         false,
-        "as does turning a page: the bar has something new to say"
+        "and the turn it was asked for arrives with them"
       );
 
       stopReader(box);

@@ -387,11 +387,18 @@ module.exports = () => {
       "from pages that have not been laid out on the first pass"
   );
 
-  // The chapter ticks are blocks on the line rather than rods through it: no taller
-  // than the track, so nothing about the bar reaches outside the bar.
+  // A chapter's tick is a block of white on the line, drawn inside a box the height of
+  // the track: what is seen is inside the bar, and what answers to the pointer is a
+  // target the size of the one the line itself offers.
   assert.ok(
-    /\.manga-reader-progress-node\s*\{[^}]*height:\s*4px/.test(readerCss),
-    "mangaReader.css should keep a chapter's tick within the height of the line"
+    /\.manga-reader-progress-node::before\s*\{[^}]*height:\s*4px/.test(
+      readerCss
+    ),
+    "mangaReader.css should draw a chapter's tick within the height of the line"
+  );
+  assert.ok(
+    /\.manga-reader-progress-node\s*\{[^}]*bottom:\s*0/.test(readerCss),
+    "and should give it the whole height of the track to be aimed at"
   );
 
   // And the pages cut off at the edge of the picture area, which is what keeps a

@@ -230,19 +230,32 @@
  * the eye. The one being read is not marked — the handle is already sitting on it.
  */
 /*
- * A chapter's tick: as tall as the line and no taller, and solid white against it.
- * Somewhere to aim at, so four pixels across rather than two — a tick the width of a
- * hair on a line the height of one is a tick nobody finds.
+ * A chapter's tick: a block of white on the line, drawn inside a box the height of the
+ * track.
+ *
+ * The same division as the line itself — what is seen is 4px, what answers to the
+ * pointer is 16 — because a tick that answered only where it is drawn is a tick a
+ * reader has to aim at, and one they will miss. Four pixels across rather than two, for
+ * the same reason: the track is a thing to be aimed at, and so is what sits on it.
  */
 .manga-reader-progress-node {
   position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  margin-left: -2px;
+  cursor: pointer;
+}
+
+.manga-reader-progress-node::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
   top: 50%;
   height: 4px;
   margin-top: -2px;
-  width: 4px;
-  margin-left: -2px;
   background: #fff;
-  cursor: pointer;
 }
 
 .manga-reader-progress-node:hover {
