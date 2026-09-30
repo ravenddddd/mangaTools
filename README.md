@@ -671,6 +671,7 @@ While the switch is on, and while you are reading a **gallery**:
 | **Zoom** | The wheel, as in Stash's own lightbox: away from you to zoom in, towards you to zoom out, `Shift` to scroll up and down instead. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
 | **Pan** | Press and drag to move the pages — as far as you take them, past the edge of the screen and all, exactly as Stash's own image does; turning the page is what puts them back in the middle. A drag never turns the page, and a click never moves it. Nor does a press held longer than a click: Stash's own other half of the test, so a press you thought better of sends you nowhere |
 | **Shift the pairing** | A second switch in the options menu, or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
+| **The progress bar** | Across the foot of the picture: how far through the book you are, with a tick where each chapter begins. Drag it to cross four hundred pages in one gesture — the handle follows your hand exactly, while the pictures follow as fast as they can be fetched — and letting go lands you on the page you were nearest. Click a tick to jump straight to that chapter. It fades out when nothing is happening; the pointer brings it back |
 | **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. A slider in the options menu sets how long, down to 0 for none. Nothing is animated for a reader who has asked their system for less motion |
 | **Fullscreen** | Stash's own button in Stash's own place. While the lightbox is filling the screen, a click on the space around the pages does nothing at all — the margin of a book is not a way out of it — so leaving fullscreen is the button, or Escape |
 | **Back closes it** | Pressing Back closes the lightbox instead of leaving it over the page you land on. Stash's own does not: its lightbox is in its own state and not in the route, so Back moves the page out from under it |
@@ -850,6 +851,8 @@ custom field puts a gallery back exactly where it was.
 - **No pinch or touch panning.** The wheel and the mouse are back — Stash's own two
   gestures, with Stash's own numbers — but a touchscreen's are not: no two-finger
   pinch, and no dragging the pages with one finger. Stash's own lightbox has both.
+  The progress bar is dragged with a mouse for the same reason: a drag is the same
+  gesture whatever it is dragging, and this plugin has built the one.
 - **Stash's four image settings are not read.** Display mode, scale up to fit, reset
   zoom on navigation and scroll mode are Stash's own options, and their defaults are
   what this half does: fit to the screen, no scaling up, the position reset on every

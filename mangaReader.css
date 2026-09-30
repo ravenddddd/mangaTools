@@ -154,6 +154,147 @@
 }
 
 /*
+ * The reading progress bar: where the reader is in the book, and a way to move.
+ *
+ * This one is not Stash's and has no markup of its own to wear, so it is the
+ * plugin's look rather than a copy of anything — a thin bar low on the picture, a
+ * handle that appears when aimed at, and ticks for the chapters.
+ *
+ * **Off the bottom edge by enough to hold the handle.** The display clips what is
+ * drawn outside it — that is what keeps a zoomed page off the header — and a 12px
+ * handle centred on a 4px track hangs below both. Six pixels is that overhang and a
+ * little more.
+ */
+.manga-reader-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 6px;
+  /* Taller than it looks: the bar is 4px of paint and 16px of somewhere to aim */
+  height: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  transition: opacity 0.25s ease;
+  user-select: none;
+}
+
+/*
+ * Asleep: out of sight, and taking no pointers. An invisible strip across the bottom
+ * of the picture that still caught clicks would be sixteen pixels of the page that
+ * no longer turn it.
+ */
+.manga-reader-progress.is-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.manga-reader-progress-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: height 0.12s ease;
+}
+
+.manga-reader-progress:hover .manga-reader-progress-track,
+.manga-reader-progress.is-scrubbing .manga-reader-progress-track {
+  height: 6px;
+}
+
+.manga-reader-progress-read {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  transition: width 0.15s ease;
+}
+
+/*
+ * The chapters, as ticks at the page each begins on.
+ *
+ * Faint on purpose: they are there to be found, not to compete with the handle for
+ * the eye. The one being read is not marked — the handle is already sitting on it.
+ */
+.manga-reader-progress-node {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+}
+
+.manga-reader-progress-node:hover {
+  width: 4px;
+  margin-left: -2px;
+  background: #fff;
+}
+
+.manga-reader-progress-thumb {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  /*
+   * Centred on the track by relation rather than by a number: the track grows on
+   * hover, and a fixed offset would sit a pixel low in exactly the state the handle
+   * is visible in.
+   */
+  top: 50%;
+  transform: translate(-50%, -50%);
+  transition:
+    left 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.manga-reader-progress:hover .manga-reader-progress-thumb,
+.manga-reader-progress.is-scrubbing .manga-reader-progress-thumb {
+  opacity: 1;
+}
+
+/*
+ * While a pointer is down the handle *is* the pointer: no easing, because easing is
+ * lag, and a handle that lags a hand is the thing this bar was built not to do. The
+ * easing above is for everything else — above all for the moment the reader lets go
+ * and the handle settles onto the page they chose.
+ */
+.manga-reader-progress.is-scrubbing .manga-reader-progress-read,
+.manga-reader-progress.is-scrubbing .manga-reader-progress-thumb {
+  transition: none;
+}
+
+.manga-reader-progress.is-scrubbing .manga-reader-progress-thumb {
+  transition: opacity 0.15s ease;
+}
+
+/* The page the drag is on, above the handle it belongs to */
+.manga-reader-progress-label {
+  position: absolute;
+  bottom: 20px;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.manga-reader-progress.is-scrubbing .manga-reader-progress-label {
+  opacity: 1;
+}
+
+/*
  * The footer's left column: the O counter and the rating stars.
  *
  * Not this half's to offer — and not, in a lightbox that is reading a book, anything

@@ -182,6 +182,18 @@ export interface MangaReaderNamespace {
   VIEW_STEP: number;
   /** How long a press may last and still be the click that turns a page */
   VIEW_CLICK_MS: number;
+  /**
+   * The progress bar's own arithmetic and its two timings — see progress.ts, where
+   * the snapping is explained and why the handle is not throttled with it.
+   */
+  fractionOfPage(page: number, total: number): number;
+  pageAtFraction(fraction: number, total: number): number;
+  progressNodes(
+    chapters: MangaReaderPlacedChapter[],
+    total: number
+  ): { title: string; at: number; fraction: number }[];
+  PROGRESS_SCRUB_MS: number;
+  PROGRESS_IDLE_MS: number;
   stepsToAdjacent(
     screens: MangaReaderScreen[],
     pageIndex: number,

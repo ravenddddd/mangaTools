@@ -33,6 +33,15 @@ import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
 import { syncFooter } from "./footer";
 import {
+  PROGRESS_IDLE_MS,
+  PROGRESS_SCRUB_MS,
+  ensureProgress,
+  fractionOfPage,
+  pageAtFraction,
+  progressNodes,
+  removeProgress,
+} from "./progress";
+import {
   type MangaReaderChapter,
   chapterAt,
   chaptersFromStash,
@@ -534,6 +543,10 @@ function sync(lightbox: Element): void {
     at < 0 ? null : gallery.images[gallery.screens[at].start] || null
   );
 
+  // The same position said as a fraction of the book, and the one gesture that
+  // crosses it. See progress.ts.
+  if (at >= 0) ensureProgress(lightbox, progressState(gallery, at, lightbox));
+
   if (at < 0) return;
 
   if (
@@ -551,6 +564,30 @@ function sync(lightbox: Element): void {
   if (!container) return;
 
   draw(gallery.screens[at], at);
+}
+
+/**
+ * Everything the progress bar draws from, gathered at the moment it is drawn.
+ *
+ * The page the chapter name is asked for is the *reader's* page number, and the
+ * answer comes from the same membership rule the header's own name uses — see
+ * chapterAt — so the bar cannot name a different chapter than the header does.
+ */
+function progressState(
+  gallery: MangaReaderGallery,
+  at: number,
+  lightbox: Element
+): Parameters<typeof ensureProgress>[1] {
+  return {
+    at: gallery.screens[at]?.start ?? 0,
+    total: gallery.pages.length,
+    chapters: gallery.chapters,
+    chapterNameAt: (page) =>
+      chapterAt(gallery.chapters, gallery.pages[page]?.id || "")?.title || "",
+    handlers: {
+      onSeek: (to: number) => seekTo(lightbox, to),
+    },
+  };
 }
 
 /**
@@ -708,6 +745,14 @@ NR.VIEW_MIN_ZOOM = VIEW_MIN_ZOOM;
 NR.VIEW_MAX_ZOOM = VIEW_MAX_ZOOM;
 NR.VIEW_STEP = VIEW_STEP;
 NR.VIEW_CLICK_MS = VIEW_CLICK_MS;
+
+// The progress bar's arithmetic, published for the same reason the zoom's is: the
+// fractions and the snapping are where a mistake would be invisible in a DOM test.
+NR.fractionOfPage = fractionOfPage;
+NR.pageAtFraction = pageAtFraction;
+NR.progressNodes = progressNodes;
+NR.PROGRESS_SCRUB_MS = PROGRESS_SCRUB_MS;
+NR.PROGRESS_IDLE_MS = PROGRESS_IDLE_MS;
 
 /**
  * Fades a screen in as it arrives.
@@ -932,6 +977,7 @@ function deactivate(): void {
   // class that hides its chrome is the one that carries this plugin's.
   if (root) {
     removeChrome(root);
+    removeProgress(root);
     root.classList.remove(CLASS_TAKEOVER);
   }
   forgetOpenMenu();
@@ -1128,6 +1174,25 @@ function turnBy(lightbox: Element, direction: 1 | -1): boolean {
   place += steps;
   sync(lightbox);
   return true;
+}
+
+/**
+ * Moves the reader to a page, which is the third way the place moves.
+ *
+ * The reader's arrow keys and Stash's chevrons turn by a *screen*; a chapter jump
+ * puts the place at a chapter's first page; this is the progress bar, which names a
+ * page and expects the book to be open at whichever screen holds it. The page is
+ * kept as asked for rather than rounded down to that screen's first page: the
+ * counter in the header counts the page the reader chose, which is the page the bar
+ * named all the while it was being dragged, and `screenNow` is what turns the page
+ * into the screen to draw.
+ */
+function seekTo(lightbox: Element, at: number): void {
+  const gallery = current();
+  if (!gallery) return;
+
+  place = Math.min(Math.max(at, 0), gallery.pages.length - 1);
+  sync(lightbox);
 }
 
 /**

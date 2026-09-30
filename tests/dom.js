@@ -36,6 +36,13 @@ function makeElement(tagName) {
     tagName: String(tagName).toUpperCase(),
     id: "",
     className: "",
+    /**
+     * What `getBoundingClientRect` answers, in the shape the plugin reads. Nothing
+     * here lays anything out, so a test that means to measure an element — the
+     * progress bar's track, which turns a pointer's x into a fraction of it — says
+     * for itself where it is and how wide.
+     */
+    rect: { left: 0, top: 0, width: 0, height: 0 },
     // `data-*` attributes, as the real element exposes them: the plugin reads one
     // to tell Stash's two nav buttons apart.
     dataset: {},
@@ -61,6 +68,9 @@ function makeElement(tagName) {
     attributes: {},
     setAttribute(name, value) {
       el.attributes[name] = String(value);
+    },
+    getBoundingClientRect() {
+      return el.rect;
     },
     getAttribute(name) {
       return Object.hasOwn(el.attributes, name) ? el.attributes[name] : null;

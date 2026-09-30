@@ -3093,6 +3093,320 @@ async function main() {
   });
 
   /**
+   * The bar's arithmetic, called on its own.
+   *
+   * The snapping is the whole feel of the thing and the least visible in a DOM test:
+   * a page is a mark, and the boundary between two marks is halfway between them.
+   */
+  await runSection("the progress bar's arithmetic", () => {
+    // Eight pages, so the marks are at 0, 1/8, 2/8 … and the boundaries at the
+    // halves: 3.4 in page terms lands on 3, 3.5 on 4.
+    assert.strictEqual(NR.pageAtFraction(3.4 / 8, 8), 3);
+    assert.strictEqual(NR.pageAtFraction(3.5 / 8, 8), 4);
+    assert.strictEqual(NR.pageAtFraction(3.6 / 8, 8), 4);
+    assert.strictEqual(
+      NR.pageAtFraction(1, 8),
+      7,
+      "the far end is the last page, not one past it"
+    );
+    assert.strictEqual(NR.pageAtFraction(-0.5, 8), 0);
+    assert.strictEqual(NR.pageAtFraction(0.99, 8), 7);
+
+    assert.strictEqual(NR.fractionOfPage(0, 40), 0);
+    assert.strictEqual(NR.fractionOfPage(3, 40), 3 / 40);
+    assert.strictEqual(
+      NR.fractionOfPage(39, 40),
+      39 / 40,
+      "the last page is a mark short of the end, like every other page"
+    );
+    assert.strictEqual(NR.fractionOfPage(999, 40), 39 / 40);
+
+    // A gallery with one page has no fractions to speak of, and no bar.
+    assert.strictEqual(NR.fractionOfPage(0, 1), 0);
+    assert.strictEqual(NR.pageAtFraction(0.7, 1), 0);
+
+    // Ticks: one per chapter, where each begins, and two on one page are one tick.
+    assert.deepStrictEqual(
+      NR.progressNodes(
+        [
+          { title: "開幕", at: 0, images: [] },
+          { title: "中盤", at: 4, images: [] },
+          { title: "同名", at: 4, images: [] },
+          { title: "越界", at: 99, images: [] },
+        ],
+        20
+      ),
+      [
+        { title: "開幕", at: 0, fraction: 0 },
+        { title: "中盤", at: 4, fraction: 4 / 20 },
+      ],
+      "at the page each chapter begins on, and once"
+    );
+  });
+
+  /**
+   * The bar itself: drawn where the reader is, dragged to somewhere else.
+   *
+   * Two speeds are the point of it — the handle follows the pointer, the jump is
+   * throttled — and both are pinned here, including the half that must not happen:
+   * a drag that turns the page, or a press on the bar that pans it.
+   */
+  await runSection("the progress bar shows the way, and moves it", async () => {
+    const { box } = await startReader({
+      galleryId: "31",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
+
+    const bar = box.lightbox.querySelector(".manga-reader-progress");
+    assert.ok(bar, "a gallery with pages has a bar");
+    assert.strictEqual(
+      bar.getAttribute("data-manga-reader-hidden"),
+      null,
+      "and it is on the screen"
+    );
+
+    const track = bar.querySelector(".manga-reader-progress-track");
+    const read = bar.querySelector(".manga-reader-progress-read");
+    const thumb = bar.querySelector(".manga-reader-progress-thumb");
+    const ticks = () => [
+      ...bar.querySelectorAll(".manga-reader-progress-node"),
+    ];
+
+    // The track as the browser would measure it, since a pointer's x is only a
+    // fraction of something.
+    track.rect = { left: 0, top: 0, width: 800, height: 4 };
+
+    assert.strictEqual(read.style.width, "0.000%", "the book opens unread");
+    assert.strictEqual(thumb.style.left, "0.000%");
+
+    assert.strictEqual(ticks().length, 2, "one tick per chapter");
+    assert.deepStrictEqual(
+      ticks().map((tick) => [tick.title, tick.style.left]),
+      [
+        ["開幕", "25.000%"],
+        ["中盤", "50.000%"],
+      ],
+      "at the page each begins on, which is 2 of 8 and 4 of 8"
+    );
+
+    // A turn: the bar follows the reader.
+    dom.click(box.navRight);
+    assert.deepStrictEqual(drawn(), ["/image/702/image", "/image/703/image"]);
+    assert.strictEqual(
+      read.style.width,
+      "12.500%",
+      "a screen later, the fill ends where the reader is: page 2 of 8"
+    );
+
+    // A drag: the handle follows the pointer on every event — to the pixel, with no
+    // snapping — while the jump that costs a fetch is held back.
+    const still = container().style.transform;
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 700 })
+    );
+    assert.strictEqual(
+      thumb.style.left,
+      "87.500%",
+      "the handle is where the pointer is, not on the nearest page"
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/708/image"],
+      "and the jump behind it went to the screen holding page 8"
+    );
+
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 100 })
+    );
+    assert.strictEqual(
+      thumb.style.left,
+      "12.500%",
+      "the next pointer event moves the handle again, just as immediately"
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/708/image"],
+      "while the jump waits its turn — two pictures a millisecond apart would be " +
+        "one fetch and one decode each, which is what the wait is for"
+    );
+
+    // Let go before the wait is up: the release lands where the pointer left off,
+    // whatever the jump it was owed — a reader who has stopped dragging has stopped
+    // asking, and waiting out a timer they cannot see is the bar arguing with them.
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/702/image", "/image/703/image"],
+      "letting go lands on what the pointer asked for, without waiting its turn"
+    );
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, NR.PROGRESS_SCRUB_MS + 40)
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/702/image", "/image/703/image"],
+      "and the jump it was owed never comes: a reader who has let go of the bar is " +
+        "not carried back to where they were dragging"
+    );
+
+    // A second drag, this time with the wait allowed to run out: the handle moves at
+    // once, the jump lands when its turn comes, and the release asks for nothing new.
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 400 })
+    );
+    assert.strictEqual(
+      thumb.style.left,
+      "50.000%",
+      "halfway along is page 4 of 8"
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/704/image", "/image/705/image"],
+      "which is the screen holding it"
+    );
+
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 100 })
+    );
+    assert.strictEqual(thumb.style.left, "12.500%");
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/704/image", "/image/705/image"],
+      "a second jump this soon is held back, so the picture is still behind"
+    );
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, NR.PROGRESS_SCRUB_MS + 40)
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/702/image", "/image/703/image"],
+      "and the picture follows the handle when the wait runs out"
+    );
+
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+
+    // A press on the bar is not a press on the pages: the bar is their sibling, so
+    // nothing the reader does to it can pan them or turn them.
+    assert.strictEqual(
+      container().style.transform,
+      still,
+      "dragging the bar pans nothing"
+    );
+    assert.strictEqual(
+      dom.click(track).propagationStopped,
+      true,
+      "and the click it ends with never reaches Stash's lightbox, which closes on one"
+    );
+
+    // A tick is a jump to its chapter.
+    dom.click(ticks()[1]);
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/704/image", "/image/705/image"],
+      "clicking a chapter's tick opens the book at that chapter"
+    );
+
+    stopReader(box);
+    assert.strictEqual(
+      box.lightbox.querySelector(".manga-reader-progress"),
+      null,
+      "and the bar goes with the lightbox"
+    );
+  });
+
+  /**
+   * The bar sleeps when nothing is happening, and wakes when something is.
+   *
+   * The clock is the test's: waiting two and a half seconds to see a bar go away is
+   * a test nobody would keep. The timers the plugin sets are the plugin's own — it
+   * is the callback that is run by hand here.
+   */
+  await runSection("the progress bar sleeps, and wakes", async () => {
+    const real = dom.window.setTimeout;
+    const timers = [];
+    dom.window.setTimeout = (fn, ms) => {
+      timers.push({ fn, ms });
+      return real(fn, ms);
+    };
+
+    try {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const bar = box.lightbox.querySelector(".manga-reader-progress");
+      const asleep = () => bar.classList.contains("is-idle");
+
+      assert.strictEqual(
+        asleep(),
+        false,
+        "a bar that has just been drawn is awake"
+      );
+
+      const sleep = timers.find((timer) => timer.ms === NR.PROGRESS_IDLE_MS);
+      assert.ok(sleep, "and it has set itself a clock to go to sleep by");
+
+      sleep.fn();
+      assert.strictEqual(
+        asleep(),
+        true,
+        "which, when it runs out, puts it away"
+      );
+
+      // Anything moving over the lightbox brings it back — including a pointer that
+      // never touches the bar, which is the case that matters: asleep, it is taking
+      // no pointers of its own.
+      box.lightbox.dispatch("mousemove", dom.makeEvent("mousemove", {}));
+      assert.strictEqual(
+        asleep(),
+        false,
+        "and moving over the lightbox wakes it"
+      );
+
+      sleep.fn();
+      dom.click(box.navRight);
+      assert.strictEqual(
+        asleep(),
+        false,
+        "as does turning a page: the bar has something new to say"
+      );
+
+      stopReader(box);
+    } finally {
+      dom.window.setTimeout = real;
+    }
+  });
+
+  /**
+   * A gallery of one page gets no bar.
+   *
+   * There is no progress to show through a single picture, and a bar across the foot
+   * of one would be furniture with nothing to say — the same reason Stash draws its
+   * own counter only for a lightbox of more than one image.
+   */
+  await runSection("a gallery of one page gets no bar", async () => {
+    const { box } = await startReader({
+      galleryId: "12",
+      on: true,
+      total: 1,
+    });
+
+    assert.strictEqual(
+      box.lightbox.querySelector(".manga-reader-progress"),
+      null,
+      "the one-page gallery has no bar at all — not a hidden one"
+    );
+
+    stopReader(box);
+  });
+
+  /**
    * Paging past what the lightbox has loaded makes it fetch, and while it fetches it
    * shows a spinner *instead of* its header and its carousel. That is not a lightbox
    * this plugin cannot read — it is one that is busy — and reading it as the former is
