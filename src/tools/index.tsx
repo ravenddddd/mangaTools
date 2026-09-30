@@ -63,6 +63,12 @@ import {
   currentSidebarFilter,
   publishSidebarFilter,
 } from "./sidebar-filter";
+// Types only, and deliberately so: these are erased before the bundle exists, so
+// this half names the reader's shapes without depending on its modules at run time.
+import type {
+  ChapterImportPlan,
+  ChapterImportRun,
+} from "../reader/chapters-import";
 import type { ReactNode } from "react";
 import type { MangaToolsFilterModel } from "../plugin-api";
 import type {
@@ -1161,13 +1167,22 @@ function storedIsManga(galleryId: string): boolean {
  * a two-step click would need a third, which is exactly the kind of state naming
  * this plugin went to some trouble to avoid.
  */
-function ConfirmUnmark(props: {
+/**
+ * A question, in a modal.
+ *
+ * The shell both of this plugin's confirmations use — taking the manga mark off,
+ * and importing a library's chapters over the lists this plugin already has. Stash's
+ * own Bootstrap, so it looks like the rest of the page; the two differ only in what
+ * they say and in which of them is the dangerous answer.
+ */
+function ConfirmDialog(props: {
+  children: unknown;
+  confirmLabel: string;
+  cancelLabel: string;
+  variant: string;
   onCancel: () => void;
   onConfirm: () => void;
-  /** Whether the edit form is holding unsaved changes the write will reset */
-  resetsForm: boolean;
 }) {
-  const intl = PluginApi.libraries.Intl.useIntl();
   const Bootstrap = PluginApi.libraries.Bootstrap;
   const Modal = Bootstrap?.Modal;
   const Button = Bootstrap?.Button;
@@ -1175,26 +1190,285 @@ function ConfirmUnmark(props: {
 
   return (
     <Modal show size="sm" onHide={props.onCancel}>
-      <Modal.Body>
-        <div>{t(intl, "mangaTools.manga.confirm")}</div>
-        {/* Taking the mark off removes the language and the censorship with it,
-            which the details panel draws — so the cache has to follow, and Stash's
-            edit form reinitialises itself when it does. Marking is the other way
-            round and is written quietly, so this only ever applies here. */}
-        {props.resetsForm ? (
-          <div>{t(intl, "mangaTools.manga.confirmResetsForm")}</div>
-        ) : null}
-      </Modal.Body>
+      <Modal.Body>{props.children}</Modal.Body>
       <Modal.Footer>
         <Button variant="secondary" onClick={props.onCancel}>
-          {t(intl, "mangaTools.manga.confirmCancel")}
+          {props.cancelLabel}
         </Button>
-        <Button variant="danger" onClick={props.onConfirm}>
-          {t(intl, "mangaTools.manga.confirmOk")}
+        <Button variant={props.variant} onClick={props.onConfirm}>
+          {props.confirmLabel}
         </Button>
       </Modal.Footer>
     </Modal>
   );
+}
+
+function ConfirmUnmark(props: {
+  onCancel: () => void;
+  onConfirm: () => void;
+  /** Whether the edit form is holding unsaved changes the write will reset */
+  resetsForm: boolean;
+}) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+
+  return (
+    <ConfirmDialog
+      variant="danger"
+      confirmLabel={t(intl, "mangaTools.manga.confirmOk")}
+      cancelLabel={t(intl, "mangaTools.manga.confirmCancel")}
+      onCancel={props.onCancel}
+      onConfirm={props.onConfirm}
+    >
+      <div>{t(intl, "mangaTools.manga.confirm")}</div>
+      {/* Taking the mark off removes the language and the censorship with it,
+          which the details panel draws — so the cache has to follow, and Stash's
+          edit form reinitialises itself when it does. Marking is the other way
+          round and is written quietly, so this only ever applies here. */}
+      {props.resetsForm ? (
+        <div>{t(intl, "mangaTools.manga.confirmResetsForm")}</div>
+      ) : null}
+    </ConfirmDialog>
+  );
+}
+
+/**
+ * Where the chapter import has got to.
+ *
+ * The module's state rather than React's, like everything else this half draws: the
+ * panel repaints on `emit()`, so a run in progress reports its own progress, and a
+ * test can watch a run finish instead of being unable to open it at all.
+ */
+type ChapterJob =
+  | { phase: "idle" }
+  | { phase: "planning" }
+  | { phase: "confirming"; plan: ChapterImportPlan; replace: boolean }
+  | {
+      phase: "running";
+      plan: ChapterImportPlan;
+      replace: boolean;
+      done: number;
+      total: number;
+    }
+  | { phase: "done"; outcome: ChapterImportRun };
+
+let chapterJob: ChapterJob = { phase: "idle" };
+
+/**
+ * The reader half's import job, or null when that half is not running.
+ *
+ * Reached through the window rather than imported, which is what keeps the two
+ * halves unlinked: the chapter format is the reader's, so the job is its, and this
+ * half asks through the namespace the same way the reader asks this half for
+ * `markedInStore`. Absent is a real state — a Stash that could not start one half
+ * runs the other — so every caller checks before it calls.
+ */
+function readerChapters(): {
+  planChapterImports(): Promise<ChapterImportPlan>;
+  runChapterImports(
+    plan: ChapterImportPlan,
+    options?: {
+      reimport?: boolean;
+      onProgress?: (done: number, total: number) => void;
+    }
+  ): Promise<ChapterImportRun>;
+} | null {
+  const reader = (
+    window as unknown as {
+      MangaReader?: {
+        planChapterImports?: unknown;
+        runChapterImports?: unknown;
+      };
+    }
+  ).MangaReader;
+
+  if (
+    !reader ||
+    typeof reader.planChapterImports !== "function" ||
+    typeof reader.runChapterImports !== "function"
+  ) {
+    return null;
+  }
+
+  return reader as unknown as {
+    planChapterImports(): Promise<ChapterImportPlan>;
+    runChapterImports(
+      plan: ChapterImportPlan,
+      options?: {
+        reimport?: boolean;
+        onProgress?: (done: number, total: number) => void;
+      }
+    ): Promise<ChapterImportRun>;
+  };
+}
+
+/**
+ * Importing Stash's chapters into this plugin's own field, for a whole library.
+ *
+ * The one-time move a library that has been on Stash's own rows all along needs.
+ * The Chapters tab does the same job for the gallery it is on; this is that job for
+ * every gallery that needs it, which is the shape it has to be — the galleries that
+ * need it are exactly the ones nobody has opened the tab on.
+ *
+ * Two steps on screen as well as in the job: a read-only plan, so the question can
+ * say how many galleries it is about, and then the run. Nothing is written until
+ * the question is answered.
+ */
+function ChapterImportSetting(props: { intl: MangaToolsIntl }) {
+  const intl = props.intl;
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+  const Button = Bootstrap?.Button;
+  const job = chapterJob;
+
+  /** Asks the reader half what there is to do, and says so if it cannot */
+  function plan() {
+    const reader = readerChapters();
+    if (!reader) {
+      console.error(
+        "[mangaTools] the reader half is not running, so its chapter import " +
+          "cannot be asked for"
+      );
+      return;
+    }
+
+    chapterJob = { phase: "planning" };
+    emit();
+
+    reader.planChapterImports().then(
+      (next) => {
+        chapterJob =
+          next.toImport.length > 0 || next.owned.length > 0
+            ? { phase: "confirming", plan: next, replace: false }
+            : { phase: "done", outcome: emptyRun() };
+        emit();
+      },
+      (e: unknown) => {
+        console.error("[mangaTools] could not work out what to import:", e);
+        chapterJob = { phase: "idle" };
+        emit();
+      }
+    );
+  }
+
+  /** Does it, reporting each gallery as it lands */
+  function run(plan: ChapterImportPlan, replace: boolean) {
+    const reader = readerChapters();
+    if (!reader) return;
+
+    const total = replace
+      ? plan.toImport.length + plan.owned.length
+      : plan.toImport.length;
+    chapterJob = { phase: "running", plan, replace, done: 0, total };
+    emit();
+
+    reader
+      .runChapterImports(plan, {
+        reimport: replace,
+        onProgress: (done, total) => {
+          chapterJob = { phase: "running", plan, replace, done, total };
+          emit();
+        },
+      })
+      .then(
+        (outcome) => {
+          chapterJob = { phase: "done", outcome };
+          emit();
+        },
+        (e: unknown) => {
+          console.error("[mangaTools] the chapter import did not finish:", e);
+          chapterJob = { phase: "idle" };
+          emit();
+        }
+      );
+  }
+
+  if (!Button) return null;
+
+  return (
+    <>
+      <div className="setting manga-tools-settings">
+        <div className="manga-tools-settings-block">
+          <h3>{t(intl, "mangaTools.settings.chapters.heading")}</h3>
+          <div className="sub-heading">
+            {t(intl, "mangaTools.settings.chapters.description")}
+          </div>
+          <div className="manga-tools-settings-control">
+            {job.phase === "running" ? (
+              <span className="manga-tools-settings-progress">
+                {t(intl, "mangaTools.settings.chapters.progress")} {job.done}{" "}
+                {t(intl, "mangaTools.settings.chapters.of")} {job.total}
+              </span>
+            ) : (
+              <Button
+                variant="secondary"
+                disabled={job.phase === "planning"}
+                onClick={plan}
+              >
+                {t(
+                  intl,
+                  job.phase === "planning"
+                    ? "mangaTools.settings.chapters.checking"
+                    : "mangaTools.settings.chapters.check"
+                )}
+              </Button>
+            )}
+          </div>
+          {/* What the last run did, said in numbers rather than in a sentence: the
+            three outcomes are counted separately because they mean different
+            things, and "nothing to bring over" is not a failure. */}
+          {job.phase === "done" ? (
+            <div className="sub-heading">
+              {t(intl, "mangaTools.settings.chapters.progress")}{" "}
+              {job.outcome.written.length} ·{" "}
+              {t(intl, "mangaTools.settings.chapters.skipped")}{" "}
+              {job.outcome.skippedEmpty.length} ·{" "}
+              {t(intl, "mangaTools.settings.chapters.failed")}{" "}
+              {job.outcome.failed.length}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {job.phase === "confirming" ? (
+        <ConfirmDialog
+          variant="danger"
+          confirmLabel={t(intl, "mangaTools.settings.chapters.start")}
+          cancelLabel={t(intl, "mangaTools.manga.confirmCancel")}
+          onCancel={() => {
+            chapterJob = { phase: "idle" };
+            emit();
+          }}
+          onConfirm={() => run(job.plan, job.replace)}
+        >
+          <div>
+            {t(intl, "mangaTools.settings.chapters.toImport")}{" "}
+            {job.plan.toImport.length} ·{" "}
+            {t(intl, "mangaTools.settings.chapters.owned")}{" "}
+            {job.plan.owned.length}
+          </div>
+          <label className="manga-tools-settings-check">
+            <input
+              type="checkbox"
+              checked={job.replace}
+              onChange={() => {
+                chapterJob = {
+                  phase: "confirming",
+                  plan: job.plan,
+                  replace: !job.replace,
+                };
+                emit();
+              }}
+            />{" "}
+            {t(intl, "mangaTools.settings.chapters.replace")}
+          </label>
+        </ConfirmDialog>
+      ) : null}
+    </>
+  );
+}
+
+/** A run that did nothing, for a plan with nothing in it */
+function emptyRun(): ChapterImportRun {
+  return { written: [], failed: [], skippedEmpty: [] };
 }
 
 /**
@@ -2507,6 +2781,8 @@ function MangaToolsSettings(props: { pluginID: string }) {
           persist();
         }}
       />
+
+      <ChapterImportSetting intl={intl} />
 
       <BooleanSetting
         id="mangaTools-hidePerformers"

@@ -11,6 +11,7 @@ const {
   capturedQueries,
   find,
   makeFilterModel,
+  mutationWrites,
   original,
   patched,
   patchedAfter,
@@ -370,6 +371,61 @@ module.exports = () => {
   console.log(
     "✓ settings UI (multiselect + switches write configurePlugin, update shared state)"
   );
+
+  // ── 7c. The chapter import, which is a job rather than a setting ────
+  // It is on this page because a library-wide action belongs on the page where the
+  // plugin's other controls are, and it is *not* a setting: it stores nothing, and
+  // what it writes is each gallery's own chapters field. What a click does is plan
+  // — a read-only query — and only then ask, which is what makes it safe to put a
+  // button next to a switch that looks the same.
+  //
+  // The smoke world has no gallery with chapters of Stash's to bring over, so the
+  // plan comes back empty and nothing is written. The job itself is exercised
+  // against fixtures in ./reader.js, which is where the chapter states live.
+  {
+    const el = call("PluginSettings", { pluginID: "mangaTools" });
+
+    assert.strictEqual(
+      find(
+        el,
+        (n) => n.props?.children === "mangaTools.settings.chapters.heading"
+      ),
+      null,
+      "the heading is a string this plugin's catalogs resolve, not a raw id"
+    );
+    const heading = find(
+      el,
+      (n) => n.props?.children === "Import chapters from Stash"
+    );
+    assert.ok(heading, "the panel offers the chapter import");
+    assert.strictEqual(
+      heading.type,
+      "h3",
+      "under a heading, like the settings around it"
+    );
+
+    const button = find(
+      el,
+      (n) => n.props?.children === "Check what would be imported"
+    );
+    assert.ok(button, "with a button that asks what there is to do");
+
+    const writesBefore = mutationWrites.length;
+    button.props.onClick();
+
+    assert.strictEqual(
+      mutationWrites.length,
+      writesBefore,
+      "and asking writes nothing — the plan is a read, and the question comes next"
+    );
+    assert.ok(
+      find(
+        call("PluginSettings", { pluginID: "mangaTools" }),
+        (n) => n.props?.children === "Checking…"
+      ),
+      "the button says what it is doing rather than looking like nothing happened"
+    );
+  }
 
   // ── 7d. The plugin's own strings follow Stash's UI language ────────
   // Only the strings this plugin writes itself have catalogs: the headings, the
