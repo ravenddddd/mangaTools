@@ -3262,6 +3262,7 @@ async function main() {
       "中盤",
       "and the pointer on a tick names that chapter"
     );
+    const labelAt = label.style.left;
     assert.strictEqual(
       bubbleLine("page"),
       "",
@@ -3286,6 +3287,11 @@ async function main() {
       "中盤",
       "leaving it the words it had: emptying it first shows something else in the " +
         "last tenth of a second, which is the flash it used to give"
+    );
+    assert.strictEqual(
+      label.style.left,
+      labelAt,
+      "and the place it had, so it does not slide to the handle on its way out"
     );
 
     // And the book moving under a pointer that has not: the bar's width changes with
@@ -3394,6 +3400,18 @@ async function main() {
       ["5 / 8", "中盤"],
       "and the bubble says where the drag is on one line and the chapter on another"
     );
+
+    // Crossing a tick while dragging is no reason to change what the drag is saying:
+    // its bubble is the drag's, and the row keeps out of it.
+    bar.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { target: ticks()[1] })
+    );
+    assert.deepStrictEqual(
+      [bubbleLine("page"), bubbleLine("chapter")],
+      ["5 / 8", "中盤"],
+      "and dragging over a chapter's tick does not turn the bubble into its name"
+    );
     assert.deepStrictEqual(
       drawn(),
       ["/image/704/image", "/image/705/image"],
@@ -3421,6 +3439,27 @@ async function main() {
     );
 
     dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      false,
+      "letting go takes the bubble down with the drag: what it was saying was where " +
+        "the drag was going, and the reader has arrived"
+    );
+
+    // A drag that ends inside the screen it started on — page 2 of the pair already
+    // on show — is the case the pass cannot clean up, because nothing about the screen
+    // has changed for it to notice.
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 100 })
+    );
+    assert.strictEqual(bar.classList.contains("is-showing"), true);
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      false,
+      "and a drag that lands where the reader already was takes it down too"
+    );
 
     // A press on the bar is not a press on the pages: the bar is their sibling, so
     // nothing the reader does to it can pan them or turn them.

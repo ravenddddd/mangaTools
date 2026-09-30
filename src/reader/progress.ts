@@ -350,13 +350,18 @@ function update(state: ProgressState): void {
     }
   }
 
-  // Kept inside the bar rather than centred on a point that may be at either end.
-  const half = labelWidth / 2;
-  const width = track.clientWidth || 0;
-  const at = bubble ? bubble.fraction : fraction;
-  const px =
-    Math.max(half, Math.min(at * width, width - half)).toFixed(0) + "px";
-  if (label.style.left !== px) label.style.left = px;
+  // Where the bubble points is wherever it was put. With none up there is nothing to
+  // point at, and moving the label to the handle is what made it slide across the bar
+  // during the fade it was on its way out with.
+  if (bubble) {
+    const half = labelWidth / 2;
+    const width = track.clientWidth || 0;
+    const px =
+      Math.max(half, Math.min(bubble.fraction * width, width - half)).toFixed(
+        0
+      ) + "px";
+    if (label.style.left !== px) label.style.left = px;
+  }
 
   // A bar with something new to say comes back: the reader who turned a page is
   // looking at the pages, and the bar is how they see where that was. Not on the
@@ -411,6 +416,11 @@ function drawNodes(state: ProgressState): void {
  */
 function onMoveOverBar(event: Event): void {
   wake();
+
+  // A drag has a bubble of its own, and the pointer crossing a tick on its way is not
+  // a reason to change it: what a drag says is where it is going, not which chapter
+  // it happens to be passing over.
+  if (pressed) return;
 
   const node = event.target as HTMLElement | null;
   const tick = node?.classList?.contains(CLASS_NODE) ? node : null;
@@ -563,6 +573,9 @@ function settle(): void {
   pointer = null;
 
   latest?.handlers.onSeek(wanted);
+  // The drag is over, so its bubble is too: what it was saying was where the drag was
+  // going, and the reader has arrived.
+  takeBubbleDown();
   redraw();
 }
 
