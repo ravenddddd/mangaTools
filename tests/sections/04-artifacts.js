@@ -387,6 +387,13 @@ module.exports = () => {
       "from pages that have not been laid out on the first pass"
   );
 
+  // The chapter ticks are blocks on the line rather than rods through it: no taller
+  // than the track, so nothing about the bar reaches outside the bar.
+  assert.ok(
+    /\.manga-reader-progress-node\s*\{[^}]*height:\s*4px/.test(readerCss),
+    "mangaReader.css should keep a chapter's tick within the height of the line"
+  );
+
   // And the pages cut off at the edge of the picture area, which is what keeps a
   // zoom off the header — Stash gets the same cut from its slides' paint containment.
   // Without it the zoomed pages paint over the header and take its clicks, and a

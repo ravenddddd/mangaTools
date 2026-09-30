@@ -191,7 +191,7 @@ export interface MangaReaderNamespace {
   progressNodes(
     chapters: MangaReaderPlacedChapter[],
     total: number
-  ): { title: string; at: number; fraction: number }[];
+  ): { name: string; at: number; fraction: number }[];
   PROGRESS_SCRUB_MS: number;
   PROGRESS_IDLE_MS: number;
   stepsToAdjacent(

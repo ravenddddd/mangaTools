@@ -97,19 +97,21 @@ export function pageAtFraction(fraction: number, total: number): number {
 export function progressNodes(
   chapters: MangaReaderPlacedChapter[],
   total: number
-): { title: string; at: number; fraction: number }[] {
-  const nodes: { title: string; at: number; fraction: number }[] = [];
+): { name: string; at: number; fraction: number }[] {
+  const nodes: { name: string; at: number; fraction: number }[] = [];
   const seen = new Set<number>();
 
-  for (const chapter of chapters) {
-    if (chapter.at < 0 || chapter.at >= total || seen.has(chapter.at)) continue;
+  chapters.forEach((chapter, index) => {
+    if (chapter.at < 0 || chapter.at >= total || seen.has(chapter.at)) return;
     seen.add(chapter.at);
     nodes.push({
-      title: chapter.title,
+      // A chapter with no name is named by its place, which is what the header's own
+      // menu calls it too.
+      name: chapter.title || "#" + (index + 1),
       at: chapter.at,
       fraction: fractionOfPage(chapter.at, total),
     });
-  }
+  });
 
   return nodes;
 }
@@ -126,6 +128,8 @@ const CLASS_LABEL = "manga-reader-progress-label";
 const CLASS_SCRUBBING = "is-scrubbing";
 /** While it is asleep: out of sight, and out of the way of clicks */
 const CLASS_IDLE = "is-idle";
+/** While a chapter's tick is under the pointer: the bubble says which one */
+const CLASS_NAMING = "is-naming";
 /** The state the bar was last drawn from, which its gestures read */
 let latest: ProgressState | null = null;
 
@@ -155,8 +159,6 @@ let lastJump = 0;
 let pending: number | null = null;
 /** The timer that will put the bar to sleep */
 let idle: number | null = null;
-/** The lightbox whose pointer movements are being watched */
-let watching: Element | null = null;
 
 /**
  * Builds the bar, or updates the one on screen.
@@ -187,7 +189,6 @@ export function ensureProgress(
 
   if (!bar || !track || !read || !thumb || !label || !nodes) return bar;
 
-  watch(lightbox);
   update(state);
 
   return bar;
@@ -201,7 +202,6 @@ export function removeProgress(lightbox: Element): void {
   if (node !== bar) return;
 
   stopTimers();
-  if (watching) watching.removeEventListener("mousemove", onWake);
 
   bar = null;
   track = null;
@@ -211,7 +211,6 @@ export function removeProgress(lightbox: Element): void {
   nodes = null;
   drawn = null;
   latest = null;
-  watching = null;
   pointer = null;
   pressed = false;
   labelWidth = 0;
@@ -240,8 +239,18 @@ function build(lightbox: Element): void {
   track.appendChild(read);
   track.appendChild(nodes);
   track.appendChild(thumb);
-  bar.appendChild(label);
+  // In the track, with it: the bubble is the width of the line it is about, so a
+  // fraction of one is a place on the other. In the row, it would be measured
+  // against whatever is positioned above that, which is the lightbox.
+  track.appendChild(label);
   bar.appendChild(track);
+
+  // The row itself, not the lightbox: a bar that wakes whenever the pointer moves
+  // anywhere brings a reader's eye to the bottom of the picture for nothing. What
+  // wakes it is the pointer reaching *it* — which works while it is asleep because
+  // it is a row of its own and covers nothing that anybody else wants.
+  bar.addEventListener("mousemove", onWake);
+  bar.addEventListener("mouseleave", onLeave);
 
   track.addEventListener("mousedown", onPress);
   // The bar is a sibling of the pages rather than a child of them, so a press here
@@ -318,7 +327,6 @@ function drawNodes(state: ProgressState): void {
     const tick = document.createElement("div");
     tick.className = CLASS_NODE;
     tick.style.left = (node.fraction * 100).toFixed(3) + "%";
-    if (node.title) tick.title = node.title;
     // A tick's own press is a jump, not the start of a scrub.
     tick.addEventListener("mousedown", (event) => event.stopPropagation());
     tick.addEventListener("click", (event) => {
@@ -326,27 +334,21 @@ function drawNodes(state: ProgressState): void {
       latest?.handlers.onSeek(node.at);
       wake();
     });
+    // The name, in this plugin's own bubble rather than in the browser's: a title
+    // attribute waits a second before it says anything, which is a second of not
+    // knowing which of four ticks is the one under the pointer.
+    tick.addEventListener("mouseenter", () => name(node.name, node.fraction));
     nodes.appendChild(tick);
   }
 }
 
-/**
- * Watches the lightbox for movement, once per lightbox.
- *
- * On the lightbox rather than on the bar, because the bar is asleep and taking no
- * pointers exactly when it matters most: a pointer that never touches the bar is the
- * one that has to bring it back.
- */
-function watch(lightbox: Element): void {
-  if (watching === lightbox) return;
-
-  if (watching) watching.removeEventListener("mousemove", onWake);
-  lightbox.addEventListener("mousemove", onWake);
-  watching = lightbox;
-}
-
 function onWake(): void {
   wake();
+}
+
+/** The pointer left the row: it may stay awake, but it stops naming a chapter */
+function onLeave(): void {
+  bar?.classList.remove(CLASS_NAMING);
 }
 
 /** Brings the bar back, and starts the clock that will put it away again */
@@ -367,6 +369,27 @@ function stopTimers(): void {
   if (pending !== null) window.clearTimeout(pending);
   idle = null;
   pending = null;
+}
+
+/**
+ * Says which chapter's tick the pointer is on, and where it is.
+ *
+ * The same bubble the drag uses, in the same place: a fraction of the track and the
+ * words, with neither a delay nor a hover of its own to wait out.
+ */
+function name(words: string, fraction: number): void {
+  if (!bar || !label || !track) return;
+
+  if (label.textContent !== words) {
+    label.textContent = words;
+    labelWidth = label.offsetWidth;
+  }
+
+  const half = labelWidth / 2;
+  const width = track.clientWidth || 0;
+  label.style.left =
+    Math.max(half, Math.min(fraction * width, width - half)).toFixed(0) + "px";
+  bar.classList.add(CLASS_NAMING);
 }
 
 /** Whether a pointer is down on the bar */

@@ -182,7 +182,6 @@
  */
 .manga-reader-progress.is-idle {
   opacity: 0;
-  pointer-events: none;
 }
 
 /*
@@ -230,21 +229,25 @@
  * Faint on purpose: they are there to be found, not to compete with the handle for
  * the eye. The one being read is not marked — the handle is already sitting on it.
  */
+/*
+ * A chapter's tick: as tall as the line and no taller, and solid white against it.
+ * Somewhere to aim at, so four pixels across rather than two — a tick the width of a
+ * hair on a line the height of one is a tick nobody finds.
+ */
 .manga-reader-progress-node {
   position: absolute;
   top: 50%;
-  height: 12px;
-  margin-top: -6px;
-  width: 2px;
-  margin-left: -1px;
-  background: rgba(255, 255, 255, 0.45);
+  height: 4px;
+  margin-top: -2px;
+  width: 4px;
+  margin-left: -2px;
+  background: #fff;
   cursor: pointer;
 }
 
 .manga-reader-progress-node:hover {
-  width: 4px;
-  margin-left: -2px;
-  background: #fff;
+  width: 6px;
+  margin-left: -3px;
 }
 
 .manga-reader-progress-thumb {
@@ -288,10 +291,12 @@
 }
 
 /* The page the drag is on, above the bar it belongs to */
+/* In the track rather than in the row, because the track is what it is about: the
+ * same width, so a fraction of one is a place on the other. */
 .manga-reader-progress-label {
   position: absolute;
   bottom: 100%;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   transform: translateX(-50%);
   padding: 2px 8px;
   border-radius: 3px;
@@ -305,7 +310,8 @@
   pointer-events: none;
 }
 
-.manga-reader-progress.is-scrubbing .manga-reader-progress-label {
+.manga-reader-progress.is-scrubbing .manga-reader-progress-label,
+.manga-reader-progress.is-naming .manga-reader-progress-label {
   opacity: 1;
 }
 

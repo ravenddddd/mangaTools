@@ -3143,8 +3143,8 @@ async function main() {
         20
       ),
       [
-        { title: "開幕", at: 0, fraction: 0 },
-        { title: "中盤", at: 4, fraction: 4 / 20 },
+        { name: "開幕", at: 0, fraction: 0 },
+        { name: "中盤", at: 4, fraction: 4 / 20 },
       ],
       "at the page each chapter begins on, and once"
     );
@@ -3188,6 +3188,7 @@ async function main() {
     const track = bar.querySelector(".manga-reader-progress-track");
     const read = bar.querySelector(".manga-reader-progress-read");
     const thumb = bar.querySelector(".manga-reader-progress-thumb");
+    const label = bar.querySelector(".manga-reader-progress-label");
     const ticks = () => [
       ...bar.querySelectorAll(".manga-reader-progress-node"),
     ];
@@ -3217,13 +3218,36 @@ async function main() {
 
     assert.strictEqual(ticks().length, 2, "one tick per chapter");
     assert.deepStrictEqual(
-      ticks().map((tick) => [tick.title, tick.style.left]),
-      [
-        ["開幕", "25.000%"],
-        ["中盤", "50.000%"],
-      ],
+      ticks().map((tick) => tick.style.left),
+      ["25.000%", "50.000%"],
       "at the page each begins on, which is 2 of 8 and 4 of 8"
     );
+
+    // The name comes from the plugin's own bubble, at once, rather than from a
+    // browser tooltip that waits a second before saying anything at all.
+    assert.strictEqual(
+      bar.classList.contains("is-naming"),
+      false,
+      "no chapter is named until the pointer is on one"
+    );
+    ticks()[1].dispatch("mouseenter", dom.makeEvent("mouseenter", {}));
+    assert.strictEqual(
+      label.textContent,
+      "中盤",
+      "and the pointer on a tick names that chapter"
+    );
+    assert.strictEqual(
+      bar.classList.contains("is-naming"),
+      true,
+      "in the bar's own bubble, shown at once rather than after a browser's delay"
+    );
+    assert.strictEqual(
+      label.parentNode,
+      track,
+      "which is measured against the track it belongs to, not against the lightbox"
+    );
+    bar.dispatch("mouseleave", dom.makeEvent("mouseleave", {}));
+    assert.strictEqual(bar.classList.contains("is-naming"), false);
 
     // A turn: the bar follows the reader.
     dom.click(box.navRight);
@@ -3402,15 +3426,18 @@ async function main() {
         "which, when it runs out, puts it away"
       );
 
-      // Anything moving over the lightbox brings it back — including a pointer that
-      // never touches the bar, which is the case that matters: asleep, it is taking
-      // no pointers of its own.
+      // The pointer reaching the bar is what brings it back, and nothing else: a bar
+      // that appeared whenever the pointer moved anywhere would bring the eye to the
+      // bottom of the picture for nothing.
       box.lightbox.dispatch("mousemove", dom.makeEvent("mousemove", {}));
       assert.strictEqual(
         asleep(),
-        false,
-        "and moving over the lightbox wakes it"
+        true,
+        "moving anywhere in the lightbox does not wake it"
       );
+
+      bar.dispatch("mousemove", dom.makeEvent("mousemove", {}));
+      assert.strictEqual(asleep(), false, "the pointer reaching the bar does");
 
       sleep.fn();
       dom.click(box.navRight);
