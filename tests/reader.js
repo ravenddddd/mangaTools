@@ -2645,7 +2645,7 @@ async function main() {
    * Called directly: the surfaces above it — the tab's form and the lightbox — are
    * what call this, and what they draw is their own sections' business.
    */
-  await runSection("writing chapters, and taking one back", async () => {
+  await runSection("writing chapters, and saying so", async () => {
     const list = [{ title: "A", images: ["1", "2"] }];
     const next = [
       { title: "A", images: ["1"] },
@@ -2656,17 +2656,11 @@ async function main() {
         "plugin.mangaTools.chapters"
       ];
 
-    assert.strictEqual(
-      NR.canUndoChapters("901"),
-      false,
-      "there is nothing to take back before anything is written"
-    );
-
     const heard = [];
     const stop = NR.watchChapters((id) => heard.push(id));
 
     const at = mutations.length;
-    await NR.writeChapters("901", next, list);
+    await NR.writeChapters("901", next);
 
     assert.strictEqual(mutations.length - at, 1, "the write goes out, once");
     assert.strictEqual(
@@ -2679,74 +2673,24 @@ async function main() {
       ["901"],
       "and everyone listening hears which gallery changed"
     );
-    assert.strictEqual(
-      NR.canUndoChapters("901"),
-      true,
-      "and what the change replaced is kept"
-    );
-
-    const beforeUndo = mutations.length;
-    await NR.undoChapters("901");
-
-    assert.strictEqual(
-      mutations.length - beforeUndo,
-      1,
-      "undoing writes again"
-    );
-    assert.strictEqual(
-      written(beforeUndo),
-      '{"v":1,"chapters":[{"title":"A","images":["1","2"]}]}',
-      "putting back exactly what the change replaced"
-    );
-    assert.deepStrictEqual(heard, ["901", "901"], "…and saying so as well");
-    assert.strictEqual(
-      NR.canUndoChapters("901"),
-      false,
-      "and only once: an undo that could itself be undone is a redo, and there is none"
-    );
-
-    await NR.undoChapters("901");
-    assert.strictEqual(
-      mutations.length - beforeUndo,
-      1,
-      "a second undo has nothing to take back, and writes nothing"
-    );
-
-    // A write with nothing to remember — the importer's, which writes twenty-odd
-    // galleries in a row — arms no undo at all.
-    await NR.writeChapters("902", next, null);
-    assert.strictEqual(
-      NR.canUndoChapters("902"),
-      false,
-      "a write that was given nothing to take back leaves nothing to take back"
-    );
-
+    // What is asserted about a listener that has stopped listening: the write still
+    // happens, and it is only the listening that stopped.
+    const stopHeard = heard.length;
     const beforeStop = mutations.length;
     stop();
-    await NR.writeChapters("901", list, null);
+    await NR.writeChapters("901", list);
     assert.strictEqual(
       mutations.length - beforeStop,
       1,
       "the write still happens after a listener stops listening"
     );
-    assert.deepStrictEqual(
-      heard,
-      ["901", "901", "902"],
-      "…it is only the listening that stopped — which is what the writer asks for " +
-        "when the tab it was drawing into has gone"
+    assert.strictEqual(
+      heard.length,
+      stopHeard,
+      "…and only the listening stopped, which is what the tab asks for when the page " +
+        "it was drawing into has gone"
     );
   });
-
-  /**
-   * The handover: what the lightbox is given, and what it is not.
-   *
-   * This plugin does not draw a chapter menu of its own. Stash's own menu does the
-   * jumping — `gotoPage`, which is an instant `setIndex` — and the only thing it
-   * refuses is a list not in path order, because its chapter numbers count in path
-   * order. Hand it this plugin's list *and* chapters numbered in that list, and its
-   * own menu is right in any order. So what these sections pin is the handover
-   * itself: the images, the chapters, and the numbers that make the jump land.
-   */
   await runSection(
     "the lightbox is handed this plugin's own chapters",
     async () => {
@@ -4602,7 +4546,7 @@ async function main() {
 
     /** The form's two fields and its buttons, as the tab drew them */
     const formIn = (container) => {
-      const form = container.querySelector(".manga-reader-chapters-form");
+      const form = container.querySelector("form");
       const fields = [...form.querySelectorAll(".form-control")];
       return {
         form,
@@ -4646,7 +4590,7 @@ async function main() {
     );
     assert.strictEqual(
       creating.fields[1].parentNode.previousElementSibling.textContent,
-      "Image index",
+      "Image #",
       "and the second is the index of the page the chapter begins at"
     );
     assert.strictEqual(
@@ -4658,6 +4602,78 @@ async function main() {
       creating.remove === null,
       true,
       "with nothing to delete: there is no chapter yet"
+    );
+
+    // Stash's own form, markup for markup: the ids and the `for` that tie each label
+    // to its input, the class lists in Stash's order, the placeholder that is the
+    // label again, and the empty place an error goes.
+    assert.strictEqual(
+      creating.form.getAttribute("novalidate"),
+      "",
+      "the form is novalidate, because it says what is wrong itself"
+    );
+    assert.strictEqual(
+      creating.form.children[0].className,
+      "form-container px-3",
+      "the fields are in the padded container Stash puts them in"
+    );
+    assert.strictEqual(
+      creating.form.children[1].className,
+      "buttons-container px-3",
+      "and the buttons in theirs"
+    );
+    assert.strictEqual(
+      creating.form.children[1].children[0].className,
+      "d-flex",
+      "inside the flex row that lays them out"
+    );
+    assert.strictEqual(
+      creating.fields[0].getAttribute("id") +
+        " / " +
+        creating.fields[0].getAttribute("name"),
+      "title / title",
+      "the title field is Stash's own"
+    );
+    assert.strictEqual(
+      creating.fields[0].parentNode.previousElementSibling.getAttribute("for"),
+      "title",
+      "and its label points at it, which is what a label does"
+    );
+    assert.strictEqual(
+      creating.fields[1].getAttribute("id"),
+      "image_index",
+      "the index field too"
+    );
+    assert.strictEqual(
+      creating.fields[0].className,
+      "text-input form-control",
+      "the class list is Stash's, in Stash's order"
+    );
+    assert.strictEqual(
+      creating.fields[0].placeholder,
+      "Title",
+      "and the placeholder is the label again, as Stash's own form has it"
+    );
+    assert.strictEqual(
+      creating.fields[0].parentNode.children[1].className,
+      "invalid-feedback",
+      "with the empty place Bootstrap puts an error in"
+    );
+    assert.strictEqual(
+      creating.save.className,
+      "btn btn-primary",
+      "Save is Stash's primary button"
+    );
+    assert.strictEqual(
+      creating.cancel.className,
+      "ml-2 btn btn-secondary",
+      "and Cancel is its secondary one, with `ml-2` where Stash has it"
+    );
+    assert.strictEqual(
+      fresh.button.className.includes("manga-reader-chapters-editing"),
+      true,
+      "and Stash's own Create button is out of sight while the form is open — its own " +
+        "panel takes the button away with the rows"
     );
 
     const at = mutations.length;
@@ -4676,9 +4692,14 @@ async function main() {
         "out of 第一話, which keeps the ones before it"
     );
     assert.strictEqual(
-      dom.body.querySelector(".manga-reader-chapters-form") === null,
+      dom.body.querySelector("form") === null,
       true,
       "and the form closes on what was written"
+    );
+    assert.strictEqual(
+      fresh.button.className.includes("manga-reader-chapters-editing"),
+      false,
+      "which brings Stash's own button back"
     );
     assert.deepStrictEqual(
       drawnRows(fresh.container),
@@ -4687,41 +4708,38 @@ async function main() {
         "back, the news having carried it"
     );
 
-    // ── and the undo line is offered under it ───────────────────────────────
-    const undo = dom.body.querySelector("#manga-reader-chapters-undo");
-    assert.ok(undo, "a change that can be taken back is offered");
-    assert.strictEqual(
-      undo.children[0].textContent,
-      "Chapters changed — undo",
-      "in as many words"
-    );
-
-    const beforeUndo = mutations.length;
-    dom.click(undo.children[0]);
+    // A refusal is shown *on the field it is about* rather than as a line of its own:
+    // Bootstrap's own two halves, which is also the only way this form says anything.
+    dom.click(fresh.button);
+    await settle();
+    const again = formIn(fresh.container);
+    again.fields[0].value = "again";
+    again.fields[1].value = "1";
+    const beforeRefusal = mutations.length;
+    dom.click(again.save);
     await settle();
 
     assert.strictEqual(
-      mutations.length - beforeUndo,
-      1,
-      "undoing writes again"
+      mutations.length,
+      beforeRefusal,
+      "a refused save writes nothing"
     );
+
+    // Read again: a refusal is drawn by *rebuilding* the form — the field carries the
+    // mark and the words under it — so the nodes this started with are not the ones
+    // on screen.
+    const refused = formIn(fresh.container);
     assert.strictEqual(
-      written(beforeUndo),
-      '{"v":1,"chapters":[{"title":"第一話","images":["708","707","706","705"]},' +
-        '{"title":"第二話","images":["704","703","702","701"]}]}',
-      "putting back exactly the list the create replaced — Stash's own rows, " +
-        "translated, which is what this gallery was reading from before"
-    );
-    assert.deepStrictEqual(
-      drawnRows(fresh.container),
-      ["第一話 - #1", "第二話 - #5"],
-      "and the rows go back with it"
-    );
-    assert.strictEqual(
-      dom.body.querySelector("#manga-reader-chapters-undo") === null,
+      refused.fields[1].classList.contains("is-invalid"),
       true,
-      "and there is nothing left to take back"
+      "the field it is about is marked, as Bootstrap marks one"
     );
+    assert.strictEqual(
+      refused.fields[1].parentNode.children[1].textContent,
+      "A chapter already begins here",
+      "and the reason is under it"
+    );
+
     stopTab(fresh);
 
     // ── rename and delete, on a gallery with a list of its own ──────────────
@@ -4807,7 +4825,7 @@ async function main() {
       "deleting takes the chapter away and gives its pages to nobody"
     );
     assert.strictEqual(
-      dom.body.querySelector(".manga-reader-chapters-form") === null,
+      dom.body.querySelector("form") === null,
       true,
       "and closes the form"
     );
@@ -5227,7 +5245,7 @@ async function main() {
     dom.click(tab.button);
     await settle();
 
-    const form = tab.container.querySelector(".manga-reader-chapters-form");
+    const form = tab.container.querySelector("form");
     assert.strictEqual(
       form.querySelectorAll(".form-control")[1].value,
       "8",
@@ -5241,7 +5259,7 @@ async function main() {
     dom.click(tab.container.children[0].children[1].children[1]);
     await settle();
 
-    const renaming = tab.container.querySelector(".manga-reader-chapters-form");
+    const renaming = tab.container.querySelector("form");
     renaming.querySelectorAll(".form-control")[0].value = "renamed";
 
     const heard = [];

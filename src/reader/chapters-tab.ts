@@ -47,12 +47,7 @@ import {
   renameChapterAt,
   serializeChapters,
 } from "./chapters";
-import {
-  canUndoChapters,
-  undoChapters,
-  watchChapters,
-  writeChapters,
-} from "./chapters-edit";
+import { watchChapters, writeChapters } from "./chapters-edit";
 import { NR } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
 import {
@@ -70,12 +65,12 @@ const SEL_PANEL = ".container";
 const HIDDEN = "data-manga-reader-hidden";
 /** The import control, found again by this id when the page is drawn over */
 const IMPORT_ID = "manga-reader-chapters-import";
-/** The line under it that offers to take the last change back */
-const UNDO_ID = "manga-reader-chapters-undo";
 /** The class the per-row Edit link carries, so a test can find it */
 const CLASS_EDIT = "manga-reader-chapter-edit";
 /** Marks Stash's own button as one this plugin has already taken over */
 const TAKEN = "data-manga-reader-taken";
+/** On Stash's Create button while this plugin's chapter form is open */
+const CLASS_EDITING = "manga-reader-chapters-editing";
 
 /** What was rendered, so a pass over the document only rebuilds when it differs */
 let renderedFor = "";
@@ -123,10 +118,6 @@ let form: {
 } | null = null;
 /** What was wrong with the last Save, or "" — read only when a form is drawn */
 let formError = "";
-
-/** The line offering to take the last change back, and the button in it */
-let undoLine: HTMLElement | null = null;
-let undoButton: HTMLButtonElement | null = null;
 
 /** The import control, kept between passes, and what it was last built as */
 let control: HTMLElement | null = null;
@@ -313,6 +304,7 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
   panelInHand = panel;
 
   takeOverCreate(panel);
+  toggleCreate(panel, !form);
 
   panel.textContent = "";
   if (form) {
@@ -323,11 +315,9 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
     }
   }
 
-  // The import is about the list, so it is not offered while the form is on top of
-  // it. The undo line is about what has already been written, so it stays.
+  // The import is about the list, so it is not offered while the form is on top of it.
   if (form) hideImport();
   else drawImport(panel, gallery);
-  drawUndo(panel, gallery);
 }
 
 /**
@@ -563,6 +553,23 @@ function importChapters(): void {
 }
 
 /**
+ * Stash's own Create button, out of the way while the form it opens is open.
+ *
+ * Stash replaces its whole panel with the form — button, rows and all — so while the
+ * form is up there is no button to press. This half cannot take Stash's markup away:
+ * it is React's, and the next render puts it back. So it is put out of *sight*, by a
+ * class of this plugin's own, and not with the `data-manga-reader-hidden` attribute:
+ * that one means "this is Stash's and has been dealt with", and it is exactly what
+ * `findPanel` refuses a panel for.
+ */
+function toggleCreate(panel: HTMLElement, shown: boolean): void {
+  const button = panel.previousElementSibling;
+  if (!isStashButton(button)) return;
+
+  button.classList.toggle(CLASS_EDITING, !shown);
+}
+
+/**
  * Draws the tab again from the gallery in hand.
  *
  * Into the panel this module already drew into, rather than one it looks up: the
@@ -594,21 +601,24 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
   const editing = !!form?.startPageId;
 
   const node = document.createElement("form");
-  node.className = "manga-reader-chapters-form";
+  node.setAttribute("novalidate", "");
   // Nothing here submits anything — the buttons are handled — but a form that could
   // reload the page is not a form to leave lying about.
   node.addEventListener("submit", (event: Event) => event.preventDefault());
 
-  const title = field(
-    node,
+  const container = document.createElement("div");
+  container.className = "form-container px-3";
+
+  const titleField = field(
+    container,
     gallery.locale,
     "mangaReader.chapterTitle",
     "title",
     "text",
     form?.initialTitle ?? ""
   );
-  const index = field(
-    node,
+  const indexField = field(
+    container,
     gallery.locale,
     "mangaReader.chapterIndex",
     "image_index",
@@ -616,15 +626,20 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
     form?.initialIndex ?? "1"
   );
 
-  if (formError) {
-    const error = document.createElement("div");
-    error.className = "manga-reader-chapters-form-error";
-    error.textContent = stringFor(gallery.locale, formError);
-    node.appendChild(error);
-  }
+  node.appendChild(container);
+
+  // Every refusal this form can have is about where the chapter begins — a page that
+  // already starts one, a page this gallery has not got, a chapter that is gone —
+  // so they all land on that field, which is where the answer is wrong.
+  if (formError) refuse(indexField.error, stringFor(gallery.locale, formError));
+
+  const title = titleField.input;
+  const index = indexField.input;
 
   const buttons = document.createElement("div");
-  buttons.className = "buttons-container d-flex";
+  buttons.className = "buttons-container px-3";
+  const buttonsRow = document.createElement("div");
+  buttonsRow.className = "d-flex";
 
   const save = document.createElement("button");
   save.type = "button";
@@ -643,29 +658,42 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
   save.addEventListener("click", () =>
     submitForm(title.value, Number(index.value))
   );
-  buttons.appendChild(save);
+  buttonsRow.appendChild(save);
 
   const cancel = document.createElement("button");
   cancel.type = "button";
-  cancel.className = "btn btn-secondary ml-2";
+  cancel.className = "ml-2 btn btn-secondary";
   cancel.textContent = stringFor(gallery.locale, "mangaReader.cancel");
   cancel.addEventListener("click", closeForm);
-  buttons.appendChild(cancel);
+  buttonsRow.appendChild(cancel);
 
   if (editing) {
     const remove = document.createElement("button");
     remove.type = "button";
-    remove.className = "btn btn-danger ml-auto";
+    remove.className = "ml-auto btn btn-danger";
     remove.textContent = stringFor(gallery.locale, "mangaReader.delete");
     remove.addEventListener("click", deleteChapter);
-    buttons.appendChild(remove);
+    buttonsRow.appendChild(remove);
   }
 
+  buttons.appendChild(buttonsRow);
   node.appendChild(buttons);
   panel.appendChild(node);
 }
 
-/** One field, the shape Stash's own `renderInputField` produces */
+/**
+ * One field, as Stash's own `renderInputField` renders one.
+ *
+ * Markup for markup, because a form that merely *looks* like Stash's is a form that
+ * drifts from it: the label and the input point at each other by `for` and `id`, the
+ * placeholder is the label again, the class list is `text-input form-control` in that
+ * order, and the error is the empty `.invalid-feedback` Bootstrap shows when the
+ * input carries `is-invalid`. Which is what the field's own form — the one on the
+ * edit tab — comes out as, so the two are the same form to anything that reads them.
+ *
+ * The two ids are Stash's own (`title`, `image_index`). A page has one of these forms
+ * at a time: the edit tab's is mounted on the edit tab, this one on the Chapters tab.
+ */
 function field(
   parent: HTMLElement,
   locale: string | null,
@@ -673,13 +701,14 @@ function field(
   name: string,
   type: string,
   value: string
-): HTMLInputElement {
+): { input: HTMLInputElement; error: HTMLElement } {
   const group = document.createElement("div");
   group.className = "form-group row";
   group.setAttribute("data-field", name);
 
   const label = document.createElement("label");
-  label.className = "col-sm-3";
+  label.className = "form-label col-form-label col-sm-3";
+  label.setAttribute("for", name);
   label.textContent = stringFor(locale, labelId);
   group.appendChild(label);
 
@@ -687,14 +716,38 @@ function field(
   column.className = "col-sm-9";
 
   const input = document.createElement("input");
+  input.className = "text-input form-control";
+  input.setAttribute("name", name);
+  input.setAttribute("id", name);
   input.type = type;
-  input.className = "form-control";
+  input.placeholder = stringFor(locale, labelId);
   input.value = value;
   column.appendChild(input);
-  group.appendChild(column);
 
+  const error = document.createElement("div");
+  error.className = "invalid-feedback";
+  column.appendChild(error);
+
+  group.appendChild(column);
   parent.appendChild(group);
-  return input;
+
+  return { input, error };
+}
+
+/**
+ * What a refused save looks like: the field marked, and the reason under it.
+ *
+ * Both halves are Bootstrap's own: `is-invalid` on the input and the words in the
+ * `.invalid-feedback` beside it. This is also why nothing else is drawn for it — an
+ * error line of this plugin's own would be a second way for the same form to say the
+ * same thing.
+ */
+function refuse(error: HTMLElement | null, message: string): void {
+  const input = error?.parentNode?.children[0] as HTMLElement | undefined;
+  if (!error || !input) return;
+
+  input.classList.add("is-invalid");
+  error.textContent = message;
 }
 
 /**
@@ -790,7 +843,7 @@ function applyEdit(gallery: ChaptersInHand, next: MangaReaderChapter[]): void {
   busy = true;
   redraw();
 
-  writeChapters(gallery.id, next, gallery.stored).then(
+  writeChapters(gallery.id, next).then(
     () => {
       busy = false;
       closeForm();
@@ -811,63 +864,6 @@ function closeForm(): void {
   form = null;
   formError = "";
   redraw();
-}
-
-/**
- * The line that offers to take the last change back.
- *
- * Its own box rather than part of the import control, which is where it sits: the
- * control's own children are asserted by index, and a line appearing inside it would
- * be a second thing wearing the same id.
- */
-function drawUndo(panel: HTMLElement, gallery: ChaptersInHand): void {
-  if (!canUndoChapters(gallery.id)) {
-    undoLine?.remove();
-    undoLine = null;
-    undoButton = null;
-    return;
-  }
-
-  if (!undoLine || !undoButton) {
-    undoButton = document.createElement("button");
-    undoButton.type = "button";
-    undoButton.className = "btn btn-link btn-sm";
-    undoButton.addEventListener("click", undoLast);
-
-    undoLine = document.createElement("div");
-    undoLine.id = UNDO_ID;
-    undoLine.className = "manga-reader-chapters-undo";
-    undoLine.appendChild(undoButton);
-  }
-
-  const place = panel.parentNode;
-  if (place && undoLine.parentNode !== place) {
-    place.insertBefore(undoLine, panel.nextElementSibling);
-  }
-
-  const text = stringFor(gallery.locale, "mangaReader.undoChapters");
-  if (undoButton.textContent !== text) undoButton.textContent = text;
-}
-
-/** Takes the last change back — which is its own write, and announces itself */
-function undoLast(): void {
-  const gallery = inHand;
-  if (!gallery || busy) return;
-
-  busy = true;
-  redraw();
-
-  undoChapters(gallery.id).then(
-    () => {
-      busy = false;
-      redraw();
-    },
-    (e: unknown) => {
-      busy = false;
-      console.error("[mangaReader] could not take that change back:", e);
-      redraw();
-    }
-  );
 }
 
 /** Puts the import control away while the form is on top of the list */
@@ -996,6 +992,4 @@ export function forgetChaptersTab(): void {
   confirming = false;
   form = null;
   formError = "";
-  undoLine = null;
-  undoButton = null;
 }

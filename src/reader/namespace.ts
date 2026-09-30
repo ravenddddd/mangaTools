@@ -198,20 +198,8 @@ export interface MangaReaderNamespace {
     failed: { id: string; error: unknown }[];
     skippedEmpty: string[];
   }>;
-  /**
-   * Writes a gallery's chapters and says so, remembering what they were — see
-   * chapters-edit.ts. `previous` is what an undo would put back, or null for a
-   * write that should have no undo (the importer's).
-   */
-  writeChapters(
-    galleryId: string,
-    next: MangaReaderChapter[],
-    previous: MangaReaderChapter[] | null
-  ): Promise<void>;
-  /** Whether there is a change to this gallery's chapters to take back */
-  canUndoChapters(galleryId: string): boolean;
-  /** Puts back what the last change to this gallery replaced, once */
-  undoChapters(galleryId: string): Promise<void>;
+  /** Writes a gallery's chapters and says so — see chapters-edit.ts */
+  writeChapters(galleryId: string, next: MangaReaderChapter[]): Promise<void>;
   /**
    * Hears about a gallery's chapters changing; the returned function stops it. For
    * the surfaces that keep their own copy of the list — which is all of them.

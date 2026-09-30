@@ -875,15 +875,17 @@ it again.
 
 ### Editing them
 
-The Chapters tab's **Create** button and each row's **Edit** link both open Stash's
-own chapter form — two fields, and Save / Cancel / Delete — and what it writes is
-this plugin's field. The tab is otherwise Stash's own: the same rows, the same
-numbering, the same shape.
+The Chapters tab's **Create** button and each row's **Edit** link both open **Stash's
+own chapter form** — the same two fields, the same three buttons, the same markup down
+to the ids and the class lists — and what it writes is this plugin's field. While the
+form is open the Create button is out of sight, the way Stash's own panel takes its
+button away with the rows; Stash's markup comes back on the next render, so it is
+hidden rather than removed.
 
 | Field | What it means |
 |---|---|
 | **Title** | The chapter's name, which may be empty |
-| **Image index** | Which page the chapter begins at, counted from 1 **in the order the rows are in** — path order |
+| **Image #** | Which page the chapter begins at, counted from 1 **in the order the rows are in** — path order |
 
 A **new** chapter takes the pages from that index to the next chapter's start, out of
 whatever held them. Its index opens on the page you were last reading, when you were
@@ -894,11 +896,6 @@ as the runs between their starts: the pages it gives up go to the chapter before
 because that is what a chapter's pages mean — the earlier chapter runs up to this
 one's start. **Delete** is the other thing: the chapter goes and its pages are left
 in *no* chapter, which no other edit can do.
-
-**One level of undo, for the session.** After any change the tab offers "Chapters
-changed — undo" under the list, and it puts back exactly what the change replaced.
-One step, and it does not undo itself; reloading the page forgets it. It is not
-stored anywhere: a step in what you were doing, not a fact about the gallery.
 
 Nothing here writes Stash's own chapter rows either. A gallery with no list of this
 plugin's own gets one the first time it is edited — the same import the button above

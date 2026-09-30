@@ -197,7 +197,7 @@ export async function runChapterImports(
       if (chapters.length === 0) {
         run.skippedEmpty.push(id);
       } else {
-        await writeChapters(id, chapters, null);
+        await writeChapters(id, chapters);
         run.written.push(id);
       }
     } catch (error) {

@@ -375,3 +375,13 @@
 [data-manga-reader-hidden] {
   display: none;
 }
+
+/* Stash's own Create button, while this plugin's chapter form is open. Stash replaces
+   its panel with the form — button and all — so while the form is up there is no
+   button to press. This markup is React's and comes back on the next render, so it is
+   put out of *sight* rather than away: hidden by a class of this plugin's own, not by
+   the `data-manga-reader-hidden` attribute, which means "this is Stash's and has been
+   dealt with" and is what keeps this plugin able to find the panel at all. */
+.manga-reader-chapters-editing {
+  display: none;
+}
