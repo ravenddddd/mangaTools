@@ -114,13 +114,13 @@ module.exports = () => {
   const bulkHost = bulkStudioRow.nextElementSibling;
   assert.strictEqual(bulkHost.className, "manga-tools-field-host");
   assert.strictEqual(
-    bulkHost.previousElementSibling,
-    bulkStudioRow,
+    bulkHost.previousElementSibling === bulkStudioRow,
+    true,
     "the rows should go right after the studio row"
   );
   assert.strictEqual(
-    bulkHost.nextElementSibling,
-    bulkPerformerRow,
+    bulkHost.nextElementSibling === bulkPerformerRow,
+    true,
     "and right before the performers row — i.e. between studio and performers"
   );
   assert.strictEqual(b14.host, bulkHost);

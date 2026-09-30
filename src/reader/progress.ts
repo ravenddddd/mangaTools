@@ -242,6 +242,19 @@ export function removeProgress(lightbox: Element): void {
 
   if (node !== bar) return;
 
+  // A drag still in flight: the move and the release are on the *document*, so they
+  // outlive the element that started them, and a bar built for the next lightbox would
+  // find a hand on it that is not there — holding its width for a press that ended in
+  // a gallery nobody is looking at.
+  //
+  // Let go of it without asking for the page it was over. A release *seeks*, and this
+  // one would seek into a lightbox that is being taken apart: the reader would lay out
+  // and draw a screen for a container that no longer exists, over and over.
+  if (pressed) {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onRelease);
+  }
+
   stopTimers();
 
   bar = null;
@@ -311,10 +324,6 @@ function build(lightbox: Element): void {
   track.addEventListener("mouseleave", onLeaveTrack);
 
   track.addEventListener("mousedown", onPress);
-  // The bar is a sibling of the pages rather than a child of them, so a press here
-  // never reaches the reader's own press. A *click* would still reach the lightbox,
-  // though, and a click there is the click that closes Stash's lightbox.
-  bar.addEventListener("click", (event) => event.stopPropagation());
 
   place(lightbox);
 }
@@ -566,9 +575,13 @@ function onPress(event: Event): void {
   // moves and the drag has something of its own to say.
   const tick = tickUnder(press.target);
   if (tick) {
+    const fraction = Number(tick.dataset?.fraction || 0);
     target = Number(tick.dataset?.at || 0);
-    pointer = Number(tick.dataset?.fraction || 0);
+    pointer = fraction;
     lastJump = Date.now();
+    // Said here as well as on the hover, because a finger never hovers: a press that
+    // arrived without one would otherwise be a jump to a chapter that says nothing.
+    setBubble({ page: "", chapter: tick.dataset?.name || "", fraction });
     latest?.handlers.onSeek(target);
     redraw();
   } else {

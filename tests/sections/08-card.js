@@ -666,8 +666,8 @@ module.exports = () => {
     "and that node is inside Stash's own popover row, not a row of our own"
   );
   assert.strictEqual(
-    marked.host.parentNode.lastElementChild,
-    marked.host,
+    marked.host.parentNode.lastElementChild === marked.host,
+    true,
     "as its last child — after Stash's organized mark"
   );
   assert.strictEqual(
@@ -769,13 +769,13 @@ module.exports = () => {
       "neither shows up as a raw custom-field row"
   );
   assert.strictEqual(
-    first.drawn.host.parentNode,
-    toolbarGroup,
+    first.drawn.host.parentNode === toolbarGroup,
+    true,
     "the toolbar contents mount into the toolbar group"
   );
   assert.strictEqual(
-    toolbarGroup.children[1],
-    first.drawn.host,
+    toolbarGroup.children[1] === first.drawn.host,
+    true,
     "directly after the span holding Stash's organized button, and before the " +
       "operation menu"
   );

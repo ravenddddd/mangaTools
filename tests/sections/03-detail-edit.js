@@ -309,8 +309,8 @@ module.exports = () => {
       "this is a manga gallery's edit page, and that is the default"
   );
   assert.strictEqual(
-    fieldHostEl.previousElementSibling,
-    studioRow,
+    fieldHostEl.previousElementSibling === studioRow,
+    true,
     "the mount point should come right after the studio row"
   );
   assert.strictEqual(
@@ -462,8 +462,8 @@ module.exports = () => {
   editForm.insertBefore(makeEl("div"), performerRow);
   editField({ "plugin.mangaTools.language": "ja" });
   assert.strictEqual(
-    fieldHostEl.previousElementSibling,
-    studioRow,
+    fieldHostEl.previousElementSibling === studioRow,
+    true,
     "a re-render should pull it back"
   );
   const fieldHosts = editForm.children.filter((c) =>

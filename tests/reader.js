@@ -1265,8 +1265,8 @@ async function main() {
       const drawnBox = container();
       assert.ok(drawnBox, "and a container to draw them in");
       assert.strictEqual(
-        drawnBox.parentNode,
-        box.display,
+        drawnBox.parentNode === box.display,
+        true,
         "inside the display area"
       );
       assert.ok(
@@ -2129,7 +2129,7 @@ async function main() {
         expectSwitch: false,
       });
 
-      assert.strictEqual(container(), null, "nothing is drawn");
+      assert.strictEqual(container() === null, true, "nothing is drawn");
       assert.ok(
         errorsSince(at).some((line) =>
           /could not read this gallery's pages/.test(line)
@@ -2578,7 +2578,7 @@ async function main() {
       });
       await settle();
 
-      assert.strictEqual(container(), null, "nothing is drawn");
+      assert.strictEqual(container() === null, true, "nothing is drawn");
       assert.deepStrictEqual(
         shown,
         [],
@@ -2801,8 +2801,8 @@ async function main() {
       "and it sits in the options box its popover is measured from"
     );
     assert.strictEqual(
-      chrome.querySelector(".manga-reader-options-anchor"),
-      anchor,
+      chrome.querySelector(".manga-reader-options-anchor") === anchor,
+      true,
       "which this plugin also names, because the measuring is the one thing it adds"
     );
 
@@ -3363,8 +3363,8 @@ async function main() {
     );
     assert.strictEqual(bar.classList.contains("is-showing"), true);
     assert.strictEqual(
-      label.parentNode,
-      track,
+      label.parentNode === track,
+      true,
       "which is measured against the track it belongs to, not against the lightbox"
     );
 
@@ -3585,10 +3585,20 @@ async function main() {
       still,
       "dragging the bar pans nothing"
     );
-    assert.strictEqual(
-      dom.click(track).propagationStopped,
+    const keys = [];
+    dom.document.addEventListener("keydown", (event) => keys.push(event.key));
+    const click = dom.click(track);
+    assert.notStrictEqual(
+      click.propagationStopped,
       true,
-      "and the click it ends with never reaches Stash's lightbox, which closes on one"
+      "and the click it ends with is an ordinary one: it reaches the lightbox, which " +
+        "is what puts a menu away"
+    );
+    assert.deepStrictEqual(
+      keys,
+      [],
+      "and Stash's own close does not fire for it — what it closes on is its own slide, " +
+        "not this plugin's bar"
     );
 
     // The width a drag was holding arrives when the drag is let go of — so the drag
@@ -3663,12 +3673,77 @@ async function main() {
       "taking the pair's own width once the hand is off it"
     );
 
+    // A press that arrived without a hover: a finger never hovers, and a press on a
+    // tick is that chapter whether or not the pointer ever rested on it.
+    track.dispatch("mouseleave", dom.makeEvent("mouseleave", {}));
+    assert.strictEqual(bar.classList.contains("is-showing"), false);
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", {
+        button: 0,
+        clientX: 400,
+        target: ticks()[1],
+      })
+    );
+    // The bubble comes up for it as well, which is what makes this a test at all: a
+    // bubble that was taken down keeps the words it had while it fades, so the words
+    // alone would read the same if the press had said nothing.
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      true,
+      "and the bubble comes back up for it, though no hover ever put it up"
+    );
+    assert.strictEqual(
+      bubbleLine("chapter"),
+      "中盤",
+      "and it says which chapter it is all the same"
+    );
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+
+    // B: and the drag it started does not outlive the lightbox. Left in flight, its
+    // move and its release are on the *document*, which outlives the element that
+    // put them there — and a release arriving while the next lightbox is open would
+    // seek into *it*, at a page nobody chose.
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 400 })
+    );
     stopReader(box);
     assert.strictEqual(
-      box.lightbox.querySelector(".manga-reader-progress"),
-      null,
+      box.lightbox.querySelector(".manga-reader-progress") === null,
+      true,
       "and the bar goes with the lightbox"
     );
+
+    const next = await startReader({ galleryId: "8", on: true });
+    const nextBar = next.box.lightbox.querySelector(".manga-reader-progress");
+    const nextTrack = nextBar.querySelector(".manga-reader-progress-track");
+    [...container().querySelectorAll("img")].forEach((image, at) => {
+      image.offsetLeft = at * 520;
+      image.offsetWidth = 500;
+    });
+    dom.flush();
+    assert.strictEqual(
+      nextTrack.style.width,
+      "500px",
+      "the bar of the next lightbox takes its width, having no hand held over it"
+    );
+
+    // And nothing of that drag is still listening on the document it was made on:
+    // the hand that was down when the last lightbox went is not a hand on this one.
+    const beforeRelease = drawn();
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 700 })
+    );
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    assert.deepStrictEqual(
+      drawn(),
+      beforeRelease,
+      "and a release from the drag that ended in the last lightbox seeks nothing in " +
+        "this one"
+    );
+    stopReader(next.box);
   });
 
   /**
@@ -3800,8 +3875,8 @@ async function main() {
     });
 
     assert.strictEqual(
-      box.lightbox.querySelector(".manga-reader-progress"),
-      null,
+      box.lightbox.querySelector(".manga-reader-progress") === null,
+      true,
       "the one-page gallery has no bar at all — not a hidden one"
     );
 
@@ -3920,11 +3995,13 @@ async function main() {
       await settle();
 
       assert.strictEqual(
-        box.popover ? box.popover.querySelector(".manga-reader-options") : null,
-        null,
+        (box.popover
+          ? box.popover.querySelector(".manga-reader-options")
+          : null) === null,
+        true,
         "no switch of this plugin's in its options menu"
       );
-      assert.strictEqual(container(), null, "nothing drawn over it");
+      assert.strictEqual(container() === null, true, "nothing drawn over it");
       assert.deepStrictEqual(shown, [], "and nothing handed to its lightbox");
       assert.deepStrictEqual(
         errorsSince(at),
