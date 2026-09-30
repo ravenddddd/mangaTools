@@ -327,7 +327,12 @@ function update(state: ProgressState): void {
   // than a bar a screen out of date: the width stands until there is a real one, and
   // an image finishing is what asks for the pass that takes it. See the load listener
   // in takeover.ts.
-  if (state.width > 0) {
+  //
+  // And it stands while a pointer is down, whatever the pages measure: the bar's width
+  // is half of what turns a pointer's x into a page, so a drag that narrowed it as it
+  // went would move the pages out from under the hand that was choosing them. It takes
+  // the new width when the drag is let go of, and the easing above carries it there.
+  if (state.width > 0 && !pressed) {
     const wanted = Math.round(state.width) + "px";
     if (track.style.width !== wanted) track.style.width = wanted;
   }

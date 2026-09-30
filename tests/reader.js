@@ -3368,6 +3368,13 @@ async function main() {
       ["/image/708/image"],
       "and the jump behind it went to the screen holding page 8"
     );
+    assert.strictEqual(
+      track.style.width,
+      "1020px",
+      "and the bar keeps the width it had under the hand: page 8 stands alone, and a " +
+        "bar that narrowed here would move the pages out from under the pointer " +
+        "choosing them"
+    );
 
     dom.document.dispatch(
       "mousemove",
@@ -3510,6 +3517,46 @@ async function main() {
       dom.click(track).propagationStopped,
       true,
       "and the click it ends with never reaches Stash's lightbox, which closes on one"
+    );
+
+    // The width a drag was holding arrives when the drag is let go of — so the drag
+    // ends on the page that stands alone, and the bar takes its width.
+    const held = track.style.width;
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 700 })
+    );
+    assert.strictEqual(
+      track.style.width,
+      held,
+      "the bar is the width it was when the hand landed on it"
+    );
+
+    // The jump is owed a wait, and the screen it lands on is a narrower one: the width
+    // still stands, because the hand is still on the bar.
+    await new Promise((resolve) =>
+      setTimeout(resolve, NR.PROGRESS_SCRUB_MS + 40)
+    );
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/708/image"],
+      "page 8, which stands alone"
+    );
+    // Laid out as the browser would lay out the screen that just arrived — page 8,
+    // 500 wide — and the bar still holds the width the hand landed on.
+    laidOut();
+    dom.flush();
+    assert.strictEqual(
+      track.style.width,
+      held,
+      "and it does not narrow under the hand that is choosing pages on it, even once " +
+        "the page it landed on has been measured"
+    );
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    assert.strictEqual(
+      track.style.width,
+      "500px",
+      "and takes page 8's own width once the hand is off it"
     );
 
     // A tick is a jump to its chapter.
