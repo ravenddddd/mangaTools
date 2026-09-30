@@ -1186,8 +1186,8 @@ function onNavClick(event: Event): void {
  *     one goes the way the reader who clicked it meant.
  *   - **anywhere else**, the letterbox: Stash closes the lightbox when a click
  *     reaches the slide, and the whole slide is behind these pages — unless the
- *     lightbox is filling the screen, in which case the press is asking for the
- *     screen back rather than for the lightbox to go.
+ *     lightbox is filling the screen, where a click on the margin asks for nothing
+ *     and is given nothing.
  */
 function onSpreadClick(event: Event): void {
   const lightbox = root;
@@ -1203,12 +1203,12 @@ function onSpreadClick(event: Event): void {
 
   const target = event.target as HTMLElement | null;
   if (target?.tagName !== "IMG") {
-    // In fullscreen, a click on the space around the pages gives the screen back
-    // rather than closing the lightbox: leaving fullscreen and closing the lightbox
-    // are two things, and one press that did both would be the reader's next press
-    // landing on whatever the first one uncovered.
+    // In fullscreen, a click on the space around the pages does nothing at all.
+    // Leaving fullscreen is the header's button or Escape, and nobody asking for a
+    // page turn hits the letterbox by accident — whereas a reader who has filled the
+    // screen with a book and then clicks the margin has asked for nothing, and being
+    // given their browser back is not nothing.
     if (inFullscreen(lightbox)) {
-      document.exitFullscreen();
       event.stopPropagation();
       return;
     }

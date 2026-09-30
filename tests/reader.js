@@ -1708,15 +1708,16 @@ async function main() {
   );
 
   /**
-   * In fullscreen, that same click gives the screen back first.
+   * In fullscreen, a click on the space around the pages does nothing.
    *
-   * One press, one thing: a reader who clicks the dark space around the pages while
-   * the lightbox is filling the screen is asking for their browser back, and a press
-   * that both left fullscreen and closed the book would land their next press on
-   * whatever the first one uncovered.
+   * The click that closes the lightbox everywhere else is a click on the margin of a
+   * book, and a reader who has filled the screen with one and then clicks its margin
+   * has asked for nothing — being handed their browser back is not nothing. Leaving
+   * fullscreen is the header's button, or Escape: deliberately not the thing a reader
+   * hits while reading.
    */
   await runSection(
-    "fullscreen gives the screen back before the lightbox closes",
+    "while fullscreen, a click on the space around the pages does nothing",
     async () => {
       const { box } = await startReader({ galleryId: "8", on: true });
       const keys = [];
@@ -1733,13 +1734,13 @@ async function main() {
       const click = dom.click(container());
       assert.strictEqual(
         dom.document.fullscreenElement,
-        null,
-        "and a click on the space around the pages gives the screen back"
+        box.lightbox,
+        "and a click on the space around the pages leaves the screen as it is"
       );
       assert.deepStrictEqual(
         keys,
         [],
-        "rather than closing the lightbox as well — which the next press does"
+        "and closes nothing either: it is the margin of a book, not a way out of one"
       );
       assert.strictEqual(
         click.propagationStopped,
@@ -1748,10 +1749,24 @@ async function main() {
       );
 
       dom.click(container());
+      assert.strictEqual(
+        dom.document.fullscreenElement,
+        box.lightbox,
+        "the next one is no different — leaving fullscreen is the button, or Escape"
+      );
+
+      // Out of fullscreen, the same click is the click it has always been.
+      dom.click(box.lightbox.querySelector(".manga-reader-fullscreen"));
+      assert.strictEqual(
+        dom.document.fullscreenElement,
+        null,
+        "the button gives the screen back"
+      );
+      dom.click(container());
       assert.deepStrictEqual(
         keys,
         ["Escape"],
-        "with the screen given back, the same click closes the lightbox as it did"
+        "and with the screen given back, the letterbox closes the lightbox as it did"
       );
 
       stopReader(box);
