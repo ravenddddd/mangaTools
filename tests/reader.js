@@ -3429,6 +3429,9 @@ async function main() {
       "a second jump this soon is held back, so the picture is still behind"
     );
 
+    // The pointer comes to rest with the button still down, and the jump it is owed
+    // lands. That is the book moving — and the pass that notices must leave the drag's
+    // bubble alone, or the bubble goes the moment a reader stops to look at it.
     await new Promise((resolve) =>
       setTimeout(resolve, NR.PROGRESS_SCRUB_MS + 40)
     );
@@ -3436,6 +3439,12 @@ async function main() {
       drawn(),
       ["/image/702/image", "/image/703/image"],
       "and the picture follows the handle when the wait runs out"
+    );
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      true,
+      "as the pointer rests with the button down, a jump landing does not take the " +
+        "bubble away: the drag is still the thing it is saying"
     );
 
     dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));

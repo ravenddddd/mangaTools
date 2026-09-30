@@ -374,7 +374,11 @@ function update(state: ProgressState): void {
   // A tick's name is about where the reader was, and the book can move under a
   // pointer that has not — the bar's width changes with the screen. Then the bubble
   // is about a chapter nobody is pointing at, and no mouse event is coming to say so.
-  if (moved) takeBubbleDown();
+  //
+  // Not while a pointer is down, though: a drag's jump *is* the book moving, and this
+  // is what a drag landing on the page it was going to would take its own bubble away
+  // with — which is what it did, whenever a pointer stopped to let a jump arrive.
+  if (moved && !pressed) takeBubbleDown();
   if (moved) wake();
 }
 
