@@ -22,11 +22,8 @@
  */
 import { requirePluginApi, gqlDoc } from "../plugin-api";
 import { NS } from "../tools/fields";
-import {
-  chaptersFromStash,
-  parseChapters,
-  serializeChapters,
-} from "./chapters";
+import { chaptersFromStash, parseChapters } from "./chapters";
+import { writeChapters } from "./chapters-edit";
 import { NR } from "./namespace";
 import { fetchGallery } from "./stash-lightbox";
 
@@ -200,7 +197,7 @@ export async function runChapterImports(
       if (chapters.length === 0) {
         run.skippedEmpty.push(id);
       } else {
-        await writeChapters(id, serializeChapters(chapters));
+        await writeChapters(id, chapters, null);
         run.written.push(id);
       }
     } catch (error) {
@@ -212,20 +209,6 @@ export async function runChapterImports(
   }
 
   return run;
-}
-
-/** The tools half's write, or a rejection naming the half that is missing */
-function writeChapters(galleryId: string, json: string): Promise<void> {
-  const write = NS.writeChapters;
-  if (typeof write !== "function") {
-    return Promise.reject(
-      new Error(
-        "[mangaReader] the tools half is not running, so chapters cannot be written"
-      )
-    );
-  }
-
-  return write(galleryId, json);
 }
 
 NR.CHAPTERS_QUERY_TEXT = CHAPTERS_QUERY_TEXT;

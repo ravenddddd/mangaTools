@@ -46,6 +46,9 @@ import { requirePluginApi } from "../plugin-api";
 // the reader half for it through `window.MangaReader` — and a module nothing
 // imports is a module whose body never runs.
 import "./chapters-import";
+// The same, for the other half of the chapter work: the editor's write is called from
+// chapters-tab.ts and this half's own cached copy is updated by what it announces.
+import "./chapters-edit";
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
 import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";

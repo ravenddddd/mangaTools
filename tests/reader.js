@@ -2602,6 +2602,104 @@ async function main() {
   });
 
   /**
+   * The write, what it announces, and the one change it keeps to take back.
+   *
+   * Called directly: the surfaces above it — the tab's form and the lightbox — are
+   * what call this, and what they draw is their own sections' business.
+   */
+  await runSection("writing chapters, and taking one back", async () => {
+    const list = [{ title: "A", images: ["1", "2"] }];
+    const next = [
+      { title: "A", images: ["1"] },
+      { title: "B", images: ["2"] },
+    ];
+    const written = (at) =>
+      mutations[at].variables.input.custom_fields.partial[
+        "plugin.mangaTools.chapters"
+      ];
+
+    assert.strictEqual(
+      NR.canUndoChapters("41"),
+      false,
+      "there is nothing to take back before anything is written"
+    );
+
+    const heard = [];
+    const stop = NR.watchChapters((id) => heard.push(id));
+
+    const at = mutations.length;
+    await NR.writeChapters("41", next, list);
+
+    assert.strictEqual(mutations.length - at, 1, "the write goes out, once");
+    assert.strictEqual(
+      written(at),
+      '{"v":1,"chapters":[{"title":"A","images":["1"]},{"title":"B","images":["2"]}]}',
+      "as the list it was handed, serialised"
+    );
+    assert.deepStrictEqual(
+      heard,
+      ["41"],
+      "and everyone listening hears which gallery changed"
+    );
+    assert.strictEqual(
+      NR.canUndoChapters("41"),
+      true,
+      "and what the change replaced is kept"
+    );
+
+    const beforeUndo = mutations.length;
+    await NR.undoChapters("41");
+
+    assert.strictEqual(
+      mutations.length - beforeUndo,
+      1,
+      "undoing writes again"
+    );
+    assert.strictEqual(
+      written(beforeUndo),
+      '{"v":1,"chapters":[{"title":"A","images":["1","2"]}]}',
+      "putting back exactly what the change replaced"
+    );
+    assert.deepStrictEqual(heard, ["41", "41"], "…and saying so as well");
+    assert.strictEqual(
+      NR.canUndoChapters("41"),
+      false,
+      "and only once: an undo that could itself be undone is a redo, and there is none"
+    );
+
+    await NR.undoChapters("41");
+    assert.strictEqual(
+      mutations.length - beforeUndo,
+      1,
+      "a second undo has nothing to take back, and writes nothing"
+    );
+
+    // A write with nothing to remember — the importer's, which writes twenty-odd
+    // galleries in a row — arms no undo at all.
+    await NR.writeChapters("42", next, null);
+    assert.strictEqual(
+      NR.canUndoChapters("42"),
+      false,
+      "a write that was given nothing to take back leaves nothing to take back"
+    );
+
+    const beforeStop = mutations.length;
+    stop();
+    await NR.writeChapters("41", list, null);
+    assert.strictEqual(
+      mutations.length - beforeStop,
+      1,
+      "the write still happens after a listener stops listening"
+    );
+    assert.deepStrictEqual(
+      heard,
+      ["41", "41", "42"],
+      "…it is only the listening that stopped — which is what the writer asks for " +
+        "when the tab it was drawing into has gone"
+    );
+  });
+
+  /**
    * The handover: what the lightbox is given, and what it is not.
    *
    * This plugin does not draw a chapter menu of its own. Stash's own menu does the
