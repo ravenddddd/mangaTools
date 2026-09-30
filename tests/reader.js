@@ -3246,14 +3246,7 @@ async function main() {
     // under it: a tick redrawn under a stationary pointer cannot tell anyone.
     const bubbleLine = (which) =>
       label.querySelector(".manga-reader-progress-" + which).textContent;
-
-    assert.strictEqual(
-      bar.classList.contains("is-showing"),
-      false,
-      "no chapter is named until the pointer is on one"
-    );
-
-    bar.dispatch(
+    track.dispatch(
       "mousemove",
       dom.makeEvent("mousemove", { target: ticks()[1] })
     );
@@ -3276,7 +3269,7 @@ async function main() {
     );
 
     // Off the tick but still on the bar: nothing is named any more.
-    bar.dispatch("mousemove", dom.makeEvent("mousemove", { target: track }));
+    track.dispatch("mousemove", dom.makeEvent("mousemove", { target: track }));
     assert.strictEqual(
       bar.classList.contains("is-showing"),
       false,
@@ -3297,7 +3290,7 @@ async function main() {
     // And the book moving under a pointer that has not: the bar's width changes with
     // the screen, so a named tick can be gone with no mouse event to say so. The pass
     // has to take the bubble down itself.
-    bar.dispatch(
+    track.dispatch(
       "mousemove",
       dom.makeEvent("mousemove", { target: ticks()[1] })
     );
@@ -3403,7 +3396,7 @@ async function main() {
 
     // Crossing a tick while dragging is no reason to change what the drag is saying:
     // its bubble is the drag's, and the row keeps out of it.
-    bar.dispatch(
+    track.dispatch(
       "mousemove",
       dom.makeEvent("mousemove", { target: ticks()[1] })
     );
@@ -3411,6 +3404,14 @@ async function main() {
       [bubbleLine("page"), bubbleLine("chapter")],
       ["5 / 8", "中盤"],
       "and dragging over a chapter's tick does not turn the bubble into its name"
+    );
+
+    // And it holds it even when the pointer leaves the line: a drag is still a drag.
+    track.dispatch("mouseleave", dom.makeEvent("mouseleave", {}));
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      true,
+      "a drag holds its bubble when the pointer leaves the line"
     );
     assert.deepStrictEqual(
       drawn(),
@@ -3517,6 +3518,7 @@ async function main() {
     try {
       const { box } = await startReader({ galleryId: "8", on: true });
       const bar = box.lightbox.querySelector(".manga-reader-progress");
+      const track = bar.querySelector(".manga-reader-progress-track");
       const asleep = () => bar.classList.contains("is-idle");
 
       // Nothing to put away and nothing yet to say: a lightbox that has just opened,
@@ -3561,8 +3563,19 @@ async function main() {
         "moving anywhere in the lightbox does not wake it"
       );
 
+      // The row the bar sits in, which is the full width of the lightbox and taller
+      // than the line: a pointer moving along it is nowhere near the bar, and a bar
+      // that answered to it would stay awake for everything along the bottom of the
+      // window — which is what "it takes far longer than two seconds" was.
       bar.dispatch("mousemove", dom.makeEvent("mousemove", {}));
-      assert.strictEqual(asleep(), false, "the pointer reaching the bar does");
+      assert.strictEqual(
+        asleep(),
+        true,
+        "and neither does moving along the row it sits in"
+      );
+
+      track.dispatch("mousemove", dom.makeEvent("mousemove", {}));
+      assert.strictEqual(asleep(), false, "the pointer reaching the line does");
 
       latestSleep().fn();
       dom.click(box.navRight);

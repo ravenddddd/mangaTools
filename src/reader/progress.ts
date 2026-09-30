@@ -280,12 +280,15 @@ function build(lightbox: Element): void {
   track.appendChild(label);
   bar.appendChild(track);
 
-  // The row itself, not the lightbox: a bar that wakes whenever the pointer moves
-  // anywhere brings a reader's eye to the bottom of the picture for nothing. What
-  // wakes it is the pointer reaching *it* — which works while it is asleep because
-  // it is a row of its own and covers nothing that anybody else wants.
-  bar.addEventListener("mousemove", onMoveOverBar);
-  bar.addEventListener("mouseleave", takeBubbleDown);
+  // The track, not the row it sits in: what a reader sees as the bar is the line, and
+  // a strip the full width of the lightbox that answered to the pointer would keep the
+  // bar awake for every movement along the bottom of the window — including the ones
+  // that never came near it.
+  //
+  // It works while the bar is asleep because the track is a row of its own, over
+  // nothing that anybody else wants.
+  track.addEventListener("mousemove", onMoveOverBar);
+  track.addEventListener("mouseleave", onLeaveTrack);
 
   track.addEventListener("mousedown", onPress);
   // The bar is a sibling of the pages rather than a child of them, so a press here
@@ -443,6 +446,11 @@ function onMoveOverBar(event: Event): void {
     fraction: Number(tick.dataset?.fraction || 0),
   });
   redraw();
+}
+
+/** The pointer left the line: the bubble goes, unless a drag is holding it */
+function onLeaveTrack(): void {
+  if (!pressed) takeBubbleDown();
 }
 
 /** Puts the bubble up, or moves it: what it says is decided by whoever calls this */
