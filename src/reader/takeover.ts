@@ -10,13 +10,27 @@
  *      it, so React is free to re-render its own subtree without ours going with
  *      it — and the carousel keeps existing, hidden, because it is the thing that
  *      holds the lightbox's idea of where it is;
- *   3. hides that carousel with a class and lays the two pages out itself;
- *   4. drives the lightbox through its own interface — reading where it is from
- *      its header, and moving it with its own arrow keys (see stash-lightbox.ts)
- *      rather than keeping a second idea of the current page that could drift from
- *      the first. Every way of moving — our keys, Stash's keys, the nav strip, a
- *      chapter — ends in the same DOM change, so there is one code path back to a
- *      correct drawing, and it is the observer's.
+ *   3. hides Stash's own header and carousel with classes — see `claim`, which does
+ *      it the moment the lightbox is known to be one of this gallery's rather than
+ *      when there is something to draw, so a reader never watches the wrong pages be
+ *      replaced — and puts a container of its own beside the carousel and lays the
+ *      pages out in it;
+ *   4. keeps its **own idea of where the reader is** — a page, `place` — and never
+ *      moves Stash's carousel. Stash's own two ways of turning move one *page* where
+ *      a screen is one or two of them, and it drops a press that arrives while the
+ *      last one is still swapping; so the three ways a reader has of asking for a
+ *      turn all end in `turnBy`, which is arithmetic on `place`.
+ *
+ * WHAT IT IS RESPONSIBLE FOR, which is a lot for one file — the reason this list is
+ * here is that the next thing added should be weighed against it: the pass over the
+ * document and the gallery read behind it; the container and the screens drawn in it;
+ * the gestures on those pages (a click that turns, a wheel that zooms, a drag that
+ * pans); the chapters — their menu in the header, and the tab on the gallery's own
+ * page; the progress bar; the header; the footer's own name for the page; and the
+ * route, which closes the lightbox when it changes underneath one. If any of it is
+ * ever lifted out, the candidates are the gestures and the position — which are also
+ * the two with the most interaction between them, and the source of nearly every bug
+ * this half has had. See the note on state in progress.ts.
  *
  * The approach follows kokkengMangaViewer (github.com/kokkeng1/stash_plugin_custom),
  * which does the same thing for a scrolling view. Its lesson worth repeating is
@@ -1058,7 +1072,11 @@ function measureAgain(): void {
 // ── The lightbox's chapters ────────────────────────────────────────
 
 /**
- * Hands the lightbox this plugin's list, and its chapters with it.
+ * Hands the lightbox the list this plugin is drawing from.
+ *
+ * The images and nothing else: the chapters are this half's own menu now, and what
+ * Stash needs the list for is its own footer — the name of the page and the way back
+ * to the gallery it came from.
  *
  * Stash shows a chapter menu of its own, and jumps with it — `gotoPage`, which is
  * `setIndex` and lands instantly. What it will not do is show that menu for a

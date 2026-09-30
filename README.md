@@ -705,22 +705,22 @@ The approach follows
 [kokkengMangaViewer](https://github.com/kokkeng1/stash_plugin_custom/tree/main/plugins/kokkengMangaViewer),
 which does the same thing in the wild for a scrolling view.
 
-**Keys are pressed one at a time, and that is not a detail.** A turn of a screen is
-two pages, and the lightbox moves one page per press — but it *drops* a press that
-arrives while the page before it is still swapping (`isSwitchingPageRef` in Stash's
-lightbox: "rapid inputs are dropped"). Two presses in the same tick therefore move
-one page rather than two, intermittently, since a cached page swaps fast enough for
-it not to happen. So a move is an errand: press once, wait for the header to say it
-landed, press again — and send it again if the wait runs out, because a dropped
-press changes nothing in the DOM for anything else to notice.
+**The reader keeps its own place.** Stash's lightbox moves one page per press, and
+*drops* a press that arrives while the page before it is still swapping
+(`isSwitchingPageRef` in its source: "rapid inputs are dropped"). Driving it from here
+would mean pressing once, waiting to be told it had landed, pressing again — an errand
+with a timeout in it, for a move this half can make itself. So the place is a number
+this plugin owns, a turn is arithmetic on it, and Stash's carousel is left where the
+lightbox opened it: hidden, because it is not what is on screen, but still there,
+because it is what Stash's own footer is rendered from.
 
-**Everything it depends on is in one file.** `src/reader/stash-lightbox.ts` holds
-the class names, the header format and the image query — the whole of what this half
-assumes about Stash's markup. If a Stash release renames any of it, the reader stops
-drawing and says so in the console rather than drawing something wrong: a canvas
-that cannot tell where it is must not paint. The same goes for a gallery Stash
-cannot answer for, or one whose page count no longer matches what the lightbox is
-showing.
+**What it assumes about Stash is written down.** `src/reader/stash-lightbox.ts`
+holds the class names and the image query; `chrome.ts` and `footer.ts` hold the
+markup Stash's own header and footer are made of, which this half borrows rather than
+imitates. If a Stash release renames any of it, the reader stops drawing and says so
+in the console rather than drawing something wrong: a canvas that cannot tell where it
+is must not paint. The same goes for a gallery Stash cannot answer for, or one whose
+page count no longer matches what the lightbox is showing.
 
 ### Stash's own ways of turning a page go through this half's turn
 
@@ -732,7 +732,7 @@ paired:
 - the **chevrons** either side of the image, which are Stash's buttons and move one
   page — in a two-page view the same screen, so a reader clicking one sees nothing
   happen. The click is stopped before Stash's React handler sees it and the same
-  errand an arrow press starts is started instead;
+  turn an arrow press starts is started instead;
 - the **click on a page**, which Stash reads per image (the right half forward, the
   left half back) and this half reads the same way.
 
@@ -817,19 +817,19 @@ an ordinary thing to have: a cover, a divider, a page nobody has decided about
 yet. The button says so rather than guessing, which is how a page that still needs
 a chapter becomes visible.
 
-**The menu is Stash's own.** Not a menu of this plugin's dressed up to look like
-one: the lightbox's own chapter control, in its own place, offering this plugin's
-chapters. What makes that possible is that both halves of Stash's rule are about
-the *numbers*, not the menu. It refuses to show chapters for a lightbox whose list
-is not in path order, because its chapter numbers count in path order and would
-point at the wrong images — so hand it a list **and** chapters numbered in that
-list, and its own menu is right in any order at all, and its own jump — `setIndex`,
-which lands instantly — is the jump.
+**The menu is this plugin's own.** Stash renders its chapter menu from *its*
+numbers — the Nth image, counted in path order — so a gallery sorted any other way
+has no menu at all: those numbers would point at the wrong images. A menu this half
+cannot make Stash show is a menu that is simply missing, so this half draws its own,
+in Stash's markup and in Stash's place: the lightbox's own chapter control, offering
+this plugin's chapters, and jumping to where each one begins **on screen**. The
+header's chapter name is drawn from the same list, so it cannot disagree with it.
 
-Which is what this plugin does, once the double-page mode is on and it has read
-the gallery: it hands the lightbox the images it is drawing and its own chapters,
-numbered by where each one begins on screen. The header's chapter name follows for
-free, since it reads the same list.
+**What is handed over is the images, not the chapters.** The lightbox is given the
+list this half is drawing from, in the order it is drawing it — which is what makes
+Stash's own footer name the right page and offer the right way back to the gallery.
+The chapters are not handed over at all: the chapters tab and the lightbox's chapter
+menu are both drawn by this plugin, from this plugin's list.
 
 **Only on a list it has checked.** The handover is skipped when the list is not the
 one the lightbox is showing — a filtered list behind it, say — because replacing a
@@ -837,7 +837,7 @@ lightbox's images with a different set is not a takeover but a swap, and every
 number after the first difference would be wrong. A gallery whose pages could not
 be matched to what is on screen is not drawn at all, and nothing is handed over.
 
-**Nothing is written until you edit a gallery's chapters.****Nothing is written until you edit a gallery's chapters.** A gallery with no list
+**Nothing is written until you edit a gallery's chapters.** A gallery with no list
 of its own — which is every gallery to begin with, including the ones whose
 chapters you made by hand in Stash — is read from Stash's own numbers instead:
 Stash gives each chapter a start and nothing else, so its ranges (each chapter up

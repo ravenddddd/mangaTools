@@ -50,7 +50,6 @@ export const CLASS_CHAPTER_MENU = "manga-reader-chapter-menu";
  * attribute the chapters tab marks Stash's own Create button with.
  */
 const HIDDEN = "data-manga-reader-hidden";
-export const CLASS_MENU = "manga-reader-menu";
 export const CLASS_MENU_BUTTON = "manga-reader-menu-button";
 export const CLASS_MENU_PANEL = "manga-reader-menu-panel";
 export const CLASS_MENU_ITEM = "manga-reader-menu-item";

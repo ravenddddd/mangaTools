@@ -17,21 +17,19 @@ import { gqlDoc, requirePluginApi } from "../plugin-api";
 import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
 
-/** The root element's class. Everything else is a child of it. */
-export const CLASS_LIGHTBOX = "Lightbox";
-export const CLASS_DISPLAY = "Lightbox-display";
-export const CLASS_CAROUSEL = "Lightbox-carousel";
-export const CLASS_INDICATOR = "Lightbox-header-indicator";
-export const CLASS_OPTIONS_ICON = "Lightbox-header-options-icon";
-export const CLASS_POPOVER_BODY = "popover-body";
-
-/** The selectors, spelled once so a page of Stash's markup is read the same way everywhere */
+/**
+ * The selectors, spelled once so a page of Stash's markup is read the same way
+ * everywhere.
+ *
+ * The header's indicator and the carousel are both still read — for where the
+ * lightbox is, and for which image is at that place. What used to be here beside
+ * them, classes as well as selectors, outlived the code that read it; a name nothing
+ * reads is a name that goes stale without anybody noticing.
+ */
 export const SELECTOR_LIGHTBOX = ".Lightbox";
 export const SELECTOR_DISPLAY = ".Lightbox-display";
-export const SELECTOR_CAROUSEL = ".Lightbox-carousel";
 export const SELECTOR_INDICATOR = ".Lightbox-header-indicator";
-export const SELECTOR_OPTIONS_ICON = ".Lightbox-header-options-icon";
-export const SELECTOR_POPOVER_BODY = ".popover .popover-body";
+export const SELECTOR_CAROUSEL = ".Lightbox-carousel";
 
 /**
  * Stash's own next/previous buttons, the chevrons either side of the image.
