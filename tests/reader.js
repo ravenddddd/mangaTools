@@ -30,6 +30,8 @@ const state = {
   galleries: {},
   queries: [],
   failing: false,
+  /** Set by a test to hold the next gallery query open: see the client below */
+  holdGallery: null,
 };
 
 const mutations = [];
@@ -65,7 +67,7 @@ const client = {
       variables.sort === "path" && gallery.pathImages
         ? gallery.pathImages
         : gallery.images;
-    return Promise.resolve({
+    const answer = {
       data: {
         configuration: { interface: { language: state.language } },
         pages: { images: pages },
@@ -86,7 +88,19 @@ const client = {
           })),
         },
       },
-    });
+    };
+
+    // Held open by a test that wants to look at the lightbox while the answer is still
+    // on its way — which is the whole of what a flash of Stash's own chrome is. What
+    // is held is the answer itself, so releasing it gives the query what it would
+    // have had.
+    if (state.holdGallery) {
+      return new Promise((resolve) => {
+        state.holdGallery = () => resolve(answer);
+      });
+    }
+
+    return Promise.resolve(answer);
   },
   // Stash's writes, recorded rather than performed: this plugin is not allowed to
   // make any — see the note on never touching Stash's own data — and a stub that
@@ -296,6 +310,9 @@ const named = (id, title, path) => ({
   ...image(id, 1000, 1500),
   title,
   visual_files: [{ __typename: "ImageFile", path, width: 1000, height: 1500 }],
+  // Which is what Stash's own footer links back to, and null folder and all: that is
+  // what this Stash answers for a gallery outside its library folders.
+  galleries: [{ id: "51", title: "Gallery 51", folder: null }],
   // Stash publishes a URL here as well, query and all, and it is not a file's name:
   // a footer that reads a page's name out of this says "image?t=1700000009".
   paths: {
@@ -763,6 +780,13 @@ state.galleries["43"] = OWN_CHAPTERS;
 state.galleries["33"] = OWN_CHAPTERS;
 state.galleries["34"] = OWN_CHAPTERS;
 state.galleries["51"] = NAMED_GALLERY;
+// For the section about a lightbox whose pages are still being read: a gallery no
+// other section has opened, since a gallery already read answers from the cache and
+// there would be nothing in flight to look at.
+state.galleries["53"] = {
+  images: numbered(CHAPTERS_VIEW),
+  pathImages: numbered(CHAPTERS_PATH),
+};
 // For the sections about the pairing shift, which is remembered per gallery.
 state.galleries["36"] = PLAIN_GALLERY;
 // A gallery this plugin has no business on: marked `manga: false`, which is what keeps
@@ -2384,7 +2408,29 @@ async function main() {
         "and the chapters, in the order they begin on screen"
       );
 
+      // And it is handed over again the next time the lightbox is opened. A reader
+      // opens one, closes it, opens it again — and the *second* lightbox is the one
+      // where the footer's gallery link was reported missing, so this is the case to
+      // pin rather than assume.
       stopReader(box);
+      const again = await startReader({
+        galleryId: "31",
+        on: true,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
+      });
+      assert.strictEqual(
+        shown.length,
+        2,
+        "opening the lightbox a second time hands the list over again"
+      );
+      assert.deepStrictEqual(
+        shown[1].props.images.map((i) => i.id),
+        CHAPTERS_VIEW.map(String),
+        "with the same images in the same order"
+      );
+      stopReader(again.box);
     }
   );
 
@@ -2433,6 +2479,12 @@ async function main() {
         first.visual_files[0].path,
         "/manga/author/002.jpg",
         "…and so does the file it is"
+      );
+      assert.deepStrictEqual(
+        first.galleries,
+        [{ id: "51", title: "Gallery 51", folder: null }],
+        "and the gallery it is in, which is what Stash's own footer links back to: an " +
+          "image that belongs to none is an image whose lightbox shows no such link"
       );
       assert.strictEqual(second.title, "", "an image with no title has none");
       assert.strictEqual(
@@ -3743,6 +3795,53 @@ async function main() {
    * how a reader ended up watching a spinner with the spread view switched off behind
    * it.
    */
+  /**
+   * The lightbox is claimed before the gallery has answered.
+   *
+   * Stash opens it wearing its own chrome, and the query that says what to draw
+   * instead takes a round trip: without this the reader watches Stash's own counter
+   * and Stash's own page for the length of it, and then watches them be replaced.
+   */
+  await runSection(
+    "the lightbox is claimed before its pages are read",
+    async () => {
+      state.holdGallery = true;
+
+      const { box } = await startReader({
+        galleryId: "53",
+        on: true,
+        total: 8,
+        ids: CHAPTERS_VIEW.map(String),
+        expectSwitch: false,
+      });
+
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-takeover"),
+        true,
+        "the lightbox is taken over the moment it is one of this gallery's, before " +
+          "there is anything to draw in it"
+      );
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-active"),
+        true,
+        "and its own carousel is out of the way with it, rather than showing a page " +
+          "the reader is not going to be shown"
+      );
+
+      // Let it answer, so nothing is left in flight for the sections after this one.
+      const release = state.holdGallery;
+      state.holdGallery = null;
+      release();
+      await settle();
+      assert.strictEqual(
+        box.lightbox.querySelector(".manga-reader-spread") !== null,
+        true,
+        "and once it has answered, the pages are drawn as usual"
+      );
+      stopReader(box);
+    }
+  );
+
   await runSection(
     "a busy lightbox is waited out, not given up on",
     async () => {

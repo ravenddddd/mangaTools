@@ -278,6 +278,16 @@ function step(): void {
     return;
   }
 
+  // Claimed before anything can be drawn in it.
+  //
+  // Stash's lightbox opens wearing its own chrome — its own counter, its own idea of
+  // which order the pages are in, its own page in the carousel — and what this plugin
+  // draws instead waits on a query. So the claiming comes first, the moment the
+  // lightbox is known to be one of this gallery's, and the drawing follows when there
+  // is something to draw. A lightbox that is empty for the length of a query is an
+  // honest one; a flash of pages the reader is not going to be shown is not.
+  claim(lightbox);
+
   // Read whether or not the mode is on: the chapters are what the lightbox is handed
   // once this gallery is in hand, and a reader who never turns the spread view on
   // still wants them. The mode decides what is *drawn*, and nothing else.
@@ -292,6 +302,20 @@ function step(): void {
   if (!wanted()) return;
 
   sync(lightbox);
+}
+
+/**
+ * Takes the lightbox over before there is anything to put in it.
+ *
+ * The two classes hide Stash's chrome and its carousel — see the stylesheet — and
+ * draw nothing of this plugin's. So the lightbox is empty for as long as the gallery
+ * takes to answer, and `deactivate` hands it all back if the answer never comes: the
+ * worst case is a reader who waits and then has Stash's own lightbox, not one left
+ * with no lightbox at all.
+ */
+function claim(lightbox: Element): void {
+  lightbox.classList.add(CLASS_ACTIVE);
+  lightbox.classList.add(CLASS_TAKEOVER);
 }
 
 /**

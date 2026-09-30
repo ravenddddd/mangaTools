@@ -251,6 +251,13 @@ export const GALLERY_QUERY_TEXT = [
   "      paths {",
   "        image",
   "      }",
+  "      galleries {",
+  "        id",
+  "        title",
+  "        folder {",
+  "          path",
+  "        }",
+  "      }",
   "    }",
   "  }",
   "  byPath: findImages(",
@@ -328,6 +335,11 @@ interface GalleryPayload {
         height?: number;
       }>;
       paths?: { image?: string };
+      galleries?: Array<{
+        id: string;
+        title?: string;
+        folder?: { path?: string } | null;
+      }>;
     }>;
   };
   /** Only asked for when the order is not path — see fetchGallery */
@@ -347,6 +359,20 @@ export interface LightboxImage {
   id: string;
   title: string;
   paths: { image: string };
+  /**
+   * The galleries this image is in, as Stash's own lightbox reads them.
+   *
+   * Carried for one reason: that lightbox renders its footer's link back to the
+   * gallery from the image it is showing, and an image that belongs to no gallery has
+   * no link to render. The list this plugin hands over is the gallery's own, so the
+   * answer is always the one gallery it is being read from — and `folder` is what
+   * Stash names a gallery by when it has no title.
+   */
+  galleries: Array<{
+    id: string;
+    title: string;
+    folder: { path: string } | null;
+  }>;
   visual_files: Array<{
     __typename: string;
     path: string;
@@ -467,6 +493,15 @@ export async function fetchGallery(
           height: sized?.height || 0,
         },
       ],
+      // As they came, and always a list: Stash asks whether there are any, so an image
+      // with none and an image nobody asked about have to look the same to it.
+      galleries: (image.galleries || []).map((gallery) => ({
+        id: String(gallery.id),
+        title: String(gallery.title ?? ""),
+        folder: gallery.folder
+          ? { path: String(gallery.folder.path ?? "") }
+          : null,
+      })),
     };
   });
 
