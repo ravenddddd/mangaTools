@@ -72,7 +72,7 @@ export interface ProgressState {
 export const PROGRESS_SCRUB_MS = 120;
 
 /** How long the bar is left alone before it gets out of the way, in milliseconds */
-export const PROGRESS_IDLE_MS = 2500;
+export const PROGRESS_IDLE_MS = 2000;
 
 /** Where a page sits on the bar, as a fraction — see the note above */
 export function fractionOfPage(page: number, total: number): number {
@@ -122,6 +122,8 @@ const CLASS_TRACK = "manga-reader-progress-track";
 const CLASS_READ = "manga-reader-progress-read";
 const CLASS_THUMB = "manga-reader-progress-thumb";
 const CLASS_NODES = "manga-reader-progress-nodes";
+const CLASS_PAGE_WORDS = "manga-reader-progress-page";
+const CLASS_CHAPTER_WORDS = "manga-reader-progress-chapter";
 const CLASS_NODE = "manga-reader-progress-node";
 const CLASS_LABEL = "manga-reader-progress-label";
 /** While a pointer is down: the handle is the pointer, and nothing eases */
@@ -139,12 +141,23 @@ let track: HTMLElement | null = null;
 let read: HTMLElement | null = null;
 let thumb: HTMLElement | null = null;
 let label: HTMLElement | null = null;
+let labelPage: HTMLElement | null = null;
+let labelChapter: HTMLElement | null = null;
 let nodes: HTMLElement | null = null;
 
 /** What the last pass drew, so a pass that changes nothing writes nothing */
 let drawn: { nodes: string; at: number; total: number } | null = null;
 /** How wide the label came out, measured when its words change rather than per move */
 let labelWidth = 0;
+
+/**
+ * A chapter's name being shown because the pointer is on its tick, or null.
+ *
+ * Kept rather than written and forgotten, because a pass over the document has to be
+ * able to draw the bubble again without knowing why it is up — and one that could not
+ * would draw the reader's own position into it instead, which is a bug this had.
+ */
+let naming: { words: string; fraction: number } | null = null;
 
 /**
  * Where the pointer is along the bar, as a fraction, while it is down.
@@ -211,6 +224,7 @@ export function removeProgress(lightbox: Element): void {
   nodes = null;
   drawn = null;
   latest = null;
+  naming = null;
   pointer = null;
   pressed = false;
   labelWidth = 0;
@@ -219,10 +233,23 @@ export function removeProgress(lightbox: Element): void {
 /** The elements the bar is made of, once per lightbox */
 function build(lightbox: Element): void {
   bar = document.createElement("div");
-  bar.className = CLASS_BAR;
+  // Asleep to begin with: a lightbox that has just opened has said nothing yet, and a
+  // bar that appears over the picture with it is a bar to be got rid of before the
+  // picture can be read. What wakes it is the pointer reaching it, or a turn.
+  bar.className = CLASS_BAR + " " + CLASS_IDLE;
 
   label = document.createElement("div");
   label.className = CLASS_LABEL;
+
+  // Two lines: where the reader is, and what the chapter there is called. Neither in
+  // the same breath as the other, because they are different kinds of thing — a
+  // number that changes every screen, and a name that changes every few dozen.
+  labelPage = document.createElement("div");
+  labelPage.className = CLASS_PAGE_WORDS;
+  labelChapter = document.createElement("div");
+  labelChapter.className = CLASS_CHAPTER_WORDS;
+  label.appendChild(labelPage);
+  label.appendChild(labelChapter);
 
   track = document.createElement("div");
   track.className = CLASS_TRACK;
@@ -295,24 +322,39 @@ function update(state: ProgressState): void {
   if (read.style.width !== where) read.style.width = where;
   if (thumb.style.left !== where) thumb.style.left = where;
 
+  // What the bubble says: the chapter whose tick is under the pointer, if one is, and
+  // otherwise where the reader is — which is what a drag is showing.
   const page = pointer === null ? state.at : target;
-  const name = state.chapterNameAt(page);
-  const words = page + 1 + " / " + state.total + (name ? " · " + name : "");
-  if (label.textContent !== words) {
-    label.textContent = words;
+  const words = naming
+    ? { page: "", chapter: naming.words }
+    : {
+        page: page + 1 + " / " + state.total,
+        chapter: state.chapterNameAt(page),
+      };
+  const place = naming ? naming.fraction : null;
+  if (labelPage?.textContent !== words.page) {
+    if (labelPage) labelPage.textContent = words.page;
+    labelWidth = label.offsetWidth;
+  }
+  if (labelChapter?.textContent !== words.chapter) {
+    if (labelChapter) labelChapter.textContent = words.chapter;
     labelWidth = label.offsetWidth;
   }
 
   // Kept inside the bar rather than centred on a point that may be at either end.
   const half = labelWidth / 2;
   const width = track.clientWidth || 0;
-  const left = Math.max(half, Math.min(fraction * width, width - half));
-  const px = left.toFixed(0) + "px";
+  const at = place === null ? fraction : place;
+  const px =
+    Math.max(half, Math.min(at * width, width - half)).toFixed(0) + "px";
   if (label.style.left !== px) label.style.left = px;
 
   // A bar with something new to say comes back: the reader who turned a page is
-  // looking at the pages, and the bar is how they see where that was.
-  const moved = !drawn || drawn.at !== state.at || drawn.total !== state.total;
+  // looking at the pages, and the bar is how they see where that was. Not on the
+  // first pass, though — a lightbox that has just opened has said nothing yet, and a
+  // bar that appears with it is a bar that has to be dismissed before it can be read.
+  const moved =
+    drawn !== null && (drawn.at !== state.at || drawn.total !== state.total);
   drawn = { nodes: key, at: state.at, total: state.total };
   if (moved) wake();
 }
@@ -348,7 +390,11 @@ function onWake(): void {
 
 /** The pointer left the row: it may stay awake, but it stops naming a chapter */
 function onLeave(): void {
+  if (!naming) return;
+
+  naming = null;
   bar?.classList.remove(CLASS_NAMING);
+  redraw();
 }
 
 /** Brings the bar back, and starts the clock that will put it away again */
@@ -378,18 +424,14 @@ function stopTimers(): void {
  * words, with neither a delay nor a hover of its own to wait out.
  */
 function name(words: string, fraction: number): void {
-  if (!bar || !label || !track) return;
+  if (!bar) return;
 
-  if (label.textContent !== words) {
-    label.textContent = words;
-    labelWidth = label.offsetWidth;
-  }
-
-  const half = labelWidth / 2;
-  const width = track.clientWidth || 0;
-  label.style.left =
-    Math.max(half, Math.min(fraction * width, width - half)).toFixed(0) + "px";
+  naming = { words, fraction };
   bar.classList.add(CLASS_NAMING);
+  // Drawn here rather than waited for: the pass this write provokes would draw it
+  // again in a moment, but a bubble that arrives a moment late is a bubble the
+  // reader has already looked away from.
+  redraw();
 }
 
 /** Whether a pointer is down on the bar */

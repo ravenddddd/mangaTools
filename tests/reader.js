@@ -3230,11 +3230,20 @@ async function main() {
       false,
       "no chapter is named until the pointer is on one"
     );
+    const bubbleLine = (which) =>
+      label.querySelector(".manga-reader-progress-" + which).textContent;
+
     ticks()[1].dispatch("mouseenter", dom.makeEvent("mouseenter", {}));
     assert.strictEqual(
-      label.textContent,
+      bubbleLine("chapter"),
       "中盤",
       "and the pointer on a tick names that chapter"
+    );
+    assert.strictEqual(
+      bubbleLine("page"),
+      "",
+      "in a bubble of its own with no page number in it: the pass that follows a " +
+        "write of the reader's own used to draw the reader's position over the name"
     );
     assert.strictEqual(
       bar.classList.contains("is-naming"),
@@ -3334,6 +3343,11 @@ async function main() {
       "halfway along is page 4 of 8"
     );
     assert.deepStrictEqual(
+      [bubbleLine("page"), bubbleLine("chapter")],
+      ["5 / 8", "中盤"],
+      "and the bubble says where the drag is on one line and the chapter on another"
+    );
+    assert.deepStrictEqual(
       drawn(),
       ["/image/704/image", "/image/705/image"],
       "which is the screen holding it"
@@ -3410,16 +3424,32 @@ async function main() {
       const bar = box.lightbox.querySelector(".manga-reader-progress");
       const asleep = () => bar.classList.contains("is-idle");
 
+      // Nothing to put away and nothing yet to say: a lightbox that has just opened,
+      // with a bar over it, is a bar that has to be got rid of before the picture can
+      // be read.
+      assert.strictEqual(
+        asleep(),
+        true,
+        "a bar that has just been drawn is asleep"
+      );
+      assert.strictEqual(
+        timers.filter((timer) => timer.ms === NR.PROGRESS_IDLE_MS).length,
+        0,
+        "and it has set itself no clock, since there is nothing to put away"
+      );
+
+      dom.click(box.navRight);
       assert.strictEqual(
         asleep(),
         false,
-        "a bar that has just been drawn is awake"
+        "turning a page wakes it: the bar has something new to say"
       );
 
-      const sleep = timers.find((timer) => timer.ms === NR.PROGRESS_IDLE_MS);
-      assert.ok(sleep, "and it has set itself a clock to go to sleep by");
+      const latestSleep = () =>
+        timers.filter((timer) => timer.ms === NR.PROGRESS_IDLE_MS).pop();
+      assert.ok(latestSleep(), "and it sets itself a clock to go to sleep by");
 
-      sleep.fn();
+      latestSleep().fn();
       assert.strictEqual(
         asleep(),
         true,
@@ -3439,7 +3469,7 @@ async function main() {
       bar.dispatch("mousemove", dom.makeEvent("mousemove", {}));
       assert.strictEqual(asleep(), false, "the pointer reaching the bar does");
 
-      sleep.fn();
+      latestSleep().fn();
       dom.click(box.navRight);
       assert.strictEqual(
         asleep(),

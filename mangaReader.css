@@ -171,7 +171,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.15s ease;
   user-select: none;
 }
 
@@ -298,16 +298,27 @@
   bottom: 100%;
   margin-bottom: 4px;
   transform: translateX(-50%);
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.75);
   color: #fff;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
+  text-align: center;
   white-space: nowrap;
   opacity: 0;
   transition: opacity 0.15s ease;
   pointer-events: none;
+}
+
+/* Where the reader is — a number, and no line of its own when a tick is named */
+.manga-reader-progress-page:empty {
+  display: none;
+}
+
+/* What the chapter there is called */
+.manga-reader-progress-chapter:empty {
+  display: none;
 }
 
 .manga-reader-progress.is-scrubbing .manga-reader-progress-label,
