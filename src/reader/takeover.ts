@@ -578,9 +578,11 @@ function progressState(
   at: number,
   lightbox: Element
 ): Parameters<typeof ensureProgress>[1] {
+  const screen = gallery.screens[at];
   return {
     at: gallery.screens[at]?.start ?? 0,
     total: gallery.pages.length,
+    width: pictureWidth(screen?.pages.length ?? 0),
     chapters: gallery.chapters,
     chapterNameAt: (page) =>
       chapterAt(gallery.chapters, gallery.pages[page]?.id || "")?.title || "",
@@ -1174,6 +1176,31 @@ function turnBy(lightbox: Element, direction: 1 | -1): boolean {
   place += steps;
   sync(lightbox);
   return true;
+}
+
+/**
+ * How wide the pages on show are drawn, which is the width the progress bar takes.
+ *
+ * Measured from the *layout* box of each image — `offsetWidth` and `offsetLeft`,
+ * neither of which the zoom's transform touches — and taken as the span from the
+ * leftmost edge to the rightmost, so a pair measures as the pair and a lone page as
+ * itself. Nothing has been laid out yet on the first pass of a fresh lightbox, and a
+ * width of zero is answered for in the stylesheet: the track's own maximum keeps it
+ * from drawing wider than the row it is in.
+ */
+function pictureWidth(pages: number): number {
+  if (!container || pages <= 0) return 0;
+
+  let left = Number.POSITIVE_INFINITY;
+  let right = 0;
+
+  for (const node of Array.from(container.querySelectorAll("img"))) {
+    const image = node as HTMLElement;
+    left = Math.min(left, image.offsetLeft);
+    right = Math.max(right, image.offsetLeft + image.offsetWidth);
+  }
+
+  return right > left ? right - left : 0;
 }
 
 /**

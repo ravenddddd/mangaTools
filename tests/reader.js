@@ -3174,6 +3174,17 @@ async function main() {
       "and it is on the screen"
     );
 
+    // Its own row in the lightbox's column, between the picture and the footer: not a
+    // layer over the pages, which is what it was and what it must not be again.
+    const kids = [...box.lightbox.children];
+    const rowOf = (name) =>
+      kids.findIndex((node) => node.className.includes(name));
+    assert.ok(
+      rowOf("Lightbox-display") < rowOf("manga-reader-progress") &&
+        rowOf("manga-reader-progress") < rowOf("Lightbox-footer"),
+      "the bar is a row between the picture and the footer, not a layer over the pages"
+    );
+
     const track = bar.querySelector(".manga-reader-progress-track");
     const read = bar.querySelector(".manga-reader-progress-read");
     const thumb = bar.querySelector(".manga-reader-progress-thumb");
@@ -3182,16 +3193,23 @@ async function main() {
     ];
 
     // The track as the browser would measure it, since a pointer's x is only a
-    // fraction of something; and the chevrons, which the bar ends where they begin.
+    // fraction of something; and the pages, which are what the bar is as wide as.
+    // Layout boxes, which the zoom's transform does not touch.
+    const laidOut = () => {
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+    };
+
     track.rect = { left: 0, top: 0, width: 800, height: 4 };
-    box.navLeft.offsetWidth = 90;
-    box.navRight.offsetWidth = 90;
+    laidOut();
     dom.flush();
 
-    assert.deepStrictEqual(
-      [bar.style.left, bar.style.right],
-      ["90px", "90px"],
-      "and it stops clear of Stash's own page-turn buttons"
+    assert.strictEqual(
+      track.style.width,
+      "500px",
+      "the bar is as wide as the pages on show — the cover, which stands alone"
     );
 
     assert.strictEqual(read.style.width, "0.000%", "the book opens unread");
@@ -3214,6 +3232,16 @@ async function main() {
       read.style.width,
       "12.500%",
       "a screen later, the fill ends where the reader is: page 2 of 8"
+    );
+
+    // And the width follows the pages: a screen of one page is a narrower bar than a
+    // screen of two, which is what makes it read as the book's own edge.
+    laidOut();
+    dom.flush();
+    assert.strictEqual(
+      track.style.width,
+      "1020px",
+      "the pair is still two pages wide"
     );
 
     // A drag: the handle follows the pointer on every event — to the pixel, with no

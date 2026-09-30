@@ -114,6 +114,22 @@ function makeElement(tagName) {
     },
 
     /**
+     * The DOM's own `insertBefore`, for the two places the plugin wants a node in a
+     * particular place: its header where Stash's header is, and its progress bar in
+     * the row before the footer.
+     */
+    insertBefore(child, before) {
+      if (child.parentNode) detach(child.parentNode, child);
+
+      const at = el.children.indexOf(before);
+      if (at === -1) return el.appendChild(child);
+
+      el.children.splice(at, 0, child);
+      child.parentNode = el;
+      return child;
+    },
+
+    /**
      * The sibling before this one, elements only — the chapters tab is found by the
      * button Stash renders beside it.
      */

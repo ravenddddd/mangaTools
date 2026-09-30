@@ -40,6 +40,14 @@ export interface ProgressState {
   at: number;
   /** How many pages the gallery has, which is what the bar is a fraction of */
   total: number;
+  /**
+   * How wide the pages on show are, in pixels — which is how wide the bar is.
+   *
+   * Measured by the reader, from the pages it drew: the bar belongs to those pages
+   * the way a book's own edge does, and a track wider or narrower than the picture
+   * reads as a control floating over it rather than as a part of it.
+   */
+  width: number;
   /** The chapters, placed in the order being read — one tick each */
   chapters: MangaReaderPlacedChapter[];
   /**
@@ -163,8 +171,7 @@ export function ensureProgress(
 ): HTMLElement | null {
   latest = state;
 
-  const display = lightbox.querySelector(".Lightbox-display");
-  if (!display) return bar;
+  if (!lightbox.querySelector(".Lightbox-footer")) return bar;
 
   // A gallery of one page has no progress to show, and a bar across the bottom of a
   // single picture is furniture with nothing to say — Stash draws its own counter
@@ -173,11 +180,13 @@ export function ensureProgress(
   // page, and this one has nothing to put there.
   if (state.total <= 1) return null;
 
-  if (!bar) build(display);
+  if (!bar) build(lightbox);
+  // React owns the lightbox's children and can take this row away with them; the
+  // observer puts it back, the same way the pages' container is put back.
+  else if (bar.parentNode !== lightbox) place(lightbox);
 
   if (!bar || !track || !read || !thumb || !label || !nodes) return bar;
 
-  inset(lightbox);
   watch(lightbox);
   update(state);
 
@@ -209,7 +218,7 @@ export function removeProgress(lightbox: Element): void {
 }
 
 /** The elements the bar is made of, once per lightbox */
-function build(display: Element): void {
+function build(lightbox: Element): void {
   bar = document.createElement("div");
   bar.className = CLASS_BAR;
 
@@ -240,7 +249,22 @@ function build(display: Element): void {
   // though, and a click there is the click that closes Stash's lightbox.
   bar.addEventListener("click", (event) => event.stopPropagation());
 
-  display.appendChild(bar);
+  place(lightbox);
+}
+
+/**
+ * Puts the bar in its own row, between the picture and the footer.
+ *
+ * A row rather than an overlay: the bar is about the pages, and a line drawn across
+ * the bottom of them is a line drawn across the pages themselves. It sits against
+ * the footer, so it goes before the footer in the lightbox's column.
+ */
+function place(lightbox: Element): void {
+  if (!bar) return;
+
+  const footer = lightbox.querySelector(".Lightbox-footer");
+  if (footer) lightbox.insertBefore(bar, footer);
+  else lightbox.appendChild(bar);
 }
 
 /** Draws the bar from a state: the ticks, the fill, the handle, the words */
@@ -251,6 +275,9 @@ function update(state: ProgressState): void {
   if (!drawn || drawn.nodes !== key || drawn.total !== state.total) {
     drawNodes(state);
   }
+
+  const wanted = Math.round(state.width) + "px";
+  if (track.style.width !== wanted) track.style.width = wanted;
 
   const settled = fractionOfPage(state.at, state.total);
   const fraction = pointer === null ? settled : pointer;
@@ -279,28 +306,6 @@ function update(state: ProgressState): void {
   const moved = !drawn || drawn.at !== state.at || drawn.total !== state.total;
   drawn = { nodes: key, at: state.at, total: state.total };
   if (moved) wake();
-}
-
-/**
- * Stops the bar short of Stash's own page-turn buttons.
- *
- * Measured from the button rather than written down: the chevrons are Stash's markup
- * and its stylesheet decides how wide they are, and a number here would be a copy of
- * that decision, drifting the moment either changes. A lightbox with no chevrons —
- * which is a lightbox of one image, where this bar is not drawn at all — leaves the
- * bar the full width, which is what no inset means.
- */
-function inset(lightbox: Element): void {
-  if (!bar) return;
-
-  const button = lightbox.querySelector(
-    ".Lightbox-navbutton"
-  ) as HTMLElement | null;
-  const width = button?.offsetWidth || 0;
-  const value = width + "px";
-
-  if (bar.style.left !== value) bar.style.left = value;
-  if (bar.style.right !== value) bar.style.right = value;
 }
 
 /** One tick per chapter, where its first page sits */

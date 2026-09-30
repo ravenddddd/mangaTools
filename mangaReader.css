@@ -160,28 +160,17 @@
  * plugin's look rather than a copy of anything — a thin bar low on the picture, a
  * handle that appears when aimed at, and ticks for the chapters.
  *
- * **Flush with the bottom of the picture area**, which is the top of the footer: the
- * last line of the picture rather than something floating over it.
- *
- * Flush is only safe because the track sits in the *middle* of this box rather than
- * at its foot. The display clips what is drawn outside it — that is what keeps a
- * zoomed page off the header — and a 12px handle centred on a 4px track hangs 4px
- * below the track, so a track at the very bottom would lose the handle's lower half
- * to the clip. Centred, the whole handle is inside it.
- *
- * It stops short of the edges: `left` and `right` are set from the width of Stash's
- * own page-turn buttons, so the bar ends where they begin.
+ * **Its own row, between the picture and the footer** — not an overlay. A line drawn
+ * across the bottom of the pages is a line drawn across the pages, and this plugin is
+ * a guest in this lightbox: it takes a strip of the lightbox rather than any part of
+ * the picture. The row is the height of something to aim at, not the height of paint.
  */
 .manga-reader-progress {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  /* Taller than it looks: the bar is 4px of paint and 16px of somewhere to aim */
-  height: 16px;
-  z-index: 30;
+  flex-shrink: 0;
+  height: 18px;
   display: flex;
   align-items: center;
+  justify-content: center;
   transition: opacity 0.25s ease;
   user-select: none;
 }
@@ -196,24 +185,41 @@
   pointer-events: none;
 }
 
+/*
+ * As wide as the pages on show — set from their measured width — and no wider than
+ * the row it is in. Its height is the whole of the aim, with the 4px of paint drawn
+ * inside it, because a 4px target is a target a reader misses.
+ */
 .manga-reader-progress-track {
   position: relative;
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.18);
-  transition: height 0.12s ease;
+  height: 16px;
+  max-width: 100%;
+  transition: width 0.2s ease;
 }
 
-.manga-reader-progress:hover .manga-reader-progress-track,
-.manga-reader-progress.is-scrubbing .manga-reader-progress-track {
-  height: 6px;
+.manga-reader-progress-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 0.12s ease;
+}
+
+.manga-reader-progress:hover .manga-reader-progress-track::before,
+.manga-reader-progress.is-scrubbing .manga-reader-progress-track::before {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .manga-reader-progress-read {
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 50%;
+  height: 4px;
+  margin-top: -2px;
   background: rgba(255, 255, 255, 0.7);
   transition: width 0.15s ease;
 }
@@ -226,8 +232,9 @@
  */
 .manga-reader-progress-node {
   position: absolute;
-  top: -3px;
-  bottom: -3px;
+  top: 50%;
+  height: 12px;
+  margin-top: -6px;
   width: 2px;
   margin-left: -1px;
   background: rgba(255, 255, 255, 0.45);
@@ -283,7 +290,8 @@
 /* The page the drag is on, above the bar it belongs to */
 .manga-reader-progress-label {
   position: absolute;
-  bottom: 20px;
+  bottom: 100%;
+  margin-bottom: 2px;
   transform: translateX(-50%);
   padding: 2px 8px;
   border-radius: 3px;

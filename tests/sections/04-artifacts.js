@@ -372,6 +372,21 @@ module.exports = () => {
       "column holding them"
   );
 
+  // The progress bar's own row, and the fact that it is a row: a bar positioned over
+  // the pages would be a line drawn across the pages, and this plugin takes a strip
+  // of the lightbox rather than any part of the picture.
+  assert.ok(
+    /\.manga-reader-progress\s*\{[^}]*flex-shrink:\s*0/.test(readerCss) &&
+      !/\.manga-reader-progress\s*\{[^}]*position:\s*absolute/.test(readerCss),
+    "mangaReader.css should lay the bar out as a row of the lightbox rather than " +
+      "overlay the pages: the picture is not this plugin's to draw on"
+  );
+  assert.ok(
+    /\.manga-reader-progress-track\s*\{[^}]*max-width:\s*100%/.test(readerCss),
+    "and the track should be capped by the row it is in, since its width is measured " +
+      "from pages that have not been laid out on the first pass"
+  );
+
   // And the pages cut off at the edge of the picture area, which is what keeps a
   // zoom off the header — Stash gets the same cut from its slides' paint containment.
   // Without it the zoomed pages paint over the header and take its clicks, and a
