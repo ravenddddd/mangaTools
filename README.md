@@ -873,6 +873,37 @@ be run again at any time: galleries it has already imported are left alone unles
 you ask it to replace them, which also makes an interrupted run a matter of running
 it again.
 
+### Editing them
+
+The Chapters tab's **Create** button and each row's **Edit** link both open Stash's
+own chapter form — two fields, and Save / Cancel / Delete — and what it writes is
+this plugin's field. The tab is otherwise Stash's own: the same rows, the same
+numbering, the same shape.
+
+| Field | What it means |
+|---|---|
+| **Title** | The chapter's name, which may be empty |
+| **Image index** | Which page the chapter begins at, counted from 1 **in the order the rows are in** — path order |
+
+A **new** chapter takes the pages from that index to the next chapter's start, out of
+whatever held them. Its index opens on the page you were last reading, when you were
+reading this gallery — which is the one thing this form does that Stash's does not.
+
+Changing an existing chapter's index **moves its start**, and the chapters are re-cut
+as the runs between their starts: the pages it gives up go to the chapter before it,
+because that is what a chapter's pages mean — the earlier chapter runs up to this
+one's start. **Delete** is the other thing: the chapter goes and its pages are left
+in *no* chapter, which no other edit can do.
+
+**One level of undo, for the session.** After any change the tab offers "Chapters
+changed — undo" under the list, and it puts back exactly what the change replaced.
+One step, and it does not undo itself; reloading the page forgets it. It is not
+stored anywhere: a step in what you were doing, not a fact about the gallery.
+
+Nothing here writes Stash's own chapter rows either. A gallery with no list of this
+plugin's own gets one the first time it is edited — the same import the button above
+does, done for you — and from then on the reader reads this plugin's field.
+
 ### What is not here yet
 
 - **No pinch or touch panning.** The wheel and the mouse are back — Stash's own two
@@ -1354,12 +1385,11 @@ The reading half's own:
   the second time the menu is opened in a session.
 - **Reading progress is not tracked.** That needs a viewer of our own rather than a
   takeover of Stash's.
-- **Chapters can be imported, but not yet edited.** Stash's own chapters can be
-  copied into this plugin's field — a button under the Chapters tab, or a job on the
-  settings page for every marked gallery — and from then on the list is this
-  plugin's, which is what survives a gallery being re-sorted. What is still missing
-  is editing it: making a chapter ("this image starts one"), renaming one, taking one
-  out. Until that exists the field can only be written by importing again.
+- **Chapter editing is one gallery at a time.** The Chapters tab creates, renames,
+  moves a start and deletes; the settings page imports a whole library at once. What
+  is missing is changing several galleries' chapters in one go, and a keyboard
+  shortcut for the form — Stash's own is `n` while the tab is open, and this plugin
+  has none.
 - **A page in no chapter is not marked as such.** Stash's own header names the last
   chapter that began at or before where the reader is, which is what its numbers
   mean, so a cover before the first chapter shows no name and a divider between two
