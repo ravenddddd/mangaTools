@@ -33,15 +33,24 @@ import { fetchGallery } from "./stash-lightbox";
 /**
  * Every marked gallery, with its own chapters and this plugin's field.
  *
- * Asked with the mark as a *variable* rather than spliced into the document, so a
- * test can tell this query from the tools half's own gallery map — which is the
- * same `findGalleries` with no variables at all. It also keeps the field name in
- * one place, which is where it belongs.
+ * Asked with the mark as *variables* rather than spliced into the document, so a test
+ * can tell this query from the tools half's own gallery map — which is the same
+ * `findGalleries` with no variables at all — and so both constants stay in the code
+ * rather than being copied into a string.
+ *
+ * **This shape is not something the suite can check.** The client the tests run
+ * against answers whatever it is asked, so a query a real Stash *rejects* passes
+ * every test in this repository: the first version of this one did, and the settings
+ * panel's button did nothing at all until it was run against a real instance. The
+ * criterion is a list of objects with a `field` on each, `value` is a list of `Any`,
+ * and the two together are what Stash's schema accepts. `tests/reader.js` pins the
+ * text for that reason — an edit here has to be re-run against a real Stash, and the
+ * test failing is the reminder.
  */
 export const CHAPTERS_QUERY_TEXT = [
-  "query MangaReaderChapterImports($field: String!, $perPage: Int!) {",
+  "query MangaReaderChapterImports($field: String!, $mark: Any!, $perPage: Int!) {",
   "  findGalleries(",
-  "    gallery_filter: { custom_fields: { value: [$field], modifier: EQUALS } }",
+  "    gallery_filter: { custom_fields: [{ field: $field, modifier: EQUALS, value: [$mark] }] }",
   "    filter: { per_page: $perPage }",
   "  ) {",
   "    count",
@@ -123,7 +132,11 @@ export async function planChapterImports(): Promise<ChapterImportPlan> {
     // open edit form to reinitialise itself.
     .query({
       query,
-      variables: { field: NS.MANGA_FIELD_NAME, perPage: -1 },
+      variables: {
+        field: NS.MANGA_FIELD_NAME,
+        mark: NS.MANGA_VALUE,
+        perPage: -1,
+      },
       fetchPolicy: "no-cache",
     })
     .then((res) => res?.data as ChaptersPayload | undefined);
@@ -215,5 +228,6 @@ function writeChapters(galleryId: string, json: string): Promise<void> {
   return write(galleryId, json);
 }
 
+NR.CHAPTERS_QUERY_TEXT = CHAPTERS_QUERY_TEXT;
 NR.planChapterImports = planChapterImports;
 NR.runChapterImports = runChapterImports;

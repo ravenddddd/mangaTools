@@ -4345,6 +4345,31 @@ async function main() {
       "and everything marked was looked at, including the galleries with nothing " +
         "to bring over"
     );
+
+    // The one thing about this job the suite cannot test. The client these tests
+    // run against answers whatever it is asked, so a query a real Stash *rejects*
+    // passes every assertion in this file — and the first version of this one did
+    // exactly that: the settings panel's button did nothing at all on a real
+    // instance, and only the browser said so.
+    //
+    // So the text is pinned to the shape a real Stash accepted on 2026-09-30: the
+    // criterion is a *list* of objects, each carrying a `field`, and `value` is a
+    // list of `Any` — which is why the mark is a variable of that type rather than
+    // a `String!`. An edit here fails this assertion, and that is the reminder to
+    // run the new query against something that can refuse it.
+    assert.ok(
+      /custom_fields: \[\{ field: \$field, modifier: EQUALS, value: \[\$mark\] \}\]/.test(
+        NR.CHAPTERS_QUERY_TEXT
+      ),
+      "the plan asks with the criterion Stash's schema accepts: " +
+        NR.CHAPTERS_QUERY_TEXT
+    );
+    assert.ok(
+      /\$field: String!, \$mark: Any!, \$perPage: Int!/.test(
+        NR.CHAPTERS_QUERY_TEXT
+      ),
+      "declaring each variable as the position it is used in expects"
+    );
   });
 
   await runSection(

@@ -160,6 +160,14 @@ export interface MangaReaderNamespace {
     pathIds: string[]
   ): MangaReaderChapter[];
   /**
+   * The query the plan is asked with, as the text Stash is sent.
+   *
+   * Published for the tests, which pin it: the client they run against answers
+   * anything, so this shape can only be checked against a real instance — and an
+   * edit that is not checked is how the first version of it came back with nothing.
+   */
+  CHAPTERS_QUERY_TEXT: string;
+  /**
    * Which marked galleries have chapters of Stash's to bring into this plugin's
    * field, and which already have a list of their own — see chapters-import.ts. One
    * read-only query, and no writes: what a settings panel shows before asking.
