@@ -973,12 +973,14 @@ Then tick Manga Tools → **Install** → **Reload Plugins**.
 To update later: **Installed Plugins → Update**.
 
 **Coming from the separate Manga Reader** (this plugin's reading half until
-0.7.0): uninstall Manga Reader and update Manga Tools. Two plugins shipping the
-same reader would both install it. Nothing is lost in the move — the reading
-settings and the per-gallery shifts are read from the keys the old plugin wrote
-(`mangaReader.settings`, `mangaReader.offsets`) and copied to
-`plugin.mangaTools.*` the first time this plugin reads them, and if you have not
-uninstalled the old one yet you can still go back.
+0.7.0): uninstall Manga Reader, then update Manga Tools. **It is no longer
+published** — this plugin is where it lives now, and two plugins shipping the
+same reader would both install it onto the lightbox. Stash does not remove a
+plugin on its own, so an installed copy stays until it is uninstalled by hand.
+Nothing is lost in the move: the reading settings and the per-gallery shifts are
+read from the keys the old plugin wrote (`mangaReader.settings`,
+`mangaReader.offsets`) and copied to `plugin.mangaTools.*` the first time this
+plugin reads them.
 
 > To install manually instead: copy the whole `mangaTools/` directory into
 > `<Stash config dir>/plugins/` and hit Reload Plugins. Note the js/css paths in
