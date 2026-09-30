@@ -200,6 +200,44 @@ export interface MangaReaderNamespace {
     placed: MangaReaderPlacedChapter[],
     pageId: string
   ): MangaReaderPlacedChapter | null;
+  /**
+   * A chapter beginning at this page — the run from here to the next chapter's
+   * start, out of whatever held it — or null when there is nothing to make. See
+   * chapters.ts: this is what the editor's "create" writes.
+   */
+  addChapterAt(
+    chapters: MangaReaderChapter[],
+    order: string[],
+    pageId: string,
+    title: string
+  ): MangaReaderChapter[] | null;
+  /** The chapter beginning at this page renamed, or null when none begins there */
+  renameChapterAt(
+    chapters: MangaReaderChapter[],
+    order: string[],
+    startPageId: string,
+    title: string
+  ): MangaReaderChapter[] | null;
+  /**
+   * The chapter beginning at one page beginning at another instead: the chapters
+   * are re-cut as the runs between their starts, which is what changing a start
+   * means. Null when there is no such chapter, or nowhere to move it to.
+   */
+  moveChapterStart(
+    chapters: MangaReaderChapter[],
+    order: string[],
+    fromPageId: string,
+    toPageId: string
+  ): MangaReaderChapter[] | null;
+  /**
+   * The same list without the chapter holding this page — its pages are owned by
+   * nobody afterwards — or null when no chapter holds it.
+   */
+  removeChapterAt(
+    chapters: MangaReaderChapter[],
+    order: string[],
+    pageId: string
+  ): MangaReaderChapter[] | null;
   /** Where each chapter falls in the order on screen */
   placeChapters(
     chapters: MangaReaderChapter[],

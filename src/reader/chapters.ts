@@ -246,6 +246,228 @@ export function placeChapters(
 }
 
 /**
+ * Where each page sits in an order, by id.
+ *
+ * A page the order does not name answers `MAX_SAFE_INTEGER`: last, and tying with
+ * every other page like it. That is the one place these edits and `placeChapters`
+ * disagree, and on purpose — placing drops a chapter with nothing on screen, which
+ * is right for drawing, while an edit that dropped one would be an edit that threw
+ * a chapter away because a page of it had gone missing.
+ */
+function positionsIn(order: string[]): (id: string) => number {
+  const position = new Map<string, number>();
+  for (let i = 0; i < order.length; i++) {
+    if (!position.has(order[i])) position.set(order[i], i);
+  }
+
+  return (id) => position.get(id) ?? Number.MAX_SAFE_INTEGER;
+}
+
+/** Where a chapter begins in an order: the position of its earliest page */
+function startOf(
+  chapter: MangaReaderChapter,
+  position: (id: string) => number
+): number {
+  let at = Number.MAX_SAFE_INTEGER;
+  for (const id of chapter.images) {
+    const index = position(id);
+    if (index < at) at = index;
+  }
+
+  return at;
+}
+
+/**
+ * The chapters again, each one's images in the order given and the chapters
+ * themselves by where they begin.
+ *
+ * Written order is kept where the order cannot say: pages it does not name stay in
+ * the order they were written, at the end of their chapter, and a chapter with
+ * nothing in the order at all keeps its place among the ones that tie with it.
+ * Nothing is dropped and nothing is merged — the only additions and removals are
+ * the ones an edit asked for.
+ */
+function inOrder(
+  chapters: MangaReaderChapter[],
+  position: (id: string) => number
+): MangaReaderChapter[] {
+  return chapters
+    .map((chapter, index) => ({
+      chapter: {
+        title: chapter.title,
+        images: [...chapter.images].sort((a, b) => position(a) - position(b)),
+      },
+      at: startOf(chapter, position),
+      index,
+    }))
+    .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at - b.at))
+    .map((entry) => entry.chapter);
+}
+
+/**
+ * A chapter beginning at this page, or null when there is nothing to make.
+ *
+ * The pages it takes are the run from here to the next chapter's start, out of
+ * whatever held them — so one call covers both halves of what the reader means:
+ * splitting a chapter in two, and claiming an unowned run (the pages before the
+ * first chapter, or the ones a delete released).
+ *
+ * Null when the page is not one this gallery has, and when a chapter already
+ * begins there: a chapter with no pages is not a chapter, it is a row that draws
+ * nothing and cannot be clicked.
+ */
+export function addChapterAt(
+  chapters: MangaReaderChapter[],
+  order: string[],
+  pageId: string,
+  title: string
+): MangaReaderChapter[] | null {
+  const position = positionsIn(order);
+  const at = position(pageId);
+  if (at === Number.MAX_SAFE_INTEGER) return null;
+
+  const starts = chapters.map((chapter) => startOf(chapter, position));
+  if (starts.some((start) => start === at)) return null;
+
+  // Where it ends: the next chapter's start, or the end of the gallery. A chapter
+  // the order cannot place is not a boundary — it has no position to be one at.
+  const next = starts.filter(
+    (start) => start > at && start !== Number.MAX_SAFE_INTEGER
+  );
+  const end = next.length > 0 ? Math.min(...next) : order.length;
+
+  const rest = chapters.map((chapter) => ({
+    title: chapter.title,
+    images: chapter.images.filter((id) => {
+      const index = position(id);
+      return index < at || index >= end;
+    }),
+  }));
+
+  return inOrder([...rest, { title, images: order.slice(at, end) }], position);
+}
+
+/**
+ * The same list with the chapter starting at this page renamed, or null when no
+ * chapter begins there.
+ *
+ * Only the title is touched. Renaming is not a reason to re-cut anything, and an
+ * edit that quietly re-flowed the pages while somebody was typing a name would be
+ * the worst kind of surprise.
+ */
+export function renameChapterAt(
+  chapters: MangaReaderChapter[],
+  order: string[],
+  startPageId: string,
+  title: string
+): MangaReaderChapter[] | null {
+  const position = positionsIn(order);
+  const at = position(startPageId);
+  if (at === Number.MAX_SAFE_INTEGER) return null;
+
+  const found = chapters.findIndex(
+    (chapter) => startOf(chapter, position) === at
+  );
+  if (found < 0) return null;
+
+  return chapters.map((chapter, index) =>
+    index === found ? { title, images: chapter.images } : chapter
+  );
+}
+
+/**
+ * The chapter that begins at `fromPageId` beginning at `toPageId` instead, or null
+ * when there is no such chapter or nowhere to move it to.
+ *
+ * The chapters are re-cut as runs between their starts, which is what the reader
+ * is saying when they change this number: the pages the chapter gives up go to the
+ * chapter before it — the earlier chapter runs up to this one's start, the way a
+ * chapter's pages always have — and if the new start lands before another
+ * chapter's, the two change places rather than fighting over the same pages.
+ *
+ * A page nobody owns is the one thing this cannot produce: that is what `remove`
+ * is for. Where the list already had one (a chapter that was deleted), the run it
+ * falls in comes back to the chapter before it — the starts say where the chapters
+ * are, and re-cutting is the price of moving one.
+ */
+export function moveChapterStart(
+  chapters: MangaReaderChapter[],
+  order: string[],
+  fromPageId: string,
+  toPageId: string
+): MangaReaderChapter[] | null {
+  const position = positionsIn(order);
+  const from = position(fromPageId);
+  const to = position(toPageId);
+  if (from === Number.MAX_SAFE_INTEGER || to === Number.MAX_SAFE_INTEGER)
+    return null;
+  if (from === to) return null;
+
+  const moved = chapters.findIndex(
+    (chapter) => startOf(chapter, position) === from
+  );
+  if (moved < 0) return null;
+  // Somewhere another chapter already begins: the two would end up sharing their
+  // first page, and one of them would hold nothing.
+  const taken = chapters.some(
+    (chapter, index) => index !== moved && startOf(chapter, position) === to
+  );
+  if (taken) return null;
+
+  // Everything the order can place, re-cut; then whatever it cannot, kept as it
+  // was and kept last.
+  const placed = chapters
+    .map((chapter, index) => ({
+      chapter,
+      index,
+      at: index === moved ? to : startOf(chapter, position),
+    }))
+    .filter((entry) => entry.at !== Number.MAX_SAFE_INTEGER)
+    .sort((a, b) => (a.at === b.at ? a.index - b.index : a.at - b.at));
+
+  const runs = placed.map((entry, i) => ({
+    title: entry.chapter.title,
+    images: order.slice(
+      entry.at,
+      i + 1 < placed.length ? placed[i + 1].at : order.length
+    ),
+  }));
+
+  const unplaced = chapters.filter(
+    (chapter) => startOf(chapter, position) === Number.MAX_SAFE_INTEGER
+  );
+
+  return [...runs, ...unplaced];
+}
+
+/**
+ * The same list without the chapter holding this page, or null when no chapter
+ * holds it.
+ *
+ * Its pages are in no chapter afterwards — a state this format has and Stash's
+ * numbers cannot: an image nobody claimed, like the cover before a first chapter.
+ * They are not given to the chapter before, because deleting a chapter and moving
+ * a boundary are different things, and only one of them is about where a boundary
+ * goes. That makes this the one edit that can leave pages owned by nobody.
+ */
+export function removeChapterAt(
+  chapters: MangaReaderChapter[],
+  order: string[],
+  pageId: string
+): MangaReaderChapter[] | null {
+  const position = positionsIn(order);
+  const at = position(pageId);
+  if (at === Number.MAX_SAFE_INTEGER) return null;
+
+  const found = chapters.findIndex((chapter) =>
+    chapter.images.some((id) => position(id) === at)
+  );
+  if (found < 0) return null;
+
+  return chapters.filter((_, index) => index !== found);
+}
+
+/**
  * The chapter an image is in, or null when it is in none.
  *
  * Null is a real answer rather than a failure: a cover, a divider, a page nobody has
@@ -275,3 +497,7 @@ NR.parseChapters = parseChapters;
 NR.serializeChapters = serializeChapters;
 NR.chaptersFromStash = chaptersFromStash;
 NR.placeChapters = placeChapters;
+NR.addChapterAt = addChapterAt;
+NR.renameChapterAt = renameChapterAt;
+NR.moveChapterStart = moveChapterStart;
+NR.removeChapterAt = removeChapterAt;

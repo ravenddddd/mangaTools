@@ -441,7 +441,7 @@ function importChapters(): void {
   // that half did not start: whether this gallery is manga comes from the same
   // half, so the tab this control is in would not exist either — the check is a
   // guard against the impossible, and it says so rather than throwing.
-  if (typeof NS.importChapters !== "function") {
+  if (typeof NS.writeChapters !== "function") {
     console.error(
       "[mangaReader] the tools half is not running, so this gallery's chapters " +
         "cannot be written"
@@ -452,7 +452,7 @@ function importChapters(): void {
   busy = true;
   redraw();
 
-  NS.importChapters(target.id, serializeChapters(target.importable)).then(
+  NS.writeChapters(target.id, serializeChapters(target.importable)).then(
     () => {
       busy = false;
       if (inHand?.id === target.id) {

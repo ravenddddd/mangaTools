@@ -17,7 +17,7 @@
  * written, and none for the rest.
  *
  * Nothing here writes anything by itself: every gallery goes through the tools
- * half's `NS.importChapters`, which is the same call the tab's button makes, so
+ * half's `NS.writeChapters`, which is the same call the tab's button makes — and the
  * there is one write path and one place that reports a failed one.
  */
 import { requirePluginApi, gqlDoc } from "../plugin-api";
@@ -216,7 +216,7 @@ export async function runChapterImports(
 
 /** The tools half's write, or a rejection naming the half that is missing */
 function writeChapters(galleryId: string, json: string): Promise<void> {
-  const write = NS.importChapters;
+  const write = NS.writeChapters;
   if (typeof write !== "function") {
     return Promise.reject(
       new Error(

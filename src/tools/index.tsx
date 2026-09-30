@@ -1668,7 +1668,7 @@ function writeQuietly(
  * Rejects when nothing could be sent, and passes that on: the batch importer counts
  * a gallery it could not write and carries on with the rest.
  */
-NS.importChapters = (galleryId: string, json: string): Promise<void> => {
+NS.writeChapters = (galleryId: string, json: string): Promise<void> => {
   // Only when there is an entry to update: a gallery the store has never heard of
   // is one this half is not managing, and inventing an entry for it would be the
   // store saying it is marked.

@@ -189,7 +189,7 @@ export interface MangaToolsNamespace {
    * nothing could be sent. Published by the tools half; the reader half calls it
    * through the namespace and does without the button when it is not there.
    */
-  importChapters(galleryId: string, json: string): Promise<void>;
+  writeChapters(galleryId: string, json: string): Promise<void>;
 
   findCanonical(code?: string | null): string;
   normalize(raw: unknown): string;

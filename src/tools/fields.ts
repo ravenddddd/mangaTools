@@ -286,7 +286,7 @@ NS.isOriginal = (customFields: unknown): boolean =>
  * and objects outright (`getSQLValueFromCustomFieldInput` in
  * `pkg/sqlite/custom_fields.go`). What is inside it is `chapters.ts` in the reader
  * half, which is the only thing that knows the shape. This half does write the
- * field, but only ever with a string it was handed (`NS.importChapters`): it never
+ * field, but only ever with a string it was handed (`NS.writeChapters`): it never
  * looks inside one, which is what keeps the format the reader's.
  *
  * Not one of the fields above: those are *attributes of a gallery* that Stash

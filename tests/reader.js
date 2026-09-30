@@ -2454,6 +2454,154 @@ async function main() {
   );
 
   /**
+   * The four edits, called directly.
+   *
+   * Everything the chapter form does is one of these: a page id and the order the
+   * pages are in, never an index into a list — the tab reads path order and the
+   * lightbox reads whatever the reader sorted by, so a position is the one thing
+   * that would mean two different pages on the two surfaces.
+   */
+  await runSection("editing a chapter list, as arithmetic", () => {
+    /** Ten pages, and a list covering them in three runs */
+    const order = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+    const list = () => [
+      { title: "A", images: ["1", "2", "3"] },
+      { title: "B", images: ["4", "5", "6"] },
+      { title: "C", images: ["7", "8", "9", "10"] },
+    ];
+    const shape = (chapters) =>
+      chapters.map((c) => c.title + ":" + c.images.join(","));
+
+    assert.deepStrictEqual(
+      shape(NR.addChapterAt(list(), order, "5", "new")),
+      ["A:1,2,3", "B:4", "new:5,6", "C:7,8,9,10"],
+      "a new chapter takes the run from its page to the next chapter's start, out " +
+        "of the chapter that held it"
+    );
+    assert.deepStrictEqual(
+      shape(NR.addChapterAt(list(), order, "8", "new")),
+      ["A:1,2,3", "B:4,5,6", "C:7", "new:8,9,10"],
+      "…and a chapter that begins near the end runs to the end of the gallery, " +
+        "there being no next chapter to stop it"
+    );
+    assert.strictEqual(
+      NR.addChapterAt(list(), order, "4", "new"),
+      null,
+      "a page a chapter already begins at is nothing to create"
+    );
+    assert.strictEqual(
+      NR.addChapterAt(list(), order, "99", "new"),
+      null,
+      "and neither is a page this gallery does not have"
+    );
+
+    // A page nobody owns is a start too — the cover before the first chapter, or
+    // the run a delete released.
+    const gapped = [
+      { title: "A", images: ["1", "2", "3"] },
+      { title: "C", images: ["7", "8", "9", "10"] },
+    ];
+    assert.deepStrictEqual(
+      shape(NR.addChapterAt(gapped, order, "5", "new")),
+      ["A:1,2,3", "new:5,6", "C:7,8,9,10"],
+      "a chapter can begin on pages nobody owns, and takes only the run that follows"
+    );
+
+    assert.deepStrictEqual(
+      shape(NR.renameChapterAt(list(), order, "7", "renamed")),
+      ["A:1,2,3", "B:4,5,6", "renamed:7,8,9,10"],
+      "renaming finds the chapter by where it begins"
+    );
+    assert.strictEqual(
+      NR.renameChapterAt(list(), order, "5", "renamed"),
+      null,
+      "and there is nothing to rename where no chapter begins"
+    );
+    assert.deepStrictEqual(
+      // A chapter whose pages are not a run — which only an odd import or a
+      // hand-edited field can make. Renaming is not a reason to re-cut it.
+      NR.renameChapterAt(
+        [{ title: "odd", images: ["1", "3", "4"] }],
+        order,
+        "1",
+        "x"
+      ),
+      [{ title: "x", images: ["1", "3", "4"] }],
+      "renaming touches the title and nothing else"
+    );
+
+    assert.deepStrictEqual(
+      shape(NR.moveChapterStart(list(), order, "4", "6")),
+      ["A:1,2,3,4,5", "B:6", "C:7,8,9,10"],
+      "moving a start later gives the pages it gives up to the chapter before it"
+    );
+    assert.deepStrictEqual(
+      shape(NR.moveChapterStart(list(), order, "7", "5")),
+      ["A:1,2,3", "B:4", "C:5,6,7,8,9,10"],
+      "and moving one earlier takes its first pages back out of that chapter"
+    );
+    assert.strictEqual(
+      NR.moveChapterStart(list(), order, "4", "7"),
+      null,
+      "moving onto another chapter's start is refused: one of the two would hold nothing"
+    );
+    assert.strictEqual(NR.moveChapterStart(list(), order, "5", "6"), null);
+    assert.strictEqual(
+      NR.moveChapterStart(list(), order, "4", "99"),
+      null,
+      "and a page this gallery does not have is nowhere to move to"
+    );
+
+    const removed = NR.removeChapterAt(list(), order, "5");
+    assert.deepStrictEqual(
+      shape(removed),
+      ["A:1,2,3", "C:7,8,9,10"],
+      "removing takes the chapter away"
+    );
+    assert.strictEqual(
+      removed.some((chapter) => chapter.images.includes("5")),
+      false,
+      "…and its pages are in no chapter at all afterwards, rather than joining the " +
+        "chapter before: deleting a chapter is not moving a boundary"
+    );
+    assert.strictEqual(
+      NR.removeChapterAt(list(), order, "99"),
+      null,
+      "a page this gallery does not have is nothing to remove"
+    );
+    assert.strictEqual(
+      NR.removeChapterAt(gapped, order, "5"),
+      null,
+      "and neither is a page in no chapter at all"
+    );
+
+    // The one thing no edit may do: throw away a chapter it was not asked to.
+    const stranded = [
+      { title: "here", images: ["1", "2"] },
+      { title: "gone", images: ["901", "902"] },
+    ];
+    const survived = (chapters) =>
+      chapters ? chapters.map((c) => c.title) : null;
+
+    assert.deepStrictEqual(
+      survived(NR.addChapterAt(stranded, order, "2", "new")),
+      ["here", "new", "gone"],
+      "a chapter whose pages this gallery no longer has survives an edit — last, " +
+        "where the order cannot place it"
+    );
+    assert.deepStrictEqual(
+      survived(NR.moveChapterStart(stranded, order, "1", "2")),
+      ["here", "gone"],
+      "and survives one that re-cuts everything else"
+    );
+    assert.deepStrictEqual(
+      survived(NR.renameChapterAt(stranded, order, "1", "x")),
+      ["x", "gone"],
+      "and one that only renames"
+    );
+  });
+
+  /**
    * The handover: what the lightbox is given, and what it is not.
    *
    * This plugin does not draw a chapter menu of its own. Stash's own menu does the
@@ -4442,10 +4590,10 @@ async function main() {
 
       // The tools half owns the write, and a reader installed without it has no such
       // function — which is a gallery that failed rather than a run that stopped.
-      const write = NS.importChapters;
-      delete NS.importChapters;
+      const write = NS.writeChapters;
+      delete NS.writeChapters;
       const run = await NR.runChapterImports(plan);
-      NS.importChapters = write;
+      NS.writeChapters = write;
 
       assert.deepStrictEqual(run.written, [], "nothing was written");
       assert.deepStrictEqual(

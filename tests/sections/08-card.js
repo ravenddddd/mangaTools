@@ -319,7 +319,7 @@ module.exports = () => {
       onChange: (next) => pushes.push(next),
     });
 
-    NS.importChapters("997", json);
+    NS.writeChapters("997", json);
 
     assert.deepStrictEqual(
       mutationWrites[writesBefore].variables,
@@ -360,7 +360,7 @@ module.exports = () => {
   const chaptersCaught = [];
   const chaptersErrors = loggedErrors.length;
   state.galleryWriteResult = chaptersFailed;
-  NS.importChapters("997", '{"v":1,"chapters":[]}').catch((e) =>
+  NS.writeChapters("997", '{"v":1,"chapters":[]}').catch((e) =>
     chaptersCaught.push(e)
   );
   state.galleryWriteResult = null;
