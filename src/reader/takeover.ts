@@ -500,11 +500,12 @@ function placeOf(gallery: MangaReaderGallery, lightbox: Element): number {
 /**
  * A gallery's chapters, from this plugin's own list or from Stash's.
  *
- * Ours when it is there, Stash's when it is not — and *nothing is written* either
- * way. A gallery nobody has edited stays on Stash's numbers for as long as it
- * exists, which is what makes this feature safe to have on a library that has
- * chapters already: opening one changes nothing, and the plugin's own list appears
- * only for a gallery whose chapters somebody has actually edited.
+ * Ours when it is there, Stash's when it is not — and *nothing is written* by
+ * reading either way. A gallery nobody has imported stays on Stash's numbers for as
+ * long as it exists, which is what makes this feature safe to have on a library that
+ * has chapters already: opening one changes nothing, and the plugin's own list
+ * appears only for a gallery whose chapters somebody has actually imported — see
+ * chapters-import.ts for the write and chapters-tab.ts for the button.
  *
  * Stash's numbers count in path order, so they are translated against the ids
  * fetched in that order. When the pages on screen *are* that order — every entry

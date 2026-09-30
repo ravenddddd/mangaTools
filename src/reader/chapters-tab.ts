@@ -3,11 +3,13 @@
  *
  * Stash's own tab lists its own rows — a title and an `image_index`, a position in
  * path order — and its Create and Edit buttons write them. This plugin lists *its*
- * chapters there instead, and in time will edit those: the plugin's field is the
- * one that can say which images a chapter holds, and it is the one the reader hands
- * to the lightbox. **Stash's rows are never written**, here or anywhere else: they
- * are read for as long as they are the only thing that knows where a chapter is,
- * and after that they are left exactly as they are.
+ * chapters there instead, and offers the one write it has: an **import**, which
+ * copies Stash's rows into this plugin's field as image ids. That field is the one
+ * that can say which images a chapter holds, and it is the one the reader hands to
+ * the lightbox. Editing this plugin's own list is still to come. **Stash's rows are
+ * never written**, here or anywhere else: they are read for as long as they are the
+ * only thing that knows where a chapter is, and after that they are left exactly as
+ * they are.
  *
  * A DOM takeover, because there is nothing else to patch: Stash's panel and its
  * chapter entries are plain exports with no `PatchComponent` wrapper, so the way in
@@ -16,8 +18,11 @@
  *
  * The rows are Stash's shape, deliberately: the same `btn btn-link` in a `.row`
  * after an `<hr>`, so the tab looks like itself. What is missing is the Edit button,
- * which belongs to Stash's rows and not to this plugin's — editing comes later, and
- * it will write the plugin's field.
+ * which belongs to Stash's rows and not to this plugin's — what is under the rows
+ * instead is the **import**: one button that copies Stash's chapters into this
+ * plugin's field, converted from positions into image ids. Editing this plugin's own
+ * list — making a chapter, renaming one, taking one out — is still to come, and it
+ * will write the same field this button does.
  *
  * Clicking a row opens the lightbox at that chapter, which is what Stash's own rows
  * do: the same errand, by a different road. Stash's way is a function this plugin
@@ -255,8 +260,10 @@ function render(
   if (key === renderedFor && panel.childElementCount > 0) return;
   renderedFor = key;
 
-  // Stash's own button goes, rather than being disabled: this plugin is what edits
-  // chapters now, and its editing is not here yet.
+  // Stash's own button goes, rather than being disabled: this plugin is where a
+  // gallery's chapters are kept now — it can import them, and it will be able to
+  // edit them — and Stash's own button writes Stash's rows, which nothing here
+  // touches.
   const button = panel.previousElementSibling;
   if (button) button.setAttribute(HIDDEN, "");
 

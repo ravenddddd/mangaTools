@@ -837,14 +837,41 @@ lightbox's images with a different set is not a takeover but a swap, and every
 number after the first difference would be wrong. A gallery whose pages could not
 be matched to what is on screen is not drawn at all, and nothing is handed over.
 
-**Nothing is written until you edit a gallery's chapters.** A gallery with no list
-of its own — which is every gallery to begin with, including the ones whose
-chapters you made by hand in Stash — is read from Stash's own numbers instead:
-Stash gives each chapter a start and nothing else, so its ranges (each chapter up
-to the next one's start) are expanded into sets of images, against path order, on
-the spot. So opening a gallery changes nothing, the plugin's own list appears only
-for galleries whose chapters somebody actually edited, and deleting that one
-custom field puts a gallery back exactly where it was.
+**Nothing is written by reading.** A gallery with no list of its own — which is
+every gallery to begin with, including the ones whose chapters you made by hand in
+Stash — is read from Stash's own numbers instead: Stash gives each chapter a start
+and nothing else, so its ranges (each chapter up to the next one's start) are
+expanded into sets of images, against path order, on the spot. So opening a gallery
+changes nothing, and the plugin's own list appears only for a gallery whose chapters
+somebody has imported. See the next section for that.
+
+### Importing Stash's chapters
+
+A list of this plugin's own is written by **importing**: the same translation, kept
+in `plugin.mangaTools.chapters` as image ids rather than as positions in path order.
+That is the point of doing it — a Stash chapter is a position, so re-sorting a
+gallery or renaming a file moves it, and a list of ids cannot move.
+
+| Where | What it does |
+|---|---|
+| Chapters tab, **under the rows** | Imports the gallery whose tab it is. Offered only when Stash has chapters there that this gallery can use |
+| **Settings → Plugins → Manga Tools** | The same for every marked gallery at once. It says how many it would write first, and writes nothing until you confirm |
+
+Both ask before writing over a list this plugin already has, and that asking is not
+optional politeness: this plugin hides its own fields from Stash's custom-field
+editor, so the Chapters tab is the *only* place that list can be read — there is
+nowhere else to go and look at what an import would replace. Ticking the box in the
+settings job, or confirming in the tab, is the way back if an import was a mistake.
+
+A gallery whose Stash chapters all point past the end of its images is skipped, not
+imported: translating those gives an empty list, and writing an empty list would be
+*clearing* that gallery's chapters, which an import must never do.
+
+**Nothing of Stash's is changed.** Its own chapter rows are read and left exactly as
+they are, so the two lists can be compared as long as you like. The settings job can
+be run again at any time: galleries it has already imported are left alone unless
+you ask it to replace them, which also makes an interrupted run a matter of running
+it again.
 
 ### What is not here yet
 
@@ -933,7 +960,11 @@ object, each adding its own members — which is why `fields.ts` holds the field
 The four filter modules do the same, each publishing the members it owns at the
 end of its own file; that is what keeps the sidebar and dialog from having to
 import each other. The reader half keeps to the same arrangement at
-`window.MangaReader`, with its own types in `reader/namespace.ts`.
+`window.MangaReader`, with its own types in `reader/namespace.ts` — and that one
+is read *outward*, by the tools half, for the one job that is the reader's but is
+asked for from a settings page: importing a library's chapters. The shapes travel
+as `import type`, so nothing links the halves at run time and a Stash that started
+only one of them still runs.
 
 The reader half's settings are **not** in the plugin config. They are this
 browser's, under `plugin.mangaTools.settings` and `plugin.mangaTools.offsets` in
@@ -1323,9 +1354,12 @@ The reading half's own:
   the second time the menu is opened in a session.
 - **Reading progress is not tracked.** That needs a viewer of our own rather than a
   takeover of Stash's.
-- **Chapters are read, not yet edited, from the lightbox.** The list this plugin
-  keeps is what the reader reads and hands over; making one — a button that says
-  "this image starts a chapter" — is the next piece.
+- **Chapters can be imported, but not yet edited.** Stash's own chapters can be
+  copied into this plugin's field — a button under the Chapters tab, or a job on the
+  settings page for every marked gallery — and from then on the list is this
+  plugin's, which is what survives a gallery being re-sorted. What is still missing
+  is editing it: making a chapter ("this image starts one"), renaming one, taking one
+  out. Until that exists the field can only be written by importing again.
 - **A page in no chapter is not marked as such.** Stash's own header names the last
   chapter that began at or before where the reader is, which is what its numbers
   mean, so a cover before the first chapter shows no name and a divider between two

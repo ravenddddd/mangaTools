@@ -30,8 +30,11 @@
  * that say they are its, and a page that says nothing is in none of them.
  *
  * A gallery with no such field is read the old way, by expanding Stash's integer
- * runs into those sets — see chaptersFromStash. Nothing is written until somebody
- * edits a gallery's chapters, so opening one changes nothing.
+ * runs into those sets — see chaptersFromStash. Reading writes nothing: a gallery
+ * stays on Stash's numbers until its chapters are *imported* into the field, which
+ * is a button in the Chapters tab for one gallery and a job on the settings page
+ * for all of them (chapters-import.ts). So opening a gallery still changes nothing,
+ * which is what makes this safe to have on a library that has chapters already.
  */
 import { NR } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
@@ -163,9 +166,9 @@ export function serializeChapters(chapters: MangaReaderChapter[]): string {
  * Entries whose start falls outside `pathIds` are dropped: that is a chapter whose
  * images are no longer in the gallery, and there is nothing to point at.
  *
- * This is a translation, not a migration: nothing is written. A gallery stays on
- * this path until somebody edits its chapters, and a gallery nobody edits is never
- * written to at all.
+ * This translates and writes nothing itself. Its two callers are the tab's own
+ * rows, which are drawn from it, and the import, which stores what it returns —
+ * and a gallery nobody imports is never written to at all.
  */
 export function chaptersFromStash(
   rows: { title?: unknown; image_index?: unknown }[] | null | undefined,

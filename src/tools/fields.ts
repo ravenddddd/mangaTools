@@ -284,8 +284,10 @@ NS.isOriginal = (customFields: unknown): boolean =>
  *
  * A JSON string — the only shape a custom field can hold: Stash rejects arrays
  * and objects outright (`getSQLValueFromCustomFieldInput` in
- * `pkg/sqlite/custom_fields.go`). What is inside it is `chapters.ts` in the
- * reader half, which is the only thing that reads or writes it.
+ * `pkg/sqlite/custom_fields.go`). What is inside it is `chapters.ts` in the reader
+ * half, which is the only thing that knows the shape. This half does write the
+ * field, but only ever with a string it was handed (`NS.importChapters`): it never
+ * looks inside one, which is what keeps the format the reader's.
  *
  * Not one of the fields above: those are *attributes of a gallery* that Stash
  * draws rows for. This is this plugin's own record of where a chapter starts —
