@@ -49,6 +49,7 @@ import "./chapters-import";
 // The same, for the other half of the chapter work: the editor's write is called from
 // chapters-tab.ts and this half's own cached copy is updated by what it announces.
 import "./chapters-edit";
+import { watchChapters } from "./chapters-edit";
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
 import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
@@ -791,6 +792,38 @@ function ensureContainer(lightbox: Element): void {
 const REVEAL_BUDGET_MS = 300;
 
 NR.REVEAL_BUDGET_MS = REVEAL_BUDGET_MS;
+
+/**
+ * The page the reader is on in a gallery, by id, or null when they are not in it.
+ *
+ * Published for the Chapters tab, which cannot see the lightbox's own state and has
+ * no business asking Stash's counter: the tab's form opens on the page somebody was
+ * reading, and an *id* is what survives the two halves counting in different orders.
+ */
+NR.readingPageIdNow = (galleryId: string): string | null => {
+  const gallery = loaded.get(galleryId);
+  if (!gallery || place < 0) return null;
+
+  return gallery.pages[place]?.id ?? null;
+};
+
+/**
+ * A chapter list was written — by the tab's form, or by an import.
+ *
+ * The cached gallery is drawn from the list it was read with, so it is drawn from a
+ * list that is now out of date: the chapter menu and the progress bar's ticks would
+ * go on showing the chapters as they were. What was written comes with the news, so
+ * there is nothing to fetch — the same chapters placed in the order this half is
+ * already using, and the lightbox's own furniture is right again. The reader is not
+ * moved: a rename or a boundary is not a reason to turn a page.
+ */
+watchChapters((galleryId, chapters) => {
+  const gallery = loaded.get(galleryId);
+  if (!gallery) return;
+
+  gallery.chapters = placeChapters(chapters, gallery.pages);
+  if (root) sync(root);
+});
 
 // The zoom's arithmetic, published the way the layout's and the chapters' are: it is
 // pure, it is where a bug would hide from a DOM test, and a test that can call it

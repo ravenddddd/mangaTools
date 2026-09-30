@@ -160,6 +160,12 @@ export interface MangaReaderNamespace {
     pathIds: string[]
   ): MangaReaderChapter[];
   /**
+   * The page the reader is on in a gallery, by id, or null when they are not in it —
+   * published by takeover.ts for the tab's form, which opens on the page somebody was
+   * reading. An id, because the two halves may count the pages in different orders.
+   */
+  readingPageIdNow(galleryId: string): string | null;
+  /**
    * The query the plan is asked with, as the text Stash is sent.
    *
    * Published for the tests, which pin it: the client they run against answers
@@ -210,7 +216,9 @@ export interface MangaReaderNamespace {
    * Hears about a gallery's chapters changing; the returned function stops it. For
    * the surfaces that keep their own copy of the list — which is all of them.
    */
-  watchChapters(fn: (galleryId: string) => void): () => void;
+  watchChapters(
+    fn: (galleryId: string, chapters: MangaReaderChapter[]) => void
+  ): () => void;
   /**
    * The chapter an image is in, or null when it is in none — see chapters.ts, where
    * the answer comes from what each chapter lists rather than from its neighbours.

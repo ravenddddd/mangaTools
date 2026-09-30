@@ -3,26 +3,28 @@
  *
  * Stash's own tab lists its own rows — a title and an `image_index`, a position in
  * path order — and its Create and Edit buttons write them. This plugin lists *its*
- * chapters there instead, and offers the one write it has: an **import**, which
- * copies Stash's rows into this plugin's field as image ids. That field is the one
- * that can say which images a chapter holds, and it is the one the reader hands to
- * the lightbox. Editing this plugin's own list is still to come. **Stash's rows are
- * never written**, here or anywhere else: they are read for as long as they are the
- * only thing that knows where a chapter is, and after that they are left exactly as
- * they are.
+ * chapters there instead, and its Create and Edit buttons **write this plugin's own
+ * field**: the one that can say which images a chapter holds, and the one the reader
+ * hands to the lightbox. The form is Stash's, down to the two fields and the three
+ * buttons, because that is the shape somebody using this tab already knows — what
+ * changed is only where the answer is kept.
+ *
+ * **Stash's rows are never written**, here or anywhere else: they are read for as
+ * long as they are the only thing that knows where a chapter is, and after that they
+ * are left exactly as they are. There is also an **import** button under the list,
+ * which is the other direction: it copies Stash's rows into this plugin's field, for
+ * a gallery whose chapters have never been edited here.
  *
  * A DOM takeover, because there is nothing else to patch: Stash's panel and its
  * chapter entries are plain exports with no `PatchComponent` wrapper, so the way in
  * is the markup — the tab's own container, found by the button that sits before it,
  * emptied and filled with this plugin's rows.
  *
- * The rows are Stash's shape, deliberately: the same `btn btn-link` in a `.row`
- * after an `<hr>`, so the tab looks like itself. What is missing is the Edit button,
- * which belongs to Stash's rows and not to this plugin's — what is under the rows
- * instead is the **import**: one button that copies Stash's chapters into this
- * plugin's field, converted from positions into image ids. Editing this plugin's own
- * list — making a chapter, renaming one, taking one out — is still to come, and it
- * will write the same field this button does.
+ * The rows are Stash's shape too: the same `btn btn-link` in a `.row` after an
+ * `<hr>`, and — the half that used to be missing — the same Edit link beside it,
+ * which is what opens the form on that chapter. The number in a row is a *position
+ * in path order* because that is what the form's second field asks for, and the two
+ * have to agree: they are the same number the reader is looking at.
  *
  * Clicking a row opens the lightbox at that chapter, which is what Stash's own rows
  * do: the same errand, by a different road. Stash's way is a function this plugin
@@ -36,11 +38,23 @@ import { bridged, takeOver } from "./bridge";
 import {
   type MangaReaderChapter,
   type MangaReaderPlacedChapter,
+  addChapterAt,
   chaptersFromStash,
+  moveChapterStart,
   parseChapters,
   placeChapters,
+  removeChapterAt,
+  renameChapterAt,
   serializeChapters,
 } from "./chapters";
+import {
+  canUndoChapters,
+  undoChapters,
+  watchChapters,
+  writeChapters,
+} from "./chapters-edit";
+import { NR } from "./namespace";
+import type { MangaReaderPage } from "./spreads";
 import {
   type LightboxImage,
   fetchGallery,
@@ -56,21 +70,63 @@ const SEL_PANEL = ".container";
 const HIDDEN = "data-manga-reader-hidden";
 /** The import control, found again by this id when the page is drawn over */
 const IMPORT_ID = "manga-reader-chapters-import";
+/** The line under it that offers to take the last change back */
+const UNDO_ID = "manga-reader-chapters-undo";
+/** The class the per-row Edit link carries, so a test can find it */
+const CLASS_EDIT = "manga-reader-chapter-edit";
+/** Marks Stash's own button as one this plugin has already taken over */
+const TAKEN = "data-manga-reader-taken";
 
 /** What was rendered, so a pass over the document only rebuilds when it differs */
 let renderedFor = "";
+/** The tab's container, while it is on screen — what a redraw draws into */
+let panelInHand: HTMLElement | null = null;
 /** The gallery whose chapters are in hand, and what they are */
-let inHand: {
+interface ChaptersInHand {
   id: string;
   images: LightboxImage[];
+  /** The pages as they were fetched, which is the order the numbers count in */
+  pages: MangaReaderPage[];
+  /**
+   * The list as it is stored, which is what an edit changes — *not* the placed list
+   * the rows are drawn from. Placing drops a chapter with nothing on screen, and an
+   * edit that started from the placed list would drop it for good.
+   */
+  stored: MangaReaderChapter[];
+  /** The same list placed in the order the pages came in — what the rows show */
   chapters: MangaReaderPlacedChapter[];
   /** What Stash's own rows translate to — what an import would write */
   importable: MangaReaderChapter[];
   /** Whether this gallery already has a list of this plugin's own */
   own: boolean;
-  /** The interface language, for the control's wording */
+  /** The interface language, for the wording */
   locale: string | null;
+}
+
+/** The gallery the tab is drawing, or null when it has never read one */
+let inHand: ChaptersInHand | null = null;
+
+/**
+ * The form, while one is open, and what its fields started as.
+ *
+ * The *draft* is not here: what somebody has typed lives in the input, and is read
+ * when Save is pressed. Keeping it here would put it in the render key, and a key
+ * that changes on every keystroke is a form that is rebuilt under the cursor —
+ * which is the one thing this shape of UI gets wrong if nobody stops it.
+ */
+let form: {
+  /** The page the chapter being edited begins at, or null when making a new one */
+  startPageId: string | null;
+  /** What the fields said when the form opened, which is what "changed" means */
+  initialTitle: string;
+  initialIndex: string;
 } | null = null;
+/** What was wrong with the last Save, or "" — read only when a form is drawn */
+let formError = "";
+
+/** The line offering to take the last change back, and the button in it */
+let undoLine: HTMLElement | null = null;
+let undoButton: HTMLButtonElement | null = null;
 
 /** The import control, kept between passes, and what it was last built as */
 let control: HTMLElement | null = null;
@@ -140,6 +196,8 @@ export function syncChaptersTab(): void {
         inHand = {
           id,
           images: answer.images,
+          pages: answer.pages,
+          stored: own.chapters,
           chapters: placeChapters(own.chapters, answer.pages),
           // The list an import would write, which is the same translation the tab
           // is showing for a gallery that has no list of this plugin's own.
@@ -232,17 +290,7 @@ function isStashButton(node: Element | null): node is HTMLElement {
  * that finds it unchanged does nothing. This runs inside a MutationObserver, so an
  * unconditional write would be a change that causes a change.
  */
-function render(
-  panel: HTMLElement,
-  gallery: {
-    id: string;
-    images: LightboxImage[];
-    chapters: MangaReaderPlacedChapter[];
-    importable: MangaReaderChapter[];
-    own: boolean;
-    locale: string | null;
-  }
-): void {
+function render(panel: HTMLElement, gallery: ChaptersInHand): void {
   // Everything the render reads is in the key, the import's state included. The rows
   // alone would not be enough: an import writes the *translation* of Stash's own
   // rows, so the rows before it and after it are identical, and a key made of them
@@ -255,24 +303,63 @@ function render(
     gallery.own ? "own" : "none",
     String(gallery.importable.length),
     busy ? "busy" : confirming ? "confirm" : "idle",
+    form
+      ? "form:" + (form.startPageId ?? "new") + (formError ? ":bad" : "")
+      : "list",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
   if (key === renderedFor && panel.childElementCount > 0) return;
   renderedFor = key;
+  panelInHand = panel;
 
-  // Stash's own button goes, rather than being disabled: this plugin is where a
-  // gallery's chapters are kept now — it can import them, and it will be able to
-  // edit them — and Stash's own button writes Stash's rows, which nothing here
-  // touches.
-  const button = panel.previousElementSibling;
-  if (button) button.setAttribute(HIDDEN, "");
+  takeOverCreate(panel);
 
   panel.textContent = "";
-  for (const chapter of gallery.chapters) {
-    panel.appendChild(row(gallery, chapter));
+  if (form) {
+    drawForm(panel, gallery);
+  } else {
+    for (const chapter of gallery.chapters) {
+      panel.appendChild(row(gallery, chapter));
+    }
   }
 
-  drawImport(panel, gallery);
+  // The import is about the list, so it is not offered while the form is on top of
+  // it. The undo line is about what has already been written, so it stays.
+  if (form) hideImport();
+  else drawImport(panel, gallery);
+  drawUndo(panel, gallery);
+}
+
+/**
+ * Takes over Stash's own Create button, which is what opens the form.
+ *
+ * **Stopped in the capture phase**, because Stash's handler is React's: React listens
+ * at the root and in the bubbling phase, so a listener on the button that stops the
+ * event on its way *down* never reaches it. The button then does exactly what this
+ * plugin says and nothing else — the same way the footer's image link is kept from
+ * navigating to the page the plugin has moved on from.
+ *
+ * The button is *not* hidden, which is a change from what this tab used to do: the
+ * button is now the way in rather than something in the way, and leaving it visible
+ * is also what keeps `findPanel` able to find this panel on every pass — it
+ * recognises the panel by the button before it, and a hidden button is one it
+ * refuses.
+ */
+function takeOverCreate(panel: HTMLElement): void {
+  const button = panel.previousElementSibling;
+  if (!isStashButton(button)) return;
+  if (button.getAttribute(TAKEN) !== null) return;
+
+  button.setAttribute(TAKEN, "");
+  button.addEventListener(
+    "click",
+    (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openForm(null);
+    },
+    true
+  );
 }
 
 /**
@@ -478,22 +565,343 @@ function importChapters(): void {
 /**
  * Draws the tab again from the gallery in hand.
  *
- * The panel is not looked up again, and cannot be: the first pass hides Stash's own
- * button, which is the shape `findPanel` recognises the panel by, so from then on
- * it refuses the panel it already knows. The control is a sibling of that panel, so
- * the panel is the element before it.
+ * Into the panel this module already drew into, rather than one it looks up: the
+ * pass that finds panels belongs to the observer, and a click handler runs between
+ * two of its passes. The panel is rememberable — Stash's button stays visible now,
+ * so `findPanel` would find it again — but a redraw is not a reason to go looking.
  */
 function redraw(): void {
-  if (!inHand) return;
-
-  const panel = control?.previousElementSibling;
-  if (panel) render(panel as HTMLElement, inHand);
+  if (!inHand || !panelInHand) return;
+  render(panelInHand, inHand);
 }
 
-/** One chapter, drawn the way Stash draws one */
+/**
+ * The form, in place of the rows.
+ *
+ * Stash's shape: two `form-group` rows with a label column and a field column, and a
+ * buttons row under them. The column widths are written out rather than copied off a
+ * native field row — this tab has none to copy from: the form's own rows are Stash's
+ * edit page, which is on another tab and not in the document. `col-sm-3`/`col-sm-9`
+ * is the split Stash's `renderInputField` uses, and the README records what happened
+ * the last time one of these widths was guessed: it was a breakpoint Stash's build
+ * did not have.
+ *
+ * Built fresh whenever the key changes, which is only ever on opening, saving,
+ * cancelling or failing — never on a keystroke. That is what lets the fields keep
+ * what was typed in them without a state of their own.
+ */
+function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
+  const editing = !!form?.startPageId;
+
+  const node = document.createElement("form");
+  node.className = "manga-reader-chapters-form";
+  // Nothing here submits anything — the buttons are handled — but a form that could
+  // reload the page is not a form to leave lying about.
+  node.addEventListener("submit", (event: Event) => event.preventDefault());
+
+  const title = field(
+    node,
+    gallery.locale,
+    "mangaReader.chapterTitle",
+    "title",
+    "text",
+    form?.initialTitle ?? ""
+  );
+  const index = field(
+    node,
+    gallery.locale,
+    "mangaReader.chapterIndex",
+    "image_index",
+    "number",
+    form?.initialIndex ?? "1"
+  );
+
+  if (formError) {
+    const error = document.createElement("div");
+    error.className = "manga-reader-chapters-form-error";
+    error.textContent = stringFor(gallery.locale, formError);
+    node.appendChild(error);
+  }
+
+  const buttons = document.createElement("div");
+  buttons.className = "buttons-container d-flex";
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "btn btn-primary";
+  save.textContent = stringFor(gallery.locale, "mangaReader.save");
+  // Stash's own rule, and worth keeping: an edit is only worth saving once something
+  // has changed. A *new* chapter is worth making with what the form already says.
+  const settle = () => {
+    const dirty =
+      title.value !== form?.initialTitle || index.value !== form?.initialIndex;
+    save.disabled = editing ? !dirty : false;
+  };
+  title.addEventListener("input", settle);
+  index.addEventListener("input", settle);
+  settle();
+  save.addEventListener("click", () =>
+    submitForm(title.value, Number(index.value))
+  );
+  buttons.appendChild(save);
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "btn btn-secondary ml-2";
+  cancel.textContent = stringFor(gallery.locale, "mangaReader.cancel");
+  cancel.addEventListener("click", closeForm);
+  buttons.appendChild(cancel);
+
+  if (editing) {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "btn btn-danger ml-auto";
+    remove.textContent = stringFor(gallery.locale, "mangaReader.delete");
+    remove.addEventListener("click", deleteChapter);
+    buttons.appendChild(remove);
+  }
+
+  node.appendChild(buttons);
+  panel.appendChild(node);
+}
+
+/** One field, the shape Stash's own `renderInputField` produces */
+function field(
+  parent: HTMLElement,
+  locale: string | null,
+  labelId: string,
+  name: string,
+  type: string,
+  value: string
+): HTMLInputElement {
+  const group = document.createElement("div");
+  group.className = "form-group row";
+  group.setAttribute("data-field", name);
+
+  const label = document.createElement("label");
+  label.className = "col-sm-3";
+  label.textContent = stringFor(locale, labelId);
+  group.appendChild(label);
+
+  const column = document.createElement("div");
+  column.className = "col-sm-9";
+
+  const input = document.createElement("input");
+  input.type = type;
+  input.className = "form-control";
+  input.value = value;
+  column.appendChild(input);
+  group.appendChild(column);
+
+  parent.appendChild(group);
+  return input;
+}
+
+/**
+ * Save: one of the four edits, and a write.
+ *
+ * A new chapter is one of them; an edit is up to two — a title and a start are
+ * different things and either may be what changed — applied one after the other to
+ * the same list. What each of them refuses comes back as null, and a refusal is
+ * shown in the form rather than written: "already a chapter there" is something the
+ * reader can fix, and a field written with the value it already had is noise.
+ */
+function submitForm(title: string, index: number): void {
+  const gallery = inHand;
+  const current = form;
+  if (!gallery || !current) return;
+
+  if (!Number.isInteger(index) || index < 1 || index > gallery.pages.length) {
+    formError = "mangaReader.chapterIndexRange";
+    redraw();
+    return;
+  }
+
+  const order = gallery.pages.map((page) => page.id);
+  const pageId = gallery.pages[index - 1].id;
+
+  if (current.startPageId === null) {
+    const next = addChapterAt(gallery.stored, order, pageId, title);
+    if (!next) {
+      formError = "mangaReader.chapterStartTaken";
+      redraw();
+      return;
+    }
+
+    applyEdit(gallery, next);
+    return;
+  }
+
+  let next: MangaReaderChapter[] | null = gallery.stored;
+  if (title !== current.initialTitle) {
+    next = renameChapterAt(next, order, current.startPageId, title);
+  }
+  if (next && index !== Number(current.initialIndex)) {
+    next = moveChapterStart(next, order, current.startPageId, pageId);
+  }
+
+  if (!next) {
+    formError = "mangaReader.chapterNoSuch";
+    redraw();
+    return;
+  }
+
+  if (next === gallery.stored) {
+    // Nothing changed after all — the buttons say otherwise, but a form that wrote
+    // the value it already had would be a write nobody asked for.
+    closeForm();
+    return;
+  }
+
+  applyEdit(gallery, next);
+}
+
+/** Delete, which takes the chapter away and leaves its pages owned by nobody */
+function deleteChapter(): void {
+  const gallery = inHand;
+  const current = form;
+  if (!gallery || !current?.startPageId) return;
+
+  const next = removeChapterAt(
+    gallery.stored,
+    gallery.pages.map((page) => page.id),
+    current.startPageId
+  );
+
+  if (!next) {
+    formError = "mangaReader.chapterNoSuch";
+    redraw();
+    return;
+  }
+
+  applyEdit(gallery, next);
+}
+
+/**
+ * Writes one change and closes the form.
+ *
+ * What comes back of it is not this function's business: the write announces itself,
+ * and the announcement is what asks the server for the list again — for this surface
+ * and for any other that was drawing the same gallery. So the tab does not patch its
+ * own copy here. It did, while the only write was its own import; a list that two
+ * surfaces can change is a list worth reading back.
+ */
+function applyEdit(gallery: ChaptersInHand, next: MangaReaderChapter[]): void {
+  busy = true;
+  redraw();
+
+  writeChapters(gallery.id, next, gallery.stored).then(
+    () => {
+      busy = false;
+      closeForm();
+    },
+    (e: unknown) => {
+      busy = false;
+      console.error(
+        "[mangaReader] could not write this gallery's chapters:",
+        e
+      );
+      redraw();
+    }
+  );
+}
+
+/** Closes the form without writing anything */
+function closeForm(): void {
+  form = null;
+  formError = "";
+  redraw();
+}
+
+/**
+ * The line that offers to take the last change back.
+ *
+ * Its own box rather than part of the import control, which is where it sits: the
+ * control's own children are asserted by index, and a line appearing inside it would
+ * be a second thing wearing the same id.
+ */
+function drawUndo(panel: HTMLElement, gallery: ChaptersInHand): void {
+  if (!canUndoChapters(gallery.id)) {
+    undoLine?.remove();
+    undoLine = null;
+    undoButton = null;
+    return;
+  }
+
+  if (!undoLine || !undoButton) {
+    undoButton = document.createElement("button");
+    undoButton.type = "button";
+    undoButton.className = "btn btn-link btn-sm";
+    undoButton.addEventListener("click", undoLast);
+
+    undoLine = document.createElement("div");
+    undoLine.id = UNDO_ID;
+    undoLine.className = "manga-reader-chapters-undo";
+    undoLine.appendChild(undoButton);
+  }
+
+  const place = panel.parentNode;
+  if (place && undoLine.parentNode !== place) {
+    place.insertBefore(undoLine, panel.nextElementSibling);
+  }
+
+  const text = stringFor(gallery.locale, "mangaReader.undoChapters");
+  if (undoButton.textContent !== text) undoButton.textContent = text;
+}
+
+/** Takes the last change back — which is its own write, and announces itself */
+function undoLast(): void {
+  const gallery = inHand;
+  if (!gallery || busy) return;
+
+  busy = true;
+  redraw();
+
+  undoChapters(gallery.id).then(
+    () => {
+      busy = false;
+      redraw();
+    },
+    (e: unknown) => {
+      busy = false;
+      console.error("[mangaReader] could not take that change back:", e);
+      redraw();
+    }
+  );
+}
+
+/** Puts the import control away while the form is on top of the list */
+function hideImport(): void {
+  control?.remove();
+}
+
+/**
+ * A change to a gallery's chapters was written — by this tab, or by the reading half.
+ *
+ * The copy in hand came from the server, and a surface that keeps a copy of
+ * something two surfaces can change has to ask again rather than patch it: what was
+ * written may not be what this half would have written. Forgetting it is enough —
+ * `findPanel` finds the panel on the next pass, because Stash's own button stays
+ * visible, and the fetch is what the tab does when it has nothing in hand.
+ */
+watchChapters((galleryId, chapters) => {
+  if (inHand?.id !== galleryId) return;
+
+  // Drawn from what was written rather than fetched back: the news carries the list,
+  // and a copy that is *known* is a copy nothing can go stale waiting for. What the
+  // tab's import used to do — patch its own copy and hope — is now the same one line
+  // for every write, whoever made it.
+  inHand.stored = chapters;
+  inHand.chapters = placeChapters(chapters, inHand.pages);
+  inHand.own = true;
+  renderedFor = "";
+  redraw();
+});
+
+/** One chapter, drawn the way Stash draws one — its jump link and its Edit link */
 function row(
-  gallery: { images: LightboxImage[]; chapters: MangaReaderPlacedChapter[] },
-  chapter: { title: string; at: number }
+  gallery: ChaptersInHand,
+  chapter: MangaReaderPlacedChapter
 ): HTMLElement {
   const wrap = document.createElement("div");
 
@@ -525,17 +933,69 @@ function row(
   });
 
   line.appendChild(button);
+
+  // Stash's own row has this, pushed right by `ml-auto`, and it is what a reader
+  // already reaches for. It is the second child of the line on purpose: the jump
+  // link stays the first, which is what everything that reads a row expects.
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.className = "btn btn-link ml-auto " + CLASS_EDIT;
+  edit.textContent = stringFor(gallery.locale, "mangaReader.editChapter");
+  edit.addEventListener("click", () => openForm(chapter));
+  line.appendChild(edit);
+
   wrap.appendChild(line);
 
   return wrap;
+}
+
+/**
+ * The form, opened on a chapter or on nothing.
+ *
+ * Stash's own form opens with the index at 1 whatever the reader was looking at.
+ * This one opens on the page they are on, when they are on one of this gallery's
+ * pages in the lightbox — the same two fields and the same three buttons, with the
+ * one default that somebody reading a book can actually mean.
+ */
+function openForm(chapter: MangaReaderPlacedChapter | null): void {
+  const gallery = inHand;
+  if (!gallery) return;
+
+  form = {
+    startPageId: chapter ? (gallery.pages[chapter.at]?.id ?? null) : null,
+    initialTitle: chapter?.title ?? "",
+    // Both are one-based already: a chapter's index is where it begins counted from
+    // one, and the reading page comes back that way too.
+    initialIndex: chapter
+      ? String(chapter.at + 1)
+      : String(indexOfReadingPage(gallery)),
+  };
+  formError = "";
+  redraw();
+}
+
+/** Where the reader is in this gallery, one-based, or 1 when they are not in it */
+function indexOfReadingPage(gallery: ChaptersInHand): number {
+  // Asked of the reading half rather than read from the page: the lightbox's own
+  // counter is Stash's, and counts in whatever order the lightbox was opened with.
+  const id = NR.readingPageIdNow?.(gallery.id);
+  if (!id) return 1;
+
+  const at = gallery.pages.findIndex((page) => page.id === id);
+  return at < 0 ? 1 : at + 1;
 }
 
 /** Forgets the gallery in hand, for when the page it belonged to is gone */
 export function forgetChaptersTab(): void {
   inHand = null;
   renderedFor = "";
+  panelInHand = null;
   control = null;
   controlState = null;
   controlFor = null;
   confirming = false;
+  form = null;
+  formError = "";
+  undoLine = null;
+  undoButton = null;
 }

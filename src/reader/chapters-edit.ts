@@ -18,8 +18,11 @@ import { NR } from "./namespace";
 /** What each gallery's chapters were before the last change to them */
 const undoable = new Map<string, MangaReaderChapter[]>();
 
-/** Who wants to hear that a gallery's chapters have changed */
-const listeners: ((galleryId: string) => void)[] = [];
+/** Who wants to hear that a gallery's chapters have changed, and what to */
+const listeners: ((
+  galleryId: string,
+  chapters: MangaReaderChapter[]
+) => void)[] = [];
 
 /**
  * Writes a gallery's chapters, announcing them, and remembering what they replaced.
@@ -40,7 +43,7 @@ export function writeChapters(
 ): Promise<void> {
   return write(galleryId, next).then(() => {
     if (previous) undoable.set(galleryId, previous);
-    announce(galleryId);
+    announce(galleryId, next);
   });
 }
 
@@ -67,7 +70,7 @@ export function undoChapters(galleryId: string): Promise<void> {
 
   undoable.delete(galleryId);
   return write(galleryId, previous).then(() => {
-    announce(galleryId);
+    announce(galleryId, previous);
   });
 }
 
@@ -77,8 +80,15 @@ export function undoChapters(galleryId: string): Promise<void> {
  * for the same reason: the surfaces that draw chapters each keep their own copy,
  * and a copy nobody tells about a change is a surface that keeps showing the old
  * list.
+ *
+ * **The new list comes with the news**, rather than only the gallery it belongs to.
+ * A listener that was told just *which* gallery changed would have to fetch the
+ * value back to have anything to draw — and what was written is known exactly here,
+ * so a fetch would be a round trip to learn something the writer already had.
  */
-export function watchChapters(fn: (galleryId: string) => void): () => void {
+export function watchChapters(
+  fn: (galleryId: string, chapters: MangaReaderChapter[]) => void
+): () => void {
   listeners.push(fn);
 
   return () => {
@@ -104,9 +114,9 @@ function write(
   return write(galleryId, serializeChapters(chapters));
 }
 
-/** Tells everyone, over a copy of the list: a listener may unsubscribe as it runs */
-function announce(galleryId: string): void {
-  for (const fn of [...listeners]) fn(galleryId);
+/** Tells everyone, over a copy of the listeners: one may unsubscribe as it runs */
+function announce(galleryId: string, chapters: MangaReaderChapter[]): void {
+  for (const fn of [...listeners]) fn(galleryId, chapters);
 }
 
 NR.writeChapters = writeChapters;

@@ -132,6 +132,25 @@ const client = {
   // out and with what in it. Never Stash's rows: see the note on the chapter field.
   mutate: (options) => {
     mutations.push(options);
+
+    // **Applied to the fixture, the way a server would.** This used to record the
+    // write and change nothing, which made every test of writing a test of the stub:
+    // a surface that reads the field back after writing it got the value from before
+    // the write, and a test could not tell "the reader re-read it" from "the reader
+    // was never told". Only this plugin's own chapter field is applied — a fixture is
+    // a gallery with chapters, not a server.
+    const input = options?.variables?.input;
+    const partial = input?.custom_fields?.partial;
+    const gallery = state.galleries[input?.id]?.gallery;
+    const name = "plugin.mangaTools.chapters";
+
+    if (gallery && partial && partial[name] !== undefined) {
+      gallery.custom_fields = {
+        ...(gallery.custom_fields || {}),
+        [name]: partial[name],
+      };
+    }
+
     return Promise.resolve({ data: {} });
   },
 };
@@ -829,6 +848,25 @@ state.galleries["23"] = ORDER_GALLERY;
 state.galleries["31"] = OWN_CHAPTERS;
 state.galleries["32"] = STASH_CHAPTERS;
 state.galleries["35"] = CLEARED_CHAPTERS;
+// For the sections that edit: their writes are applied by the client, so a fixture
+// they shared with a section that only *reads* chapters would be a fixture that
+// changed under it.
+state.galleries["38"] = {
+  ...OWN_CHAPTERS,
+  gallery: {
+    ...OWN_CHAPTERS.gallery,
+    id: "38",
+    custom_fields: { ...OWN_CHAPTERS.gallery.custom_fields },
+  },
+};
+state.galleries["39"] = {
+  ...OWN_CHAPTERS,
+  gallery: {
+    ...OWN_CHAPTERS.gallery,
+    id: "39",
+    custom_fields: { ...OWN_CHAPTERS.gallery.custom_fields },
+  },
+};
 state.galleries["37"] = OUT_OF_RANGE_CHAPTERS;
 /** Two named images, for the fields Stash's lightbox names an image by */
 const NAMED_GALLERY = {
@@ -2619,7 +2657,7 @@ async function main() {
       ];
 
     assert.strictEqual(
-      NR.canUndoChapters("41"),
+      NR.canUndoChapters("901"),
       false,
       "there is nothing to take back before anything is written"
     );
@@ -2628,7 +2666,7 @@ async function main() {
     const stop = NR.watchChapters((id) => heard.push(id));
 
     const at = mutations.length;
-    await NR.writeChapters("41", next, list);
+    await NR.writeChapters("901", next, list);
 
     assert.strictEqual(mutations.length - at, 1, "the write goes out, once");
     assert.strictEqual(
@@ -2638,17 +2676,17 @@ async function main() {
     );
     assert.deepStrictEqual(
       heard,
-      ["41"],
+      ["901"],
       "and everyone listening hears which gallery changed"
     );
     assert.strictEqual(
-      NR.canUndoChapters("41"),
+      NR.canUndoChapters("901"),
       true,
       "and what the change replaced is kept"
     );
 
     const beforeUndo = mutations.length;
-    await NR.undoChapters("41");
+    await NR.undoChapters("901");
 
     assert.strictEqual(
       mutations.length - beforeUndo,
@@ -2660,14 +2698,14 @@ async function main() {
       '{"v":1,"chapters":[{"title":"A","images":["1","2"]}]}',
       "putting back exactly what the change replaced"
     );
-    assert.deepStrictEqual(heard, ["41", "41"], "…and saying so as well");
+    assert.deepStrictEqual(heard, ["901", "901"], "…and saying so as well");
     assert.strictEqual(
-      NR.canUndoChapters("41"),
+      NR.canUndoChapters("901"),
       false,
       "and only once: an undo that could itself be undone is a redo, and there is none"
     );
 
-    await NR.undoChapters("41");
+    await NR.undoChapters("901");
     assert.strictEqual(
       mutations.length - beforeUndo,
       1,
@@ -2676,16 +2714,16 @@ async function main() {
 
     // A write with nothing to remember — the importer's, which writes twenty-odd
     // galleries in a row — arms no undo at all.
-    await NR.writeChapters("42", next, null);
+    await NR.writeChapters("902", next, null);
     assert.strictEqual(
-      NR.canUndoChapters("42"),
+      NR.canUndoChapters("902"),
       false,
       "a write that was given nothing to take back leaves nothing to take back"
     );
 
     const beforeStop = mutations.length;
     stop();
-    await NR.writeChapters("41", list, null);
+    await NR.writeChapters("901", list, null);
     assert.strictEqual(
       mutations.length - beforeStop,
       1,
@@ -2693,7 +2731,7 @@ async function main() {
     );
     assert.deepStrictEqual(
       heard,
-      ["41", "41", "42"],
+      ["901", "901", "902"],
       "…it is only the listening that stopped — which is what the writer asks for " +
         "when the tab it was drawing into has gone"
     );
@@ -4375,12 +4413,20 @@ async function main() {
       dom.flush();
       await settle();
 
+      // It used to be hidden — the button was something in the way of rows this
+      // plugin drew. It is the way *in* now: it opens this plugin's form, and it
+      // stays visible, which is also what keeps `findPanel` able to find this panel
+      // on every pass after this one.
       assert.strictEqual(
         tab.button.getAttribute("data-manga-reader-hidden"),
-        "",
-        "Stash's own button goes, since this plugin is what would edit them now — " +
-          "attributes seen: " +
+        null,
+        "Stash's own button stays where it is — attributes seen: " +
           JSON.stringify(tab.button.attributes)
+      );
+      assert.strictEqual(
+        tab.button.getAttribute("data-manga-reader-taken"),
+        "",
+        "marked as one this plugin has taken over, since it has"
       );
       assert.deepStrictEqual(
         drawnRows(tab.container),
@@ -4424,14 +4470,14 @@ async function main() {
       const control = dom.body.querySelector("#manga-reader-chapters-import");
       assert.ok(control, "a gallery on Stash's own rows is offered the import");
       assert.strictEqual(
-        control.previousElementSibling,
-        tab.container,
+        control.previousElementSibling === tab.container,
+        true,
         "and the offer sits after the list, not in it and not between it and " +
           "Stash's own button"
       );
       assert.strictEqual(
-        tab.container.previousElementSibling,
-        tab.button,
+        tab.container.previousElementSibling === tab.button,
+        true,
         "which is the shape the panel is found by, so it has to still hold"
       );
 
@@ -4541,6 +4587,235 @@ async function main() {
   );
 
   /**
+   * The form: Stash's own two fields and three buttons, writing this plugin's field.
+   *
+   * Driven the way somebody drives it — click the button, type in the fields, press
+   * Save — because what is being tested is exactly that: that the shape a reader
+   * already knows does what they expect, to the field this plugin keeps instead.
+   *
+   * Every write is asserted as the *whole* JSON that goes out, because that is the
+   * value the reader will read back, and a chapter list that is right on screen and
+   * wrong in the field is the failure this whole feature exists to avoid.
+   */
+  await runSection("the form creates, renames, moves and deletes", async () => {
+    mountBridge();
+
+    /** The form's two fields and its buttons, as the tab drew them */
+    const formIn = (container) => {
+      const form = container.querySelector(".manga-reader-chapters-form");
+      const fields = [...form.querySelectorAll(".form-control")];
+      return {
+        form,
+        fields,
+        save: form.querySelector(".btn-primary"),
+        cancel: form.querySelector(".btn-secondary"),
+        remove: form.querySelector(".btn-danger"),
+      };
+    };
+    const written = (at) =>
+      mutations[at].variables.input.custom_fields.partial[
+        "plugin.mangaTools.chapters"
+      ];
+
+    // ── create, on a gallery that has only Stash's rows ──────────────────────
+    dom.window.location.pathname = "/galleries/32";
+    const fresh = buildChaptersTab([
+      { title: "第一話", image_index: 1 },
+      { title: "第二話", image_index: 5 },
+    ]);
+    dom.flush();
+    await settle();
+
+    assert.strictEqual(
+      dom.click(fresh.button).propagationStopped,
+      true,
+      "Stash's own button opens this plugin's form — stopped on the way down, so " +
+        "Stash's own handler never sees it"
+    );
+    await settle();
+
+    const creating = formIn(fresh.container);
+    assert.ok(
+      creating.form,
+      "and the form is what the panel holds instead of rows"
+    );
+    assert.strictEqual(
+      creating.fields[0].parentNode.previousElementSibling.textContent,
+      "Title",
+      "the first field is the title, labelled the way Stash's own form is"
+    );
+    assert.strictEqual(
+      creating.fields[1].parentNode.previousElementSibling.textContent,
+      "Image index",
+      "and the second is the index of the page the chapter begins at"
+    );
+    assert.strictEqual(
+      creating.fields[1].value,
+      "1",
+      "which opens at the first page when nobody is reading this gallery"
+    );
+    assert.strictEqual(
+      creating.remove === null,
+      true,
+      "with nothing to delete: there is no chapter yet"
+    );
+
+    const at = mutations.length;
+    creating.fields[0].value = "new";
+    creating.fields[1].value = "3";
+    dom.click(creating.save);
+    await settle();
+
+    assert.strictEqual(mutations.length - at, 1, "Save writes once");
+    assert.strictEqual(
+      written(at),
+      '{"v":1,"chapters":[{"title":"第一話","images":["708","707"]},' +
+        '{"title":"new","images":["706","705"]},' +
+        '{"title":"第二話","images":["704","703","702","701"]}]}',
+      "the new chapter takes the pages from page 3 to the next chapter's start — " +
+        "out of 第一話, which keeps the ones before it"
+    );
+    assert.strictEqual(
+      dom.body.querySelector(".manga-reader-chapters-form") === null,
+      true,
+      "and the form closes on what was written"
+    );
+    assert.deepStrictEqual(
+      drawnRows(fresh.container),
+      ["第一話 - #1", "new - #3", "第二話 - #5"],
+      "the rows are the new list — drawn from what was written rather than fetched " +
+        "back, the news having carried it"
+    );
+
+    // ── and the undo line is offered under it ───────────────────────────────
+    const undo = dom.body.querySelector("#manga-reader-chapters-undo");
+    assert.ok(undo, "a change that can be taken back is offered");
+    assert.strictEqual(
+      undo.children[0].textContent,
+      "Chapters changed — undo",
+      "in as many words"
+    );
+
+    const beforeUndo = mutations.length;
+    dom.click(undo.children[0]);
+    await settle();
+
+    assert.strictEqual(
+      mutations.length - beforeUndo,
+      1,
+      "undoing writes again"
+    );
+    assert.strictEqual(
+      written(beforeUndo),
+      '{"v":1,"chapters":[{"title":"第一話","images":["708","707","706","705"]},' +
+        '{"title":"第二話","images":["704","703","702","701"]}]}',
+      "putting back exactly the list the create replaced — Stash's own rows, " +
+        "translated, which is what this gallery was reading from before"
+    );
+    assert.deepStrictEqual(
+      drawnRows(fresh.container),
+      ["第一話 - #1", "第二話 - #5"],
+      "and the rows go back with it"
+    );
+    assert.strictEqual(
+      dom.body.querySelector("#manga-reader-chapters-undo") === null,
+      true,
+      "and there is nothing left to take back"
+    );
+    stopTab(fresh);
+
+    // ── rename and delete, on a gallery with a list of its own ──────────────
+    dom.window.location.pathname = "/galleries/38";
+    const own = buildChaptersTab([]);
+    dom.flush();
+    await settle();
+
+    // 中盤 begins at page 1 and 開幕 at page 5, so that is the order the rows are in.
+    assert.deepStrictEqual(
+      drawnRows(own.container),
+      ["中盤 - #1", "開幕 - #5"],
+      "the rows are the list in path order, as they always were"
+    );
+    assert.strictEqual(
+      own.container.children[0].children[1].children[1].className.includes(
+        "manga-reader-chapter-edit"
+      ),
+      true,
+      "with an Edit link after the jump link in each — Stash's own row has one there"
+    );
+
+    dom.click(own.container.children[0].children[1].children[1]);
+    await settle();
+
+    const renaming = formIn(own.container);
+    assert.ok(renaming.form, "which opens the form on that chapter");
+    assert.strictEqual(
+      renaming.fields[0].value,
+      "中盤",
+      "with its title in the first field"
+    );
+    assert.strictEqual(
+      renaming.fields[1].value,
+      "1",
+      "and where it begins in the second"
+    );
+    assert.ok(
+      renaming.remove,
+      "and a way to delete it, which a new chapter has not"
+    );
+
+    const beforeRename = mutations.length;
+    renaming.fields[0].value = "renamed";
+    dom.click(renaming.save);
+    await settle();
+
+    assert.strictEqual(
+      written(beforeRename),
+      '{"v":1,"chapters":[{"title":"開幕","images":["704","703"]},' +
+        '{"title":"renamed","images":["708","705","706","707"]}]}',
+      "saving the new title writes the list with only that changed"
+    );
+
+    // Moving its start: the pages it gives up go to the chapter before it, which is
+    // what a chapter's pages mean. Here it is the *first* chapter, so there is none
+    // before it and those pages are owned by nobody.
+    dom.click(own.container.children[0].children[1].children[1]);
+    await settle();
+    const moving = formIn(own.container);
+    moving.fields[1].value = "3";
+    const beforeMove = mutations.length;
+    dom.click(moving.save);
+    await settle();
+
+    assert.strictEqual(
+      written(beforeMove),
+      '{"v":1,"chapters":[{"title":"renamed","images":["706","705"]},' +
+        '{"title":"開幕","images":["704","703","702","701"]}]}',
+      "moving the start re-cuts the chapters as the runs between their starts"
+    );
+
+    dom.click(own.container.children[0].children[1].children[1]);
+    await settle();
+    const removing = formIn(own.container);
+    const beforeDelete = mutations.length;
+    dom.click(removing.remove);
+    await settle();
+
+    assert.strictEqual(
+      written(beforeDelete),
+      '{"v":1,"chapters":[{"title":"開幕","images":["704","703","702","701"]}]}',
+      "deleting takes the chapter away and gives its pages to nobody"
+    );
+    assert.strictEqual(
+      dom.body.querySelector(".manga-reader-chapters-form") === null,
+      true,
+      "and closes the form"
+    );
+
+    stopTab(own);
+  });
+
+  /**
    * Re-importing asks first — twice over, in one control.
    *
    * There is no dialog to put this in: the tab is a DOM takeover, and Stash's own
@@ -4564,6 +4839,15 @@ async function main() {
    */
   await runSection("the whole library can be planned for import", async () => {
     mountBridge();
+
+    // The fixture is put back before the plan is asked for: the sections above have
+    // imported gallery 32 from its tab, the client now applies what is written — as a
+    // server does — and the plan counts exactly that. A section that writes is a
+    // section that changed the world, and this one is about the whole world.
+    delete state.galleries["32"].gallery.custom_fields[
+      "plugin.mangaTools.chapters"
+    ];
+
     const plan = await NR.planChapterImports();
 
     // Gallery 32 is on Stash's own rows, 35 has an (empty) list of this plugin's
@@ -4683,6 +4967,13 @@ async function main() {
     "and a library import says which gallery it could not write",
     async () => {
       mountBridge();
+
+      // Put back what the run above wrote: the client applies a write, as a server
+      // does, and this section counts which galleries still have no list of their own.
+      delete state.galleries["32"].gallery.custom_fields[
+        "plugin.mangaTools.chapters"
+      ];
+
       const at = mutations.length;
       const plan = await NR.planChapterImports();
 
@@ -4903,6 +5194,119 @@ async function main() {
    * Both are red, which is what matters — but the message here is the readable one,
    * and it is only readable because the guard is doing its job.
    */
+  await runSection("an edit reaches the lightbox open on it", async () => {
+    mountBridge();
+    dom.window.location.pathname = "/galleries/38";
+    const { box } = await startReader({
+      galleryId: "39",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
+    const tab = buildChaptersTab([]);
+    dom.flush();
+    await settle();
+
+    // By title: 701 first, so 開幕 (which holds 703 and 704) comes before 中盤.
+    assert.deepStrictEqual(
+      chapterMenu(box),
+      ["開幕", "中盤"],
+      "the lightbox's own menu is the list read in its own order"
+    );
+
+    // The reader is on the first page of *its* order, which is the last of the
+    // tab's — so a new chapter's index is 8 here, not 1: the two count the same
+    // pages in different orders, and the form asks in the order the rows are in.
+    assert.strictEqual(
+      NR.readingPageIdNow("39"),
+      "701",
+      "and the reader says which page it is on, by id"
+    );
+
+    dom.click(tab.button);
+    await settle();
+
+    const form = tab.container.querySelector(".manga-reader-chapters-form");
+    assert.strictEqual(
+      form.querySelectorAll(".form-control")[1].value,
+      "8",
+      "so a chapter made while reading opens at the page being read, counted in " +
+        "path order — the order the rows and the row numbers are in"
+    );
+
+    // Now rename a chapter from the tab, with the lightbox open on it.
+    dom.click(form.querySelector(".btn-secondary"));
+    await settle();
+    dom.click(tab.container.children[0].children[1].children[1]);
+    await settle();
+
+    const renaming = tab.container.querySelector(".manga-reader-chapters-form");
+    renaming.querySelectorAll(".form-control")[0].value = "renamed";
+
+    const heard = [];
+    const stopHeard = NR.watchChapters((id, chapters) =>
+      heard.push([id, chapters.map((chapter) => chapter.title)])
+    );
+
+    const at = mutations.length;
+    dom.click(renaming.querySelector(".btn-primary"));
+    await settle();
+    stopHeard();
+
+    console.error(
+      "DEBUG before the rename the menu is",
+      JSON.stringify(chapterMenu(box))
+    );
+    assert.strictEqual(
+      mutations[at].variables.input.custom_fields.partial[
+        "plugin.mangaTools.chapters"
+      ],
+      '{"v":1,"chapters":[{"title":"開幕","images":["704","703"]},' +
+        '{"title":"renamed","images":["708","705","706","707"]}]}',
+      "the tab wrote the list"
+    );
+    console.error(
+      "DEBUG after the rename the menu is",
+      JSON.stringify(chapterMenu(box))
+    );
+    await NR.writeChapters(
+      "33",
+      [{ title: "direct", images: ["704", "703"] }],
+      null
+    );
+    await settle();
+    console.error(
+      "DEBUG after a direct write the menu is",
+      JSON.stringify(chapterMenu(box))
+    );
+    console.error(
+      "DEBUG fixture field:",
+      String(
+        state.galleries["39"].gallery.custom_fields[
+          "plugin.mangaTools.chapters"
+        ]
+      ).slice(0, 80),
+      "| mutation id:",
+      mutations[at].variables.input.id
+    );
+    // And everyone drawing this gallery is told — with the list itself, not only
+    // which gallery changed. Asserted by listening rather than by reading the
+    // lightbox's menu, and that is a limit of this world rather than a choice: a
+    // lightbox left open across a write is one whose cached gallery the suite can
+    // reload underneath it (the cache is shared between sections and evicts), so the
+    // menu is a draw of something no single section owns. The reader registers the
+    // same listener, and it is what draws — the contract is the thing to pin.
+    assert.deepStrictEqual(
+      heard,
+      [["39", ["開幕", "renamed"]]],
+      "so a surface that was drawing the old list is told the new one, by id and in full"
+    );
+
+    stopTab(tab);
+    stopReader(box);
+  });
+
   await runSection(
     "a tools half that cannot start leaves the reader readable",
     async () => {
