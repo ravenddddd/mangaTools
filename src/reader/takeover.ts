@@ -26,6 +26,7 @@
  */
 // The field plumbing both halves share: this one reads the same custom fields the
 // tools half writes, under the same names, through the same helpers.
+import { requirePluginApi } from "../plugin-api";
 import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
 import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
@@ -56,6 +57,7 @@ import {
   fetchGallery,
   lightboxIsLoading,
   galleryIdFromPath,
+  inFullscreen,
   lightboxOrder,
   pressEscape,
 } from "./stash-lightbox";
@@ -1183,7 +1185,9 @@ function onNavClick(event: Event): void {
  *     reads it, rather than per screen — a pair is two images and each half of each
  *     one goes the way the reader who clicked it meant.
  *   - **anywhere else**, the letterbox: Stash closes the lightbox when a click
- *     reaches the slide, and the whole slide is behind these pages.
+ *     reaches the slide, and the whole slide is behind these pages — unless the
+ *     lightbox is filling the screen, in which case the press is asking for the
+ *     screen back rather than for the lightbox to go.
  */
 function onSpreadClick(event: Event): void {
   const lightbox = root;
@@ -1199,6 +1203,16 @@ function onSpreadClick(event: Event): void {
 
   const target = event.target as HTMLElement | null;
   if (target?.tagName !== "IMG") {
+    // In fullscreen, a click on the space around the pages gives the screen back
+    // rather than closing the lightbox: leaving fullscreen and closing the lightbox
+    // are two things, and one press that did both would be the reader's next press
+    // landing on whatever the first one uncovered.
+    if (inFullscreen(lightbox)) {
+      document.exitFullscreen();
+      event.stopPropagation();
+      return;
+    }
+
     event.stopPropagation();
     pressEscape();
     return;
@@ -1383,6 +1397,42 @@ function setOffset(gallery: MangaReaderGallery, next: 0 | 1): void {
   step();
 }
 
+/**
+ * The page the reader is on, as Stash's own router last reported it.
+ *
+ * `null` until the first report, which is the page as it already stands rather than
+ * a move away from it — Stash dispatches on mount as well as on every change.
+ */
+let seenPath: string | null = null;
+
+/** Stash's "stash:location" payload, which is `Event.dispatch("location", ...)` */
+type LocationEvent = {
+  detail?: { data?: { location?: { pathname?: string } } };
+};
+
+/**
+ * Back closes the lightbox.
+ *
+ * Stash's lightbox is in its own state and not in the route: nothing about a route
+ * change takes it away, so a reader who presses Back leaves the gallery page and
+ * finds the pages still over whatever they landed on — and the lightbox's own images
+ * belong to the page they came from. So a route change under an open lightbox is
+ * that lightbox's cue to close, through the same Escape Stash's own close runs.
+ *
+ * A change of *query* is not a move: the Images list re-sorts by writing `sortby`
+ * into the URL with the lightbox open, and closing it there would be closing it for
+ * a change it is already following.
+ */
+function onLocation(event: unknown): void {
+  const path = (event as LocationEvent)?.detail?.data?.location?.pathname;
+  if (typeof path !== "string") return;
+
+  const moved = seenPath !== null && path !== seenPath;
+  seenPath = path;
+
+  if (moved && root) pressEscape();
+}
+
 // ── Wiring ─────────────────────────────────────────────────────────
 
 /**
@@ -1416,6 +1466,14 @@ export function install(): void {
 
   observer.observe(document.body, { childList: true, subtree: true });
   window.addEventListener("keydown", onKeyDown, true);
+
+  // Stash's own router, which tells plugins when the page has changed — see
+  // onLocation for what this half does with it. Guarded the way the tools half
+  // guards it: a Stash without the event has no route changes to offer.
+  const api = requirePluginApi();
+  if (api.Event?.addEventListener) {
+    api.Event.addEventListener("stash:location", onLocation);
+  }
 
   // Before the first pass, so that a gallery read in the same tick has somewhere
   // to hand its chapters. See handOverChapters.

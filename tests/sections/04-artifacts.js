@@ -355,9 +355,21 @@ module.exports = () => {
   // the gallery it came from — Stash's to say, not this plugin's to replace — so a
   // rule that hides it is a whole row of the lightbox going missing.
   assert.ok(
-    !/\.Lightbox-footer[^{]*\{[^}]*display:\s*none/.test(readerCss),
+    !/\.Lightbox-footer\s*[,{][^}]*display:\s*none/.test(readerCss),
     "mangaReader.css should not hide Stash's footer: the image's name and the way " +
       "back to its gallery are down there"
+  );
+  // Its left column is a different matter: the O counter and the rating stars are
+  // Stash's, and a lightbox that is reading a book does not want them under the
+  // reader's thumb. Hidden by their own rule rather than with the column they sit
+  // in, which is one of the footer's three equal thirds — an empty third keeps the
+  // image's name in the middle of the screen, and a missing one would not.
+  assert.ok(
+    /\.manga-reader-takeover \.Lightbox-footer-left\s*>\s*\*[^{]*\{[^}]*display:\s*none/.test(
+      readerCss
+    ),
+    "mangaReader.css should hide the footer's rating and O counter, and not the " +
+      "column holding them"
   );
   console.log(
     "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"

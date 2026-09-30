@@ -153,6 +153,15 @@ global.MouseEvent = function MouseEvent(type, init) {
 const shown = [];
 const patched = [];
 
+/**
+ * Stash's own events, by name, as a test reaches them.
+ *
+ * The reader subscribes to one — `stash:location`, which is how it hears that the
+ * page changed under an open lightbox — and a subscription is only worth a test if
+ * the test can send the event.
+ */
+const globalListeners = {};
+
 dom.window.PluginApi = {
   React: {
     Component: class {
@@ -188,6 +197,14 @@ dom.window.PluginApi = {
     before: (target, fn) => patched.push({ target, fn }),
     instead: (target, fn) => patched.push({ target, fn }),
     after: (target, fn) => patched.push({ target, fn }),
+  },
+  // Stash's own router events, which the tools half reads the path from and the
+  // reader listens to for a page change under an open lightbox.
+  Event: {
+    addEventListener: (name, fn) => {
+      if (!globalListeners[name]) globalListeners[name] = [];
+      globalListeners[name].push(fn);
+    },
   },
   components: {},
   // Stash's own React, and the DOM renderer that puts one of its components inside
@@ -1689,6 +1706,102 @@ async function main() {
       stopReader(box);
     }
   );
+
+  /**
+   * In fullscreen, that same click gives the screen back first.
+   *
+   * One press, one thing: a reader who clicks the dark space around the pages while
+   * the lightbox is filling the screen is asking for their browser back, and a press
+   * that both left fullscreen and closed the book would land their next press on
+   * whatever the first one uncovered.
+   */
+  await runSection(
+    "fullscreen gives the screen back before the lightbox closes",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const keys = [];
+      dom.document.addEventListener("keydown", (event) => keys.push(event.key));
+
+      dom.click(box.lightbox.querySelector(".manga-reader-fullscreen"));
+      assert.strictEqual(
+        dom.document.fullscreenElement,
+        box.lightbox,
+        "the header's button fills the screen with the lightbox"
+      );
+
+      // The letterbox: the container itself, not a page inside it.
+      const click = dom.click(container());
+      assert.strictEqual(
+        dom.document.fullscreenElement,
+        null,
+        "and a click on the space around the pages gives the screen back"
+      );
+      assert.deepStrictEqual(
+        keys,
+        [],
+        "rather than closing the lightbox as well — which the next press does"
+      );
+      assert.strictEqual(
+        click.propagationStopped,
+        true,
+        "and nothing else sees it"
+      );
+
+      dom.click(container());
+      assert.deepStrictEqual(
+        keys,
+        ["Escape"],
+        "with the screen given back, the same click closes the lightbox as it did"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * Back closes the lightbox.
+   *
+   * Stash's lightbox lives in its own state and not in the route: nothing about a
+   * page change takes it away, so pressing Back leaves the reader looking at the
+   * pages of a gallery they are no longer on. What the route does give is the event
+   * that says the page changed, and a page change under an open lightbox is that
+   * lightbox's cue to close — through the same Escape everything else closes it by.
+   */
+  await runSection("Back closes the lightbox", async () => {
+    const { box } = await startReader({ galleryId: "8", on: true });
+    const keys = [];
+    dom.document.addEventListener("keydown", (event) => keys.push(event.key));
+
+    const relocate = (pathname) => {
+      for (const fn of globalListeners["stash:location"] || []) {
+        fn({ detail: { data: { location: { pathname } } } });
+      }
+    };
+
+    relocate("/galleries/8");
+    assert.deepStrictEqual(
+      keys,
+      [],
+      "the page as it already stands is not a move — Stash reports it on mount too"
+    );
+
+    relocate("/galleries/8");
+    assert.deepStrictEqual(
+      keys,
+      [],
+      "and neither is a list re-sorted behind the lightbox, which is a change of " +
+        "query rather than of page"
+    );
+
+    relocate("/galleries");
+    assert.deepStrictEqual(
+      keys,
+      ["Escape"],
+      "while leaving the page closes the lightbox, the way Escape does"
+    );
+
+    stopReader(box);
+  });
 
   await runSection("a screen arrives rather than snapping in", async () => {
     const { box } = await startReader({ galleryId: "8", on: true });

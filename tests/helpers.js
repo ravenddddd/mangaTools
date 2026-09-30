@@ -16,6 +16,17 @@ const PLUGIN = path.join(__dirname, "..", "dist");
 
 // ── Stubs ──────────────────────────────────────────────────────────
 const globalListeners = {};
+/**
+ * What each of those names actually has listening, which is more than one listener
+ * for `stash:location` — both halves of the plugin read it. See the Event stub.
+ */
+const eventListeners = {};
+
+/** Forgets every subscription, for the reload that stands in for a fresh page */
+function forgetEventListeners() {
+  for (const name of Object.keys(eventListeners)) delete eventListeners[name];
+  for (const name of Object.keys(globalListeners)) delete globalListeners[name];
+}
 const patched = {};
 const patchedBefore = {};
 const patchedAfter = {};
@@ -665,8 +676,28 @@ const PluginApi = {
     },
   },
   Event: {
+    /**
+     * Stash's own event target, which takes however many listeners a name gets.
+     *
+     * That is the whole of what an `EventTarget` is for: the tools half reads the
+     * current path from `stash:location`, and the reader listens for the same event
+     * to close a lightbox that a Back has left open. One slot per name meant the
+     * second subscriber silently replaced the first, which is not a stub being
+     * lenient — it is a stub changing what the plugin under it does.
+     *
+     * `globalListeners[name]` stays a function, because that is how a test sends
+     * one; what it fans out to is kept here rather than hung off the function.
+     */
     addEventListener: (name, cb) => {
-      globalListeners[name] = cb;
+      if (!eventListeners[name]) eventListeners[name] = [];
+
+      if (!globalListeners[name]) {
+        globalListeners[name] = (event) => {
+          for (const fn of eventListeners[name]) fn(event);
+        };
+      }
+
+      eventListeners[name].push(cb);
     },
   },
   patch: {
@@ -888,6 +919,12 @@ console.log("✓ patch registration (one failing does not stop the rest)");
 for (const map of [patched, patchedBefore, patchedAfter]) {
   for (const k of Object.keys(map)) delete map[k];
 }
+// And the event listeners, for the same reason: a page loads this script once, and
+// the load being replaced here had subscribed to Stash's own events before it. Left
+// attached, they would answer every navigation twice over — a fetch apiece — and the
+// sections that count fetches would be counting a test world's mistake rather than
+// the plugin's behaviour.
+forgetEventListeners();
 delete require.cache[BUNDLE];
 require(BUNDLE);
 

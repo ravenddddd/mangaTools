@@ -672,7 +672,9 @@ While the switch is on, and while you are reading a **gallery**:
 | **Pan** | Press and drag to move the pages, within what they can give — they stop at the edge of the screen rather than going over it. A drag never turns the page, and a click never moves it |
 | **Shift the pairing** | A second switch in the options menu, or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
 | **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. A slider in the options menu sets how long, down to 0 for none. Nothing is animated for a reader who has asked their system for less motion |
-| **Everything else** | Untouched: the nav strip, Escape, the slideshow, and the footer that names the image and links back to the gallery it came from. The header is this half's own — its counter counts in the order you are reading, which is the point of it — and its fullscreen button is Stash's own button in Stash's own place, because filling the screen is a thing about the screen and not about the page |
+| **Fullscreen** | Stash's own button in Stash's own place. While the lightbox is filling the screen, a click on the space around the pages gives the screen back rather than closing the lightbox — one press, one thing |
+| **Back closes it** | Pressing Back closes the lightbox instead of leaving it over the page you land on. Stash's own does not: its lightbox is in its own state and not in the route, so Back moves the page out from under it |
+| **Everything else** | Untouched: the nav strip, Escape, the slideshow, and the footer that names the image and links back to the gallery it came from — though the rating stars and the O counter at its left end are not drawn at all: a reader holding a book open is not rating anything. The header is this half's own, because its counter has to count in the order you are reading |
 
 All of it is remembered per browser, like the lightbox options the controls sit
 beside — except the shift, which is remembered *per gallery*, because that is what

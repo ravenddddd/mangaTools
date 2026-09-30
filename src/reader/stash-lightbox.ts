@@ -124,6 +124,19 @@ export function pressArrow(direction: 1 | -1): void {
 }
 
 /**
+ * Whether this lightbox is the thing filling the screen.
+ *
+ * Asked the way Stash asks it when its own lightbox goes away — the fullscreen
+ * element is the container, or something inside it — because fullscreen can be the
+ * browser's own too (F11 sets no element at all), and that is not this lightbox's
+ * business to leave.
+ */
+export function inFullscreen(lightbox: Element): boolean {
+  const element = document.fullscreenElement as Element | null | undefined;
+  return element ? lightbox.contains(element) : false;
+}
+
+/**
  * Closes the lightbox, through Stash's own Escape.
  *
  * Stash listens for it on the document and closes — the same `close()` its own

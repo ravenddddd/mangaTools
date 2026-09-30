@@ -135,6 +135,19 @@
 }
 
 /*
+ * The footer's left column: the O counter and the rating stars.
+ *
+ * Not this half's to offer — and not, in a lightbox that is reading a book, anything
+ * a reader wants under their thumb. The controls themselves are Stash's and stay in
+ * the DOM; what is hidden is the two of them, rather than the column they sit in,
+ * because that column is one of the footer's three `flex: 1` thirds and dropping it
+ * would move the image's own name off the middle of the screen.
+ */
+.Lightbox.manga-reader-takeover .Lightbox-footer-left > * {
+  display: none;
+}
+
+/*
  * The fade length, read off the slider. The switches themselves are Stash's own
  * `form-check`s and its range input, so they are drawn by its stylesheet; this is only
  * the number beside them.
