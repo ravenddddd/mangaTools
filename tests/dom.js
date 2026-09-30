@@ -155,6 +155,16 @@ function makeElement(tagName) {
      *
      * Anything else returns null rather than guessing: a stub that quietly matched
      * the wrong thing would hide a broken selector instead of failing on it.
+     *
+     * **One pass, whatever the selector has in it.** The obvious way to write this —
+     * for each child, try the rest of the selector here and then the whole selector
+     * below — searches the subtree twice per level, so the cost doubles with every
+     * level of the fixture. A depth of twenty is a million walks of the same nodes,
+     * and a query the browser answers instantly becomes one that never returns. A
+     * descendant selector is answered instead by walking the tree once and, for each
+     * node, climbing its ancestors for the parts before the last — which is what the
+     * real selector means: it is asked of the document, and this narrows the answer
+     * to what is below `el`.
      */
     querySelector(selector) {
       const match = (node, sel) => {
@@ -163,21 +173,35 @@ function makeElement(tagName) {
         return node.tagName === sel.toUpperCase();
       };
 
-      const search = (node, parts) => {
-        const [head, ...rest] = parts;
+      const parts = selector.trim().split(/\s+/);
+
+      /** Whether this node is the one the selector ends at: the last part is its
+       * own, and every part before that has an ancestor of it above */
+      const ends = (node) => {
+        if (!match(node, parts[parts.length - 1])) return false;
+
+        let at = node.parentNode;
+        for (let want = parts.length - 2; want >= 0; want--) {
+          while (at && !match(at, parts[want])) at = at.parentNode;
+          if (!at) return false;
+          at = at.parentNode;
+        }
+
+        return true;
+      };
+
+      /** Document order: a node, then its subtree, then its next sibling */
+      const search = (node) => {
         for (const child of node.children) {
-          if (match(child, head)) {
-            if (rest.length === 0) return child;
-            const deeper = search(child, rest);
-            if (deeper) return deeper;
-          }
-          const found = search(child, parts);
+          if (ends(child)) return child;
+          const found = search(child);
           if (found) return found;
         }
+
         return null;
       };
 
-      return search(el, selector.trim().split(/\s+/));
+      return search(el);
     },
 
     /**
@@ -210,9 +234,16 @@ function makeElement(tagName) {
       return found;
     },
 
+    /**
+     * Adding the same callback twice is not two listeners in the DOM either: the
+     * second `addEventListener` of the same type and function is a no-op. This is
+     * what lets the plugin put its move and release on the document on every press
+     * and take them off once — a stub that piled them up would be *stricter* than
+     * the browser and report a leak that is not one.
+     */
     addEventListener(type, fn) {
       if (!el.listeners[type]) el.listeners[type] = [];
-      el.listeners[type].push(fn);
+      if (!el.listeners[type].includes(fn)) el.listeners[type].push(fn);
     },
 
     /** Removing one matters here: the plugin takes its lightbox listener off again */
@@ -359,7 +390,8 @@ function createDom() {
     listeners: {},
     addEventListener(type, fn) {
       if (!document.listeners[type]) document.listeners[type] = [];
-      document.listeners[type].push(fn);
+      if (!document.listeners[type].includes(fn))
+        document.listeners[type].push(fn);
     },
     // Taken off again by the plugin: a drag puts a move and a release on the document
     // and takes them off when it ends. A document that could not forget them would
@@ -438,7 +470,7 @@ function createDom() {
     listeners: {},
     addEventListener(type, fn) {
       if (!window.listeners[type]) window.listeners[type] = [];
-      window.listeners[type].push(fn);
+      if (!window.listeners[type].includes(fn)) window.listeners[type].push(fn);
     },
     dispatchEvent(event) {
       event.target = window;

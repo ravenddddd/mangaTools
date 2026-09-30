@@ -4178,6 +4178,81 @@ async function main() {
     }
   );
 
+  /**
+   * The test world's own rules, which every other section in this file reads through.
+   *
+   * A stub that answers differently from a browser is worse than no stub at all: it
+   * decides what every assertion above it means. Two of its rules are pinned here for
+   * that reason, both of them things this suite got wrong before.
+   */
+  await runSection(
+    "the test world answers the way a browser does",
+    async () => {
+      // A descendant selector whose first part is the element the query is asked of.
+      // The browser asks the document and narrows the answer to what is below that
+      // element, so the element itself may be the ancestor the first part names — the
+      // search here used to look only *below* it and missed this case entirely.
+      const outer = dom.makeElement("div");
+      outer.className = "a";
+      const inner = dom.makeElement("div");
+      inner.className = "b";
+      outer.appendChild(inner);
+
+      assert.strictEqual(
+        outer.querySelector(".a .b") === inner,
+        true,
+        "a query asked of the element its first part names finds what is below it"
+      );
+
+      const root = dom.makeElement("div");
+      const deeper = dom.makeElement("div");
+      deeper.className = "a";
+      root.appendChild(deeper);
+      const leaf = dom.makeElement("div");
+      leaf.className = "b";
+      deeper.appendChild(leaf);
+
+      assert.strictEqual(
+        root.querySelector(".a .b") === leaf,
+        true,
+        "and from above, a descendant two levels down"
+      );
+
+      // A query with nothing to find is the one that used to cost the most: the search
+      // walked the subtree below every node the first part matched, once for the rest of
+      // the selector and once for the whole of it. This says it comes back at all.
+      for (let depth = 0; depth < 40; depth += 1) {
+        const child = dom.makeElement("div");
+        child.className = "a";
+        deeper.appendChild(child);
+      }
+      assert.strictEqual(
+        root.querySelector(".a .nothing") === null,
+        true,
+        "and one that is not there is null, rather than a walk that does not end"
+      );
+
+      // One callback registered twice is one listener, as it is in the DOM — which is
+      // what lets the plugin put a move and a release on the document on every press
+      // of the progress bar and take them off once, without the pile growing.
+      const node = dom.makeElement("div");
+      const once = () => {};
+      const again = () => {};
+      node.addEventListener("mousemove", once);
+      node.addEventListener("mousemove", once);
+      node.addEventListener("mousemove", again);
+      assert.strictEqual(
+        node.listeners.mousemove.length,
+        2,
+        "the same callback twice is one listener, and a second callback is two"
+      );
+
+      node.removeEventListener("mousemove", once);
+      assert.strictEqual(node.listeners.mousemove.length, 1);
+      assert.strictEqual(node.listeners.mousemove[0], again);
+    }
+  );
+
   // ── The tally ────────────────────────────────────────────────────
 
   if (failures.length === 0) {
