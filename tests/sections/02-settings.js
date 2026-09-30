@@ -506,6 +506,40 @@ module.exports = () => {
         "never be shown"
     );
   }
+  // …and each of them *declares* each id once. The comparison above cannot see a
+  // key written twice: `JSON.parse` keeps the last one and says nothing, and every
+  // catalog being duplicated in the same way keeps the three equal — which is how a
+  // duplicated block of ids passed this suite and every other one, and was caught by
+  // the publishing workflow's `biome lint` instead. What is read here is the file,
+  // not the parsed value.
+  const fs = require("node:fs");
+  const path = require("node:path");
+  for (const locale of ["en", "zh-Hans", "zh-Hant"]) {
+    const file = path.join(
+      __dirname,
+      "..",
+      "..",
+      "src",
+      "messages",
+      `${locale}.json`
+    );
+    const seen = new Set();
+    const twice = [];
+    for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+      const key = /^\s*"([^"]+)":/.exec(line);
+      if (!key) continue;
+      if (seen.has(key[1])) twice.push(key[1]);
+      seen.add(key[1]);
+    }
+
+    assert.deepStrictEqual(
+      twice,
+      [],
+      `${locale}.json declares these ids more than once, and only the last of each ` +
+        "would ever be read"
+    );
+  }
+
   state.currentLocale = "zh-CN";
   console.log(
     "✓ plugin strings (catalogs by Stash locale, subtag fallback, English last)"

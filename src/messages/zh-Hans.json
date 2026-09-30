@@ -9,9 +9,6 @@
   "mangaReader.reimportWarning": "用 Stash 的章节替换这本的？插件已有的那份会被覆盖。",
   "mangaReader.reimportReplace": "替换",
   "mangaReader.reimportCancel": "取消",
-  "mangaReader.reimportWarning": "用 Stash 的章节替换这本的？插件已有的那份会被覆盖。",
-  "mangaReader.reimportReplace": "替换",
-  "mangaReader.reimportCancel": "取消",
 
   "mangaTools.select.placeholder": "选择语言…",
 
@@ -32,19 +29,6 @@
 
   "mangaTools.settings.hidePerformers.heading": "在漫画的编辑页隐藏「演员」",
   "mangaTools.settings.hidePerformers.description": "漫画一般没有演员，所以编辑页不显示这一栏。只是隐藏：画廊已有的演员仍然留在画廊上，保存时也不会被清掉。批量编辑对话框和简介页不受影响。",
-
-  "mangaTools.settings.chapters.heading": "从 Stash 导入章节",
-  "mangaTools.settings.chapters.description": "把每本已标记漫画的 Stash 章节抄进插件自己的章节字段 —— 阅读半边优先读的就是它，而它从来还没有被写过。Stash 那边一个字节都不改。已有插件章节的画廊默认不动，除非你要求覆盖。",
-  "mangaTools.settings.chapters.check": "先看看会导入哪些",
-  "mangaTools.settings.chapters.checking": "正在检查…",
-  "mangaTools.settings.chapters.toImport": "将导入",
-  "mangaTools.settings.chapters.owned": "已导入",
-  "mangaTools.settings.chapters.replace": "同时覆盖已导入的那些",
-  "mangaTools.settings.chapters.start": "导入",
-  "mangaTools.settings.chapters.progress": "已导入",
-  "mangaTools.settings.chapters.of": "/",
-  "mangaTools.settings.chapters.skipped": "跳过（没有可搬的）",
-  "mangaTools.settings.chapters.failed": "失败",
 
   "mangaTools.settings.chapters.heading": "从 Stash 导入章节",
   "mangaTools.settings.chapters.description": "把每本已标记漫画的 Stash 章节抄进插件自己的章节字段 —— 阅读半边优先读的就是它，而它从来还没有被写过。Stash 那边一个字节都不改。已有插件章节的画廊默认不动，除非你要求覆盖。",
