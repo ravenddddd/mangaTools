@@ -182,6 +182,16 @@ let pending: number | null = null;
 let idle: number | null = null;
 
 /**
+ * The last width the pages measured.
+ *
+ * Kept because a screen whose pictures have not arrived measures nothing, and the bar
+ * of the screen before it is a better answer than no bar at all — the reader turned a
+ * page, not off. Only the first screen of a gallery has no earlier width to stand on,
+ * and that one waits. See the guard in wake.
+ */
+let lastWidth = 0;
+
+/**
  * Whether the bar was asked for while there was nothing to draw it at.
  *
  * A turn asks the bar to say where the reader has got to, and it cannot while the new
@@ -333,17 +343,18 @@ function update(state: ProgressState): void {
     drawNodes(state);
   }
 
-  // A page that has not loaded yet measures nothing, and a bar a point wide is worse
-  // than a bar a screen out of date: the width stands until there is a real one, and
-  // an image finishing is what asks for the pass that takes it. See the load listener
-  // in takeover.ts.
-  //
-  // And it stands while a pointer is down, whatever the pages measure: the bar's width
-  // is half of what turns a pointer's x into a page, so a drag that narrowed it as it
-  // went would move the pages out from under the hand that was choosing them. It takes
-  // the new width when the drag is let go of, and the easing above carries it there.
-  if (state.width > 0 && !pressed) {
-    const wanted = Math.round(state.width) + "px";
+  // What the pages measure, remembered whenever there is a measurement to remember:
+  // a screen whose pictures are still arriving measures nothing, and the width of the
+  // screen before it is the better answer.
+  if (state.width > 0) lastWidth = state.width;
+
+  // And it is written to the track only with no pointer down. The bar's width is half
+  // of what turns a pointer's x into a page, so a drag that narrowed it as it went
+  // would move the pages out from under the hand that was choosing them; the drag
+  // takes the width it has been holding when it is let go of, and the easing above
+  // carries it there.
+  if (!pressed && lastWidth > 0) {
+    const wanted = Math.round(lastWidth) + "px";
     if (track.style.width !== wanted) track.style.width = wanted;
   }
 
@@ -416,20 +427,12 @@ function drawNodes(state: ProgressState): void {
     const tick = document.createElement("div");
     tick.className = CLASS_NODE;
     tick.style.left = (node.fraction * 100).toFixed(3) + "%";
-    // A tick's own press is a jump, not the start of a scrub.
-    tick.addEventListener("mousedown", (event) => event.stopPropagation());
-    tick.addEventListener("click", (event) => {
-      event.stopPropagation();
-      latest?.handlers.onSeek(node.at);
-      wake();
-    });
-    // The name, in this plugin's own bubble rather than in the browser's: a title
-    // attribute waits a second before it says anything, which is a second of not
-    // knowing which of four ticks is the one under the pointer.
-    // What to say about this tick, kept on it: the pointer finds the tick through the
-    // DOM instead of through a listener of its own on every one of them — a tick
-    // redrawn under a stationary pointer has no way to say that it has gone.
+    // What this tick is, kept on it: a press on it is that chapter — on the press, as
+    // a press anywhere else on the line goes to where it landed — and the bubble says
+    // its name. Both are read back from the DOM, because a tick redrawn under a
+    // stationary pointer has no way to say that it has gone or that it is here.
     tick.dataset.name = node.name;
+    tick.dataset.at = String(node.at);
     tick.dataset.fraction = String(node.fraction);
     nodes.appendChild(tick);
   }
@@ -474,6 +477,18 @@ function onLeaveTrack(): void {
   if (!pressed) takeBubbleDown();
 }
 
+/**
+ * The tick a pointer is on, if it is on one.
+ *
+ * The whole height of the track counts, since that is the box a tick answers to: a
+ * reader aiming at a chapter aims at the place, not at the four pixels of it that are
+ * painted.
+ */
+function tickUnder(target: EventTarget | null): HTMLElement | null {
+  const node = target as HTMLElement | null;
+  return node?.classList?.contains(CLASS_NODE) ? node : null;
+}
+
 /** Puts the bubble up, or moves it: what it says is decided by whoever calls this */
 function setBubble(next: {
   page: string;
@@ -501,7 +516,7 @@ function wake(): void {
   // worse than no bar — least of all here, where there is no earlier width to stand
   // on. The row keeps its place so the picture does not move; what brings the bar out
   // is the pass an image's own `load` asks for. See the load listener in takeover.ts.
-  if ((latest?.width ?? 0) <= 0) {
+  if (lastWidth <= 0) {
     bar.classList.add(CLASS_IDLE);
     owed = true;
     return;
@@ -544,9 +559,23 @@ function onPress(event: Event): void {
 
   pressed = true;
   bar?.classList.add(CLASS_SCRUBBING);
-  // Whatever the pointer was over, it is dragging now.
-  bubble = null;
-  scrubTo(fractionAt(press.clientX));
+
+  // A press on a chapter's tick is that chapter, and it goes on the press: the same
+  // rule as a press anywhere else on the line, which goes to where it landed. What is
+  // different is what the bubble says — the name it already had, until the pointer
+  // moves and the drag has something of its own to say.
+  const tick = tickUnder(press.target);
+  if (tick) {
+    target = Number(tick.dataset?.at || 0);
+    pointer = Number(tick.dataset?.fraction || 0);
+    lastJump = Date.now();
+    latest?.handlers.onSeek(target);
+    redraw();
+  } else {
+    // Whatever the pointer was over, it is dragging now.
+    bubble = null;
+    scrubTo(fractionAt(press.clientX));
+  }
 
   document.addEventListener("mousemove", onMove);
   document.addEventListener("mouseup", onRelease);

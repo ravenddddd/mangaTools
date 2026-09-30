@@ -3559,12 +3559,36 @@ async function main() {
       "and takes page 8's own width once the hand is off it"
     );
 
-    // A tick is a jump to its chapter.
-    dom.click(ticks()[1]);
+    // A tick is that chapter, on the press — the same rule as a press anywhere else on
+    // the line, which goes to where it landed — and the drag that follows starts from
+    // there rather than from the page under the pointer.
+    const beforeTick = track.style.width;
+    track.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", {
+        button: 0,
+        clientX: 400,
+        target: ticks()[1],
+      })
+    );
     assert.deepStrictEqual(
       drawn(),
       ["/image/704/image", "/image/705/image"],
-      "clicking a chapter's tick opens the book at that chapter"
+      "pressing a chapter's tick opens the book at that chapter"
+    );
+    assert.strictEqual(
+      track.style.width,
+      beforeTick,
+      "and the bar keeps the width it had, the hand being on it"
+    );
+
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    laidOut();
+    dom.flush();
+    assert.strictEqual(
+      track.style.width,
+      "1020px",
+      "taking the pair's own width once the hand is off it"
     );
 
     stopReader(box);
@@ -3664,23 +3688,24 @@ async function main() {
       dom.click(box.navRight);
       assert.strictEqual(
         asleep(),
-        true,
-        "a turn with the new pages still on their way leaves it where it is: a bar " +
-          "with nothing measured is a bar a point wide"
+        false,
+        "as does turning a page: the bar has something new to say, and the width of " +
+          "the screen before it to say it at"
+      );
+      assert.strictEqual(
+        track.style.width,
+        "500px",
+        "which is the width it keeps while the new pages are on their way"
       );
 
-      // And when they arrive, the asking is answered: the bar comes out with a width
-      // to be drawn at. This is the pass an image's own `load` asks for, by hand.
+      // The pages arriving do not move it: a screen whose pictures measure nothing
+      // leaves the width alone, and their own `load` is what asks for this pass.
       [...container().querySelectorAll("img")].forEach((image, at) => {
         image.offsetLeft = at * 520;
         image.offsetWidth = 500;
       });
       dom.flush();
-      assert.strictEqual(
-        asleep(),
-        false,
-        "and the turn it was asked for arrives with them"
-      );
+      assert.strictEqual(asleep(), false);
 
       stopReader(box);
     } finally {
