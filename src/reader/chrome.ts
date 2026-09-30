@@ -42,6 +42,8 @@ export const CLASS_CLOSE = "manga-reader-close";
 export const CLASS_FULLSCREEN = "manga-reader-fullscreen";
 /** The zoom reset, which Stash draws only while its image is zoomed */
 export const CLASS_ZOOM = "manga-reader-zoom";
+/** The chapter menu's wrapper, which is what goes when there are no chapters */
+export const CLASS_CHAPTER_MENU = "manga-reader-chapter-menu";
 /**
  * The attribute that hides what this plugin stands in for, and the one thing the
  * stylesheet knows about any of it: see the rule in mangaReader.css. The same
@@ -142,7 +144,7 @@ export function ensureChrome(
     // toggle and the menu — and a `dropdown-menu` is positioned against that wrapper.
     // Without one the menu is positioned against the header, which is where it landed.
     const chapters = document.createElement("div");
-    chapters.className = "dropdown";
+    chapters.className = "dropdown " + CLASS_CHAPTER_MENU;
     chapters.appendChild(
       menuButton("chapters", CLASS_CHAPTER_TOGGLE, "faBars")
     );
@@ -272,17 +274,16 @@ function update(chrome: HTMLElement, state: ChromeState): void {
   chapterPanel.classList.toggle("show", openMenu === "chapters");
   settingsPanel.classList.toggle("show", openMenu === "settings");
 
-  // The zoom reset is drawn only while there is a zoom to reset. Set rather than
-  // toggled with a comparison, because an attribute write that changes nothing is
-  // still a write: the pass runs on every change the lightbox makes.
-  const zoom = chrome.querySelector("." + CLASS_ZOOM) as HTMLElement | null;
-  if (zoom) {
-    const hidden = zoom.getAttribute(HIDDEN) !== null;
-    if (hidden === state.zoomed) {
-      if (state.zoomed) zoom.removeAttribute(HIDDEN);
-      else zoom.setAttribute(HIDDEN, "");
-    }
-  }
+  // Two things this header draws only sometimes: the zoom reset, while there is a
+  // zoom to reset, and the chapter menu, while there are chapters to put in it. A
+  // gallery in no chapters has nothing for that menu to be, so it has no menu and no
+  // button — which is Stash's own rule, and the reason its own header is empty of
+  // them on such a gallery.
+  showWhen(chrome.querySelector("." + CLASS_ZOOM), state.zoomed);
+  showWhen(
+    chrome.querySelector("." + CLASS_CHAPTER_MENU),
+    state.placed.length > 0
+  );
 
   drawChapters(chapterPanel, state);
   drawSettings(settingsPanel, state);
@@ -503,6 +504,22 @@ function menuButton(opens: Menu, classes: string, icon: string): HTMLElement {
     redraw();
   });
   return button;
+}
+
+/**
+ * Shows or hides something by the attribute, and only when it differs.
+ *
+ * Only when it differs, because this pass runs on every change the lightbox makes,
+ * and an attribute written with the value it already has is still a write — which is
+ * the shape of change that makes a change. Once per button is not much to ask.
+ */
+function showWhen(node: Element | null, shown: boolean): void {
+  if (!node) return;
+
+  if ((node.getAttribute(HIDDEN) !== null) === shown) {
+    if (shown) node.removeAttribute(HIDDEN);
+    else node.setAttribute(HIDDEN, "");
+  }
 }
 
 /** The icon a menu shows: the bars open into a cross, and the cog stays a cog */

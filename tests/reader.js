@@ -2491,6 +2491,14 @@ async function main() {
       "and the menu is in that same wrapper, which is what positions it"
     );
 
+    assert.strictEqual(
+      chrome
+        .querySelector(".manga-reader-chapter-menu")
+        .getAttribute("data-manga-reader-hidden"),
+      null,
+      "and a gallery that has chapters is offered the menu to read them in"
+    );
+
     const gear = toggle("settings");
     assert.ok(
       owns(gear, "btn", "btn-link"),
@@ -2621,6 +2629,31 @@ async function main() {
 
     stopReader(box);
   });
+
+  /**
+   * A gallery in no chapters has no chapter menu: no menu, and no button to open one.
+   *
+   * Stash's own header is empty of them on such a gallery — it renders its chapter
+   * menu only when it has chapters to put in it — and a button that opens nothing is
+   * worse than no button at all: it says there are chapters, and then shows none.
+   */
+  await runSection(
+    "a gallery in no chapters gets no chapter button",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+      const menu = chrome.querySelector(".manga-reader-chapter-menu");
+
+      assert.ok(menu, "the header is built with a place for the chapter menu");
+      assert.notStrictEqual(
+        menu.getAttribute("data-manga-reader-hidden"),
+        null,
+        "and the place is hidden, because this gallery has no chapters to put in it"
+      );
+
+      stopReader(box);
+    }
+  );
 
   /**
    * The wheel, and the press and drag: Stash's two ways of looking closer, which
