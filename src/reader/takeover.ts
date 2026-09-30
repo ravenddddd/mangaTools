@@ -715,6 +715,16 @@ function ensureContainer(lightbox: Element): void {
     container.addEventListener("click", onSpreadClick);
     container.addEventListener("wheel", onSpreadWheel);
     container.addEventListener("mousedown", onSpreadPress);
+    // An image that has not arrived measures nothing, and the progress bar is as wide
+    // as the pages: this is the one event that says they are here, since a picture
+    // finishing is not a change to the document for the observer to see.
+    container.addEventListener(
+      "load",
+      () => {
+        if (root) sync(root);
+      },
+      true
+    );
   }
 
   // Stash's own layers above this one are positioned; this makes the display the

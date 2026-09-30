@@ -321,8 +321,7 @@
   display: none;
 }
 
-.manga-reader-progress.is-scrubbing .manga-reader-progress-label,
-.manga-reader-progress.is-naming .manga-reader-progress-label {
+.manga-reader-progress.is-showing .manga-reader-progress-label {
   opacity: 1;
 }
 

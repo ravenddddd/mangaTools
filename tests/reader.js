@@ -3213,6 +3213,23 @@ async function main() {
       "the bar is as wide as the pages on show — the cover, which stands alone"
     );
 
+    // An image that has not loaded measures nothing at all, and that is what collapsed
+    // the bar to a point: nothing measures zero, the width stands, and the pass that
+    // an image's own `load` asks for is what takes the real one.
+    [...container().querySelectorAll("img")].forEach((image) => {
+      image.offsetLeft = 0;
+      image.offsetWidth = 0;
+    });
+    dom.flush();
+    assert.strictEqual(
+      track.style.width,
+      "500px",
+      "and a page that has not arrived yet does not make it a point"
+    );
+    laidOut();
+    dom.flush();
+    assert.strictEqual(track.style.width, "500px");
+
     assert.strictEqual(read.style.width, "0.000%", "the book opens unread");
     assert.strictEqual(thumb.style.left, "0.000%");
 
@@ -3224,16 +3241,22 @@ async function main() {
     );
 
     // The name comes from the plugin's own bubble, at once, rather than from a
-    // browser tooltip that waits a second before saying anything at all.
-    assert.strictEqual(
-      bar.classList.contains("is-naming"),
-      false,
-      "no chapter is named until the pointer is on one"
-    );
+    // browser tooltip that waits a second before saying anything at all. The pointer
+    // is found by the bar, which is the only thing that can say a tick is no longer
+    // under it: a tick redrawn under a stationary pointer cannot tell anyone.
     const bubbleLine = (which) =>
       label.querySelector(".manga-reader-progress-" + which).textContent;
 
-    ticks()[1].dispatch("mouseenter", dom.makeEvent("mouseenter", {}));
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      false,
+      "no chapter is named until the pointer is on one"
+    );
+
+    bar.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { target: ticks()[1] })
+    );
     assert.strictEqual(
       bubbleLine("chapter"),
       "中盤",
@@ -3242,21 +3265,45 @@ async function main() {
     assert.strictEqual(
       bubbleLine("page"),
       "",
-      "in a bubble of its own with no page number in it: the pass that follows a " +
-        "write of the reader's own used to draw the reader's position over the name"
+      "in a bubble of its own with no page number in it"
     );
-    assert.strictEqual(
-      bar.classList.contains("is-naming"),
-      true,
-      "in the bar's own bubble, shown at once rather than after a browser's delay"
-    );
+    assert.strictEqual(bar.classList.contains("is-showing"), true);
     assert.strictEqual(
       label.parentNode,
       track,
       "which is measured against the track it belongs to, not against the lightbox"
     );
-    bar.dispatch("mouseleave", dom.makeEvent("mouseleave", {}));
-    assert.strictEqual(bar.classList.contains("is-naming"), false);
+
+    // Off the tick but still on the bar: nothing is named any more.
+    bar.dispatch("mousemove", dom.makeEvent("mousemove", { target: track }));
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      false,
+      "and moving off the tick takes the bubble down"
+    );
+    assert.strictEqual(
+      bubbleLine("chapter"),
+      "中盤",
+      "leaving it the words it had: emptying it first shows something else in the " +
+        "last tenth of a second, which is the flash it used to give"
+    );
+
+    // And the book moving under a pointer that has not: the bar's width changes with
+    // the screen, so a named tick can be gone with no mouse event to say so. The pass
+    // has to take the bubble down itself.
+    bar.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { target: ticks()[1] })
+    );
+    assert.strictEqual(bar.classList.contains("is-showing"), true);
+    dom.click(box.navRight);
+    assert.strictEqual(
+      bar.classList.contains("is-showing"),
+      false,
+      "a page turn takes it down as well: it was naming a tick that may be gone"
+    );
+    // Back to the cover, so the rest of this section starts where it did.
+    dom.click(box.navLeft);
 
     // A turn: the bar follows the reader.
     dom.click(box.navRight);

@@ -130,8 +130,8 @@ const CLASS_LABEL = "manga-reader-progress-label";
 const CLASS_SCRUBBING = "is-scrubbing";
 /** While it is asleep: out of sight, and out of the way of clicks */
 const CLASS_IDLE = "is-idle";
-/** While a chapter's tick is under the pointer: the bubble says which one */
-const CLASS_NAMING = "is-naming";
+/** While the bubble is up: the drag's page, or the chapter a tick is for */
+const CLASS_SHOWING = "is-showing";
 /** The state the bar was last drawn from, which its gestures read */
 let latest: ProgressState | null = null;
 
@@ -151,13 +151,21 @@ let drawn: { nodes: string; at: number; total: number } | null = null;
 let labelWidth = 0;
 
 /**
- * A chapter's name being shown because the pointer is on its tick, or null.
+ * What the bubble is saying, and where it is saying it, or null when it is down.
  *
- * Kept rather than written and forgotten, because a pass over the document has to be
- * able to draw the bubble again without knowing why it is up — and one that could not
- * would draw the reader's own position into it instead, which is a bug this had.
+ * Kept here rather than worked out in every pass, because those are not the same
+ * question: a pass that redrew the bubble from the reader's position drew over a
+ * chapter's name the moment the pointer paused on its tick, which is what this did.
+ *
+ * A bubble that is taken down keeps the words it had while it fades: emptying it
+ * first shows something else in the last tenth of a second, which is worse than
+ * showing nothing.
  */
-let naming: { words: string; fraction: number } | null = null;
+let bubble: {
+  page: string;
+  chapter: string;
+  fraction: number;
+} | null = null;
 
 /**
  * Where the pointer is along the bar, as a fraction, while it is down.
@@ -224,7 +232,7 @@ export function removeProgress(lightbox: Element): void {
   nodes = null;
   drawn = null;
   latest = null;
-  naming = null;
+  bubble = null;
   pointer = null;
   pressed = false;
   labelWidth = 0;
@@ -276,8 +284,8 @@ function build(lightbox: Element): void {
   // anywhere brings a reader's eye to the bottom of the picture for nothing. What
   // wakes it is the pointer reaching *it* — which works while it is asleep because
   // it is a row of its own and covers nothing that anybody else wants.
-  bar.addEventListener("mousemove", onWake);
-  bar.addEventListener("mouseleave", onLeave);
+  bar.addEventListener("mousemove", onMoveOverBar);
+  bar.addEventListener("mouseleave", takeBubbleDown);
 
   track.addEventListener("mousedown", onPress);
   // The bar is a sibling of the pages rather than a child of them, so a press here
@@ -312,8 +320,14 @@ function update(state: ProgressState): void {
     drawNodes(state);
   }
 
-  const wanted = Math.round(state.width) + "px";
-  if (track.style.width !== wanted) track.style.width = wanted;
+  // A page that has not loaded yet measures nothing, and a bar a point wide is worse
+  // than a bar a screen out of date: the width stands until there is a real one, and
+  // an image finishing is what asks for the pass that takes it. See the load listener
+  // in takeover.ts.
+  if (state.width > 0) {
+    const wanted = Math.round(state.width) + "px";
+    if (track.style.width !== wanted) track.style.width = wanted;
+  }
 
   const settled = fractionOfPage(state.at, state.total);
   const fraction = pointer === null ? settled : pointer;
@@ -322,29 +336,24 @@ function update(state: ProgressState): void {
   if (read.style.width !== where) read.style.width = where;
   if (thumb.style.left !== where) thumb.style.left = where;
 
-  // What the bubble says: the chapter whose tick is under the pointer, if one is, and
-  // otherwise where the reader is — which is what a drag is showing.
-  const page = pointer === null ? state.at : target;
-  const words = naming
-    ? { page: "", chapter: naming.words }
-    : {
-        page: page + 1 + " / " + state.total,
-        chapter: state.chapterNameAt(page),
-      };
-  const place = naming ? naming.fraction : null;
-  if (labelPage?.textContent !== words.page) {
-    if (labelPage) labelPage.textContent = words.page;
-    labelWidth = label.offsetWidth;
-  }
-  if (labelChapter?.textContent !== words.chapter) {
-    if (labelChapter) labelChapter.textContent = words.chapter;
-    labelWidth = label.offsetWidth;
+  // The bubble, when there is one. What it says was decided where it was set — see
+  // setBubble — and a pass only draws it: writing it here is what let the reader's
+  // own position land on top of a chapter's name.
+  if (bubble) {
+    if (labelPage?.textContent !== bubble.page) {
+      if (labelPage) labelPage.textContent = bubble.page;
+      labelWidth = label.offsetWidth;
+    }
+    if (labelChapter?.textContent !== bubble.chapter) {
+      if (labelChapter) labelChapter.textContent = bubble.chapter;
+      labelWidth = label.offsetWidth;
+    }
   }
 
   // Kept inside the bar rather than centred on a point that may be at either end.
   const half = labelWidth / 2;
   const width = track.clientWidth || 0;
-  const at = place === null ? fraction : place;
+  const at = bubble ? bubble.fraction : fraction;
   const px =
     Math.max(half, Math.min(at * width, width - half)).toFixed(0) + "px";
   if (label.style.left !== px) label.style.left = px;
@@ -356,6 +365,11 @@ function update(state: ProgressState): void {
   const moved =
     drawn !== null && (drawn.at !== state.at || drawn.total !== state.total);
   drawn = { nodes: key, at: state.at, total: state.total };
+
+  // A tick's name is about where the reader was, and the book can move under a
+  // pointer that has not — the bar's width changes with the screen. Then the bubble
+  // is about a chapter nobody is pointing at, and no mouse event is coming to say so.
+  if (moved) takeBubbleDown();
   if (moved) wake();
 }
 
@@ -379,21 +393,60 @@ function drawNodes(state: ProgressState): void {
     // The name, in this plugin's own bubble rather than in the browser's: a title
     // attribute waits a second before it says anything, which is a second of not
     // knowing which of four ticks is the one under the pointer.
-    tick.addEventListener("mouseenter", () => name(node.name, node.fraction));
+    // What to say about this tick, kept on it: the pointer finds the tick through the
+    // DOM instead of through a listener of its own on every one of them — a tick
+    // redrawn under a stationary pointer has no way to say that it has gone.
+    tick.dataset.name = node.name;
+    tick.dataset.fraction = String(node.fraction);
     nodes.appendChild(tick);
   }
 }
 
-function onWake(): void {
+/**
+ * The pointer moving over the bar: awake, and either on a tick or not.
+ *
+ * One listener for the whole row rather than one per tick, because "the pointer is no
+ * longer on that tick" is a question a tick cannot answer once it has been redrawn
+ * under a pointer that has not moved and is no longer over it: nothing tells it.
+ */
+function onMoveOverBar(event: Event): void {
   wake();
+
+  const node = event.target as HTMLElement | null;
+  const tick = node?.classList?.contains(CLASS_NODE) ? node : null;
+
+  if (!tick) {
+    takeBubbleDown();
+    return;
+  }
+
+  const chapter = tick.dataset?.name || "";
+  if (bubble?.chapter === chapter) return;
+
+  setBubble({
+    page: "",
+    chapter,
+    fraction: Number(tick.dataset?.fraction || 0),
+  });
+  redraw();
 }
 
-/** The pointer left the row: it may stay awake, but it stops naming a chapter */
-function onLeave(): void {
-  if (!naming) return;
+/** Puts the bubble up, or moves it: what it says is decided by whoever calls this */
+function setBubble(next: {
+  page: string;
+  chapter: string;
+  fraction: number;
+}): void {
+  bubble = next;
+  bar?.classList.add(CLASS_SHOWING);
+}
 
-  naming = null;
-  bar?.classList.remove(CLASS_NAMING);
+/** Takes the bubble down, leaving it the words it had to fade out with */
+function takeBubbleDown(): void {
+  if (!bubble) return;
+
+  bubble = null;
+  bar?.classList.remove(CLASS_SHOWING);
   redraw();
 }
 
@@ -417,23 +470,6 @@ function stopTimers(): void {
   pending = null;
 }
 
-/**
- * Says which chapter's tick the pointer is on, and where it is.
- *
- * The same bubble the drag uses, in the same place: a fraction of the track and the
- * words, with neither a delay nor a hover of its own to wait out.
- */
-function name(words: string, fraction: number): void {
-  if (!bar) return;
-
-  naming = { words, fraction };
-  bar.classList.add(CLASS_NAMING);
-  // Drawn here rather than waited for: the pass this write provokes would draw it
-  // again in a moment, but a bubble that arrives a moment late is a bubble the
-  // reader has already looked away from.
-  redraw();
-}
-
 /** Whether a pointer is down on the bar */
 let pressed = false;
 
@@ -455,6 +491,8 @@ function onPress(event: Event): void {
 
   pressed = true;
   bar?.classList.add(CLASS_SCRUBBING);
+  // Whatever the pointer was over, it is dragging now.
+  bubble = null;
   scrubTo(fractionAt(press.clientX));
 
   document.addEventListener("mousemove", onMove);
@@ -484,6 +522,11 @@ function onRelease(): void {
 function scrubTo(fraction: number): void {
   pointer = fraction;
   target = pageAtFraction(fraction, latest?.total ?? 1);
+  setBubble({
+    page: target + 1 + " / " + (latest?.total ?? 1),
+    chapter: latest?.chapterNameAt(target) || "",
+    fraction,
+  });
   redraw();
 
   // Already over the page the book is open at — which for a two-page screen is
