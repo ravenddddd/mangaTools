@@ -2623,6 +2623,248 @@ async function main() {
   });
 
   /**
+   * The wheel, and the press and drag: Stash's two ways of looking closer, which
+   * this half had lost with the images it replaced. Stash's zoom acts on the image
+   * inside its carousel — the carousel this half hides — so a reader who zooms a
+   * page in Stash's lightbox expects the same wheel here, and the same hand.
+   *
+   * The arithmetic is pinned on its own, by calling it (see the section after this
+   * one). What is pinned here is that the two gestures reach it, and what they leave
+   * on the screen — including the one thing that must *not* happen: a drag ending in
+   * a click, which would turn the page for the trouble of moving it.
+   */
+  await runSection("the wheel zooms and the drag pans", async () => {
+    const { box } = await startReader({ galleryId: "8", on: true });
+
+    const spread = container();
+    const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+    const transform = () => spread.style.transform;
+    const zoomButton = () => chrome.querySelector(".manga-reader-zoom");
+    const offered = () =>
+      zoomButton().getAttribute("data-manga-reader-hidden") === null;
+    const wheel = (deltaY, init) =>
+      spread.dispatch(
+        "wheel",
+        dom.makeEvent("wheel", Object.assign({ deltaY }, init))
+      );
+
+    // What the browser would report for the pages and for the box they sit in: the
+    // two sizes a pan is measured against. The test world has no layout, so a test
+    // that means to pan has to say how big things are — and it is the images' own
+    // sizes that count, since a page can be narrower than the box around it.
+    const laidOut = () => {
+      for (const page of spread.children) {
+        page.children[0].offsetWidth = 500;
+        page.children[0].offsetHeight = 800;
+      }
+      spread.clientWidth = 800;
+      spread.clientHeight = 800;
+    };
+
+    laidOut();
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(1)",
+      "the pages are drawn fitted and centred"
+    );
+    assert.strictEqual(
+      spread.children[0].children[0].draggable,
+      false,
+      "and each page says it is not draggable: a browser's own drag of an image is " +
+        "a drag of the file, and it swallows the moves a pan is made of"
+    );
+    assert.strictEqual(offered(), false, "so there is no zoom to reset");
+
+    wheel(-100);
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(1.1)",
+      "a wheel away from the reader zooms in — Stash's own 10% a notch"
+    );
+    assert.strictEqual(offered(), true, "and the header offers to put it back");
+
+    wheel(100);
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(1)",
+      "a notch back lands exactly on the fitted size, not near it"
+    );
+
+    for (let i = 0; i < 30; i++) wheel(100);
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(0.1)",
+      "and zooming out stops at a tenth rather than at nothing"
+    );
+
+    for (let i = 0; i < 60; i++) wheel(-100);
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(8)",
+      "while zooming in stops at eight — a ceiling Stash has not got, because " +
+        "past it there is no reading and no way back"
+    );
+
+    // One notch in from the ceiling, and then the drag. Read off the transform
+    // rather than assumed: what the wheel did is this test's subject too.
+    wheel(100);
+    const scale = /scale\((.*)\)$/.exec(transform())[1];
+    spread.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
+    );
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 140, clientY: 100 })
+    );
+    assert.strictEqual(
+      transform(),
+      "translate(40px, 0px) scale(" + scale + ")",
+      "a drag moves the pages by as much as the pointer moved"
+    );
+
+    // The far edge, which is as far as the pages can give: this screen is one page
+    // half the width of the box, scaled, so half of what it has beyond the box is
+    // the most it can be moved either way.
+    const edge = (Number(scale) * 500 - 800) / 2;
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 5000, clientY: 100 })
+    );
+    assert.strictEqual(
+      transform(),
+      "translate(" + edge + "px, 0px) scale(" + scale + ")",
+      "and a drag far past that lands exactly on the edge"
+    );
+
+    // Dragged again, from further away still: the same place, because it is the
+    // edge rather than however far the pointer was taken.
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 9000, clientY: 100 })
+    );
+    assert.strictEqual(
+      transform(),
+      "translate(" + edge + "px, 0px) scale(" + scale + ")",
+      "and no further: the pages cannot be pushed off the screen they are read on"
+    );
+
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    const before = drawn();
+    dom.click(spread.children[0].children[0], { offsetX: 400 });
+    assert.deepStrictEqual(
+      drawn(),
+      before,
+      "the release that ends a drag is not a click: the page does not turn"
+    );
+    assert.strictEqual(
+      transform(),
+      "translate(" + edge + "px, 0px) scale(" + scale + ")",
+      "and the pages stay where they were dragged to"
+    );
+
+    laidOut();
+    dom.click(spread.children[0].children[0], { offsetX: 400 });
+    assert.deepStrictEqual(
+      drawn(),
+      ["/image/402/image", "/image/403/image"],
+      "a click with no drag in front of it still turns the page"
+    );
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(" + scale + ")",
+      "and the next screen arrives centred, at the zoom the reader was reading at"
+    );
+
+    dom.click(zoomButton());
+    assert.strictEqual(
+      transform(),
+      "translate(0px, 0px) scale(1)",
+      "the header's reset puts the pages back to the fitted size"
+    );
+    assert.strictEqual(offered(), false, "and takes itself away again");
+
+    stopReader(box);
+  });
+
+  /**
+   * The same zoom, with no DOM in the way.
+   *
+   * Read off Stash's own source rather than invented: the tenth of a step, the floor
+   * at a tenth of the fit, and the snap to 1 that keeps a wheel that went out and
+   * came back from leaving a hair of zoom behind — which the header would then offer
+   * to reset, for a zoom nobody can see.
+   */
+  await runSection("the zoom's arithmetic, called on its own", () => {
+    assert.deepStrictEqual(
+      NR.fitView(),
+      { zoom: 1, x: 0, y: 0 },
+      "fitted is one, and the middle of the screen"
+    );
+    assert.deepStrictEqual(
+      NR.centred({ zoom: 2, x: 30, y: -40 }),
+      { zoom: 2, x: 0, y: 0 },
+      "a turn takes the pan away and keeps the zoom"
+    );
+    assert.strictEqual(NR.isZoomed(NR.fitView()), false);
+    assert.strictEqual(NR.isZoomed({ zoom: 1.1, x: 0, y: 0 }), true);
+
+    assert.strictEqual(
+      NR.zoomed(NR.fitView(), 1 + 0.01).zoom,
+      1,
+      "a hair off the fitted size is the fitted size"
+    );
+    assert.strictEqual(NR.zoomed(NR.fitView(), 1.1).zoom, 1.1);
+    assert.strictEqual(NR.zoomed(NR.fitView(), 0.0001).zoom, NR.VIEW_MIN_ZOOM);
+    assert.strictEqual(NR.zoomed(NR.fitView(), 1e6).zoom, NR.VIEW_MAX_ZOOM);
+
+    const pages = { width: 1000, height: 800 };
+    const box = { width: 800, height: 800 };
+
+    // At the fitted size the pages cannot be wider than the box they were fitted
+    // into — a pair is capped at half of it each — so there is nothing to pan, and
+    // the arithmetic says so rather than being told.
+    assert.deepStrictEqual(
+      NR.panned(NR.fitView(), 100, 100, { width: 600, height: 800 }, box),
+      { zoom: 1, x: 0, y: 0 },
+      "pages that fit inside their box have nowhere to be panned to"
+    );
+    assert.deepStrictEqual(
+      NR.panned({ zoom: 2, x: 0, y: 0 }, 9999, 9999, pages, box),
+      { zoom: 2, x: 600, y: 400 },
+      "and pages twice the size of it can be panned by half the difference, no more"
+    );
+    assert.deepStrictEqual(
+      NR.panned({ zoom: 2, x: 0, y: 0 }, -30, 0, pages, box),
+      { zoom: 2, x: -30, y: 0 },
+      "either way, from wherever they were"
+    );
+    assert.deepStrictEqual(
+      NR.panned(
+        { zoom: 2, x: 0, y: 0 },
+        10,
+        10,
+        { width: 200, height: 200 },
+        box
+      ),
+      { zoom: 2, x: 0, y: 0 },
+      "a page that is still narrower than the box stays in the middle of it"
+    );
+    assert.deepStrictEqual(
+      NR.panned(
+        { zoom: 2, x: 0, y: 0 },
+        50,
+        50,
+        { width: Number.NaN, height: Number.NaN },
+        { width: Number.NaN, height: Number.NaN }
+      ),
+      { zoom: 2, x: 0, y: 0 },
+      "and a box nothing has measured — no layout yet — leaves them there rather " +
+        "than at NaN"
+    );
+  });
+
+  /**
    * Paging past what the lightbox has loaded makes it fetch, and while it fetches it
    * shows a spinner *instead of* its header and its carousel. That is not a lightbox
    * this plugin cannot read — it is one that is busy — and reading it as the former is

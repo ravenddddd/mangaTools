@@ -335,6 +335,16 @@ function createDom() {
       if (!document.listeners[type]) document.listeners[type] = [];
       document.listeners[type].push(fn);
     },
+    // Taken off again by the plugin: a drag puts a move and a release on the document
+    // and takes them off when it ends. A document that could not forget them would
+    // hide a listener piling up on every drag.
+    removeEventListener(type, fn) {
+      const list = document.listeners[type];
+      if (!list) return;
+
+      const at = list.indexOf(fn);
+      if (at !== -1) list.splice(at, 1);
+    },
     /** Events the plugin dispatches land here: the test reads them back. */
     dispatchEvent(event) {
       event.target = document;

@@ -30,6 +30,22 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
+  /*
+   * A press on a page is the start of a pan or of a click, and a browser's own
+   * selection would be a third thing happening at the same time. The zoom and the
+   * pan themselves are a `transform` this rule says nothing about; the transform's
+   * origin is the element's middle, which is the default and the middle of the screen.
+   */
+  user-select: none;
+}
+
+/*
+ * While the pages are zoomed there is something to drag, and the pointer says so.
+ * The images keep the pointer Stash's own images have, which is the cursor a click
+ * that turns a page deserves.
+ */
+.manga-reader-spread.is-zoomed {
+  cursor: grab;
 }
 
 /*
@@ -64,6 +80,8 @@
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  /* The cursor a click that turns the page deserves, as Stash's own images have */
+  cursor: pointer;
 }
 
 /*

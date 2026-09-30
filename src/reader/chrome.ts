@@ -40,6 +40,14 @@ export const CLASS_OPTIONS_ANCHOR = "manga-reader-options-anchor";
 export const CLASS_CLOSE = "manga-reader-close";
 /** The fullscreen toggle, which Stash draws between the gear and the cross */
 export const CLASS_FULLSCREEN = "manga-reader-fullscreen";
+/** The zoom reset, which Stash draws only while its image is zoomed */
+export const CLASS_ZOOM = "manga-reader-zoom";
+/**
+ * The attribute that hides what this plugin stands in for, and the one thing the
+ * stylesheet knows about any of it: see the rule in mangaReader.css. The same
+ * attribute the chapters tab marks Stash's own Create button with.
+ */
+const HIDDEN = "data-manga-reader-hidden";
 export const CLASS_MENU = "manga-reader-menu";
 export const CLASS_MENU_BUTTON = "manga-reader-menu-button";
 export const CLASS_MENU_PANEL = "manga-reader-menu-panel";
@@ -71,6 +79,8 @@ export interface ChromeHandlers {
   onSetting(next: Partial<MangaReaderSettings>): void;
   /** The pairing shift, which belongs to the gallery rather than to the reader */
   onOffset(next: 0 | 1): void;
+  /** Back to the fitted size, from whatever the pages have been zoomed to */
+  onResetZoom(): void;
   /** Close, by Stash's own path */
   onClose(): void;
 }
@@ -89,6 +99,8 @@ export interface ChromeState {
   settings: MangaReaderSettings;
   /** The pairing shift for this gallery: 0, or 1 to pair everything one page over */
   offset: 0 | 1;
+  /** Whether the pages are zoomed, which is when there is a zoom to reset */
+  zoomed: boolean;
   locale: string | null;
   handlers: ChromeHandlers;
 }
@@ -162,6 +174,9 @@ export function ensureChrome(
     anchor.appendChild(panel("settings", "popover"));
     options.appendChild(anchor);
     right.appendChild(options);
+    // The zoom reset, drawn only while there is a zoom to reset — Stash's own
+    // condition, and its own button, in the place it puts it.
+    right.appendChild(zoomButton());
     // Fullscreen, if this browser has it at all — which is the condition Stash draws
     // its own under. It is asked for of the lightbox, so the pages are what fills the
     // screen, exactly as its button does.
@@ -256,6 +271,18 @@ function update(chrome: HTMLElement, state: ChromeState): void {
 
   chapterPanel.classList.toggle("show", openMenu === "chapters");
   settingsPanel.classList.toggle("show", openMenu === "settings");
+
+  // The zoom reset is drawn only while there is a zoom to reset. Set rather than
+  // toggled with a comparison, because an attribute write that changes nothing is
+  // still a write: the pass runs on every change the lightbox makes.
+  const zoom = chrome.querySelector("." + CLASS_ZOOM) as HTMLElement | null;
+  if (zoom) {
+    const hidden = zoom.getAttribute(HIDDEN) !== null;
+    if (hidden === state.zoomed) {
+      if (state.zoomed) zoom.removeAttribute(HIDDEN);
+      else zoom.setAttribute(HIDDEN, "");
+    }
+  }
 
   drawChapters(chapterPanel, state);
   drawSettings(settingsPanel, state);
@@ -527,6 +554,28 @@ function drawIcon(host: HTMLElement, name: string): void {
   if (!Icon || !icon || !render) return;
 
   render(api.React.createElement(Icon, { icon }), host);
+}
+
+/**
+ * Puts the pages back to the size they were drawn at.
+ *
+ * Drawn always and hidden by an attribute rather than added and removed: this header
+ * is built once and updated in place, and a button that comes and goes would mean
+ * two ways of building it. Stash's own appears and disappears with the zoom, which is
+ * the same thing seen from the outside — see the hidden rule in mangaReader.css.
+ */
+function zoomButton(): HTMLElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = CLASS_ICON_BUTTON + " " + CLASS_ZOOM;
+  button.title = "Reset zoom";
+  button.setAttribute(HIDDEN, "");
+  setIcon(button, "faSearchMinus");
+  button.addEventListener("click", () => {
+    openMenu = null;
+    latest?.handlers.onResetZoom();
+  });
+  return button;
 }
 
 /**

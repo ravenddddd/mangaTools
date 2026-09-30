@@ -59,6 +59,20 @@ import {
   lightboxOrder,
   pressEscape,
 } from "./stash-lightbox";
+import {
+  VIEW_MAX_ZOOM,
+  VIEW_MIN_ZOOM,
+  VIEW_PAN_STEP,
+  VIEW_SLOP,
+  VIEW_STEP,
+  type MangaReaderBox,
+  type MangaReaderView,
+  centred,
+  fitView,
+  isZoomed,
+  panned,
+  zoomed,
+} from "./zoom";
 
 /**
  * The three switches' words, in the interface's language.
@@ -71,6 +85,8 @@ import {
 
 /** A screen of one page, which the stylesheet lays out differently */
 const CLASS_SINGLE = "is-single";
+/** On the pages while they are zoomed: the one thing about a zoom the CSS can see */
+const CLASS_ZOOMED = "is-zoomed";
 
 /** Class on Stash's lightbox while this plugin is drawing inside it */
 const CLASS_ACTIVE = "manga-reader-active";
@@ -103,6 +119,15 @@ let settings: MangaReaderSettings = readSettings();
 /** The lightbox being worked in, and this plugin's container inside it */
 let root: Element | null = null;
 let container: HTMLElement | null = null;
+
+/**
+ * Where the pages are drawn: fitted, moved, and at what scale.
+ *
+ * The pan is per screen and the zoom is not — see `centred`, which is what a turn
+ * does to this. Reset when the lightbox closes, because the next gallery is not this
+ * one and opening it at the last one's zoom would be a surprise.
+ */
+let view: MangaReaderView = fitView();
 
 /**
  * The galleries whose pages are in hand, by id.
@@ -544,7 +569,13 @@ function chromeState(
     settings,
     offset,
     locale: language,
+    zoomed: isZoomed(view),
     handlers: {
+      onResetZoom: () => {
+        view = fitView();
+        applyView();
+        sync(lightbox);
+      },
       onChapter: (to: number) => {
         place = to;
         step();
@@ -631,6 +662,8 @@ function ensureContainer(lightbox: Element): void {
     container = document.createElement("div");
     container.className = CLASS_SPREAD;
     container.addEventListener("click", onSpreadClick);
+    container.addEventListener("wheel", onSpreadWheel);
+    container.addEventListener("mousedown", onSpreadPress);
   }
 
   // Stash's own layers above this one are positioned; this makes the display the
@@ -650,6 +683,19 @@ function ensureContainer(lightbox: Element): void {
 const REVEAL_BUDGET_MS = 300;
 
 NR.REVEAL_BUDGET_MS = REVEAL_BUDGET_MS;
+
+// The zoom's arithmetic, published the way the layout's and the chapters' are: it is
+// pure, it is where a bug would hide from a DOM test, and a test that can call it
+// directly is the cheaper way to pin it.
+NR.fitView = fitView;
+NR.centred = centred;
+NR.zoomed = zoomed;
+NR.panned = panned;
+NR.isZoomed = isZoomed;
+NR.VIEW_MIN_ZOOM = VIEW_MIN_ZOOM;
+NR.VIEW_MAX_ZOOM = VIEW_MAX_ZOOM;
+NR.VIEW_STEP = VIEW_STEP;
+NR.VIEW_SLOP = VIEW_SLOP;
 
 /**
  * Fades a screen in as it arrives.
@@ -740,6 +786,9 @@ function draw(screen: MangaReaderScreen, at: number): void {
     image.src = pageUrl(page);
     image.alt = String(screen.start + index + 1);
     image.decoding = "async";
+    // A browser's own drag of an image is a drag of the *file*, and it swallows the
+    // pointer moves a pan is made of. Stash's own images say the same.
+    image.draggable = false;
 
     box.appendChild(image);
     boxes.push(box);
@@ -759,6 +808,13 @@ function draw(screen: MangaReaderScreen, at: number): void {
     if (awaiting === at) awaiting = -1;
 
     container.textContent = "";
+    // Where the reader is looking, one screen on: the middle of it, at whatever
+    // zoom they were reading at. Stash does the same on its own image change, and
+    // resetting it here — with the screen rather than with the turn — covers the
+    // other ways a screen arrives: a chapter, a shift of the pairing, a re-lay.
+    view = centred(view);
+    applyView();
+
     container.classList.toggle(CLASS_SINGLE, screen.pages.length === 1);
     boxes.forEach((box) => {
       container?.appendChild(box);
@@ -852,6 +908,13 @@ function deactivate(): void {
     container.remove();
     container = null;
   }
+
+  // A new container is a new view — see ensureContainer, which is where it is made.
+  // This much is for the container that had one: the lightbox is gone and nothing
+  // should be waiting on its release.
+  view = fitView();
+  pressed = null;
+  dragged = false;
 
   // The header goes with the drawing, and the lightbox gets Stash's own back: the
   // class that hides its chrome is the one that carries this plugin's.
@@ -1126,6 +1189,14 @@ function onSpreadClick(event: Event): void {
   const lightbox = root;
   if (!lightbox || !container) return;
 
+  // A press that moved was a pan, and its release arrives here as a click because
+  // that is what a press and release on one element is. Turning the page as well
+  // would mean a drag always cost a page.
+  if (dragged) {
+    dragged = false;
+    return;
+  }
+
   const target = event.target as HTMLElement | null;
   if (target?.tagName !== "IMG") {
     event.stopPropagation();
@@ -1141,6 +1212,154 @@ function onSpreadClick(event: Event): void {
   const width = target.offsetWidth;
   const forward = !width || click.offsetX >= width / 2;
   if (turnBy(lightbox, forward ? 1 : -1)) event.stopPropagation();
+}
+
+/**
+ * The wheel: closer, or further away — and with shift held, up and down.
+ *
+ * Stash's own arrangement under its own default: `scrollMode` is Zoom, so an
+ * unshifted wheel zooms and a shifted one scrolls, and the step is the 10% its
+ * source uses. Ours zooms about the middle of the screen rather than about the
+ * pointer: the pages are fitted to a box, and what a reader means by "closer" is
+ * closer in the middle of what they are looking at.
+ *
+ * The carousel behind these pages is hidden rather than gone, and a hidden element
+ * is not a place a wheel event can land — so this is the only wheel in the lightbox,
+ * and there is nothing to stop from hearing it.
+ */
+function onSpreadWheel(event: Event): void {
+  if (!container) return;
+
+  const wheel = event as WheelEvent;
+  const box = boxOf(container);
+  const pages = contentOf(container);
+  const up = wheel.deltaY < 0;
+
+  view = wheel.shiftKey
+    ? panned(view, 0, up ? -VIEW_PAN_STEP : VIEW_PAN_STEP, pages, box)
+    : panned(zoomed(view, up ? VIEW_STEP : 1 / VIEW_STEP), 0, 0, pages, box);
+
+  applyView();
+  redrawChrome();
+}
+
+/**
+ * A press on the pages, which is either the start of a pan or the start of a click.
+ *
+ * Which of the two it was is decided on the way out — by how far the pointer
+ * travelled — so both are watched from here. The move and the release are on the
+ * document rather than on the pages: a drag that leaves the pages, or the lightbox,
+ * is still a drag, and it has to end somewhere.
+ */
+function onSpreadPress(event: Event): void {
+  const press = event as MouseEvent;
+  if (press.button !== 0) return;
+
+  pressed = { x: press.clientX, y: press.clientY, moved: false };
+  dragged = false;
+
+  document.addEventListener("mousemove", onSpreadMove);
+  document.addEventListener("mouseup", onSpreadRelease);
+}
+
+/** Where the pointer is, where it was, and whether that is far enough to be a drag */
+interface MangaReaderPress {
+  /** Where the press started: what says whether the pointer has travelled at all */
+  x: number;
+  y: number;
+  /** Whether it has travelled far enough to be a drag rather than a click */
+  moved: boolean;
+}
+
+let pressed: MangaReaderPress | null = null;
+
+/**
+ * Whether the press that just ended was a drag.
+ *
+ * Read by the click handler, which cannot tell: a press and a release on one element
+ * is a click whether or not the pointer went anywhere in between.
+ */
+let dragged = false;
+
+function onSpreadMove(event: Event): void {
+  if (!pressed || !container) return;
+
+  const move = event as MouseEvent;
+  const dx = move.clientX - pressed.x;
+  const dy = move.clientY - pressed.y;
+
+  if (!pressed.moved && Math.abs(dx) < VIEW_SLOP && Math.abs(dy) < VIEW_SLOP) {
+    return;
+  }
+
+  // From here on the press is a drag, and the pages follow the pointer: the
+  // distance moved *since the last event*, so that a long drag does not chase a
+  // single accumulated offset from where the press began.
+  pressed.moved = true;
+  pressed.x = move.clientX;
+  pressed.y = move.clientY;
+
+  view = panned(view, dx, dy, contentOf(container), boxOf(container));
+  applyView();
+}
+
+function onSpreadRelease(): void {
+  document.removeEventListener("mousemove", onSpreadMove);
+  document.removeEventListener("mouseup", onSpreadRelease);
+
+  if (pressed?.moved) dragged = true;
+  pressed = null;
+}
+
+/**
+ * Puts the view on the pages.
+ *
+ * The whole screen is scaled as one thing, because that is the unit this half
+ * reads in: a pair of pages zooms together, and the transform that does it is one
+ * line rather than one per image. `translate` first so the movement is in pixels of
+ * the screen rather than of the scaled pages.
+ */
+function applyView(): void {
+  if (!container) return;
+
+  container.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
+  container.classList.toggle(CLASS_ZOOMED, isZoomed(view));
+}
+
+/**
+ * How big the pages are drawn, which is what there is to pan: see panned.
+ *
+ * Measured on the images rather than on the boxes around them: an image is sized by
+ * its own ratio within the box it was given, and a box can be wider than the page in
+ * it — which would let the pan go further than the page has pixels for.
+ */
+function contentOf(host: HTMLElement): MangaReaderBox {
+  let width = 0;
+  let height = 0;
+
+  for (const node of Array.from(host.querySelectorAll("img"))) {
+    const image = node as HTMLElement;
+    width += image.offsetWidth || 0;
+    height = Math.max(height, image.offsetHeight || 0);
+  }
+
+  return { width, height };
+}
+
+/** How big the box the pages sit in is, which is what they are panned inside */
+function boxOf(host: HTMLElement): MangaReaderBox {
+  return { width: host.clientWidth || 0, height: host.clientHeight || 0 };
+}
+
+/**
+ * Draws the header again, because a zoom is a thing the header says something about.
+ *
+ * Through `sync` rather than at the header directly: it is the one path that decides
+ * what is drawn, it is cheap when nothing has changed, and a second way in would be a
+ * second set of conditions to keep in step with the first.
+ */
+function redrawChrome(): void {
+  if (root) sync(root);
 }
 
 /**

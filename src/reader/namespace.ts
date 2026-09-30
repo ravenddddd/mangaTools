@@ -15,6 +15,7 @@
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import type { LightboxImage } from "./stash-lightbox";
+import type { MangaReaderBox, MangaReaderView } from "./zoom";
 
 /**
  * The order the lightbox is showing its images in — see lightboxOrder in
@@ -167,6 +168,25 @@ export interface MangaReaderNamespace {
     pages: MangaReaderPage[]
   ): MangaReaderPlacedChapter[];
   screenAt(screens: MangaReaderScreen[], pageIndex: number): number;
+  /**
+   * The zoom and pan of the pages this half draws — see zoom.ts, which is where the
+   * arithmetic lives and why it is arithmetic rather than DOM work.
+   */
+  fitView(): MangaReaderView;
+  centred(view: MangaReaderView): MangaReaderView;
+  zoomed(view: MangaReaderView, factor: number): MangaReaderView;
+  panned(
+    view: MangaReaderView,
+    dx: number,
+    dy: number,
+    pages: MangaReaderBox,
+    box: MangaReaderBox
+  ): MangaReaderView;
+  isZoomed(view: MangaReaderView): boolean;
+  VIEW_MIN_ZOOM: number;
+  VIEW_MAX_ZOOM: number;
+  VIEW_STEP: number;
+  VIEW_SLOP: number;
   stepsToAdjacent(
     screens: MangaReaderScreen[],
     pageIndex: number,

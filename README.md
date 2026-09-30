@@ -668,6 +668,8 @@ While the switch is on, and while you are reading a **gallery**:
 | **The cover** | Stands alone. A cover is not the left half of anything |
 | **Arrows and chevrons** | Left and right move a *screen*, not a page — so a pair advances together. The keyboard arrows and Stash's own chevrons both go through the same turn |
 | **Clicks** | Clicking a page turns it, right half forward and left half back, exactly as Stash's own image click does. Clicking the space around the pages still closes the lightbox |
+| **Zoom** | The wheel, as in Stash's own lightbox: away from you to zoom in, towards you to zoom out, `Shift` to scroll up and down instead. A whole screen zooms at once, so a pair zooms together, and the header offers a reset while there is a zoom to put back |
+| **Pan** | Press and drag to move the pages, within what they can give — they stop at the edge of the screen rather than going over it. A drag never turns the page, and a click never moves it |
 | **Shift the pairing** | A second switch in the options menu, or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
 | **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. A slider in the options menu sets how long, down to 0 for none. Nothing is animated for a reader who has asked their system for less motion |
 | **Everything else** | Untouched: the nav strip, Escape, the slideshow, and the footer that names the image and links back to the gallery it came from. The header is this half's own — its counter counts in the order you are reading, which is the point of it — and its fullscreen button is Stash's own button in Stash's own place, because filling the screen is a thing about the screen and not about the page |
@@ -843,8 +845,15 @@ custom field puts a gallery back exactly where it was.
 
 ### What is not here yet
 
-- **No zoom or pan in spread mode.** Stash's zoom acts on the carousel, which is
-  hidden while this half draws. Pages are fitted to the screen and that is all.
+- **No pinch or touch panning.** The wheel and the mouse are back — Stash's own two
+  gestures, with Stash's own numbers — but a touchscreen's are not: no two-finger
+  pinch, and no dragging the pages with one finger. Stash's own lightbox has both.
+- **Stash's four image settings are not read.** Display mode, scale up to fit, reset
+  zoom on navigation and scroll mode are Stash's own options, and their defaults are
+  what this half does: fit to the screen, no scaling up, the position reset on every
+  screen and the zoom kept, and the wheel zooming rather than panning. Change one of
+  them in Stash's settings and this half will not follow; the options menu here has
+  its own three settings and no room for those.
 - **Two of the pairing rules are settings without a UI**: `coverAlone` and
   `detectSpreads` are stored and honoured, but the options menu offers only the
   mode, the fade and the shift. Both default to what a manga wants.
