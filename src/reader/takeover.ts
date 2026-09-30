@@ -31,6 +31,7 @@ import { NS } from "../tools/fields";
 import { bridged, installBridge, takeOver } from "./bridge";
 import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
+import { syncFooter } from "./footer";
 import {
   type MangaReaderChapter,
   chapterAt,
@@ -523,6 +524,16 @@ function sync(lightbox: Element): void {
   lightbox.classList.add(CLASS_TAKEOVER);
 
   const at = screenNow(gallery);
+
+  // The footer's own name for the page, which Stash cannot work out for itself: its
+  // render is of the place it mounted at, and this half is the only thing that knows
+  // where the reader is now. See footer.ts. Before the screen's own early return,
+  // because a footer left stale is stale whatever the screen is doing.
+  syncFooter(
+    lightbox,
+    at < 0 ? null : gallery.images[gallery.screens[at].start] || null
+  );
+
   if (at < 0) return;
 
   if (

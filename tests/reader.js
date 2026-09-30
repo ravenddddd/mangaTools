@@ -263,10 +263,13 @@ const page = (id, width = 1000, height = 1500) => ({ id, width, height });
 /** A page that spans two of them. */
 const wide = (id) => page(id, 2000, 1500);
 
-/** A page as Stash's GraphQL answers with it: a size inside `visual_files` */
+/**
+ * A page as Stash's GraphQL answers with it: a size inside `visual_files`, and the
+ * file's own path — which is what names a page that has no title.
+ */
 const image = (id, width, height) => ({
   id,
-  visual_files: [{ width, height }],
+  visual_files: [{ path: "/data/" + id + ".jpg", width, height }],
 });
 
 /**
@@ -372,6 +375,27 @@ function buildLightbox(current = 1, total = 5, ids = null) {
 
   const footer = dom.makeElement("div");
   footer.className = "Lightbox-footer";
+
+  // What the footer names the image and links to, as Stash renders it: built once,
+  // from the *index Stash mounted with*, and never again — which is the whole reason
+  // this plugin has to correct it. See footer.ts.
+  const footerCenter = dom.makeElement("div");
+  footerCenter.className = "Lightbox-footer-center";
+  const imageLink = dom.makeElement("a");
+  imageLink.className = "image-link";
+  // Named and pointed at the image Stash mounted on, and then never rewritten:
+  // React renders this from its own index, which this plugin stops moving.
+  const opening = (ids || [])[current - 1];
+  imageLink.textContent = opening ? opening + ".jpg" : "";
+  if (opening) imageLink.setAttribute("href", "/images/" + opening);
+  const galleryLink = dom.makeElement("a");
+  galleryLink.className = "image-gallery-link";
+  // Stash's own, and right as it stands: there is one gallery behind the lightbox and
+  // the reader never leaves it.
+  galleryLink.textContent = "Gallery";
+  footerCenter.appendChild(imageLink);
+  footerCenter.appendChild(galleryLink);
+  footer.appendChild(footerCenter);
 
   // The nav strip: one thumbnail per image the lightbox is holding, and clicking
   // one is Stash's own way of going straight to it. Built the way Stash builds it
@@ -2414,6 +2438,66 @@ async function main() {
       stopReader(box);
     }
   );
+
+  /**
+   * The footer names the page the reader is on.
+   *
+   * Stash renders its footer from *its* place in the lightbox, and this half never
+   * moves that place: a turn is the reader's own arithmetic, and the carousel is left
+   * where the lightbox opened, hidden, holding the index it mounted with. So the
+   * footer named the image the reader opened on — right on the first page and never
+   * again. What is corrected is the image link, in place; see footer.ts.
+   */
+  await runSection("the footer names the page the reader is on", async () => {
+    const { box } = await startReader({
+      galleryId: "51",
+      on: true,
+      total: 2,
+      search: "?sortby=title&perPage=500",
+    });
+
+    const center = box.lightbox.querySelector(".Lightbox-footer-center");
+    const link = center.querySelector(".image-link");
+    const gallery = center.querySelector(".image-gallery-link");
+
+    assert.strictEqual(
+      link.textContent,
+      "第二話",
+      "the page the lightbox opened on is the one the footer names"
+    );
+    assert.strictEqual(link.getAttribute("href"), "/images/901");
+
+    // Stash's own gallery link, left alone: one gallery behind the lightbox, and the
+    // reader never leaves it — so there is nothing there to correct.
+    assert.strictEqual(
+      gallery.textContent,
+      "Gallery",
+      "and the gallery link is Stash's own, untouched"
+    );
+
+    // A turn, and the name follows it — the title where there is one, and the file's
+    // name where there is not, which is the rule Stash's own footer names a page by.
+    dom.click(box.navRight);
+    assert.deepStrictEqual(drawn(), ["/image/902/image"]);
+    assert.strictEqual(
+      link.textContent,
+      "003.jpg",
+      "the next page is named by its file, since it has no title"
+    );
+    assert.strictEqual(link.getAttribute("href"), "/images/902");
+
+    // And the click: a router link goes where it was *rendered* to go, so the
+    // corrected href would mean nothing if the router still heard the click.
+    const click = dom.click(link);
+    assert.strictEqual(
+      click.propagationStopped,
+      true,
+      "a click on the footer's link is kept from the router, so the browser follows " +
+        "the corrected href rather than the one Stash rendered"
+    );
+
+    stopReader(box);
+  });
 
   await runSection(
     "a carousel showing images this plugin never read",
