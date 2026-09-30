@@ -25,13 +25,16 @@
  * images and chapters, at the index the chapter begins at. Which also means the
  * lightbox a chapter opens is the one the reader will be drawing in.
  */
+import { stringFor } from "../i18n";
 import { NS } from "../tools/fields";
 import { bridged, takeOver } from "./bridge";
 import {
+  type MangaReaderChapter,
   type MangaReaderPlacedChapter,
   chaptersFromStash,
   parseChapters,
   placeChapters,
+  serializeChapters,
 } from "./chapters";
 import {
   type LightboxImage,
@@ -46,6 +49,8 @@ import {
 const SEL_PANEL = ".container";
 /** Marks a node as Stash's, so it is hidden once and found again on the next pass */
 const HIDDEN = "data-manga-reader-hidden";
+/** The import control, found again by this id when the page is drawn over */
+const IMPORT_ID = "manga-reader-chapters-import";
 
 /** What was rendered, so a pass over the document only rebuilds when it differs */
 let renderedFor = "";
@@ -54,7 +59,25 @@ let inHand: {
   id: string;
   images: LightboxImage[];
   chapters: MangaReaderPlacedChapter[];
+  /** What Stash's own rows translate to — what an import would write */
+  importable: MangaReaderChapter[];
+  /** Whether this gallery already has a list of this plugin's own */
+  own: boolean;
+  /** The interface language, for the control's wording */
+  locale: string | null;
 } | null = null;
+
+/** The import control and the button in it, kept between passes */
+let control: HTMLElement | null = null;
+let controlButton: HTMLButtonElement | null = null;
+/** What that button would import, as of the last pass that drew it */
+let controlFor: {
+  id: string;
+  importable: MangaReaderChapter[];
+  own: boolean;
+} | null = null;
+/** A write is in flight: the button says so and refuses a second click */
+let busy = false;
 
 /**
  * One pass over the document: is a Chapters tab on screen, and does it say what
@@ -96,8 +119,21 @@ export function syncChaptersTab(): void {
         // Another gallery, or another page, while that was in flight.
         if (galleryIdFromPath(window.location.pathname) !== id) return;
 
-        const chapters = placeChapters(chaptersOf(answer), answer.pages);
-        inHand = { id, images: answer.images, chapters };
+        const pageIds = answer.pages.map((page) => page.id);
+        const own = chaptersOf(answer);
+
+        inHand = {
+          id,
+          images: answer.images,
+          chapters: placeChapters(own.chapters, answer.pages),
+          // The list an import would write, which is the same translation the tab
+          // is showing for a gallery that has no list of this plugin's own.
+          // Computed from the rows rather than from what is on screen: it is what
+          // would be *written*, so it cannot depend on how the screen is ordered.
+          importable: chaptersFromStash(answer.stashChapters, pageIds),
+          own: own.own,
+          locale: answer.language,
+        };
         syncChaptersTab();
       })
       .catch((e) => {
@@ -121,16 +157,24 @@ function chaptersOf(answer: {
   customFields: unknown;
   stashChapters: { title?: string; image_index?: number }[];
   pages: { id: string }[];
-}): { title: string; images: string[] }[] {
+}): { chapters: MangaReaderChapter[]; own: boolean } {
   const own = parseChapters(
     NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null
   );
-  if (own) return own;
 
-  return chaptersFromStash(
-    answer.stashChapters,
-    answer.pages.map((page) => page.id)
-  );
+  // A list this plugin wrote may be empty on purpose — an empty array is a gallery
+  // whose chapters were cleared — and it wins over Stash's rows exactly as a full
+  // one does. Only *null* (no field, or a value this build cannot read) falls
+  // through to Stash's numbers.
+  if (own) return { chapters: own, own: true };
+
+  return {
+    chapters: chaptersFromStash(
+      answer.stashChapters,
+      answer.pages.map((page) => page.id)
+    ),
+    own: false,
+  };
 }
 
 /**
@@ -179,10 +223,23 @@ function render(
     id: string;
     images: LightboxImage[];
     chapters: MangaReaderPlacedChapter[];
+    importable: MangaReaderChapter[];
+    own: boolean;
+    locale: string | null;
   }
 ): void {
+  // Everything the render reads is in the key, the import's state included. The rows
+  // alone would not be enough: an import writes the *translation* of Stash's own
+  // rows, so the rows before it and after it are identical, and a key made of them
+  // would match and return early with the button still offering the import that has
+  // just happened. What forces that pass today is `busy`, which flips on the way
+  // through a write; `own` is here so that the key says what this render actually
+  // depends on rather than only what happens to change.
   const key = [
     gallery.id,
+    gallery.own ? "own" : "none",
+    String(gallery.importable.length),
+    busy ? "busy" : "idle",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
   if (key === renderedFor && panel.childElementCount > 0) return;
@@ -197,6 +254,143 @@ function render(
   for (const chapter of gallery.chapters) {
     panel.appendChild(row(gallery, chapter));
   }
+
+  drawImport(panel, gallery);
+}
+
+/**
+ * The import control: a box of this plugin's own under the list, and the button in
+ * it.
+ *
+ * It sits **after** Stash's container rather than inside it or between it and
+ * Stash's own button, and both of those other places are spoken for: `findPanel`
+ * knows the panel by the button immediately before it, so a control there would be
+ * taken for Stash's own and hidden by the next pass; and the panel's children are
+ * its rows, so a control in there would be drawn as one and read as one. After it,
+ * neither lookup has anything to say about it.
+ *
+ * The button is built once and updated after, and what it would import lives in
+ * `controlFor` rather than in the click handler's closure: the control outlives the
+ * pass that made it, and a handler closed over that pass's gallery would offer to
+ * import the previous gallery's chapters.
+ */
+function drawImport(
+  panel: HTMLElement,
+  gallery: {
+    id: string;
+    importable: MangaReaderChapter[];
+    own: boolean;
+    locale: string | null;
+  }
+): void {
+  // Nothing to bring over: a gallery Stash has no chapters for, or one whose rows
+  // all point past the end of its images. Either way an import would write nothing,
+  // and a write to no purpose is worse than no button.
+  if (gallery.importable.length === 0) {
+    control?.remove();
+    control = null;
+    controlButton = null;
+    controlFor = null;
+    return;
+  }
+
+  if (!control || !controlButton) {
+    controlButton = document.createElement("button");
+    controlButton.type = "button";
+    controlButton.className = "btn btn-secondary btn-sm";
+    controlButton.addEventListener("click", importChapters);
+
+    control = document.createElement("div");
+    control.id = IMPORT_ID;
+    control.className = "manga-reader-chapters-import";
+    control.appendChild(controlButton);
+  }
+
+  controlFor = {
+    id: gallery.id,
+    importable: gallery.importable,
+    own: gallery.own,
+  };
+
+  const place = panel.parentNode;
+  if (place && control.parentNode !== place) {
+    place.insertBefore(control, panel.nextElementSibling);
+  }
+
+  const wording = busy
+    ? "mangaReader.importingChapters"
+    : gallery.own
+      ? "mangaReader.reimportChapters"
+      : "mangaReader.importChapters";
+  const text = stringFor(gallery.locale, wording);
+  if (controlButton.textContent !== text) controlButton.textContent = text;
+  controlButton.disabled = busy;
+}
+
+/**
+ * Writes Stash's chapters into this plugin's own field.
+ *
+ * The write is the tools half's — the same quiet mutation the mark uses, with the
+ * store and Stash's own form told first — and this half hands over a *string*: the
+ * format is its own, and the half that writes does not have to know what a chapter
+ * is. Nothing is read back afterwards: what was written is the value in hand, so
+ * this gallery has a list of its own from here on, which is a fact rather than a
+ * guess. The server is asked again the next time the tab is opened, which is where
+ * the list on screen was read from.
+ */
+function importChapters(): void {
+  const target = controlFor;
+  if (!target || busy) return;
+
+  // The tools half publishes the write. It cannot be *hidden* for the case where
+  // that half did not start: whether this gallery is manga comes from the same
+  // half, so the tab this control is in would not exist either — the check is a
+  // guard against the impossible, and it says so rather than throwing.
+  if (typeof NS.importChapters !== "function") {
+    console.error(
+      "[mangaReader] the tools half is not running, so this gallery's chapters " +
+        "cannot be written"
+    );
+    return;
+  }
+
+  busy = true;
+  redraw();
+
+  NS.importChapters(target.id, serializeChapters(target.importable)).then(
+    () => {
+      busy = false;
+      if (inHand?.id === target.id) {
+        inHand.own = true;
+        inHand.importable = target.importable;
+      }
+
+      redraw();
+    },
+    (e: unknown) => {
+      busy = false;
+      console.error(
+        "[mangaReader] could not import this gallery's chapters:",
+        e
+      );
+      redraw();
+    }
+  );
+}
+
+/**
+ * Draws the tab again from the gallery in hand.
+ *
+ * The panel is not looked up again, and cannot be: the first pass hides Stash's own
+ * button, which is the shape `findPanel` recognises the panel by, so from then on
+ * it refuses the panel it already knows. The control is a sibling of that panel, so
+ * the panel is the element before it.
+ */
+function redraw(): void {
+  if (!inHand) return;
+
+  const panel = control?.previousElementSibling;
+  if (panel) render(panel as HTMLElement, inHand);
 }
 
 /** One chapter, drawn the way Stash draws one */
@@ -243,4 +437,7 @@ function row(
 export function forgetChaptersTab(): void {
   inHand = null;
   renderedFor = "";
+  control = null;
+  controlButton = null;
+  controlFor = null;
 }

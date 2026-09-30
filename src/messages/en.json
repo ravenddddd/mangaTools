@@ -3,6 +3,9 @@
   "mangaReader.doublePage": "Double page",
   "mangaReader.fade": "Fade in",
   "mangaReader.offset": "Shift the pairing by one page",
+  "mangaReader.importChapters": "Import Stash's chapters",
+  "mangaReader.reimportChapters": "Re-import Stash's chapters",
+  "mangaReader.importingChapters": "Importing…",
 
   "mangaTools.select.placeholder": "Select language…",
 

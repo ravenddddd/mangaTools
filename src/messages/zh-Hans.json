@@ -3,6 +3,9 @@
   "mangaReader.doublePage": "双页阅读",
   "mangaReader.fade": "淡入",
   "mangaReader.offset": "配对偏移一格",
+  "mangaReader.importChapters": "导入 Stash 的章节",
+  "mangaReader.reimportChapters": "重新导入 Stash 的章节",
+  "mangaReader.importingChapters": "正在导入…",
 
   "mangaTools.select.placeholder": "选择语言…",
 

@@ -102,9 +102,9 @@ const client = {
 
     return Promise.resolve(answer);
   },
-  // Stash's writes, recorded rather than performed: this plugin is not allowed to
-  // make any — see the note on never touching Stash's own data — and a stub that
-  // simply had no mutate would hide a write that tried.
+  // Writes, recorded rather than performed. This plugin does write — its own custom
+  // fields, never Stash's own data — so what a test reads here is which mutation went
+  // out and with what in it. Never Stash's rows: see the note on the chapter field.
   mutate: (options) => {
     mutations.push(options);
     return Promise.resolve({ data: {} });
@@ -747,7 +747,44 @@ const STASH_CHAPTERS = {
   },
 };
 
-dom.window.location.pathname = "/";
+/**
+ * A gallery that cleared its chapters on purpose, and still has Stash's rows.
+ *
+ * The empty array is the whole point of it: a list this plugin wrote may be empty
+ * — that is what "these chapters were removed" looks like — and it is read as a
+ * list that is *there*. A tab that treated it as absent would offer to import over
+ * the gallery's own answer without asking, which is the one thing an import must
+ * not do.
+ */
+const CLEARED_CHAPTERS = {
+  images: numbered(CHAPTERS_VIEW),
+  pathImages: numbered(CHAPTERS_PATH),
+  gallery: {
+    id: "35",
+    custom_fields: {
+      "plugin.mangaTools.chapters": JSON.stringify({ v: 1, chapters: [] }),
+    },
+    chapters: [{ title: "第一話", image_index: 1 }],
+  },
+};
+
+/**
+ * And one whose only Stash chapter points past the end of its own images.
+ *
+ * Translating it gives nothing — the row is dropped rather than clamped — so there
+ * is nothing to bring over even though Stash has a chapter to show. Which is the
+ * difference between "Stash has chapters" and "Stash has chapters this gallery can
+ * use", and only the second is a reason to offer an import.
+ */
+const OUT_OF_RANGE_CHAPTERS = {
+  images: numbered(CHAPTERS_VIEW),
+  pathImages: numbered(CHAPTERS_PATH),
+  gallery: {
+    id: "37",
+    custom_fields: {},
+    chapters: [{ title: "gone", image_index: 99 }],
+  },
+};
 
 // In place before the bundle loads, not merely before the sections run: the tools
 // half's first refresh happens as it loads, and that refresh is what tells the reader
@@ -766,6 +803,8 @@ state.galleries["22"] = ORDER_GALLERY;
 state.galleries["23"] = ORDER_GALLERY;
 state.galleries["31"] = OWN_CHAPTERS;
 state.galleries["32"] = STASH_CHAPTERS;
+state.galleries["35"] = CLEARED_CHAPTERS;
+state.galleries["37"] = OUT_OF_RANGE_CHAPTERS;
 /** Two named images, for the fields Stash's lightbox names an image by */
 const NAMED_GALLERY = {
   images: [
@@ -4083,6 +4122,148 @@ async function main() {
       );
 
       stopTab(tab);
+    }
+  );
+
+  /**
+   * The import: Stash's chapters copied into this plugin's own field.
+   *
+   * The field the reader prefers and nothing has ever written, and this is the only
+   * thing that fills it. It lives in the tab because the tab is where the chapters
+   * are read — and because the fetch it already makes is the translation's own
+   * input: it asks for *path* order, so the ids Stash's numbers count against are
+   * the ones in hand, at no extra cost.
+   */
+  await runSection(
+    "the chapters tab offers Stash's chapters for import",
+    async () => {
+      mountBridge();
+      const at = mutations.length;
+      dom.window.location.pathname = "/galleries/32";
+      const tab = buildChaptersTab([
+        { title: "第一話", image_index: 1 },
+        { title: "第二話", image_index: 5 },
+      ]);
+
+      dom.flush();
+      await settle();
+
+      const control = dom.body.querySelector("#manga-reader-chapters-import");
+      assert.ok(control, "a gallery on Stash's own rows is offered the import");
+      assert.strictEqual(
+        control.previousElementSibling,
+        tab.container,
+        "and the offer sits after the list, not in it and not between it and " +
+          "Stash's own button"
+      );
+      assert.strictEqual(
+        tab.container.previousElementSibling,
+        tab.button,
+        "which is the shape the panel is found by, so it has to still hold"
+      );
+
+      const offer = control.children[0];
+      assert.strictEqual(offer.tagName, "BUTTON");
+      assert.strictEqual(
+        offer.type,
+        "button",
+        "a button in Stash's own form that does not say so is a button that submits it"
+      );
+      assert.strictEqual(
+        offer.textContent,
+        "Import Stash's chapters",
+        "and it says what it would do"
+      );
+      assert.deepStrictEqual(
+        mutations.slice(at),
+        [],
+        "offering is not doing: nothing is written until it is clicked"
+      );
+
+      dom.click(offer);
+      await settle();
+
+      assert.strictEqual(mutations.length - at, 1, "clicking imports, once");
+      assert.deepStrictEqual(
+        mutations[at].variables,
+        {
+          input: {
+            id: "32",
+            custom_fields: {
+              partial: {
+                "plugin.mangaTools.chapters":
+                  '{"v":1,"chapters":[{"title":"第一話","images":["708","707","706","705"]},' +
+                  '{"title":"第二話","images":["704","703","702","701"]}]}',
+              },
+            },
+          },
+        },
+        "Stash's numbers, expanded against path order and written as this plugin's " +
+          "own list — ids rather than indices, which is the whole point of the move"
+      );
+      assert.strictEqual(
+        dom.body.querySelector("#manga-reader-chapters-import").children[0]
+          .textContent,
+        "Re-import Stash's chapters",
+        "and the offer changes: this gallery has a list of this plugin's own now, " +
+          "so writing over it is a different thing to ask for"
+      );
+
+      stopTab(tab);
+    }
+  );
+
+  await runSection(
+    "and offers nothing when there is nothing to bring over",
+    async () => {
+      mountBridge();
+
+      // A gallery reading from its own list already, with no rows of Stash's to bring
+      // over: there is nothing an import would write.
+      dom.window.location.pathname = "/galleries/31";
+      const own = buildChaptersTab([]);
+      dom.flush();
+      await settle();
+
+      assert.strictEqual(
+        dom.body.querySelector("#manga-reader-chapters-import") === null,
+        true,
+        "a gallery with no rows of Stash's is offered nothing"
+      );
+      stopTab(own);
+
+      // A cleared list is a list. It says re-import — the same as any other gallery
+      // that has one of this plugin's own — and never "import", which would be an
+      // offer to write over an answer without saying so.
+      dom.window.location.pathname = "/galleries/35";
+      const cleared = buildChaptersTab([{ title: "第一話", image_index: 1 }]);
+      dom.flush();
+      await settle();
+
+      const control = dom.body.querySelector("#manga-reader-chapters-import");
+      assert.ok(control, "a gallery whose own list is empty still has one");
+      assert.strictEqual(
+        control.children[0].textContent,
+        "Re-import Stash's chapters",
+        "and it is the re-import offer: an empty list is a gallery whose chapters " +
+          "were cleared, not one that has none"
+      );
+      stopTab(cleared);
+
+      // Rows that all point past the end of the gallery: Stash has a chapter, and this
+      // gallery can use none of it, so there is nothing to write.
+      dom.window.location.pathname = "/galleries/37";
+      const past = buildChaptersTab([{ title: "gone", image_index: 99 }]);
+      dom.flush();
+      await settle();
+
+      assert.strictEqual(
+        dom.body.querySelector("#manga-reader-chapters-import") === null,
+        true,
+        "and neither is one offered an import of nothing, which would write an empty " +
+          "list over whatever it had"
+      );
+      stopTab(past);
     }
   );
 

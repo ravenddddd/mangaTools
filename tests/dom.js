@@ -139,6 +139,14 @@ function makeElement(tagName) {
       return at > 0 ? el.parentNode.children[at - 1] : null;
     },
 
+    /** Its mirror, for the nodes the plugin puts *after* one it found */
+    get nextElementSibling() {
+      if (!el.parentNode) return null;
+      const at = el.parentNode.children.indexOf(el);
+      const next = el.parentNode.children[at + 1];
+      return next || null;
+    },
+
     /** Whether the node is this element or below it — how a menu knows a click was inside it */
     contains(node) {
       for (let at = node; at; at = at.parentNode) {
