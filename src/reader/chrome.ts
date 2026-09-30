@@ -188,6 +188,14 @@ export function ensureChrome(
     // its own: that group is what holds the end of the row.
     right.appendChild(closeButton());
     chrome.appendChild(right);
+
+    // A menu is closed by anything that is not it. Stash's own options popover closes
+    // this way — `rootClose` — and a menu that only closes by pressing its own button
+    // again is a menu a reader ends up reading past.
+    //
+    // On the lightbox rather than on the document: one listener per header, taken away
+    // with the lightbox it belongs to, and no chance of it outliving one.
+    lightbox.addEventListener("click", onLightboxClick);
   }
 
   chromeNode = chrome;
@@ -199,7 +207,20 @@ export function ensureChrome(
 export function removeChrome(lightbox: Element): void {
   const chrome = lightbox.querySelector("." + CLASS_CHROME);
   if (chrome) chrome.remove();
+  lightbox.removeEventListener("click", onLightboxClick);
   if (chrome === chromeNode) chromeNode = null;
+}
+
+/**
+ * A click anywhere in the lightbox, which puts away whichever menu is open — unless
+ * the click was inside the header, where the menus and their buttons are.
+ */
+function onLightboxClick(event: Event): void {
+  if (openMenu === null) return;
+  if (chromeNode?.contains(event.target as Node)) return;
+
+  openMenu = null;
+  redraw();
 }
 
 /** The state the buttons read when they are pressed, which is the last one drawn */

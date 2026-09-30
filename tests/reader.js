@@ -2706,6 +2706,26 @@ async function main() {
       "and pressing it again puts the menu away"
     );
 
+    // Anything that is not the menu closes it — Stash's own options popover closes
+    // this way, and a menu that only its own button can put away is one a reader ends
+    // up reading past.
+    // The footer, which is Stash's own markup with no handler of its own: a click
+    // there reaches the lightbox and nothing else, which is the case this is about.
+    // (A click on a page reaches it too, and turns the page on the way.)
+    dom.click(toggle("chapters"));
+    assert.strictEqual(menu("chapters").classList.contains("show"), true);
+    dom.click(box.lightbox.querySelector(".Lightbox-footer"));
+    assert.strictEqual(
+      menu("chapters").classList.contains("show"),
+      false,
+      "and a click anywhere else in the lightbox puts it away"
+    );
+    assert.strictEqual(
+      toggle("chapters").getAttribute("aria-expanded"),
+      "false",
+      "with the button saying so"
+    );
+
     stopReader(box);
   });
 
