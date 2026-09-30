@@ -2809,17 +2809,14 @@ async function main() {
         dom.makeEvent("wheel", Object.assign({ deltaY }, init))
       );
 
-    // What the browser would report for the pages and for the box they sit in: the
-    // two sizes a pan is measured against. The test world has no layout, so a test
-    // that means to pan has to say how big things are — and it is the images' own
-    // sizes that count, since a page can be narrower than the box around it.
+    // What the browser would report for a page, which is what says which half of it
+    // a click landed on. The test world has no layout, so a test that means to click
+    // a page has to say how wide it is.
     const laidOut = () => {
       for (const page of spread.children) {
         page.children[0].offsetWidth = 500;
         page.children[0].offsetHeight = 800;
       }
-      spread.clientWidth = 800;
-      spread.clientHeight = 800;
     };
 
     laidOut();
@@ -2884,30 +2881,17 @@ async function main() {
       "a drag moves the pages by as much as the pointer moved"
     );
 
-    // The far edge, which is as far as the pages can give: this screen is one page
-    // half the width of the box, scaled, so half of what it has beyond the box is
-    // the most it can be moved either way.
-    const edge = (Number(scale) * 500 - 800) / 2;
+    // And on, past the edge of the screen: Stash's own image follows the pointer
+    // wherever it goes, and what brings it back is the next image rather than a stop
+    // at the border.
     dom.document.dispatch(
       "mousemove",
       dom.makeEvent("mousemove", { clientX: 5000, clientY: 100 })
     );
     assert.strictEqual(
       transform(),
-      "translate(" + edge + "px, 0px) scale(" + scale + ")",
-      "and a drag far past that lands exactly on the edge"
-    );
-
-    // Dragged again, from further away still: the same place, because it is the
-    // edge rather than however far the pointer was taken.
-    dom.document.dispatch(
-      "mousemove",
-      dom.makeEvent("mousemove", { clientX: 9000, clientY: 100 })
-    );
-    assert.strictEqual(
-      transform(),
-      "translate(" + edge + "px, 0px) scale(" + scale + ")",
-      "and no further: the pages cannot be pushed off the screen they are read on"
+      "translate(4900px, 0px) scale(" + scale + ")",
+      "a drag carries on past the edge of the screen, as Stash's own does"
     );
 
     dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
@@ -2920,8 +2904,32 @@ async function main() {
     );
     assert.strictEqual(
       transform(),
-      "translate(" + edge + "px, 0px) scale(" + scale + ")",
+      "translate(4900px, 0px) scale(" + scale + ")",
       "and the pages stay where they were dragged to"
+    );
+
+    // A press that stayed put but lasted: also not a click. Stash's own other half
+    // of the test, and the reason a reader who pressed and thought better of it is
+    // not sent a page on.
+    spread.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+        timeStamp: 0,
+      })
+    );
+    dom.document.dispatch(
+      "mouseup",
+      dom.makeEvent("mouseup", { timeStamp: NR.VIEW_CLICK_MS + 1 })
+    );
+    dom.click(spread.children[0].children[0], { offsetX: 400 });
+    assert.deepStrictEqual(
+      drawn(),
+      before,
+      "a press that lasted longer than a click is not one, even if the pointer " +
+        "never moved"
     );
 
     laidOut();
@@ -2979,49 +2987,24 @@ async function main() {
     assert.strictEqual(NR.zoomed(NR.fitView(), 0.0001).zoom, NR.VIEW_MIN_ZOOM);
     assert.strictEqual(NR.zoomed(NR.fitView(), 1e6).zoom, NR.VIEW_MAX_ZOOM);
 
-    const pages = { width: 1000, height: 800 };
-    const box = { width: 800, height: 800 };
-
-    // At the fitted size the pages cannot be wider than the box they were fitted
-    // into — a pair is capped at half of it each — so there is nothing to pan, and
-    // the arithmetic says so rather than being told.
+    // The pan is where the pointer took the pages and nothing else: no bounds, in
+    // either direction, at the fitted size or past the edge. Stash's own drag is the
+    // same, and the next screen is what puts them back in the middle.
     assert.deepStrictEqual(
-      NR.panned(NR.fitView(), 100, 100, { width: 600, height: 800 }, box),
-      { zoom: 1, x: 0, y: 0 },
-      "pages that fit inside their box have nowhere to be panned to"
+      NR.panned(NR.fitView(), 100, 100),
+      { zoom: 1, x: 100, y: 100 },
+      "a fitted page follows the pointer as readily as a zoomed one does"
     );
     assert.deepStrictEqual(
-      NR.panned({ zoom: 2, x: 0, y: 0 }, 9999, 9999, pages, box),
-      { zoom: 2, x: 600, y: 400 },
-      "and pages twice the size of it can be panned by half the difference, no more"
+      NR.panned({ zoom: 2, x: 40, y: 0 }, -30, 25),
+      { zoom: 2, x: 10, y: 25 },
+      "and from wherever it already was"
     );
     assert.deepStrictEqual(
-      NR.panned({ zoom: 2, x: 0, y: 0 }, -30, 0, pages, box),
-      { zoom: 2, x: -30, y: 0 },
-      "either way, from wherever they were"
-    );
-    assert.deepStrictEqual(
-      NR.panned(
-        { zoom: 2, x: 0, y: 0 },
-        10,
-        10,
-        { width: 200, height: 200 },
-        box
-      ),
-      { zoom: 2, x: 0, y: 0 },
-      "a page that is still narrower than the box stays in the middle of it"
-    );
-    assert.deepStrictEqual(
-      NR.panned(
-        { zoom: 2, x: 0, y: 0 },
-        50,
-        50,
-        { width: Number.NaN, height: Number.NaN },
-        { width: Number.NaN, height: Number.NaN }
-      ),
-      { zoom: 2, x: 0, y: 0 },
-      "and a box nothing has measured — no layout yet — leaves them there rather " +
-        "than at NaN"
+      NR.panned({ zoom: 2, x: 0, y: 0 }, 9999, -9999),
+      { zoom: 2, x: 9999, y: -9999 },
+      "however far that is: past the edge of the screen is still somewhere a " +
+        "reader meant to go, and Stash does not stop them either"
     );
   });
 

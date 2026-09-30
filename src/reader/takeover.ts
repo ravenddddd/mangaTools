@@ -62,12 +62,11 @@ import {
   pressEscape,
 } from "./stash-lightbox";
 import {
+  VIEW_CLICK_MS,
   VIEW_MAX_ZOOM,
   VIEW_MIN_ZOOM,
   VIEW_PAN_STEP,
-  VIEW_SLOP,
   VIEW_STEP,
-  type MangaReaderBox,
   type MangaReaderView,
   centred,
   fitView,
@@ -697,7 +696,7 @@ NR.isZoomed = isZoomed;
 NR.VIEW_MIN_ZOOM = VIEW_MIN_ZOOM;
 NR.VIEW_MAX_ZOOM = VIEW_MAX_ZOOM;
 NR.VIEW_STEP = VIEW_STEP;
-NR.VIEW_SLOP = VIEW_SLOP;
+NR.VIEW_CLICK_MS = VIEW_CLICK_MS;
 
 /**
  * Fades a screen in as it arrives.
@@ -916,7 +915,7 @@ function deactivate(): void {
   // should be waiting on its release.
   view = fitView();
   pressed = null;
-  dragged = false;
+  held = false;
 
   // The header goes with the drawing, and the lightbox gets Stash's own back: the
   // class that hides its chrome is the one that carries this plugin's.
@@ -1193,11 +1192,12 @@ function onSpreadClick(event: Event): void {
   const lightbox = root;
   if (!lightbox || !container) return;
 
-  // A press that moved was a pan, and its release arrives here as a click because
-  // that is what a press and release on one element is. Turning the page as well
-  // would mean a drag always cost a page.
-  if (dragged) {
-    dragged = false;
+  // The release behind this click was not one of Stash's clicks — it was a pan, or a
+  // press that lasted — and a press and a release on one element is a click whether
+  // or not either of those is true. Turning the page as well would mean every drag
+  // cost a page. See onSpreadRelease.
+  if (held) {
+    held = false;
     return;
   }
 
@@ -1245,13 +1245,11 @@ function onSpreadWheel(event: Event): void {
   if (!container) return;
 
   const wheel = event as WheelEvent;
-  const box = boxOf(container);
-  const pages = contentOf(container);
   const up = wheel.deltaY < 0;
 
   view = wheel.shiftKey
-    ? panned(view, 0, up ? -VIEW_PAN_STEP : VIEW_PAN_STEP, pages, box)
-    : panned(zoomed(view, up ? VIEW_STEP : 1 / VIEW_STEP), 0, 0, pages, box);
+    ? panned(view, 0, up ? -VIEW_PAN_STEP : VIEW_PAN_STEP)
+    : zoomed(view, up ? VIEW_STEP : 1 / VIEW_STEP);
 
   applyView();
   redrawChrome();
@@ -1260,40 +1258,41 @@ function onSpreadWheel(event: Event): void {
 /**
  * A press on the pages, which is either the start of a pan or the start of a click.
  *
- * Which of the two it was is decided on the way out — by how far the pointer
- * travelled — so both are watched from here. The move and the release are on the
- * document rather than on the pages: a drag that leaves the pages, or the lightbox,
- * is still a drag, and it has to end somewhere.
+ * Which of the two it was is decided on the way out — see onSpreadRelease, which is
+ * where Stash's rule lives — so both are watched from here. The move and the release
+ * are on the document rather than on the pages: a drag that leaves the pages, or the
+ * lightbox, is still a drag, and it has to end somewhere.
  */
 function onSpreadPress(event: Event): void {
   const press = event as MouseEvent;
   if (press.button !== 0) return;
 
-  pressed = { x: press.clientX, y: press.clientY, moved: false };
-  dragged = false;
+  pressed = { x: press.clientX, y: press.clientY, at: press.timeStamp };
+  held = false;
 
   document.addEventListener("mousemove", onSpreadMove);
   document.addEventListener("mouseup", onSpreadRelease);
 }
 
-/** Where the pointer is, where it was, and whether that is far enough to be a drag */
+/** Where the pointer went down, and when: the two halves of Stash's click test */
 interface MangaReaderPress {
-  /** Where the press started: what says whether the pointer has travelled at all */
+  /** Where the press landed, which is what says whether the pointer moved at all */
   x: number;
   y: number;
-  /** Whether it has travelled far enough to be a drag rather than a click */
-  moved: boolean;
+  /** When it landed, which is what says whether it lasted long enough to be a pan */
+  at: number;
 }
 
 let pressed: MangaReaderPress | null = null;
 
 /**
- * Whether the press that just ended was a drag.
+ * Whether the press that has just ended was anything but a click.
  *
- * Read by the click handler, which cannot tell: a press and a release on one element
- * is a click whether or not the pointer went anywhere in between.
+ * Read by the click handler, which cannot tell for itself: a press and a release on
+ * one element is a click whether or not the pointer went anywhere in between, and
+ * whether or not it took a second to do it.
  */
-let dragged = false;
+let held = false;
 
 function onSpreadMove(event: Event): void {
   if (!pressed || !container) return;
@@ -1302,67 +1301,49 @@ function onSpreadMove(event: Event): void {
   const dx = move.clientX - pressed.x;
   const dy = move.clientY - pressed.y;
 
-  if (!pressed.moved && Math.abs(dx) < VIEW_SLOP && Math.abs(dy) < VIEW_SLOP) {
-    return;
-  }
+  // Anything at all is a drag: Stash's own test is whether the pointer is where it
+  // went down, to the pixel, because a hand that meant to click does not move.
+  held = true;
 
-  // From here on the press is a drag, and the pages follow the pointer: the
-  // distance moved *since the last event*, so that a long drag does not chase a
-  // single accumulated offset from where the press began.
-  pressed.moved = true;
+  // The pages follow the pointer by the distance moved *since the last event*, so
+  // that a long drag does not chase one accumulated offset from where it began.
   pressed.x = move.clientX;
   pressed.y = move.clientY;
 
-  view = panned(view, dx, dy, contentOf(container), boxOf(container));
+  view = panned(view, dx, dy);
   applyView();
 }
 
-function onSpreadRelease(): void {
+function onSpreadRelease(event: Event): void {
   document.removeEventListener("mousemove", onSpreadMove);
   document.removeEventListener("mouseup", onSpreadRelease);
 
-  if (pressed?.moved) dragged = true;
+  // Stash's other half: a press that lasted is not the tap that turns a page, even
+  // if the pointer stayed put. A reader who pressed and thought better of it has
+  // asked for nothing.
+  const release = event as MouseEvent;
+  if (pressed && release.timeStamp - pressed.at > VIEW_CLICK_MS) held = true;
+
   pressed = null;
 }
 
 /**
  * Puts the view on the pages.
  *
- * The whole screen is scaled as one thing, because that is the unit this half
- * reads in: a pair of pages zooms together, and the transform that does it is one
- * line rather than one per image. `translate` first so the movement is in pixels of
- * the screen rather than of the scaled pages.
+ * The whole screen is scaled as one thing, because that is the unit this half reads
+ * in: a pair of pages zooms together, and the transform that does it is one line
+ * rather than one per image. `translate` first so the movement is in pixels of the
+ * screen rather than of the scaled pages.
+ *
+ * A transform does not clip, so the pages scaled past the edge of the picture area
+ * would paint over the header — which is exactly what Stash's own slides prevent,
+ * and what the `overflow` rule in mangaReader.css prevents here.
  */
 function applyView(): void {
   if (!container) return;
 
   container.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
   container.classList.toggle(CLASS_ZOOMED, isZoomed(view));
-}
-
-/**
- * How big the pages are drawn, which is what there is to pan: see panned.
- *
- * Measured on the images rather than on the boxes around them: an image is sized by
- * its own ratio within the box it was given, and a box can be wider than the page in
- * it — which would let the pan go further than the page has pixels for.
- */
-function contentOf(host: HTMLElement): MangaReaderBox {
-  let width = 0;
-  let height = 0;
-
-  for (const node of Array.from(host.querySelectorAll("img"))) {
-    const image = node as HTMLElement;
-    width += image.offsetWidth || 0;
-    height = Math.max(height, image.offsetHeight || 0);
-  }
-
-  return { width, height };
-}
-
-/** How big the box the pages sit in is, which is what they are panned inside */
-function boxOf(host: HTMLElement): MangaReaderBox {
-  return { width: host.clientWidth || 0, height: host.clientHeight || 0 };
 }
 
 /**

@@ -15,7 +15,7 @@
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import type { LightboxImage } from "./stash-lightbox";
-import type { MangaReaderBox, MangaReaderView } from "./zoom";
+import type { MangaReaderView } from "./zoom";
 
 /**
  * The order the lightbox is showing its images in — see lightboxOrder in
@@ -175,18 +175,13 @@ export interface MangaReaderNamespace {
   fitView(): MangaReaderView;
   centred(view: MangaReaderView): MangaReaderView;
   zoomed(view: MangaReaderView, factor: number): MangaReaderView;
-  panned(
-    view: MangaReaderView,
-    dx: number,
-    dy: number,
-    pages: MangaReaderBox,
-    box: MangaReaderBox
-  ): MangaReaderView;
+  panned(view: MangaReaderView, dx: number, dy: number): MangaReaderView;
   isZoomed(view: MangaReaderView): boolean;
   VIEW_MIN_ZOOM: number;
   VIEW_MAX_ZOOM: number;
   VIEW_STEP: number;
-  VIEW_SLOP: number;
+  /** How long a press may last and still be the click that turns a page */
+  VIEW_CLICK_MS: number;
   stepsToAdjacent(
     screens: MangaReaderScreen[],
     pageIndex: number,

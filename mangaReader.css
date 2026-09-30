@@ -135,6 +135,25 @@
 }
 
 /*
+ * The pages are cut off at the edge of the picture area, so a zoom cannot reach the
+ * header.
+ *
+ * This is what Stash's own lightbox does, by a different road: its slides are
+ * painted with containment (`content-visibility: auto`), and a contained box clips
+ * what is inside it. Without a clip the pages are a transformed layer that paints
+ * over the header and takes the clicks meant for it — and a click that reaches the
+ * pages but not an image is the click that closes the lightbox, so a reader who
+ * zoomed in and then reached for the gear closed their lightbox instead.
+ *
+ * On the display rather than on the container: `overflow` on the container would be
+ * clipped *after* its transform, which is to say the clip would grow with the zoom
+ * and clip nothing.
+ */
+.Lightbox.manga-reader-takeover .Lightbox-display {
+  overflow: hidden;
+}
+
+/*
  * The footer's left column: the O counter and the rating stars.
  *
  * Not this half's to offer — and not, in a lightbox that is reading a book, anything

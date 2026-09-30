@@ -10,16 +10,20 @@
  * is one screenful, which in a two-page view is two of them. A pair zooms together,
  * because that is what a reader looking closer at a spread means.
  *
- * **The pan is clamped against the pages, not against the box they sit in.** The
- * pages are centred in a box that is usually wider than they are, and a pan clamped
- * by the box would let a page be dragged most of the way off the screen, with nothing
- * to bring it back. The clamp is the difference between the two sizes, and it is what
- * keeps a page where it can be found.
+ * **The drag is Stash's own, which is to say unbounded.** Its image follows the
+ * pointer wherever it goes, and what brings it back is the next image: the position
+ * is reset every time the picture changes. Clamping the pan to the edge of the
+ * screen looks tidier and is not what a reader who has used Stash's lightbox
+ * expects, so it is not what this does.
+ *
+ * **What keeps the pages off the header is the clip, not arithmetic.** Stash's own
+ * slides are painted with containment, so a zoomed image is cut off at the edge of
+ * the picture area rather than scaled over the controls. See the `overflow` rule in
+ * mangaReader.css: the same box, the same cut.
  *
  * Pure: no DOM, no state, and every function is a function of its arguments, so the
  * arithmetic — which is the part that can be wrong in a way nothing else notices — is
- * tested by calling it, and the wiring in takeover.ts is left with measuring and
- * applying.
+ * tested by calling it, and the wiring in takeover.ts is left with applying it.
  */
 
 /** Where the pages are drawn: the fitted size, moved, and nothing else */
@@ -29,12 +33,6 @@ export interface MangaReaderView {
   /** How far the pages have been moved from the middle, in pixels */
   x: number;
   y: number;
-}
-
-/** A box in the page, in pixels: one of the two a pan is measured against */
-export interface MangaReaderBox {
-  width: number;
-  height: number;
 }
 
 /** The floor Stash puts under its own zoom */
@@ -60,13 +58,13 @@ export const VIEW_PAN_STEP = 75;
  */
 export const VIEW_SNAP = 0.015;
 /**
- * How far the pointer may travel and still be a click rather than a drag.
+ * How long a press may last and still be the click that turns a page.
  *
- * A press that moves is a pan — the pages follow the pointer — and a press that does
- * not is the click that turns the page. Without a threshold every drag would end in
- * a turn, because that is what a click on a page means.
+ * Stash's own 200 ms, and it is half of what tells a click from a drag there: the
+ * other half is that the pointer never moved. Without it a reader who pressed,
+ * thought better of it and released would turn a page they never asked for.
  */
-export const VIEW_SLOP = 4;
+export const VIEW_CLICK_MS = 200;
 
 /** The fitted view: what a screen is drawn at, and what a zoom is reset to */
 export function fitView(): MangaReaderView {
@@ -93,8 +91,8 @@ export function isZoomed(view: MangaReaderView): boolean {
  * One step closer, or further away.
  *
  * Bounded at both ends, and snapped to 1 near it — see VIEW_SNAP. The pan is not
- * touched here: whether a pan is still possible after a zoom is a question about the
- * pages, and the caller has their size.
+ * touched here: where the pages are looking is a place in the picture, and changing
+ * the scale does not move the middle of it.
  */
 export function zoomed(view: MangaReaderView, factor: number): MangaReaderView {
   const wanted = Math.min(
@@ -107,33 +105,17 @@ export function zoomed(view: MangaReaderView, factor: number): MangaReaderView {
 }
 
 /**
- * The pages moved by a pointer's worth of pixels, and then put back in their box.
+ * The pages moved by a pointer's worth of pixels.
  *
- * Clamped to what the scaled pages can give: if they are wider than the box there is
- * that much to pan, and if they are not there is nothing, so a press on a fitted
- * page moves nothing at all. Both ends are clamped, which Stash's own drag is not —
- * its pages can be thrown off the screen and only a click brings them back.
+ * Nowhere in particular, and that is the point: Stash's own image follows the
+ * pointer past the edge of the screen and stays there until the next image puts it
+ * back in the middle. A pan that stopped at the edge would be this plugin's idea of
+ * where the reader meant to stop, and it is not one worth having.
  */
 export function panned(
   view: MangaReaderView,
   dx: number,
-  dy: number,
-  pages: MangaReaderBox,
-  box: MangaReaderBox
+  dy: number
 ): MangaReaderView {
-  return {
-    zoom: view.zoom,
-    x: clamp(view.x + dx, (view.zoom * pages.width - box.width) / 2),
-    y: clamp(view.y + dy, (view.zoom * pages.height - box.height) / 2),
-  };
-}
-
-/** Within `limit` either way, and never outside 0 — a box with nothing to pan in it */
-function clamp(value: number, limit: number): number {
-  if (!Number.isFinite(value)) return 0;
-
-  const bound = Math.max(limit, 0);
-  if (!Number.isFinite(bound)) return 0;
-
-  return Math.min(Math.max(value, -bound), bound);
+  return { zoom: view.zoom, x: view.x + dx, y: view.y + dy };
 }

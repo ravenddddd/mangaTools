@@ -371,6 +371,20 @@ module.exports = () => {
     "mangaReader.css should hide the footer's rating and O counter, and not the " +
       "column holding them"
   );
+
+  // And the pages cut off at the edge of the picture area, which is what keeps a
+  // zoom off the header — Stash gets the same cut from its slides' paint containment.
+  // Without it the zoomed pages paint over the header and take its clicks, and a
+  // click that reaches the pages but not an image is the click that closes the
+  // lightbox. Unhittable controls are the one failure a DOM test cannot see: the stub
+  // has no hit testing to fail.
+  assert.ok(
+    /\.manga-reader-takeover \.Lightbox-display[^{]*\{[^}]*overflow:\s*hidden/.test(
+      readerCss
+    ),
+    "mangaReader.css should clip the pages to the display: zoomed, they paint over " +
+      "the header, whose buttons are the only way to zoom back out"
+  );
   console.log(
     "✓ bundle shape (single script file, self-contained, JSX transformed, artwork shipped)"
   );
