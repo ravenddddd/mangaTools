@@ -159,6 +159,10 @@ export interface MangaReaderNamespace {
     rows: { title?: unknown; image_index?: unknown }[] | null | undefined,
     pathIds: string[]
   ): MangaReaderChapter[];
+  /** How much wheel travel turns one screen — see onSpreadWheel in takeover.ts */
+  WHEEL_TURN: number;
+  /** How long the wheel is still before what it has travelled is forgotten */
+  WHEEL_REST_MS: number;
   /**
    * The page the reader is on in a gallery, by id, or null when they are not in it —
    * published by takeover.ts for the tab's form, which opens on the page somebody was

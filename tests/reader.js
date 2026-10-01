@@ -3286,167 +3286,243 @@ async function main() {
    * on the screen — including the one thing that must *not* happen: a drag ending in
    * a click, which would turn the page for the trouble of moving it.
    */
-  await runSection("the wheel zooms and the drag pans", async () => {
-    const { box } = await startReader({ galleryId: "8", on: true });
+  await runSection(
+    "the wheel turns, ctrl+wheel zooms, and the drag pans",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
 
-    const spread = container();
-    const chrome = box.lightbox.querySelector(".manga-reader-chrome");
-    const transform = () => spread.style.transform;
-    const zoomButton = () => chrome.querySelector(".manga-reader-zoom");
-    const offered = () =>
-      zoomButton().getAttribute("data-manga-reader-hidden") === null;
-    const wheel = (deltaY, init) =>
-      spread.dispatch(
-        "wheel",
-        dom.makeEvent("wheel", Object.assign({ deltaY }, init))
+      const spread = container();
+      const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+      const transform = () => spread.style.transform;
+      const zoomButton = () => chrome.querySelector(".manga-reader-zoom");
+      const offered = () =>
+        zoomButton().getAttribute("data-manga-reader-hidden") === null;
+      const wheel = (deltaY, init) =>
+        spread.dispatch(
+          "wheel",
+          dom.makeEvent("wheel", Object.assign({ deltaY }, init))
+        );
+
+      // What the browser would report for a page, which is what says which half of it
+      // a click landed on. The test world has no layout, so a test that means to click
+      // a page has to say how wide it is.
+      const laidOut = () => {
+        for (const page of spread.children) {
+          page.children[0].offsetWidth = 500;
+          page.children[0].offsetHeight = 800;
+        }
+      };
+
+      laidOut();
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(1)",
+        "the pages are drawn fitted and centred"
+      );
+      assert.strictEqual(
+        spread.children[0].children[0].draggable,
+        false,
+        "and each page says it is not draggable: a browser's own drag of an image is " +
+          "a drag of the file, and it swallows the moves a pan is made of"
+      );
+      assert.strictEqual(offered(), false, "so there is no zoom to reset");
+
+      // Turning, first, because that is what this wheel does now. One notch is one
+      // screen: a mouse reports about a hundred pixels for one, and the reader is on
+      // the cover of a two-page gallery.
+      const opened = drawn();
+      wheel(120);
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image", "/image/403/image"],
+        "a wheel towards the reader turns a screen — the gesture a hand on a wheel in " +
+          "front of a book makes"
+      );
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(1)",
+        "and it is a turn, not a zoom: the pages are still the size they were"
       );
 
-    // What the browser would report for a page, which is what says which half of it
-    // a click landed on. The test world has no layout, so a test that means to click
-    // a page has to say how wide it is.
-    const laidOut = () => {
-      for (const page of spread.children) {
-        page.children[0].offsetWidth = 500;
-        page.children[0].offsetHeight = 800;
-      }
-    };
+      // A trackpad sends a burst of small events for one flick, so what the wheel has
+      // travelled is added up: part of a notch does nothing, and the rest of it is kept.
+      // The first notch left a fifth of itself behind, and these three are one notch
+      // back the long way round.
+      const turned = drawn();
+      wheel(-40);
+      wheel(-40);
+      assert.deepStrictEqual(
+        drawn(),
+        turned,
+        "two thirds of a notch is not a screen"
+      );
+      wheel(-40);
+      assert.deepStrictEqual(
+        drawn(),
+        opened,
+        "…and what was left of the first notch makes the third of it one: a notch is " +
+          "a screen, and no more"
+      );
 
-    laidOut();
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(1)",
-      "the pages are drawn fitted and centred"
-    );
-    assert.strictEqual(
-      spread.children[0].children[0].draggable,
-      false,
-      "and each page says it is not draggable: a browser's own drag of an image is " +
-        "a drag of the file, and it swallows the moves a pan is made of"
-    );
-    assert.strictEqual(offered(), false, "so there is no zoom to reset");
+      // Forgotten once the wheel has been still — a wheel that drifted for a while
+      // should not turn a page on a flick nobody made.
+      await new Promise((resolve) =>
+        setTimeout(resolve, NR.WHEEL_REST_MS + 40)
+      );
+      wheel(-80);
+      assert.deepStrictEqual(
+        drawn(),
+        opened,
+        "and what it had travelled is forgotten once the wheel stops, so a slow drift " +
+          "never adds up to a turn"
+      );
 
-    wheel(-100);
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(1.1)",
-      "a wheel away from the reader zooms in — Stash's own 10% a notch"
-    );
-    assert.strictEqual(offered(), true, "and the header offers to put it back");
+      // Ctrl, and a browser's own page zoom lives on the same chord.
+      wheel(-100, { ctrlKey: true });
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(1.1)",
+        "ctrl+wheel away from the reader zooms in — Stash's own 10% a notch"
+      );
+      assert.deepStrictEqual(drawn(), opened, "…and a zoom is not a turn");
+      assert.strictEqual(
+        offered(),
+        true,
+        "and the header offers to put it back"
+      );
 
-    wheel(100);
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(1)",
-      "a notch back lands exactly on the fitted size, not near it"
-    );
+      wheel(100, { ctrlKey: true });
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(1)",
+        "a notch back lands exactly on the fitted size, not near it"
+      );
 
-    for (let i = 0; i < 30; i++) wheel(100);
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(0.1)",
-      "and zooming out stops at a tenth rather than at nothing"
-    );
+      for (let i = 0; i < 30; i++) wheel(100, { ctrlKey: true });
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(0.1)",
+        "and zooming out stops at a tenth rather than at nothing"
+      );
 
-    for (let i = 0; i < 60; i++) wheel(-100);
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(8)",
-      "while zooming in stops at eight — a ceiling Stash has not got, because " +
-        "past it there is no reading and no way back"
-    );
+      for (let i = 0; i < 60; i++) wheel(-100, { ctrlKey: true });
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(8)",
+        "while zooming in stops at eight — a ceiling Stash has not got, because " +
+          "past it there is no reading and no way back"
+      );
 
-    // One notch in from the ceiling, and then the drag. Read off the transform
-    // rather than assumed: what the wheel did is this test's subject too.
-    wheel(100);
-    const scale = /scale\((.*)\)$/.exec(transform())[1];
-    spread.dispatch(
-      "mousedown",
-      dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
-    );
-    dom.document.dispatch(
-      "mousemove",
-      dom.makeEvent("mousemove", { clientX: 140, clientY: 100 })
-    );
-    assert.strictEqual(
-      transform(),
-      "translate(40px, 0px) scale(" + scale + ")",
-      "a drag moves the pages by as much as the pointer moved"
-    );
+      // One notch in from the ceiling, and then the drag. Read off the transform
+      // rather than assumed: what the wheel did is this test's subject too.
+      wheel(100, { ctrlKey: true });
+      const scale = /scale\((.*)\)$/.exec(transform())[1];
+      spread.dispatch(
+        "mousedown",
+        dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
+      );
+      dom.document.dispatch(
+        "mousemove",
+        dom.makeEvent("mousemove", { clientX: 140, clientY: 100 })
+      );
+      assert.strictEqual(
+        transform(),
+        "translate(40px, 0px) scale(" + scale + ")",
+        "a drag moves the pages by as much as the pointer moved"
+      );
 
-    // And on, past the edge of the screen: Stash's own image follows the pointer
-    // wherever it goes, and what brings it back is the next image rather than a stop
-    // at the border.
-    dom.document.dispatch(
-      "mousemove",
-      dom.makeEvent("mousemove", { clientX: 5000, clientY: 100 })
-    );
-    assert.strictEqual(
-      transform(),
-      "translate(4900px, 0px) scale(" + scale + ")",
-      "a drag carries on past the edge of the screen, as Stash's own does"
-    );
+      // And on, past the edge of the screen: Stash's own image follows the pointer
+      // wherever it goes, and what brings it back is the next image rather than a stop
+      // at the border.
+      dom.document.dispatch(
+        "mousemove",
+        dom.makeEvent("mousemove", { clientX: 5000, clientY: 100 })
+      );
+      assert.strictEqual(
+        transform(),
+        "translate(4900px, 0px) scale(" + scale + ")",
+        "a drag carries on past the edge of the screen, as Stash's own does"
+      );
 
-    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
-    const before = drawn();
-    dom.click(spread.children[0].children[0], { offsetX: 400 });
-    assert.deepStrictEqual(
-      drawn(),
-      before,
-      "the release that ends a drag is not a click: the page does not turn"
-    );
-    assert.strictEqual(
-      transform(),
-      "translate(4900px, 0px) scale(" + scale + ")",
-      "and the pages stay where they were dragged to"
-    );
+      dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+      const before = drawn();
+      dom.click(spread.children[0].children[0], { offsetX: 400 });
+      assert.deepStrictEqual(
+        drawn(),
+        before,
+        "the release that ends a drag is not a click: the page does not turn"
+      );
+      assert.strictEqual(
+        transform(),
+        "translate(4900px, 0px) scale(" + scale + ")",
+        "and the pages stay where they were dragged to"
+      );
 
-    // A press that stayed put but lasted: also not a click. Stash's own other half
-    // of the test, and the reason a reader who pressed and thought better of it is
-    // not sent a page on.
-    spread.dispatch(
-      "mousedown",
-      dom.makeEvent("mousedown", {
-        button: 0,
-        clientX: 100,
-        clientY: 100,
-        timeStamp: 0,
-      })
-    );
-    dom.document.dispatch(
-      "mouseup",
-      dom.makeEvent("mouseup", { timeStamp: NR.VIEW_CLICK_MS + 1 })
-    );
-    dom.click(spread.children[0].children[0], { offsetX: 400 });
-    assert.deepStrictEqual(
-      drawn(),
-      before,
-      "a press that lasted longer than a click is not one, even if the pointer " +
-        "never moved"
-    );
+      // A press that stayed put but lasted: also not a click. Stash's own other half
+      // of the test, and the reason a reader who pressed and thought better of it is
+      // not sent a page on.
+      spread.dispatch(
+        "mousedown",
+        dom.makeEvent("mousedown", {
+          button: 0,
+          clientX: 100,
+          clientY: 100,
+          timeStamp: 0,
+        })
+      );
+      dom.document.dispatch(
+        "mouseup",
+        dom.makeEvent("mouseup", { timeStamp: NR.VIEW_CLICK_MS + 1 })
+      );
+      dom.click(spread.children[0].children[0], { offsetX: 400 });
+      assert.deepStrictEqual(
+        drawn(),
+        before,
+        "a press that lasted longer than a click is not one, even if the pointer " +
+          "never moved"
+      );
 
-    laidOut();
-    dom.click(spread.children[0].children[0], { offsetX: 400 });
-    assert.deepStrictEqual(
-      drawn(),
-      ["/image/402/image", "/image/403/image"],
-      "a click with no drag in front of it still turns the page"
-    );
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(" + scale + ")",
-      "and the next screen arrives centred, at the zoom the reader was reading at"
-    );
+      // Shift+wheel scrolls the page rather than turning it, which is Stash's own
+      // meaning for that chord and worth keeping: looking at a tall page without
+      // turning away from it.
+      const onShow = drawn();
+      const wasAt = transform();
+      wheel(120, { shiftKey: true });
+      assert.notStrictEqual(
+        transform(),
+        wasAt,
+        "shift+wheel scrolls the pages instead"
+      );
+      assert.deepStrictEqual(
+        drawn(),
+        onShow,
+        "…and scrolls rather than turns: the screen on show is the one it was"
+      );
 
-    dom.click(zoomButton());
-    assert.strictEqual(
-      transform(),
-      "translate(0px, 0px) scale(1)",
-      "the header's reset puts the pages back to the fitted size"
-    );
-    assert.strictEqual(offered(), false, "and takes itself away again");
+      laidOut();
+      dom.click(spread.children[0].children[0], { offsetX: 400 });
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/402/image", "/image/403/image"],
+        "a click with no drag in front of it still turns the page"
+      );
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(" + scale + ")",
+        "and the next screen arrives centred, at the zoom the reader was reading at"
+      );
 
-    stopReader(box);
-  });
+      dom.click(zoomButton());
+      assert.strictEqual(
+        transform(),
+        "translate(0px, 0px) scale(1)",
+        "the header's reset puts the pages back to the fitted size"
+      );
+      assert.strictEqual(offered(), false, "and takes itself away again");
+
+      stopReader(box);
+    }
+  );
 
   /**
    * The same zoom, with no DOM in the way.

@@ -666,9 +666,9 @@ While the switch is on, and while you are reading a **gallery**:
 | **Two pages at once** | Laid out to fit the screen, in reading order, the earlier page on the right |
 | **Spreads** | A page wider than it is tall is taken for one image spanning two pages, and stands alone |
 | **The cover** | Stands alone. A cover is not the left half of anything |
-| **Arrows and chevrons** | Left and right move a *screen*, not a page — so a pair advances together. The keyboard arrows and Stash's own chevrons both go through the same turn |
+| **Arrows, chevrons and the wheel** | Left and right move a *screen*, not a page — so a pair advances together. The keyboard arrows, Stash's own chevrons and the mouse wheel all go through the same turn: the wheel is added up rather than counted by event, so a trackpad's flick is one screen rather than twenty |
 | **Clicks** | Clicking a page turns it, right half forward and left half back, exactly as Stash's own image click does. Clicking the space around the pages still closes the lightbox |
-| **Zoom** | The wheel, as in Stash's own lightbox: away from you to zoom in, towards you to zoom out, `Shift` to scroll up and down instead. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
+| **Zoom** | `Ctrl` + the wheel: away from you to zoom in, towards you to zoom out, `Shift` + the wheel to scroll up and down instead. **Not Stash's own arrangement** — its wheel zooms and its `Shift`+wheel scrolls, by its `scrollMode` default — but a browser puts its own page zoom on `Ctrl`+wheel, so that chord is taken rather than passed on. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
 | **Pan** | Press and drag to move the pages — as far as you take them, past the edge of the screen and all, exactly as Stash's own image does; turning the page is what puts them back in the middle. A drag never turns the page, and a click never moves it. Nor does a press held longer than a click: Stash's own other half of the test, so a press you thought better of sends you nowhere |
 | **Shift the pairing** | A second switch in the options menu, or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
 | **The progress bar** | Its own line between the picture and the footer, as wide as the pages it is measuring — so a spread's bar is wider than a lone page's, and it never lies across the picture: how far through the book you are, with a tick where each chapter begins. Drag it to cross four hundred pages in one gesture — the handle follows your hand exactly, while the pictures follow as fast as they can be fetched — and letting go lands you on the page you were nearest. Hover a tick to see which chapter it is, in the bar's own bubble — at once, rather than after the second a browser's tooltip takes — and click it to jump straight there. It is out of the way to begin with, fades again after a couple of seconds, and the pointer reaching the bar is what brings it back |
@@ -903,15 +903,16 @@ does, done for you — and from then on the reader reads this plugin's field.
 
 ### What is not here yet
 
-- **No pinch or touch panning.** The wheel and the mouse are back — Stash's own two
-  gestures, with Stash's own numbers — but a touchscreen's are not: no two-finger
+- **No pinch or touch panning.** The mouse is back — a drag that pans, a wheel that
+  turns, `Ctrl`+wheel to zoom — but a touchscreen's gestures are not: no two-finger
   pinch, and no dragging the pages with one finger. Stash's own lightbox has both.
   The progress bar is dragged with a mouse for the same reason: a drag is the same
   gesture whatever it is dragging, and this plugin has built the one.
 - **Stash's four image settings are not read.** Display mode, scale up to fit, reset
   zoom on navigation and scroll mode are Stash's own options, and their defaults are
   what this half does: fit to the screen, no scaling up, the position reset on every
-  screen and the zoom kept, and the wheel zooming rather than panning. Change one of
+  screen and the zoom kept, and the wheel turning a page rather than zooming or
+  panning. Change one of
   them in Stash's settings and this half will not follow; the options menu here has
   its own three settings and no room for those.
 - **Two of the pairing rules are settings without a UI**: `coverAlone` and

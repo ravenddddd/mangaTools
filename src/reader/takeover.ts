@@ -24,7 +24,7 @@
  * WHAT IT IS RESPONSIBLE FOR, which is a lot for one file — the reason this list is
  * here is that the next thing added should be weighed against it: the pass over the
  * document and the gallery read behind it; the container and the screens drawn in it;
- * the gestures on those pages (a click that turns, a wheel that zooms, a drag that
+ * the gestures on those pages (a click that turns, a wheel that turns, a drag that
  * pans); the chapters — their menu in the header, and the tab on the gallery's own
  * page; the progress bar; the header; the footer's own name for the page; and the
  * route, which closes the lightbox when it changes underneath one. If any of it is
@@ -1437,30 +1437,93 @@ function onSpreadClick(event: Event): void {
 }
 
 /**
- * The wheel: closer, or further away — and with shift held, up and down.
+ * How much wheel travel turns one screen.
  *
- * Stash's own arrangement under its own default: `scrollMode` is Zoom, so an
- * unshifted wheel zooms and a shifted one scrolls, and the step is the 10% its
- * source uses. Ours zooms about the middle of the screen rather than about the
- * pointer: the pages are fitted to a box, and what a reader means by "closer" is
- * closer in the middle of what they are looking at.
+ * A mouse's own notch is about a hundred pixels, so a notch is a page and no more.
+ * The number is what makes a *trackpad* usable: it sends a burst of small events for
+ * one flick, and a page turn per event would cross a book in a flick.
+ */
+export const WHEEL_TURN = 100;
+
+/** How long the wheel is still before what it has travelled is forgotten */
+export const WHEEL_REST_MS = 250;
+
+// Published where they are declared: an assignment up with the other publications
+// would read them in their own dead zone.
+NR.WHEEL_TURN = WHEEL_TURN;
+NR.WHEEL_REST_MS = WHEEL_REST_MS;
+
+/** What the wheel has travelled since the last screen it turned */
+let wheelRun = 0;
+/** The timer that forgets it once the wheel has stopped */
+let wheelRest: number | null = null;
+
+/**
+ * The wheel: a page — or, with **ctrl** held, closer and further away.
+ *
+ * Not Stash's arrangement, and deliberately. Its `scrollMode` default is Zoom, so
+ * its wheel zooms and its shifted wheel scrolls; here the wheel turns a page, which
+ * is what a hand on a wheel in front of a book means, and **ctrl+wheel** is what
+ * zooms — which is also where a browser puts its own zoom, so the chord is taken
+ * rather than passed on. Shift keeps Stash's own meaning for it: up and down the
+ * page, for looking at a tall one without turning away from it.
+ *
+ * A wheel is not one event per notch. What it has travelled is added up and a screen
+ * is turned per WHEEL_TURN of it, with the remainder kept — a slow drift adds up to
+ * a turn of its own otherwise — and forgotten once the wheel has been still for
+ * WHEEL_REST_MS.
+ *
+ * The zoom keeps Stash's numbers and this plugin's centre: about the middle of the
+ * screen rather than about the pointer, because the pages are fitted to a box and
+ * what a reader means by "closer" is closer in the middle of what they are looking
+ * at.
  *
  * The carousel behind these pages is hidden rather than gone, and a hidden element
  * is not a place a wheel event can land — so this is the only wheel in the lightbox,
  * and there is nothing to stop from hearing it.
  */
 function onSpreadWheel(event: Event): void {
-  if (!container) return;
+  const lightbox = root;
+  if (!lightbox || !container) return;
 
   const wheel = event as WheelEvent;
-  const up = wheel.deltaY < 0;
+  // Taken whatever is done with it: ctrl+wheel is the browser's own page zoom, and
+  // without this a reader zooming into a page would zoom the whole interface.
+  wheel.preventDefault();
 
-  view = wheel.shiftKey
-    ? panned(view, 0, up ? -VIEW_PAN_STEP : VIEW_PAN_STEP)
-    : zoomed(view, up ? VIEW_STEP : 1 / VIEW_STEP);
+  if (wheel.ctrlKey || wheel.metaKey) {
+    view = zoomed(view, wheel.deltaY < 0 ? VIEW_STEP : 1 / VIEW_STEP);
+    applyView();
+    redrawChrome();
+    return;
+  }
 
-  applyView();
-  redrawChrome();
+  if (wheel.shiftKey) {
+    view = panned(view, 0, wheel.deltaY < 0 ? -VIEW_PAN_STEP : VIEW_PAN_STEP);
+    applyView();
+    redrawChrome();
+    return;
+  }
+
+  wheelRun += wheel.deltaY;
+
+  if (wheelRest !== null) window.clearTimeout(wheelRest);
+  wheelRest = window.setTimeout(() => {
+    wheelRest = null;
+    wheelRun = 0;
+  }, WHEEL_REST_MS);
+
+  while (Math.abs(wheelRun) >= WHEEL_TURN) {
+    const forward = wheelRun > 0;
+    wheelRun -= forward ? WHEEL_TURN : -WHEEL_TURN;
+
+    // Nothing that way: keep nothing of what it travelled, or the next notch of the
+    // same wheel would turn a page the reader is already on the edge of.
+    if (!turnBy(lightbox, forward ? 1 : -1)) {
+      wheelRun = 0;
+      break;
+    }
+  }
 }
 
 /**
