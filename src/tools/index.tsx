@@ -2671,6 +2671,44 @@ type HelpExample = "badge" | "mark";
  * words what this says by showing it, and the "?" that opens it is named from
  * the same catalogue entry.
  */
+/**
+ * The language-table code for a Stash UI locale, or "" when the table has none.
+ *
+ * The two are not the same vocabulary. Stash's locales name a region — `zh-CN`,
+ * `en-US`, `ja-JP` — and the language table holds canonical *language* codes:
+ * `zh-Hans`, `en`, `ja`. So asking the table about `zh-CN` on its own gets
+ * nothing, which drew an English flag in a Simplified Chinese UI.
+ *
+ * Dropping subtags is the right tolerance *here* and the wrong one for a stored
+ * value: languages.ts maps no aliases on purpose, so that a value this plugin did
+ * not write shows up as unrecognised rather than being quietly rewritten. Nothing
+ * is stored in this direction — this is the example looking for a language the
+ * reader will recognise, and a reader on `zh-CN` is a reader of Simplified
+ * Chinese.
+ *
+ * Which is what the last step is for: `zh` is neither a table code nor a script
+ * in the standard, so the script comes from the region. Traditional for the three
+ * places that write it, Simplified everywhere else — and `zh-Hant-HK` never
+ * reaches it, having already matched `zh-Hant` on the way down.
+ */
+function sampleLanguageCode(uiLocale: string): string {
+  const parts = String(uiLocale || "").split(/[-_]/);
+
+  for (let n = parts.length; n > 0; n--) {
+    const canonical = NS.findCanonical(parts.slice(0, n).join("-"));
+    if (canonical) return canonical;
+  }
+
+  if ((parts[0] || "").toLowerCase() === "zh") {
+    const region = (parts[1] || "").toUpperCase();
+    return region === "TW" || region === "HK" || region === "MO"
+      ? "zh-Hant"
+      : "zh-Hans";
+  }
+
+  return "";
+}
+
 function HelpExampleCard(props: { highlight: HelpExample }) {
   const intl = PluginApi.libraries.Intl.useIntl();
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
@@ -2682,8 +2720,11 @@ function HelpExampleCard(props: { highlight: HelpExample }) {
   // describes itself as the raw code, so a UI in a language this plugin has no
   // entry for would draw its badge as `de-DE`, which is the chip for *bad data*.
   const locale = intl.locale;
-  const own = NS.describe(locale, locale);
-  const sample = (own?.known ? own : NS.describe("en", locale)) || undefined;
+  const code = sampleLanguageCode(locale);
+  const sample =
+    (code ? NS.describe(code, locale) : null) ||
+    NS.describe("en", locale) ||
+    undefined;
 
   // The badge and the mark are ringed, not spotlit: the card around them stays
   // readable, and "which of these two is it" is the question the panel answers.

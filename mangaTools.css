@@ -496,11 +496,15 @@
  * a browser is required to lay out. The wrapper is also what the panel is
  * measured from, which is what makes `left: 100%` mean "beside the icon".
  *
- * Opening is the stylesheet's job — hovering the wrapper, or focusing the button
- * in it, which is how a keyboard or a finger gets what a mouse gets. Nothing is
- * stateful, and the panel is in the page whether it is shown or not; that is also
- * what the smoke tests can see of it, since their React stub's state setters do
- * nothing.
+ * Opening is the stylesheet's job, and it is hover — nothing is stateful, and the
+ * panel is in the page whether it is shown or not. That is also what the smoke
+ * tests can see of it, since their React stub's state setters do nothing.
+ *
+ * The glyph is left as it was drawn before any of this existed: muted, at the size
+ * of the text it sits in, with no box of its own. A button only because it has to
+ * be one to be reachable — everything the browser puts on a button is taken off
+ * it, and the focus ring is deliberately left alone, which is what a keyboard gets
+ * and a mouse never sees.
  *
  * `margin: 0` on the glyph for the reason the wand button in MangaFieldBlock
  * gives: Stash's index.scss sets an unscoped `.fa-icon { margin: 0 0.4rem }`, and
@@ -516,23 +520,13 @@
 .manga-tools-help-button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 1.15rem;
-  height: 1.15rem;
   padding: 0;
   border: 0;
-  border-radius: 50%;
-  background: rgba(191, 204, 214, 0.18);
-  color: rgba(191, 204, 214, 0.75);
+  background: none;
+  color: rgba(191, 204, 214, 0.5);
   cursor: help;
-  font-size: 0.7rem;
+  font-size: 0.85em;
   line-height: 1;
-}
-
-.manga-tools-help-button:hover,
-.manga-tools-help-button:focus-visible {
-  background: rgba(191, 204, 214, 0.35);
-  color: #f5f8fa;
 }
 
 .manga-tools-help-button .fa-icon {
@@ -554,8 +548,13 @@
   margin-left: 0.5rem;
 }
 
+/*
+ * Hover, and `:focus-visible` — the second is what a keyboard gets and a mouse
+ * never sees: it does not match when a button is focused *by being clicked*, so
+ * nothing about this panel is kept open by a click.
+ */
 .manga-tools-help:hover .manga-tools-help-panel,
-.manga-tools-help:focus-within .manga-tools-help-panel {
+.manga-tools-help-button:focus-visible + .manga-tools-help-panel {
   display: block;
 }
 
@@ -583,6 +582,20 @@
   font-size: 1rem;
   font-weight: normal;
   line-height: 1.5;
+  /*
+   * The spotlight's clipping box, done here rather than by Stash's card.
+   * `.gallery-card.card` is `overflow: hidden`, which is what keeps a 9999px
+   * shadow from painting the page — but the mark sits at the card's own bottom
+   * edge, and that box cuts the ring around it off. One box further out, the ring
+   * has this frame's padding to live in and the dim still stops at an edge.
+   */
+  overflow: hidden;
+}
+
+/* …which is why the card itself must stop clipping. Ours only: a real card is
+   untouched by this, which is the whole reason the class is on the example. */
+.manga-tools-help-card .gallery-card.card {
+  overflow: visible;
   /*
    * Not `pointer-events: none`, which is the obvious way to say "this is a
    * picture". Two things are worse with it: the panel stops being part of what

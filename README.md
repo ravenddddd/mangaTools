@@ -674,13 +674,16 @@ is not stretched by a portrait cover. The date line alone is what a card whose
 gallery has no description draws, so nothing is being left out.
 
 The spotlight is a `box-shadow` with a spread wide enough to cover the card, drawn
-with the element and clipped by the card's own `overflow: hidden` — no overlay to
-keep in step. The ring is an `outline`, which goes outside the box without touching
-it, and its rule sets no `position`: the badge it circles is absolutely positioned
-in the cover's corner, and a `position` there would pull it back into the flow. The
-mark's slot, which is a plain span, is the one element that needs both a `position`
-and a `z-index` above the badge's own — below it, the mark's spotlight would leave
-the badge standing out while everything else dimmed.
+with the element — no overlay to keep in step. What clips it is the frame around the
+example, one box further out than Stash's card: the card's own `overflow: hidden`
+would do it, and did, until the ring around the mark turned out to be cut off by it —
+the mark sits at the card's own bottom edge, and the frame's padding is what the ring
+needs to live in. The ring is an `outline`, which goes outside the box without
+touching it, and its rule sets no `position`: the badge it circles is absolutely
+positioned in the cover's corner, and a `position` there would pull it back into the
+flow. The mark's slot, which is a plain span, is the one element that needs both a
+`position` and a `z-index` above the badge's own — below it, the mark's spotlight
+would leave the badge standing out while everything else dimmed.
 
 **The example puts the type back.** The panel hangs off the "?" inside the setting's
 own `<h3>`, so a heading's font weight, line-height and size are inherited by the
@@ -690,12 +693,19 @@ example read as the same card as the one in the list rather than as a card drawn
 inside a heading.
 
 Every word on the example — the caption, the title, the date — is in the message
-catalogues, and the language on the badge is described in the reader's locale: the
-reader's own language when the language table has it, English when it does not,
-since an unknown value describes itself as the raw code. The wording that used to be
-shown there is the button's own name, read out to whoever cannot see the picture.
-Opening it is CSS: hover, or focus, which is what gives a keyboard and a finger what
-a mouse gets — nothing about it is stateful.
+catalogues, and the badge is the reader's own language: Stash's locale is a *region*
+(`zh-CN`, `en-US`, `ja-JP`) and the language table holds *language* codes
+(`zh-Hans`, `en`, `ja`), so the code is worked out from the locale — subtags dropped
+until the table knows one, and for `zh`, which is in neither, the script taken from
+the region. Asking the table about `zh-CN` on its own is what drew an English flag in
+a Simplified Chinese UI. A locale the table has no language for gets English, since
+an unknown value describes itself as the raw code. The wording that used to be shown
+there is the button's own name, read out to whoever cannot see the picture.
+
+Opening it is CSS and it is hover — nothing about it is stateful. A keyboard gets the
+panel through `:focus-visible`, which is not what a click sets: clicking the "?" does
+not leave the panel up, and the "?" itself is left as the muted glyph it was, with a
+button's own box and chrome taken off it.
 
 **Every switch defaults to what the plugin already did, and an absent value reads as
 the default** — all of them on, except the details block, which starts folded. So an

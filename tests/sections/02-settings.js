@@ -727,6 +727,47 @@ module.exports = () => {
       "unrecognised-value chip"
   );
 
+  // The flag is the reader's own language, and Stash's locales name a *region*
+  // while the language table holds language codes: `zh-CN` is not in it, and
+  // asking about it drew an English flag in a Simplified Chinese UI. Checked for
+  // all three of the UI languages this plugin ships, plus the two spellings that
+  // are not Stash's own: a script-tagged tag, and a Chinese locale whose script
+  // has to come from its region.
+  const flagIn = (locale) => {
+    const flag = find(
+      helpWrapsIn(locale)[0].props.children[1],
+      (n) =>
+        typeof n.props?.className === "string" &&
+        n.props.className.startsWith("fi fi-")
+    );
+    return flag ? flag.props.className : "";
+  };
+  assert.strictEqual(
+    flagIn("zh-CN"),
+    "fi fi-cn",
+    "Simplified Chinese → the CN flag"
+  );
+  assert.strictEqual(
+    flagIn("zh-TW"),
+    "fi fi-tw",
+    "Traditional Chinese → the TW flag"
+  );
+  assert.strictEqual(
+    flagIn("en-US"),
+    "fi fi-gb",
+    "English → the flag the table pairs with it"
+  );
+  assert.strictEqual(
+    flagIn("ja-JP"),
+    "fi fi-jp",
+    "Japanese → the region dropped"
+  );
+  assert.strictEqual(
+    flagIn("zh-Hant-HK"),
+    "fi fi-tw",
+    "a script already in the tag is not second-guessed by the region"
+  );
+
   state.currentLocale = localeBefore;
 
   // Selecting a new set writes it back through configurePlugin and updates the

@@ -124,9 +124,23 @@ module.exports = () => {
   assert.ok(
     /\.manga-tools-help:hover\s+\.manga-tools-help-panel[^{]*\{[^}]*display:\s*block/.test(
       css
-    ) && /\.manga-tools-help:focus-within\s+\.manga-tools-help-panel/.test(css),
-    "the help panel should open on hover and on focus — the second is what gives " +
-      "a keyboard and a finger what a mouse gets"
+    ),
+    "the help panel should open on hover"
+  );
+  // …and on `:focus-visible`, which is a keyboard's focus and not a click's: what
+  // that selector buys is that clicking the "?" does *not* leave the panel up.
+  // `:focus-within` is what would, and it is asserted against here, because it is
+  // the plausible edit — it was this file's own first version.
+  assert.ok(
+    /\.manga-tools-help-button:focus-visible\s*\+\s*\.manga-tools-help-panel/.test(
+      css
+    ),
+    "a keyboard should reach the panel too, through :focus-visible rather than " +
+      ":focus-within — a click focuses the button, and the panel is not meant to stay"
+  );
+  assert.ok(
+    !/:focus-within/.test(css),
+    "nothing should keep the panel open once the pointer leaves the ?"
   );
   const panelRule = /\.manga-tools-help-panel\s*\{([^}]*)\}/.exec(css);
   assert.ok(panelRule, "the help panel needs a rule of its own");
@@ -175,8 +189,24 @@ module.exports = () => {
   // The type. The panel hangs off the "?" inside the setting's `<h3>`, so a
   // heading's own font weight and line-height are inherited by the card unless
   // they are put back — which is a difference you can see and hard to place.
+  // What the shadow is clipped by. Stash's card is `overflow: hidden`, which would
+  // do it — and did, until it turned out to cut the ring around the mark, which
+  // sits at the card's own bottom edge. So the clipping is the frame's, one box
+  // out, where the ring has padding to live in; and the card stops clipping, for
+  // the example only.
   const exampleCardRule = /\.manga-tools-help-card\s*\{([^}]*)\}/.exec(css);
   assert.ok(exampleCardRule, "the example needs a frame of its own");
+  assert.ok(
+    /overflow:\s*hidden/.test(exampleCardRule[1]),
+    "the frame should be what the spotlight is clipped by"
+  );
+  assert.ok(
+    /\.manga-tools-help-card\s+\.gallery-card\.card\s*\{[^}]*overflow:\s*visible/.test(
+      css
+    ),
+    "…and the card inside it must stop clipping, or the ring around the mark — " +
+      "which is at the card's bottom edge — is cut off by it"
+  );
   assert.ok(
     /font-weight:\s*normal/.test(exampleCardRule[1]) &&
       /line-height:\s*1\.5/.test(exampleCardRule[1]) &&
