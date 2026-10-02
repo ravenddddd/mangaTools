@@ -23,7 +23,7 @@ the page, a reader can still read.
 | **Translation group** | Who translated the comic, as free text — a box in the edit page's Manga info block, a row in the details one, and, in both directions, the language its galleries usually carry: a button on the language row, and the menu's order and flag hint |
 | **Original text** | A mark for a gallery nothing was translated from, so "no group" and "not filled in yet" cannot be confused — a 生肉/熟肉 toggle on the group row, and a `（生肉）` after the language in the details panel |
 | **Language filter** | A "language" section in the gallery list's sidebar that narrows the list to one language |
-| **Settings** | Which languages the dropdown offers, whether flags are drawn, and whether the cover badge is drawn |
+| **Settings** | One page, grouped: the two things the plugin takes over, the four fields and how they are shown, and the mark's own behaviour |
 | **Reading** | A two-page (spread) view for the image lightbox, with the pages paired the way a manga is printed — see [Reading](#reading-two-pages-at-a-time) |
 
 Each feature occupies its own section below, and each keeps to the same rule:
@@ -590,21 +590,52 @@ along with the rest.
 
 ### Settings
 
-Six settings under **Settings → Plugins → Manga Tools**:
+**Settings → Plugins → Manga Tools**, drawn by the plugin itself (see "A custom UI"
+below). Everything the plugin remembers is here — including the reading half's own
+settings, as the one JSON string the lightbox writes them as (see `reader/settings.ts`
+for why they live with the library rather than with the browser).
+
+The page is grouped by what each setting is about, and **a group's own rows appear only
+while the switch they belong to is on**:
+
+| Group | Holds |
+|---|---|
+| **Take over Stash's lightbox** | the switch, and a note that the lightbox's own settings are changed on the lightbox |
+| **Take over the Chapters tab** | the switch, and — while it is on — what it commits to: from then on, editing chapters does not touch Stash's own chapter rows |
+| **Custom fields** | the master switch; then one switch per field, with the language's own settings under it; then a heading for the three rows that are not fields |
+| **The manga mark** | three siblings under a heading: unmarking, what unmarking clears, and the mark's icon on covers |
+
+Hiding is not writing. A switch turned off and on again comes back with exactly the
+sub-settings it had, and the same goes for the field values on the galleries.
+
+**The four fields.** Language, censorship, translation group and raw, each with its own
+switch under the master. Turned off, a field leaves every surface it appears on — the
+cover badge, the details row, the edit row, the bulk dialog, the sidebar section and
+the filter dialog's card — and the values already on galleries are kept: hidden, not
+cleared. What it does *not* change is which keys the plugin recognises. `NS.ownField`
+goes on answering for a field nobody is showing, or a gallery's own JSON would come
+back as somebody else's custom field in Stash's edit form.
+
+**Raw is drawn differently depending on its neighbours.** It answers the same question
+the translation group does, which is why — with the group also on — the mark is a chip
+on the group's row rather than a row of its own. With the group turned off, raw is just
+another boolean field and gets what the others have: a switch on a row of its own. The
+details block does the same thing with what it has: the mark rides on the language row
+when there is one, and stands alone when there is not.
+
+**The language's own settings** sit under its switch, because they are about it and
+nothing else:
 
 | Setting | Type | Effect |
 |---|---|---|
 | **Enabled languages** | multiselect | Limits which languages the edit-page dropdown offers; empty = every language |
 | **Show flags** | switch | Draw flags, or the language name on its own |
 | **Show the language on gallery covers** | switch | The badge in the bottom-right of a gallery's cover |
-| **Start the details block expanded** | switch | The state the details tab's Manga info section opens in |
-| **Start the edit block expanded** | switch | The same, for the edit form's block |
-| **Hide the performers field on a manga gallery** | switch | A manga gallery's edit page leaves Stash's performers field out |
 
 An empty language list shows an "All languages" placeholder rather than every
 tag; only a chosen subset renders tags.
 
-**The two switches are deliberately independent**, so all four combinations are
+**The two display switches are deliberately independent**, so all four combinations are
 available:
 
 | Show flags | Cover badge | Cover | Dropdowns / detail row |
@@ -620,11 +651,22 @@ Taiwan flag and `en` gets the UK one), and a name can be preferable to a
 misleading flag. The name chip is the same one an unrecognised value already
 renders.
 
-**The switches default to what the plugin already did, and an absent value reads
-as the default** — both display switches on, the details block folded, the edit
-block open, the performers field hidden. So an install that predates them behaves
-exactly as it did until something is turned off. Nothing is written to the config
-until then.
+**The three rows that are not fields** — the two block defaults and the performers
+field — are under a heading of their own inside the group, because they are about how
+the manga info is shown rather than about any one field. The group only appears while
+at least one field is on: a page the plugin draws no fields on is a page those three
+are not about either, and the performers row is left alone with them.
+
+**The mark's three are siblings, not sub-settings.** Asking before unmarking and
+clearing the plugin's fields with the mark are two answers about one action rather
+than a parent and its child, so they are not wrapped in the group Stash's stylesheet
+uses to indent a setting's children. The mark is never one of the four fields and is
+never gated on them: it is what makes a gallery this plugin's at all.
+
+**Every switch defaults to what the plugin already did, and an absent value reads as
+the default** — all of them on, except the details block, which starts folded. So an
+install that predates them behaves exactly as it did until something is turned off.
+Nothing is written to the config until then.
 
 **Hiding the performers field only hides it.** The row is Stash's, its value lives
 in Stash's form, and the plugin neither renders it nor touches it: one CSS rule
@@ -636,7 +678,9 @@ details tab are unaffected.
 Every setting is saved as one map. `configurePlugin`'s input is the plugin's whole
 settings object, and writing all of them at once is correct whether that object is
 replaced or merged — which the plugin cannot confirm, since the resolver is not
-part of the published API.
+part of the published API. The settings page is not the only writer: the lightbox
+writes the reading half's JSON into its own key of the same map, and both go through
+one function that builds the whole of it, so neither can take the other's with it.
 
 It is a *custom* UI rather than Stash's stock per-setting inputs. Stash
 can only render STRING/NUMBER/BOOLEAN settings one plain input each, so "which
@@ -645,11 +689,11 @@ patches `PluginSettings` to render a react-select multiselect (flag + localised
 name, the same renderer as the edit dropdown) plus the switches, which are laid
 out exactly like Stash's own `BooleanSetting`.
 
-**Only the edit dropdown is affected.** Display is untouched: a gallery whose
-language is disabled still shows its flag badge and detail row exactly as before —
-the value is simply no longer offered as a new choice. This is react-select's
-`value`/`options` split: the selected value is rendered from `value`, which is
-never filtered, while only the option *list* is filtered.
+**Only the edit dropdown is affected by the enabled languages.** Display is untouched:
+a gallery whose language is disabled still shows its flag badge and detail row exactly
+as before — the value is simply no longer offered as a new choice. This is
+react-select's `value`/`options` split: the selected value is rendered from `value`,
+which is never filtered, while only the option *list* is filtered.
 
 ## Reading: three ways
 
@@ -957,13 +1001,17 @@ gallery or renaming a file moves it, and a list of ids cannot move.
 | Where | What it does |
 |---|---|
 | Chapters tab, **under the rows** | Imports the gallery whose tab it is. Offered only when Stash has chapters there that this gallery can use |
-| **Settings → Plugins → Manga Tools** | The same for every marked gallery at once. It says how many it would write first, and writes nothing until you confirm |
 
-Both ask before writing over a list this plugin already has, and that asking is not
+It asks before writing over a list this plugin already has, and that asking is not
 optional politeness: this plugin hides its own fields from Stash's custom-field
 editor, so the Chapters tab is the *only* place that list can be read — there is
-nowhere else to go and look at what an import would replace. Ticking the box in the
-settings job, or confirming in the tab, is the way back if an import was a mistake.
+nowhere else to go and look at what an import would replace. Confirming in the tab is
+the way back if an import was a mistake.
+
+*There used to be a second way in: a job on the settings page that would import every
+marked gallery at once. It is gone, and the plan is for the tab to bring a gallery's
+Stash chapters over quietly the first time it is opened — the import belongs where the
+chapters are, not on a page about settings.*
 
 A gallery whose Stash chapters all point past the end of its images is skipped, not
 imported: translating those gives an empty list, and writing an empty list would be
@@ -1088,17 +1136,15 @@ object, each adding its own members — which is why `fields.ts` holds the field
 The four filter modules do the same, each publishing the members it owns at the
 end of its own file; that is what keeps the sidebar and dialog from having to
 import each other. The reader half keeps to the same arrangement at
-`window.MangaReader`, with its own types in `reader/namespace.ts` — and that one
-is read *outward*, by the tools half, for the one job that is the reader's but is
-asked for from a settings page: importing a library's chapters. The shapes travel
-as `import type`, so nothing links the halves at run time and a Stash that started
-only one of them still runs.
+`window.MangaReader`, with its own types in `reader/namespace.ts`. The tools half
+starts the reader half and reads nothing back out of it: what the two halves share is
+the plugin's own fields, through the one module that names them.
 
-The reader half's settings are **not** in the plugin config. They are this
-browser's, under `plugin.mangaTools.settings` and `plugin.mangaTools.offsets` in
-`localStorage`, beside the lightbox options they sit next to in that menu — see
-`reader/settings.ts` for why, and for the fallback that reads the keys this half
-wrote when it was a plugin of its own.
+The reader half's settings are in the plugin config too, as one JSON string under
+`readerSettings` — written by the lightbox, where they are changed, rather than from
+the settings page. They used to be this browser's, in `localStorage`, and they are not
+read from there any more: a library nobody has written to has no settings, and the
+reader starts from its defaults. See `reader/settings.ts`.
 
 `tsc` plays no part in producing that file — it only type-checks, and esbuild
 strips types without reading them, so a name that does not exist compiles fine
@@ -1136,10 +1182,10 @@ To update later: **Installed Plugins → Update**.
 published** — this plugin is where it lives now, and two plugins shipping the
 same reader would both install it onto the lightbox. Stash does not remove a
 plugin on its own, so an installed copy stays until it is uninstalled by hand.
-Nothing is lost in the move: the reading settings and the per-gallery shifts are
-read from the keys the old plugin wrote (`mangaReader.settings`,
-`mangaReader.offsets`) and copied to `plugin.mangaTools.*` the first time this
-plugin reads them.
+The reading half's settings moved to the library, where every browser reads the same
+ones; the keys the old plugin left in a browser (`mangaReader.settings`,
+`mangaReader.offsets`) are **not** read, and its defaults are where a reader starts
+from.
 
 > To install manually instead: copy the whole `mangaTools/` directory into
 > `<Stash config dir>/plugins/` and hit Reload Plugins. Note the js/css paths in
@@ -1263,11 +1309,20 @@ Against a real Stash:
    `日本語` and `English`, save, then open a gallery edit page — the dropdown
    should offer only those two, while a gallery already set to Vietnamese still
    shows its flag and detail row
-9. **Check the display switches**: under Settings → Plugins → Manga Tools, turn
-   **Show flags** off — the dropdowns and the detail row should show names only,
-   and the cover badges should become name chips rather than disappearing. Turn
-   it back on and turn **Show the language on gallery covers** off instead — now
-   the covers are bare and everything else is unchanged.
+9. **Check the display switches**: under Settings → Plugins → Manga Tools, open
+   **Custom fields**, then **Language**, and turn **Show flags** off — the dropdowns
+   and the detail row should show names only, and the cover badges should become name
+   chips rather than disappearing. Turn it back on and turn **Show the language on
+   gallery covers** off instead — now the covers are bare and everything else is
+   unchanged.
+   - **Check the switches above them**: turn **Language** itself off and its whole
+     block goes — the dropdown, the badge, the detail row, the bulk row, the sidebar
+     section. Turn **Custom fields** off and all four fields go together, including
+     the manga info blocks on a gallery. Turn either back on and every setting under
+     it is exactly as it was.
+   - **Check the mark's three**: turn **Ask before unmarking** off — the toolbar
+     switch now unmarks on the first click, with a line about it in the console
+     instead of a dialog.
 10. **Check the bulk edit**: select several galleries → **Edit** → a "language"
    row should appear between studio and performers.
    - Select galleries that already share a language: the box should be prefilled
@@ -1482,10 +1537,11 @@ The reading half's own:
 - **Reading progress is not tracked.** That needs a viewer of our own rather than a
   takeover of Stash's.
 - **Chapter editing is one gallery at a time.** The Chapters tab creates, renames,
-  moves a start and deletes; the settings page imports a whole library at once. What
-  is missing is changing several galleries' chapters in one go, and a keyboard
-  shortcut for the form — Stash's own is `n` while the tab is open, and this plugin
-  has none.
+  moves a start and deletes. Importing a whole library's chapters at once used to be
+  a job on the settings page and is gone: the plan is for the tab to bring a gallery's
+  Stash chapters over quietly, where the chapters are. What is missing is changing
+  several galleries' chapters in one go, and a keyboard shortcut for the form —
+  Stash's own is `n` while the tab is open, and this plugin has none.
 - **A page in no chapter is not marked as such.** Stash's own header names the last
   chapter that began at or before where the reader is, which is what its numbers
   mean, so a cover before the first chapter shows no name and a divider between two
@@ -1562,10 +1618,10 @@ and its ~4.8 KB per locale × 32 locales would be ~140 KB against a 31 KB bundle
 to cover fewer locales than the platform already provides for nothing.
 
 **The plugin's own strings are translated too.** The headings, descriptions and
-placeholders it writes itself — `Select language…`, the three settings — live in
-`src/messages/*.json`, and `t(intl, id)` reads them from the catalog for Stash's UI
-language. Everything else on screen comes from Stash's own messages and follows the
-language for free.
+placeholders it writes itself — `Select language…`, the settings page's groups and
+switches — live in `src/messages/*.json`, and `t(intl, id)` reads them from the
+catalog for Stash's UI language. Everything else on screen comes from Stash's own
+messages and follows the language for free.
 
 A locale is chosen by its tag, dropping subtags one at a time, so `zh-Hant-HK` reads
 the `zh-Hant` catalog; a bare `zh` reads the Simplified one, matching how a bare

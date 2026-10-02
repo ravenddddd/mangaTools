@@ -63,12 +63,6 @@ import {
   currentSidebarFilter,
   publishSidebarFilter,
 } from "./sidebar-filter";
-// Types only, and deliberately so: these are erased before the bundle exists, so
-// this half names the reader's shapes without depending on its modules at run time.
-import type {
-  ChapterImportPlan,
-  ChapterImportRun,
-} from "../reader/chapters-import";
 import type { ReactNode } from "react";
 import type { MangaToolsFilterModel } from "../plugin-api";
 import type {
@@ -543,6 +537,35 @@ function refresh(): Promise<unknown> {
  * Only the `plugins` field is fetched — not the rest of Configuration, which
  * is a large object. This is the same minimal-query approach as getQuery().
  */
+/**
+ * Every switch that says whether the plugin does something at all: on.
+ *
+ * Which is what it always did — there was no way to turn any of it off — so an install
+ * that has never been touched behaves just as it did, and these settings only ever take
+ * something away. Declared here rather than down with the other defaults because the
+ * values below read it: a constant used above its declaration is in its dead zone, and
+ * the same trap is written down for the reader's own published constants.
+ */
+const FEATURE_ON_BY_DEFAULT = true;
+
+/**
+ * Every setting the managing half reads, live, before Stash has answered.
+ *
+ * The defaults, which are what the plugin did before any of this was configurable, so
+ * a page drawn in the moment before the configuration arrives is drawn the way the
+ * plugin has always drawn it rather than empty. `refreshSettings` overwrites them.
+ */
+NS.readerTakeover = FEATURE_ON_BY_DEFAULT;
+NS.manageChapters = FEATURE_ON_BY_DEFAULT;
+NS.fields = FEATURE_ON_BY_DEFAULT;
+NS.fieldLanguage = FEATURE_ON_BY_DEFAULT;
+NS.fieldCensorship = FEATURE_ON_BY_DEFAULT;
+NS.fieldTranslationGroup = FEATURE_ON_BY_DEFAULT;
+NS.fieldOriginal = FEATURE_ON_BY_DEFAULT;
+NS.coverIcon = FEATURE_ON_BY_DEFAULT;
+NS.confirmUnmark = FEATURE_ON_BY_DEFAULT;
+NS.deleteOnUnmark = FEATURE_ON_BY_DEFAULT;
+
 let SETTINGS_QUERY: unknown = null;
 
 function getSettingsQuery(): unknown {
@@ -601,6 +624,48 @@ function refreshSettings(): void {
       );
       // Absent reads as the default (on), so an install predating these
       // settings keeps its behaviour until the user turns something off.
+      // The four features, and the four fields under their master.
+      NS.readerTakeover = NS.parseFlag(
+        pluginCfg ? pluginCfg.readerTakeover : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.manageChapters = NS.parseFlag(
+        pluginCfg ? pluginCfg.manageChapters : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.fields = NS.parseFlag(
+        pluginCfg ? pluginCfg.fields : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.fieldLanguage = NS.parseFlag(
+        pluginCfg ? pluginCfg.fieldLanguage : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.fieldCensorship = NS.parseFlag(
+        pluginCfg ? pluginCfg.fieldCensorship : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.fieldTranslationGroup = NS.parseFlag(
+        pluginCfg ? pluginCfg.fieldTranslationGroup : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.fieldOriginal = NS.parseFlag(
+        pluginCfg ? pluginCfg.fieldOriginal : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.coverIcon = NS.parseFlag(
+        pluginCfg ? pluginCfg.coverIcon : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.confirmUnmark = NS.parseFlag(
+        pluginCfg ? pluginCfg.confirmUnmark : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+      NS.deleteOnUnmark = NS.parseFlag(
+        pluginCfg ? pluginCfg.deleteOnUnmark : null,
+        FEATURE_ON_BY_DEFAULT
+      );
+
       NS.showFlags = NS.parseFlag(pluginCfg ? pluginCfg.showFlags : null, true);
       NS.showCoverBadge = NS.parseFlag(
         pluginCfg ? pluginCfg.showCoverBadge : null,
@@ -969,7 +1034,7 @@ function MangaPopoverMark(props: { galleryId: string }) {
   const manga = storedIsManga(props.galleryId);
   const slot = manga ? ensurePopoverSlot(props.galleryId) : null;
 
-  if (!manga) return null;
+  if (!manga || !NS.coverIcon) return null;
 
   return (
     <>
@@ -1242,246 +1307,6 @@ function ConfirmUnmark(props: {
 }
 
 /**
- * Where the chapter import has got to.
- *
- * The module's state rather than React's, like everything else this half draws: the
- * panel repaints on `emit()`, so a run in progress reports its own progress, and a
- * test can watch a run finish instead of being unable to open it at all.
- */
-type ChapterJob =
-  | { phase: "idle" }
-  | { phase: "planning" }
-  | { phase: "confirming"; plan: ChapterImportPlan; replace: boolean }
-  | {
-      phase: "running";
-      plan: ChapterImportPlan;
-      replace: boolean;
-      done: number;
-      total: number;
-    }
-  | { phase: "done"; outcome: ChapterImportRun };
-
-let chapterJob: ChapterJob = { phase: "idle" };
-
-/**
- * The reader half's import job, or null when that half is not running.
- *
- * Reached through the window rather than imported, which is what keeps the two
- * halves unlinked: the chapter format is the reader's, so the job is its, and this
- * half asks through the namespace the same way the reader asks this half for
- * `markedInStore`. Absent is a real state — a Stash that could not start one half
- * runs the other — so every caller checks before it calls.
- */
-function readerChapters(): {
-  planChapterImports(): Promise<ChapterImportPlan>;
-  runChapterImports(
-    plan: ChapterImportPlan,
-    options?: {
-      reimport?: boolean;
-      onProgress?: (done: number, total: number) => void;
-    }
-  ): Promise<ChapterImportRun>;
-} | null {
-  const reader = (
-    window as unknown as {
-      MangaReader?: {
-        planChapterImports?: unknown;
-        runChapterImports?: unknown;
-      };
-    }
-  ).MangaReader;
-
-  if (
-    !reader ||
-    typeof reader.planChapterImports !== "function" ||
-    typeof reader.runChapterImports !== "function"
-  ) {
-    return null;
-  }
-
-  return reader as unknown as {
-    planChapterImports(): Promise<ChapterImportPlan>;
-    runChapterImports(
-      plan: ChapterImportPlan,
-      options?: {
-        reimport?: boolean;
-        onProgress?: (done: number, total: number) => void;
-      }
-    ): Promise<ChapterImportRun>;
-  };
-}
-
-/**
- * Importing Stash's chapters into this plugin's own field, for a whole library.
- *
- * The one-time move a library that has been on Stash's own rows all along needs.
- * The Chapters tab does the same job for the gallery it is on; this is that job for
- * every gallery that needs it, which is the shape it has to be — the galleries that
- * need it are exactly the ones nobody has opened the tab on.
- *
- * Two steps on screen as well as in the job: a read-only plan, so the question can
- * say how many galleries it is about, and then the run. Nothing is written until
- * the question is answered.
- */
-function ChapterImportSetting(props: { intl: MangaToolsIntl }) {
-  const intl = props.intl;
-  const Bootstrap = PluginApi.libraries.Bootstrap;
-  const Button = Bootstrap?.Button;
-  const job = chapterJob;
-
-  /** Asks the reader half what there is to do, and says so if it cannot */
-  function plan() {
-    const reader = readerChapters();
-    if (!reader) {
-      console.error(
-        "[mangaTools] the reader half is not running, so its chapter import " +
-          "cannot be asked for"
-      );
-      return;
-    }
-
-    chapterJob = { phase: "planning" };
-    emit();
-
-    reader.planChapterImports().then(
-      (next) => {
-        chapterJob =
-          next.toImport.length > 0 || next.owned.length > 0
-            ? { phase: "confirming", plan: next, replace: false }
-            : { phase: "done", outcome: emptyRun() };
-        emit();
-      },
-      (e: unknown) => {
-        console.error("[mangaTools] could not work out what to import:", e);
-        chapterJob = { phase: "idle" };
-        emit();
-      }
-    );
-  }
-
-  /** Does it, reporting each gallery as it lands */
-  function run(plan: ChapterImportPlan, replace: boolean) {
-    const reader = readerChapters();
-    if (!reader) return;
-
-    const total = replace
-      ? plan.toImport.length + plan.owned.length
-      : plan.toImport.length;
-    chapterJob = { phase: "running", plan, replace, done: 0, total };
-    emit();
-
-    reader
-      .runChapterImports(plan, {
-        reimport: replace,
-        onProgress: (done, total) => {
-          chapterJob = { phase: "running", plan, replace, done, total };
-          emit();
-        },
-      })
-      .then(
-        (outcome) => {
-          chapterJob = { phase: "done", outcome };
-          emit();
-        },
-        (e: unknown) => {
-          console.error("[mangaTools] the chapter import did not finish:", e);
-          chapterJob = { phase: "idle" };
-          emit();
-        }
-      );
-  }
-
-  if (!Button) return null;
-
-  return (
-    <>
-      <div className="setting manga-tools-settings">
-        <div className="manga-tools-settings-block">
-          <h3>{t(intl, "mangaTools.settings.chapters.heading")}</h3>
-          <div className="sub-heading">
-            {t(intl, "mangaTools.settings.chapters.description")}
-          </div>
-          <div className="manga-tools-settings-control">
-            {job.phase === "running" ? (
-              <span className="manga-tools-settings-progress">
-                {t(intl, "mangaTools.settings.chapters.progress")} {job.done}{" "}
-                {t(intl, "mangaTools.settings.chapters.of")} {job.total}
-              </span>
-            ) : (
-              <Button
-                variant="secondary"
-                disabled={job.phase === "planning"}
-                onClick={plan}
-              >
-                {t(
-                  intl,
-                  job.phase === "planning"
-                    ? "mangaTools.settings.chapters.checking"
-                    : "mangaTools.settings.chapters.check"
-                )}
-              </Button>
-            )}
-          </div>
-          {/* What the last run did, said in numbers rather than in a sentence: the
-            three outcomes are counted separately because they mean different
-            things, and "nothing to bring over" is not a failure. */}
-          {job.phase === "done" ? (
-            <div className="sub-heading">
-              {t(intl, "mangaTools.settings.chapters.progress")}{" "}
-              {job.outcome.written.length} ·{" "}
-              {t(intl, "mangaTools.settings.chapters.skipped")}{" "}
-              {job.outcome.skippedEmpty.length} ·{" "}
-              {t(intl, "mangaTools.settings.chapters.failed")}{" "}
-              {job.outcome.failed.length}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      {job.phase === "confirming" ? (
-        <ConfirmDialog
-          variant="danger"
-          confirmLabel={t(intl, "mangaTools.settings.chapters.start")}
-          cancelLabel={t(intl, "mangaTools.manga.confirmCancel")}
-          onCancel={() => {
-            chapterJob = { phase: "idle" };
-            emit();
-          }}
-          onConfirm={() => run(job.plan, job.replace)}
-        >
-          <div>
-            {t(intl, "mangaTools.settings.chapters.toImport")}{" "}
-            {job.plan.toImport.length} ·{" "}
-            {t(intl, "mangaTools.settings.chapters.owned")}{" "}
-            {job.plan.owned.length}
-          </div>
-          <label className="manga-tools-settings-check">
-            <input
-              type="checkbox"
-              checked={job.replace}
-              onChange={() => {
-                chapterJob = {
-                  phase: "confirming",
-                  plan: job.plan,
-                  replace: !job.replace,
-                };
-                emit();
-              }}
-            />{" "}
-            {t(intl, "mangaTools.settings.chapters.replace")}
-          </label>
-        </ConfirmDialog>
-      ) : null}
-    </>
-  );
-}
-
-/** A run that did nothing, for a plan with nothing in it */
-function emptyRun(): ChapterImportRun {
-  return { written: [], failed: [], skippedEmpty: [] };
-}
-
-/**
  * The edit form's custom-fields map and its setter, while the edit tab is open.
  *
  * Published by MangaFieldBlock, which is rendered inside that form and so has
@@ -1595,6 +1420,16 @@ function settingsInput(): { [key: string]: unknown } {
     enabledLanguages: NS.enabledLanguages
       ? NS.serializeEnabledLanguages(NS.enabledLanguages)
       : "",
+    readerTakeover: NS.readerTakeover,
+    manageChapters: NS.manageChapters,
+    fields: NS.fields,
+    fieldLanguage: NS.fieldLanguage,
+    fieldCensorship: NS.fieldCensorship,
+    fieldTranslationGroup: NS.fieldTranslationGroup,
+    fieldOriginal: NS.fieldOriginal,
+    coverIcon: NS.coverIcon,
+    confirmUnmark: NS.confirmUnmark,
+    deleteOnUnmark: NS.deleteOnUnmark,
     showFlags: NS.showFlags,
     showCoverBadge: NS.showCoverBadge,
     openDetailsBlock: NS.openDetailsBlock,
@@ -1880,6 +1715,13 @@ function GalleryToolbar(props: { galleryId: string; values: CustomFieldsMap }) {
   const onToggle = () => {
     if (!marked) {
       mark();
+      return;
+    }
+
+    // Asked about, or done: the switch says which, and taking a mark off is the one
+    // thing this plugin does that a reader might have meant to think about first.
+    if (!NS.confirmUnmark) {
+      onConfirmUnmark();
       return;
     }
 
@@ -2171,8 +2013,17 @@ function MangaFieldBlock(props: {
   // in Stash's form, so a gallery that does have performers keeps them on save,
   // and nothing here can lose data. The class goes on this plugin's own node,
   // which React does not manage, so a re-render of Stash's form cannot undo it.
+  //
+  // Asked together with whether any field is drawn, because the two are the same
+  // question: with all four fields turned off this block does not exist, and a page
+  // the plugin draws nothing on is a page whose fields it should not be hiding
+  // either. The setting itself is not forgotten — it is read again the moment one
+  // field is back on.
   if (host) {
-    host.classList.toggle("hide-performers", NS.hidePerformers);
+    host.classList.toggle(
+      "hide-performers",
+      NS.hidePerformers && NS.anyFieldShowing()
+    );
   }
 
   const bump = React.useState(0)[1];
@@ -2195,7 +2046,12 @@ function MangaFieldBlock(props: {
     }
   });
 
-  if (!isGalleryContext() || !Select || !host) return null;
+  // No fields drawn means no block. An empty fold whose heading opens onto nothing
+  // is worse than no fold at all, and the edit page is then Stash's own — which is
+  // exactly what a reader who turned all four off asked for.
+  if (!isGalleryContext() || !Select || !host || !NS.anyFieldShowing()) {
+    return null;
+  }
 
   // One writer for both rows: Stash's form owns the values map, so each row
   // hands it a new map rather than writing anything itself. That is what makes
@@ -2556,6 +2412,22 @@ function MangaFieldBlock(props: {
   // own pressed look, so the state needs no styling of its own beyond the shape.
   // aria-pressed is what says "toggle" to a screen reader, and the name and tooltip
   // are where the words go, since the button has none of its own.
+  // The two fields the row below is built from, asked once. Raw and the
+  // translation group are two answers to one question, which is why the chip that
+  // declares one of them rides on the other's row rather than having a row of its
+  // own — and that is only true while both are drawn. With the group turned off,
+  // raw is a field like any other and gets what every other field on this form
+  // has: a switch, on a row of its own.
+  const showGroup = NS.fieldShowing("translationGroup");
+  const showOriginal = NS.fieldShowing("original");
+
+  // Whether the *group row* is disabled by the raw mark, which is a different
+  // question from whether the gallery is raw: with the raw field turned off there is
+  // no switch anywhere to turn it back on, and a box greyed out with no way out of
+  // it is worse than one the reader can type into. The value itself is untouched
+  // either way — it simply stops steering a row it no longer belongs to.
+  const rawShown = showOriginal && isOriginal;
+
   const originalLabel = t(intl, "mangaTools.translationGroup.original");
   const originalChip = (
     <button
@@ -2580,12 +2452,44 @@ function MangaFieldBlock(props: {
     </button>
   );
 
+  // Raw on its own, for the one arrangement where the chip above has no row to sit
+  // on. It is the same control every other field of this plugin has on Stash's edit
+  // page — a switch in the control column, with the label in the column the two
+  // selects beside it use — because on its own it *is* just another boolean field,
+  // and the chip was only ever there to say "this is the other answer to the
+  // question the box next to it asks".
+  //
+  // Markup rather than react-bootstrap's Form.Check, like the rows around it: the
+  // classes are Bootstrap's own switch (`form-check form-switch` + a checkbox with
+  // `role="switch"`), which is exactly what Form.Check with type="switch" renders.
+  const originalRow = (
+    <div className={cls.group} data-field="manga_tools_original">
+      <label className={cls.label} htmlFor="manga_tools_original">
+        {originalLabel}
+      </label>
+      <div className={cls.control}>
+        <div className="form-check form-switch">
+          <input
+            className="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="manga_tools_original"
+            checked={isOriginal}
+            onChange={toggleOriginal}
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   const groupField = (
     <div className={cls.group} data-field="manga_tools_translation_group">
       <label className={cls.label} htmlFor="manga_tools_translation_group">
         {t(intl, "mangaTools.translationGroup.heading")}
       </label>
-      <div className={cls.control + " manga-tools-chip-row"}>
+      <div
+        className={cls.control + (showOriginal ? " manga-tools-chip-row" : "")}
+      >
         <Select
           className="manga-tools-select manga-tools-group-select"
           classNamePrefix="react-select"
@@ -2602,10 +2506,10 @@ function MangaFieldBlock(props: {
           // a line of text would say the same thing and leave the row a different
           // shape from the two above it, which is the property the column widths
           // here took the most work to get right.
-          isDisabled={isOriginal}
+          isDisabled={rawShown}
           placeholder={t(
             intl,
-            isOriginal
+            rawShown
               ? "mangaTools.translationGroup.originalDetail"
               : "mangaTools.translationGroup.placeholder"
           )}
@@ -2638,7 +2542,7 @@ function MangaFieldBlock(props: {
             writeGroup(opt ? opt.value : "");
           }}
         />
-        {originalChip}
+        {showOriginal ? originalChip : null}
       </div>
     </div>
   );
@@ -2673,9 +2577,13 @@ function MangaFieldBlock(props: {
           </div>
         </div>
       </div>
-      {open ? markField : null}
-      {open ? languageField : null}
-      {open ? groupField : null}
+      {open && NS.fieldShowing("censorship") ? markField : null}
+      {open && NS.fieldShowing("language") ? languageField : null}
+      {open && showGroup ? groupField : null}
+      {/* Raw, as a row of its own, only where the group's row is not there to
+          carry the chip. With both drawn the chip above is the whole of it, and
+          with the field turned off there is nothing to draw. */}
+      {open && showOriginal && !showGroup ? originalRow : null}
     </div>,
     host
   );
@@ -2701,12 +2609,36 @@ function MangaFieldBlock(props: {
  * (Settings/Inputs.tsx): a `.setting` row with the heading on the left and the
  * switch pushed to the right by Stash's own CSS.
  */
+/**
+ * A "?" beside a setting's heading, carrying the wording the sub-heading has no
+ * room for.
+ *
+ * The text goes on a wrapping <span title> rather than on the icon itself: Icon
+ * spreads what it is given onto an <svg>, and a title on an SVG is shown by some
+ * browsers and not others. With no glyph to draw the "?" is written as text, so
+ * the explanation is never unreachable — the same reasoning as the wand button in
+ * MangaFieldBlock, which falls back for exactly this reason.
+ */
+function HelpIcon(props: { text: string }) {
+  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
+  const Icon = PluginApi.components.Icon;
+  const icon = Solid.faQuestionCircle || null;
+
+  return (
+    <span className="manga-tools-help" title={props.text}>
+      {icon ? <Icon icon={icon} /> : "?"}
+    </span>
+  );
+}
+
 function BooleanSetting(props: {
   id: string;
   heading: string;
-  subHeading: string;
+  subHeading?: string;
   checked: boolean;
   onChange: (next: boolean) => void;
+  /** The wording a "?" beside the heading holds, when the sub-heading cannot */
+  help?: string;
 }) {
   const Bootstrap = PluginApi.libraries.Bootstrap;
   if (!Bootstrap) {
@@ -2719,8 +2651,22 @@ function BooleanSetting(props: {
   return (
     <div className="setting">
       <div>
-        <h3>{props.heading}</h3>
-        <div className="sub-heading">{props.subHeading}</div>
+        {/* The heading is a plain string when nothing hangs off it — a heading that
+            is an array with a null in it is a different shape to every other one on
+            the page, and to anything reading the text of one. */}
+        <h3>
+          {props.help ? (
+            <>
+              {props.heading}
+              <HelpIcon text={props.help} />
+            </>
+          ) : (
+            props.heading
+          )}
+        </h3>
+        {props.subHeading ? (
+          <div className="sub-heading">{props.subHeading}</div>
+        ) : null}
       </div>
       <div>
         <Bootstrap.Form.Switch
@@ -2735,6 +2681,68 @@ function BooleanSetting(props: {
   );
 }
 
+/**
+ * A switch and the rows that only mean anything under it.
+ *
+ * The rows are *rendered* only while the switch is on — what a reader has not
+ * turned on is not on the page — and that is deliberately the only thing the
+ * switch does to them. Nothing here writes their values: a feature turned off and
+ * on again comes back with the settings it had, which is the same promise the four
+ * field switches make about the field values.
+ *
+ * They go in Stash's own `.setting-group`, which is the class whose styling makes
+ * a row read as belonging to the one above it rather than as more of the page.
+ * That is also why the rows that are *not* one thing's sub-settings — the mark's
+ * three, the display rows — are not wrapped: they are siblings, and wrapping them
+ * would say they were children.
+ */
+function SettingSwitch(props: {
+  id: string;
+  heading: string;
+  subHeading?: string;
+  help?: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  /** The rows under it, drawn only while `checked` */
+  children?: ReactNode;
+}) {
+  return (
+    <>
+      <BooleanSetting
+        id={props.id}
+        heading={props.heading}
+        subHeading={props.subHeading}
+        help={props.help}
+        checked={props.checked}
+        onChange={props.onChange}
+      />
+      {props.checked && props.children ? (
+        <div className="setting-group manga-tools-settings-group">
+          {props.children}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A heading that groups the rows under it without being a setting itself.
+ *
+ * The two places it is used are the two where the rows belong together but not to
+ * one switch: the mark's behaviour, and how the manga blocks are shown. The rows
+ * under it stay siblings — no `.setting-group` — because that is what they are.
+ */
+function SettingsHeading(props: { heading: string; subHeading?: string }) {
+  return (
+    <div className="manga-tools-settings-heading">
+      <h3>{props.heading}</h3>
+      {props.subHeading ? (
+        <div className="sub-heading">{props.subHeading}</div>
+      ) : null}
+    </div>
+  );
+}
+
 function MangaToolsSettings() {
   useGlobalVersion();
 
@@ -2745,10 +2753,23 @@ function MangaToolsSettings() {
    * Writes every setting at once — see `saveSettings`, which is where the map is built
    * and which is also what the reading half's own writes go through. It is not the
    * settings *page*'s map: the reader's settings are on it too, and a page that saved
-   * only its own six would take them with it.
+   * only its own would take them with it.
    */
   function persist() {
     saveSettings();
+  }
+
+  /**
+   * What every switch on this page does: the new value into the live namespace
+   * first — so the page, and every other surface reading it, redraws in the same
+   * pass — and then the whole map to Stash.
+   */
+  function writeFlag(into: (next: boolean) => void) {
+    return (next: boolean) => {
+      into(next);
+      emit();
+      persist();
+    };
   }
 
   const options: MangaToolsOption[] = NS.languageOptions(intl.locale);
@@ -2760,107 +2781,240 @@ function MangaToolsSettings() {
 
   if (!Select) return null;
 
+  // One description for four switches. What turning a field off does is the same
+  // thing whichever field it is, and four copies of one sentence would read as four
+  // different promises.
+  const fieldDescription = t(intl, "mangaTools.settings.field.description");
+  const field = (
+    id: string,
+    heading: string,
+    showing: () => boolean,
+    set: (next: boolean) => void
+  ) => (
+    <BooleanSetting
+      id={id}
+      heading={heading}
+      subHeading={fieldDescription}
+      checked={showing()}
+      onChange={writeFlag(set)}
+    />
+  );
+
   return (
     <>
-      <div className="setting manga-tools-settings">
-        <div className="manga-tools-settings-block">
-          <h3>{t(intl, "mangaTools.settings.enabledLanguages.heading")}</h3>
-          <div className="sub-heading">
-            {t(intl, "mangaTools.settings.enabledLanguages.description")}
-          </div>
-          <div className="manga-tools-settings-control">
-            <Select
-              className="manga-tools-settings-select"
-              classNamePrefix="react-select"
-              isMulti
-              isClearable
-              // Flip the menu above the control when there is not enough room
-              // below (the plugin is usually the last entry on the page).
-              menuPlacement="auto"
-              placeholder={t(
-                intl,
-                "mangaTools.settings.enabledLanguages.placeholder"
-              )}
-              value={value}
-              options={options}
-              formatOptionLabel={formatLanguageOption}
-              components={{ IndicatorSeparator: () => null }}
-              onChange={(selected: MangaToolsOption[] | null) => {
-                const codes = (selected || []).map((o) => o.value);
-
-                // Reflect the change immediately (the dropdown and this UI
-                // both read NS.enabledLanguages), then persist it.
-                NS.enabledLanguages = NS.parseEnabledLanguages(
-                  NS.serializeEnabledLanguages(codes)
-                );
-                emit();
-                persist();
-              }}
-            />
-          </div>
+      {/* ── The lightbox ─────────────────────────────────────────────────── */}
+      <SettingSwitch
+        id="mangaTools-readerTakeover"
+        heading={t(intl, "mangaTools.settings.readerTakeover.heading")}
+        subHeading={t(intl, "mangaTools.settings.readerTakeover.description")}
+        checked={NS.readerTakeover}
+        onChange={writeFlag((next) => {
+          NS.readerTakeover = next;
+        })}
+      >
+        {/* Where the lightbox's own settings are is the one thing about it this
+            page cannot say with a switch: they are on the lightbox, and this page
+            deliberately does not carry a second copy of them. */}
+        <div className="manga-tools-settings-note">
+          {t(intl, "mangaTools.settings.readerTakeover.note")}
         </div>
-      </div>
+      </SettingSwitch>
 
+      {/* ── The chapters tab ─────────────────────────────────────────────── */}
+      <SettingSwitch
+        id="mangaTools-manageChapters"
+        heading={t(intl, "mangaTools.settings.manageChapters.heading")}
+        subHeading={t(intl, "mangaTools.settings.manageChapters.description")}
+        checked={NS.manageChapters}
+        onChange={writeFlag((next) => {
+          NS.manageChapters = next;
+        })}
+      >
+        <div className="manga-tools-settings-warning" role="alert">
+          {t(intl, "mangaTools.settings.manageChapters.warning")}
+        </div>
+      </SettingSwitch>
+
+      {/* ── The four fields, and how what they hold is shown ─────────────── */}
+      <SettingSwitch
+        id="mangaTools-fields"
+        heading={t(intl, "mangaTools.settings.fields.heading")}
+        subHeading={t(intl, "mangaTools.settings.fields.description")}
+        checked={NS.fields}
+        onChange={writeFlag((next) => {
+          NS.fields = next;
+        })}
+      >
+        <SettingSwitch
+          id="mangaTools-fieldLanguage"
+          heading={fieldLabel(intl)}
+          subHeading={fieldDescription}
+          checked={NS.fieldLanguage}
+          onChange={writeFlag((next) => {
+            NS.fieldLanguage = next;
+          })}
+        >
+          <div className="setting manga-tools-settings">
+            <div className="manga-tools-settings-block">
+              <h3>{t(intl, "mangaTools.settings.enabledLanguages.heading")}</h3>
+              <div className="sub-heading">
+                {t(intl, "mangaTools.settings.enabledLanguages.description")}
+              </div>
+              <div className="manga-tools-settings-control">
+                <Select
+                  className="manga-tools-settings-select"
+                  classNamePrefix="react-select"
+                  isMulti
+                  isClearable
+                  // Flip the menu above the control when there is not enough room
+                  // below (the plugin is usually the last entry on the page).
+                  menuPlacement="auto"
+                  placeholder={t(
+                    intl,
+                    "mangaTools.settings.enabledLanguages.placeholder"
+                  )}
+                  value={value}
+                  options={options}
+                  formatOptionLabel={formatLanguageOption}
+                  components={{ IndicatorSeparator: () => null }}
+                  onChange={(selected: MangaToolsOption[] | null) => {
+                    const codes = (selected || []).map((o) => o.value);
+
+                    // Reflect the change immediately (the dropdown and this UI
+                    // both read NS.enabledLanguages), then persist it.
+                    NS.enabledLanguages = NS.parseEnabledLanguages(
+                      NS.serializeEnabledLanguages(codes)
+                    );
+                    emit();
+                    persist();
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <BooleanSetting
+            id="mangaTools-showFlags"
+            heading={t(intl, "mangaTools.settings.showFlags.heading")}
+            subHeading={t(intl, "mangaTools.settings.showFlags.description")}
+            checked={NS.showFlags}
+            onChange={writeFlag((next) => {
+              NS.showFlags = next;
+            })}
+          />
+
+          <BooleanSetting
+            id="mangaTools-showCoverBadge"
+            heading={t(intl, "mangaTools.settings.showCoverBadge.heading")}
+            subHeading={t(
+              intl,
+              "mangaTools.settings.showCoverBadge.description"
+            )}
+            help={t(intl, "mangaTools.settings.showCoverBadge.help")}
+            checked={NS.showCoverBadge}
+            onChange={writeFlag((next) => {
+              NS.showCoverBadge = next;
+            })}
+          />
+        </SettingSwitch>
+
+        {field(
+          "mangaTools-fieldCensorship",
+          t(intl, "mangaTools.censorship.heading"),
+          () => NS.fieldCensorship,
+          (next) => {
+            NS.fieldCensorship = next;
+          }
+        )}
+
+        {field(
+          "mangaTools-fieldTranslationGroup",
+          t(intl, "mangaTools.translationGroup.heading"),
+          () => NS.fieldTranslationGroup,
+          (next) => {
+            NS.fieldTranslationGroup = next;
+          }
+        )}
+
+        {field(
+          "mangaTools-fieldOriginal",
+          t(intl, "mangaTools.translationGroup.original"),
+          () => NS.fieldOriginal,
+          (next) => {
+            NS.fieldOriginal = next;
+          }
+        )}
+
+        {/* Three rows that are not fields: they decide how the manga blocks are
+            shown, so they belong to the feature rather than to any one field, and
+            they get a heading instead of a switch to say so. */}
+        <SettingsHeading
+          heading={t(intl, "mangaTools.settings.display.heading")}
+        />
+        <BooleanSetting
+          id="mangaTools-openDetailsBlock"
+          heading={t(intl, "mangaTools.settings.openDetailsBlock.heading")}
+          subHeading={t(
+            intl,
+            "mangaTools.settings.openDetailsBlock.description"
+          )}
+          checked={NS.openDetailsBlock}
+          onChange={writeFlag((next) => {
+            NS.openDetailsBlock = next;
+          })}
+        />
+        <BooleanSetting
+          id="mangaTools-openEditBlock"
+          heading={t(intl, "mangaTools.settings.openEditBlock.heading")}
+          subHeading={t(intl, "mangaTools.settings.openEditBlock.description")}
+          checked={NS.openEditBlock}
+          onChange={writeFlag((next) => {
+            NS.openEditBlock = next;
+          })}
+        />
+        <BooleanSetting
+          id="mangaTools-hidePerformers"
+          heading={t(intl, "mangaTools.settings.hidePerformers.heading")}
+          subHeading={t(intl, "mangaTools.settings.hidePerformers.description")}
+          checked={NS.hidePerformers}
+          onChange={writeFlag((next) => {
+            NS.hidePerformers = next;
+          })}
+        />
+      </SettingSwitch>
+
+      {/* ── The mark itself ──────────────────────────────────────────────── */}
+      {/* No switch: these three are not one feature, they are three answers about
+          the mark, and they are deliberately siblings — the pair that is easy to
+          mistake for a parent and its child especially. */}
+      <SettingsHeading heading={t(intl, "mangaTools.settings.mark.heading")} />
       <BooleanSetting
-        id="mangaTools-showFlags"
-        heading={t(intl, "mangaTools.settings.showFlags.heading")}
-        subHeading={t(intl, "mangaTools.settings.showFlags.description")}
-        checked={NS.showFlags}
-        onChange={(next) => {
-          NS.showFlags = next;
-          emit();
-          persist();
-        }}
+        id="mangaTools-confirmUnmark"
+        heading={t(intl, "mangaTools.settings.confirmUnmark.heading")}
+        subHeading={t(intl, "mangaTools.settings.confirmUnmark.description")}
+        checked={NS.confirmUnmark}
+        onChange={writeFlag((next) => {
+          NS.confirmUnmark = next;
+        })}
       />
-
       <BooleanSetting
-        id="mangaTools-showCoverBadge"
-        heading={t(intl, "mangaTools.settings.showCoverBadge.heading")}
-        subHeading={t(intl, "mangaTools.settings.showCoverBadge.description")}
-        checked={NS.showCoverBadge}
-        onChange={(next) => {
-          NS.showCoverBadge = next;
-          emit();
-          persist();
-        }}
+        id="mangaTools-deleteOnUnmark"
+        heading={t(intl, "mangaTools.settings.deleteOnUnmark.heading")}
+        subHeading={t(intl, "mangaTools.settings.deleteOnUnmark.description")}
+        checked={NS.deleteOnUnmark}
+        onChange={writeFlag((next) => {
+          NS.deleteOnUnmark = next;
+        })}
       />
-
       <BooleanSetting
-        id="mangaTools-openDetailsBlock"
-        heading={t(intl, "mangaTools.settings.openDetailsBlock.heading")}
-        subHeading={t(intl, "mangaTools.settings.openDetailsBlock.description")}
-        checked={NS.openDetailsBlock}
-        onChange={(next) => {
-          NS.openDetailsBlock = next;
-          emit();
-          persist();
-        }}
-      />
-
-      <BooleanSetting
-        id="mangaTools-openEditBlock"
-        heading={t(intl, "mangaTools.settings.openEditBlock.heading")}
-        subHeading={t(intl, "mangaTools.settings.openEditBlock.description")}
-        checked={NS.openEditBlock}
-        onChange={(next) => {
-          NS.openEditBlock = next;
-          emit();
-          persist();
-        }}
-      />
-
-      <ChapterImportSetting intl={intl} />
-
-      <BooleanSetting
-        id="mangaTools-hidePerformers"
-        heading={t(intl, "mangaTools.settings.hidePerformers.heading")}
-        subHeading={t(intl, "mangaTools.settings.hidePerformers.description")}
-        checked={NS.hidePerformers}
-        onChange={(next) => {
-          NS.hidePerformers = next;
-          emit();
-          persist();
-        }}
+        id="mangaTools-coverIcon"
+        heading={t(intl, "mangaTools.settings.coverIcon.heading")}
+        subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
+        help={t(intl, "mangaTools.settings.coverIcon.help")}
+        checked={NS.coverIcon}
+        onChange={writeFlag((next) => {
+          NS.coverIcon = next;
+        })}
       />
     </>
   );
@@ -3435,7 +3589,11 @@ function BulkFieldsRow() {
   );
 
   // The gate in order: a warning while the reader is unmarking, the mark itself,
-  // and only then the two fields it guards.
+  // and only then the two fields it guards — each of which is drawn only while its
+  // own switch says so, and neither of which takes the other down with it. The mark
+  // is not one of the four fields and is never gated on them: it is what makes a
+  // gallery this plugin's at all, and a dialog that could not set it would leave
+  // every gallery unmarked.
   return PluginApi.ReactDOM.createPortal(
     <>
       {tri === false && aggregate !== "none" ? (
@@ -3444,8 +3602,8 @@ function BulkFieldsRow() {
         </div>
       ) : null}
       {mangaRow}
-      {tri === true ? languageRow : null}
-      {tri === true ? censorshipRow : null}
+      {tri === true && NS.fieldShowing("language") ? languageRow : null}
+      {tri === true && NS.fieldShowing("censorship") ? censorshipRow : null}
     </>,
     host
   );
@@ -3559,17 +3717,28 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   const open = state[0];
   const setOpen = state[1];
 
-  const language = NS.describe(pickLanguage(props.values), intl.locale);
-  const mark = censorshipOf(props.values);
-  const group = NS.translationGroupOf(props.values);
-  const original = NS.isOriginal(props.values);
+  // Each value is read only if its field is drawn, so a field that is off cannot
+  // reach the panel through the back door — a row whose value happens to be set on
+  // the gallery is exactly what "turned off" has to hide. What it does not do is
+  // touch the gallery: the values stay where they are, and turning the field back
+  // on brings them back.
+  const language = NS.fieldShowing("language")
+    ? NS.describe(pickLanguage(props.values), intl.locale)
+    : null;
+  const mark = NS.fieldShowing("censorship") ? censorshipOf(props.values) : "";
+  const group = NS.fieldShowing("translationGroup")
+    ? NS.translationGroupOf(props.values)
+    : "";
+  const original = NS.fieldShowing("original") && NS.isOriginal(props.values);
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
   const Icon = PluginApi.components.Icon;
   const Button = PluginApi.libraries.Bootstrap?.Button;
   const Collapse = PluginApi.libraries.Bootstrap?.Collapse;
 
   // Nothing set means nothing to say: with none of the four set the whole panel
-  // is dropped, rather than left as an empty fold with only its heading.
+  // is dropped, rather than left as an empty fold with only its heading. The same
+  // test answers "are there any fields at all": with every one of them turned off
+  // none of the four can be set, so the panel drops without a second question.
   if (!language && !mark && !group && !original) return null;
 
   // The same mount point the plain language row used: the end of .gallery-details,
@@ -3634,10 +3803,14 @@ function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
         </h6>
       ) : null}
       {original && !language ? (
-        // Raw with no language to carry the mark, so it stands on its own — and
-        // without the group's label, for the reason above. The wording carries the
-        // rest: a bare "原文" under that label would read like a group called that,
-        // which is why the string says what it does.
+        // Raw with no language row to carry the mark, so it stands on its own —
+        // and without the group's label, for the reason above. The wording carries
+        // the rest: a bare "原文" under that label would read like a group called
+        // that, which is why the string says what it does.
+        //
+        // "No language row" rather than "no language set": with the language field
+        // turned off there is no row to ride on whatever the gallery holds, and a
+        // raw mark with no way of being shown is worse than one shown plainly.
         <h6 className="manga-tools-detail">
           {t(intl, "mangaTools.translationGroup.originalDetail")}
         </h6>
@@ -3694,8 +3867,12 @@ registerPatch("after", "GalleryCard.Overlays", (...args: unknown[]) => {
   const id = props.gallery?.id;
   const value = id ? pickLanguage(store?.get(String(id))) : "";
 
-  // Nothing to add: the gallery has no language, or the badge is turned off.
-  if (!value || !NS.showCoverBadge) return result;
+  // Nothing to add: the gallery has no language, or the badge is turned off, or
+  // the language field itself is. Asked here rather than inside the badge for the
+  // reason every guard on this half is asked as early as it can be: a component
+  // that is not rendered cannot draw anything by accident.
+  if (!value || !NS.showCoverBadge || !NS.fieldShowing("language"))
+    return result;
 
   return (
     <>
@@ -4103,8 +4280,15 @@ registerPatch("after", "FilteredGalleryList.SidebarSections", (...args) => {
 
   return (
     <>
-      <SidebarLanguageFilter filter={filter} />
-      <SidebarCensorshipFilter filter={filter} />
+      {/* One section per field, each drawn only while its field is. The manga
+          section is not one of them: the mark is what makes a gallery this
+          plugin's at all, so it is offered whatever the four switches say. */}
+      {NS.fieldShowing("language") ? (
+        <SidebarLanguageFilter filter={filter} />
+      ) : null}
+      {NS.fieldShowing("censorship") ? (
+        <SidebarCensorshipFilter filter={filter} />
+      ) : null}
       <SidebarMangaFilter filter={filter} />
       {result}
     </>
@@ -4155,12 +4339,18 @@ registerPatch("instead", "GalleryList", (...args: unknown[]) => {
 
   // The filter dialog builds its cards from a shared options array that the
   // model reaches. Registering here is the first moment that array is in hand;
-  // the call is idempotent and the array is only ever pushed to once.
-  if (props.filter) registerLanguageCriterionOption(props.filter);
+  // the call is idempotent and the array is only ever pushed to once. Skipped
+  // entirely while the language field is off: a card for a field this plugin does
+  // not manage is a way into a filter nothing would then draw.
+  if (props.filter && NS.fieldShowing("language")) {
+    registerLanguageCriterionOption(props.filter);
+  }
 
   return (
     <>
-      <DialogLanguageFilter filter={props.filter as MangaToolsFilterModel} />
+      {NS.fieldShowing("language") ? (
+        <DialogLanguageFilter filter={props.filter as MangaToolsFilterModel} />
+      ) : null}
       <Original {...props} />
     </>
   );

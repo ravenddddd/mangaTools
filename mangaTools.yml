@@ -6,16 +6,17 @@
 # the two halves of the plugin and the modules they share inlined into it by
 # esbuild (see build.mjs), so there is no load order to get wrong.
 #
-# The two halves are why this file's `settings:` block does not cover everything
-# the plugin remembers. What is here is the tools half's — library policy, stored
-# in Stash's own configuration. The reader half's settings are the browser's,
-# beside the lightbox options they sit next to in that menu, and are not
-# configurable from here at all. See src/reader/settings.ts for why.
+# Both halves' settings live here, in Stash's own configuration, and both are
+# written by the settings page this plugin draws for itself. What is *not* here is
+# how the reader is set up — one page or two, the fade, the cover on its own — which
+# belongs beside the lightbox options it sits with; that half's settings are stored
+# as one JSON string in `readerSettings` below, so that every browser reads the same
+# way. See src/reader/settings.ts.
 name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.9.0
+version: 0.9.1
 ui:
   javascript:
     - mangaTools.js
@@ -43,18 +44,76 @@ ui:
 
 # Plugin settings, editable under Settings → Plugins. Stash renders one plain
 # input per entry below (STRING/NUMBER/BOOLEAN only); the plugin patches that UI
-# for itself to show a multiselect and switches instead. All of them live in
-# Configuration.plugins.mangaTools:
+# for itself and draws a page of its own — switches grouped under the feature they
+# belong to, the rows a switch holds appearing only while it is on, and a
+# multiselect. All of them live in Configuration.plugins.mangaTools.
+#
+# Three of them are *features*, and off means the plugin does not do that thing at all:
+#   readerTakeover    read a marked gallery in this plugin's own lightbox
+#   manageChapters    the Chapters tab's editing writes this plugin's field
+#   fields            the custom fields, all four of them, master switch
+#
+# Four are the fields themselves, under that master:
+#   fieldLanguage / fieldCensorship / fieldTranslationGroup / fieldOriginal
+#
+# Three are how the mark itself behaves:
+#   coverIcon         draw the mark's icon in a gallery cover's info row
+#   confirmUnmark     ask before taking the mark off
+#   deleteOnUnmark    and take this plugin's fields off with it
+#
+# And the rest are how the fields are shown — the language's four under its own
+# switch, the last three under a heading of their own:
 #   enabledLanguages  comma-separated canonical codes; empty = no restriction
 #   showFlags         draw flags, or names on their own
 #   showCoverBadge    draw the badge on gallery covers (independent of showFlags)
 #   openDetailsBlock  the state the details tab's block opens in
 #   openEditBlock     the state the edit form's block opens in
 #   hidePerformers    leave the performers field out of a manga gallery's edit page
-# Everything is absent until the user changes something, and an absent value
-# reads as the default (no restriction / both switches on / the blocks as they
-# were / the performers field hidden).
+#
+# Everything is absent until the user changes something, and an absent value reads as
+# the default — and every default is what the plugin did before the setting existed,
+# so an install that has never been touched behaves as it always did.
 settings:
+  readerTakeover:
+    displayName: Take over Stash's lightbox
+    description: A gallery marked as manga is read in this plugin's own lightbox, redesigned from the ground up. Nothing about Stash's own lightbox settings is changed.
+    type: BOOLEAN
+  manageChapters:
+    displayName: Take over the Chapters tab
+    description: Creating and editing chapters is this plugin's job, and writing them stores this plugin's own chapter field. Stash's existing chapters are brought over quietly, and are never modified.
+    type: BOOLEAN
+  fields:
+    displayName: Custom fields
+    description: The plugin's fields are written as custom fields, so none of Stash's own data is touched. Turning one off does not clear the values already on your galleries.
+    type: BOOLEAN
+  fieldLanguage:
+    displayName: Language
+    description: One of the custom fields. Turned off, the language row, badge and filter are not drawn; the values already on galleries are kept.
+    type: BOOLEAN
+  fieldCensorship:
+    displayName: Censorship
+    description: One of the custom fields. Turned off, its row, badge and filter are not drawn; the values already on galleries are kept.
+    type: BOOLEAN
+  fieldTranslationGroup:
+    displayName: Translation group
+    description: One of the custom fields. Turned off, its row and the group menu are not drawn; the values already on galleries are kept.
+    type: BOOLEAN
+  fieldOriginal:
+    displayName: Raw
+    description: One of the custom fields — the gallery is the original text and nothing was translated. Turned off, its row is not drawn; the values already on galleries are kept.
+    type: BOOLEAN
+  coverIcon:
+    displayName: Show the manga icon on gallery covers
+    description: The icon at the end of a cover's info row — the row that appears on hover, with the image count and the tag count. Turned off, the cover carries no mark, and the gallery is still managed.
+    type: BOOLEAN
+  confirmUnmark:
+    displayName: Ask before unmarking
+    description: A gallery stops being manga only after a confirmation.
+    type: BOOLEAN
+  deleteOnUnmark:
+    displayName: Remove this plugin's fields when unmarking
+    description: On, unmarking a gallery takes its language, censorship, translation group and raw values off with the mark. Off, the values stay on the gallery — hidden, and back if it is marked again.
+    type: BOOLEAN
   enabledLanguages:
     displayName: Enabled languages
     description: Only these languages appear in the edit-page dropdown. Display (badge and detail row) is unaffected. Leave empty to show every language.
@@ -68,15 +127,15 @@ settings:
     description: The badge in the bottom-right of a gallery's cover. With flags turned off it shows the language name instead of a flag.
     type: BOOLEAN
   openDetailsBlock:
-    displayName: Start the details block expanded
-    description: The Manga info section in a gallery's details tab. Collapsed, the heading is what says the section is there. Only affects the state a block opens in.
+    displayName: Start the manga info section expanded
+    description: The Manga info section in a gallery's details tab. Collapsed, its heading is what says the section is there. Only affects the state a block opens in.
     type: BOOLEAN
   openEditBlock:
-    displayName: Start the edit block expanded
+    displayName: Start the manga info block expanded
     description: The Manga info block in a gallery's edit form, holding the language, censorship and translation group fields. Only affects the state a block opens in.
     type: BOOLEAN
   hidePerformers:
-    displayName: Hide the performers field on a manga gallery
+    displayName: Hide the performers field on the edit page
     description: A manga gallery rarely has performers, so its edit page leaves the field out. Only the field is hidden — whatever a gallery already has stays on the gallery and is kept when it is saved. The bulk edit dialog and the details tab are unaffected.
     type: BOOLEAN
   # The reading half's own settings, as the JSON string they are stored as. They are

@@ -1381,6 +1381,70 @@ async function main() {
     }
   );
 
+  /**
+   * The one switch that turns *this half* off.
+   *
+   * Reading a gallery is the whole of what this half does, and off means Stash's own
+   * lightbox — drawn by Stash, with nothing of this half's added to it — while the
+   * mark, the fields, the panels and the badges all stay exactly as they were. The
+   * setting belongs to the managing half and is written from the plugin's settings
+   * page, which is why it is set here by hand rather than through the reader's own
+   * JSON: the reader only ever reads it.
+   */
+  await runSection(
+    "the takeover switch, which is the whole of this half",
+    async () => {
+      NS.readerTakeover = false;
+      const { box } = await startReader({ on: true, expectSwitch: false });
+
+      assert.strictEqual(
+        container(),
+        null,
+        "nothing of ours is drawn beside the carousel"
+      );
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-active"),
+        false,
+        "and the lightbox is not marked as one of ours"
+      );
+      assert.strictEqual(
+        box.lightbox.querySelector(".manga-reader-chrome"),
+        null,
+        "…nor does it carry any of our chrome"
+      );
+
+      NS.readerTakeover = true;
+      const { box: back } = await startReader({ on: true });
+      assert.notStrictEqual(
+        container(),
+        null,
+        "and turning it back on gives the lightbox to the plugin again"
+      );
+
+      // The same switch, turned off while the lightbox is being read. Whatever is
+      // ours comes back out where it stands rather than being left on screen by a
+      // pass that only stops drawing: the container, our chrome and the two classes
+      // that hide Stash's own. `step` is what notices, and any change to the page
+      // runs it — the flush is the test's way of standing in for one.
+      NS.readerTakeover = false;
+      dom.flush();
+      await settle();
+      assert.strictEqual(
+        container(),
+        null,
+        "turned off mid-read, the container comes away"
+      );
+      assert.strictEqual(
+        back.lightbox.classList.contains("manga-reader-active"),
+        false,
+        "…and Stash's own lightbox is what is left"
+      );
+
+      NS.readerTakeover = true;
+      stopReader(back);
+    }
+  );
+
   await runSection("the switches are in the reader's own header", async () => {
     const { box, input } = await startReader({ on: false });
 
@@ -2574,11 +2638,21 @@ async function main() {
     assert.deepStrictEqual(
       Object.keys(settingsWrites[settingsWrites.length - 1]).sort(),
       [
+        "confirmUnmark",
+        "coverIcon",
+        "deleteOnUnmark",
         "enabledLanguages",
+        "fieldCensorship",
+        "fieldLanguage",
+        "fieldOriginal",
+        "fieldTranslationGroup",
+        "fields",
         "hidePerformers",
+        "manageChapters",
         "openDetailsBlock",
         "openEditBlock",
         "readerSettings",
+        "readerTakeover",
         "showCoverBadge",
         "showFlags",
       ],
@@ -5804,6 +5878,51 @@ async function main() {
         "reading a gallery's chapters does not write anything, least of all Stash's rows"
       );
 
+      stopTab(tab);
+    }
+  );
+
+  /**
+   * The other switch this half reads, and the second thing it does: the Chapters tab.
+   *
+   * Off, the tab is Stash's — its own button opens its own editor, and nothing of this
+   * plugin's is drawn among the rows. What this half drew there is forgotten, which is
+   * the same errand as leaving a page with no gallery on it; a tab already on screen
+   * when the setting goes is put back by the next pass over the document, and the
+   * setting is changed from the settings page rather than from here in the first
+   * place.
+   */
+  await runSection(
+    "with the tab's editing off, it is Stash's tab",
+    async () => {
+      mountBridge();
+      dom.window.location.pathname = "/galleries/32";
+      NS.manageChapters = false;
+      const tab = buildChaptersTab([
+        { title: "第一話", image_index: 1 },
+        { title: "第二話", image_index: 5 },
+      ]);
+
+      dom.flush();
+      await settle();
+
+      assert.strictEqual(
+        tab.button.getAttribute("data-manga-reader-taken"),
+        null,
+        "Stash's own button is left alone, so its own editor is what it opens"
+      );
+      assert.strictEqual(
+        tab.container.querySelector(".manga-reader-chapter-edit"),
+        null,
+        "and none of our rows are drawn over its own"
+      );
+      assert.strictEqual(
+        tab.container.nextElementSibling,
+        null,
+        "…nor is the import control added under them"
+      );
+
+      NS.manageChapters = true;
       stopTab(tab);
     }
   );

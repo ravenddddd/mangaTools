@@ -151,7 +151,9 @@ let confirming = false;
  */
 export function syncChaptersTab(): void {
   const id = galleryIdFromPath(window.location.pathname);
-  if (!id) {
+  // Management turned off puts Stash's own tab back: whatever this half drew there is
+  // forgotten, which is the same errand as leaving a page with no gallery on it.
+  if (!id || !NS.manageChapters) {
     forgetChaptersTab();
     return;
   }

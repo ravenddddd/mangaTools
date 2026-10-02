@@ -30,6 +30,7 @@
 import { NS } from "../languages";
 import type {
   MangaToolsCustomFields,
+  MangaToolsFieldName,
   MangaToolsUsualLanguage,
   MangaToolsUsualLanguageMap,
 } from "../plugin-api";
@@ -322,6 +323,30 @@ NS.CHAPTER_FIELD_NAME = "plugin.mangaTools.chapters";
  * group has no sidebar section and no bulk row, and this makes it recognised
  * without making it appear.
  */
+NS.fieldShowing = (field: MangaToolsFieldName): boolean => {
+  if (!NS.fields) return false;
+  if (field === "language") return NS.fieldLanguage;
+  if (field === "censorship") return NS.fieldCensorship;
+  if (field === "translationGroup") return NS.fieldTranslationGroup;
+
+  return NS.fieldOriginal;
+};
+
+/**
+ * Whether any of the four is drawn.
+ *
+ * The question a block *made of* the fields asks before drawing itself: with all
+ * four turned off there is nothing for it to hold, and an empty fold with a heading
+ * over it is worse than no fold at all. It is not the same question as `NS.fields`,
+ * which is the master switch — one field left on is enough for the block to be
+ * worth drawing.
+ */
+NS.anyFieldShowing = (): boolean =>
+  NS.fieldShowing("language") ||
+  NS.fieldShowing("censorship") ||
+  NS.fieldShowing("translationGroup") ||
+  NS.fieldShowing("original");
+
 NS.ownField = (key: unknown): string => {
   const k = String(key ?? "")
     .trim()
@@ -367,8 +392,15 @@ NS.fieldsToClear = (customFields: unknown): string[] => {
   if (!map || typeof map !== "object") return [NS.MANGA_FIELD_NAME];
 
   const keys = Object.keys(map).filter((key) => NS.isOwnField(key));
+  const mine = keys.length ? keys : [NS.MANGA_FIELD_NAME];
 
-  return keys.length ? keys : [NS.MANGA_FIELD_NAME];
+  // **The mark always goes**, because that is what unmarking means. The rest go with it
+  // only when the reader has asked for that: a plugin that took their language off the
+  // gallery while the setting said not to would be destroying values it had just
+  // promised to keep.
+  return NS.deleteOnUnmark
+    ? mine
+    : mine.filter((key) => NS.ownField(key) === NS.MANGA_FIELD_NAME);
 };
 
 /**

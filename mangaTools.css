@@ -409,13 +409,85 @@
  * undone. `text-align` is the one that shows: it inherits into the h3 and
  * .sub-heading inside the block and right-aligns their text.
  *
- * The third class name gives this rule enough specificity to win; !important
+ * Both selectors are needed now that this block sits inside a
+ * `.manga-tools-settings-group`: the first still covers it at the page's own
+ * level, the second wherever a field switch has it nested under itself.
+ *
+ * The third class name gives these rules enough specificity to win; !important
  * is not needed.
  */
-.setting-section .setting.manga-tools-settings > div:last-child {
+.setting-section .setting.manga-tools-settings > div:last-child,
+.setting-group .setting.manga-tools-settings > div:last-child {
   margin-left: 0;
   min-width: 0;
   text-align: left;
+}
+
+/*
+ * The settings page is grouped, and the groups nest: a switch that turns a feature
+ * on, the rows that only mean anything under it, and — for the fields — a switch
+ * per field with its own rows under that.
+ *
+ * Nested rows are marked with a rule down their left rather than by an indent
+ * alone. Stash's own `.setting-group` may or may not indent them depending on the
+ * version, and a line that is there either way is what says the rows below belong
+ * to the row above. The indent is small for the same reason: it is the detail, not
+ * the signal.
+ */
+.manga-tools-settings-group {
+  border-left: 2px solid rgba(191, 204, 214, 0.35);
+  margin-left: 0.35rem;
+  padding-left: 0.9rem;
+}
+
+/*
+ * A group heading that is not a switch — "the manga mark", "how the manga info is
+ * shown". Deliberately not a `.setting` row: those are a label|control pair, and
+ * Stash's `.setting > div:last-child { margin-left: auto; text-align: right }`
+ * would push a lone heading to the right edge of the page. The size is a step
+ * above a setting's own heading, so a group reads as a level above the rows under
+ * it.
+ */
+.manga-tools-settings-heading {
+  margin-top: 1.1rem;
+}
+
+.manga-tools-settings-heading > h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.25rem;
+}
+
+/*
+ * The "?" beside a heading. Muted and a size down, so it reads as being *beside*
+ * the heading rather than part of it. `margin: 0` on the glyph for the reason the
+ * wand button in MangaFieldBlock gives: Stash's index.scss sets an unscoped
+ * `.fa-icon { margin: 0 0.4rem }`, and this wrapper already spaces it.
+ */
+.manga-tools-help {
+  color: rgba(191, 204, 214, 0.5);
+  cursor: help;
+  font-size: 0.85em;
+  margin-left: 0.4rem;
+}
+
+.manga-tools-help .fa-icon {
+  margin: 0;
+}
+
+/*
+ * Two lines that sit where a sub-setting would, and are not settings: the
+ * lightbox's note about where its own settings live, and what turning the
+ * chapters switch on commits to. Muted and unboxed, so neither reads as
+ * something to click.
+ */
+.manga-tools-settings-note,
+.manga-tools-settings-warning {
+  font-size: 0.85rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.manga-tools-settings-note {
+  color: rgba(191, 204, 214, 0.5);
 }
 
 .manga-tools-settings-control {

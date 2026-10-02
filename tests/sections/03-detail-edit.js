@@ -506,6 +506,152 @@ module.exports = () => {
     "✓ edit page (target between studio and performers / widths copied / pull back / no anchor)"
   );
 
+  // ── 9b2. A field turned off leaves the block ───────────────────────
+  // The four switches, on the one surface that draws all four. What is asserted
+  // throughout is the row's own `data-field`, which is the attribute Stash's form
+  // keys on and the only thing about these rows that does not move with the locale.
+  const blockRows = (values) => {
+    const portal = editField(values || { "plugin.mangaTools.language": "ja" });
+    if (!portal) return null;
+
+    const rows = [];
+    find(portal.node, (n) => {
+      if (typeof n.props?.["data-field"] === "string") {
+        rows.push(n.props["data-field"]);
+      }
+      return false;
+    });
+    return rows;
+  };
+
+  assert.deepStrictEqual(
+    blockRows(),
+    [
+      "manga_tools_censorship",
+      "manga_tools_language",
+      "manga_tools_translation_group",
+    ],
+    "the three rows the edit block draws, in the order it draws them"
+  );
+
+  NS.fieldCensorship = false;
+  assert.deepStrictEqual(
+    blockRows(),
+    ["manga_tools_language", "manga_tools_translation_group"],
+    "a field turned off takes its row and nothing else"
+  );
+  NS.fieldCensorship = true;
+
+  // Raw and the group are two answers to one question, so the raw mark rides on the
+  // group's row as a chip — a chip that only means anything while there is a box
+  // beside it. With the group turned off, raw is a field of its own and gets what
+  // every other field on this form has: a switch on a row of its own.
+  NS.fieldTranslationGroup = false;
+  assert.deepStrictEqual(
+    blockRows(),
+    ["manga_tools_censorship", "manga_tools_language", "manga_tools_original"],
+    "with the group turned off, raw stands on its own"
+  );
+  const rawRow = find(
+    editField({ "plugin.mangaTools.language": "ja" }).node,
+    (n) => n.props?.["data-field"] === "manga_tools_original"
+  );
+  const rawSwitch = find(rawRow, (n) => n.type === "input");
+  assert.strictEqual(rawSwitch.props.type, "checkbox");
+  assert.strictEqual(
+    rawSwitch.props.role,
+    "switch",
+    "which is Bootstrap's switch, the same control Stash gives a boolean field"
+  );
+  assert.strictEqual(
+    rawSwitch.props.checked,
+    false,
+    "and it reads the gallery"
+  );
+  assert.strictEqual(
+    find(
+      editField({ "plugin.mangaTools.language": "ja" }).node,
+      (n) =>
+        n.props?.className ===
+        "btn btn-secondary manga-tools-chip manga-tools-original"
+    ),
+    null,
+    "and the steak chip is not drawn where there is no group row to carry it"
+  );
+
+  // The group's own box is not greyed out by a raw mark it can no longer undo: with
+  // the raw field off there is no switch anywhere to turn it back on, and a box
+  // disabled with no way out of it is worse than one that can be typed into.
+  NS.fieldOriginal = false;
+  NS.fieldTranslationGroup = true;
+  NS.fieldOriginal = true;
+  const rawGallery = {
+    "plugin.mangaTools.language": "ja",
+    "plugin.mangaTools.original": "true",
+  };
+  const groupBox = find(
+    editField(rawGallery).node,
+    (n) => n.props?.inputId === "manga_tools_translation_group"
+  );
+  assert.strictEqual(
+    groupBox.props.isDisabled,
+    true,
+    "a raw gallery's group box is disabled while the raw switch is there to undo it"
+  );
+  NS.fieldOriginal = false;
+  assert.strictEqual(
+    find(
+      editField(rawGallery).node,
+      (n) => n.props?.inputId === "manga_tools_translation_group"
+    ).props.isDisabled,
+    false,
+    "…and live again when the raw field is turned off"
+  );
+  NS.fieldOriginal = true;
+
+  // All four off is the one arrangement with no block at all — and with it goes the
+  // class that hides Stash's performers row, because a page the plugin draws nothing
+  // on is a page whose fields it should not be hiding either.
+  NS.fieldLanguage = false;
+  NS.fieldCensorship = false;
+  NS.fieldTranslationGroup = false;
+  NS.fieldOriginal = false;
+  assert.strictEqual(
+    editField({ "plugin.mangaTools.language": "ja" }),
+    null,
+    "no fields at all means no block"
+  );
+  // Read off the anchor rather than off `fieldHostEl`: the no-anchor case above
+  // takes the studio row away and puts it back, which makes the plugin build a
+  // fresh mount point, so that variable is the old one. The mount point is always
+  // the element right after the anchor — that is what ensureHostAfter guarantees.
+  assert.strictEqual(
+    studioRow.nextElementSibling.className,
+    "manga-tools-field-host",
+    "and the performers row comes back with it"
+  );
+
+  // The master switch reaches the fields but never touches their own switches: a
+  // feature turned off and on again comes back exactly as it was.
+  NS.fields = false;
+  assert.strictEqual(editField({ "plugin.mangaTools.language": "ja" }), null);
+  NS.fields = true;
+  NS.fieldLanguage = true;
+  NS.fieldCensorship = true;
+  NS.fieldTranslationGroup = true;
+  NS.fieldOriginal = true;
+  assert.deepStrictEqual(
+    blockRows(),
+    [
+      "manga_tools_censorship",
+      "manga_tools_language",
+      "manga_tools_translation_group",
+    ],
+    "and the block is back, unchanged, the moment the master is"
+  );
+  console.log("✓ the edit block's four switches (and the raw mark on its own)");
+
+  //
   // ── 9c. The switch, before the plugin's own answer arrives ─────────
   //
   // The store is null until the first fetch settles, and this section runs

@@ -142,6 +142,47 @@ module.exports = () => {
     "each section is handed the filter the list published, not one of its own"
   );
 
+  // A field turned off takes its own section off the sidebar, and only its own. The
+  // manga section is not one of the four fields: the mark is what makes a gallery
+  // this plugin's at all, so it is offered whatever the switches say.
+  const sectionsNow = () =>
+    callAfter("FilteredGalleryList.SidebarSections", { children: [] }, original)
+      .props.children;
+
+  NS.fieldLanguage = false;
+  const noLanguage = sectionsNow();
+  assert.deepStrictEqual(
+    noLanguage.map((c) => (c === null ? null : typeof c.type)),
+    [null, "function", "function", "string"],
+    "a field turned off takes its own section and nothing else"
+  );
+  assert.strictEqual(
+    noLanguage[1].props.filter,
+    published,
+    "the two left still read the filter the list published"
+  );
+
+  NS.fieldCensorship = false;
+  const neither = sectionsNow();
+  assert.deepStrictEqual(
+    neither.map((c) => (c === null ? null : typeof c.type)),
+    [null, null, "function", "string"],
+    "and the same for the censorship field"
+  );
+  assert.strictEqual(
+    neither[2].props.filter,
+    published,
+    "while the manga section stays: it is a mark, not a field"
+  );
+
+  NS.fieldLanguage = true;
+  NS.fieldCensorship = true;
+  assert.deepStrictEqual(
+    sectionsNow().map((c) => (c === null ? null : typeof c.type)),
+    ["function", "function", "function", "string"],
+    "and both come back exactly where they were"
+  );
+
   // The publication itself reads the model out of the rendered tree, wherever it
   // sits in it — the elements Stash hands the model to are not at a fixed depth.
   const deep = makeFilterModel([

@@ -172,6 +172,30 @@ module.exports = () => {
     ["manga_tools_manga", "manga_tools_language", "manga_tools_censorship"],
     "an all-manga selection shows the mark and both fields, in order"
   );
+
+  // …and each of the two only while its own switch says so. The mark is not one of
+  // the four fields and is never gated on them: it is what makes a gallery this
+  // plugin's at all, so a dialog that could not set it would leave every gallery
+  // unmarked.
+  NS.fieldCensorship = false;
+  assert.deepStrictEqual(
+    bulkChildren().map((r) => r.props["data-field"]),
+    ["manga_tools_manga", "manga_tools_language"],
+    "a field turned off takes its row and nothing else"
+  );
+  NS.fieldCensorship = true;
+  NS.fieldLanguage = false;
+  assert.deepStrictEqual(
+    bulkChildren().map((r) => r.props["data-field"]),
+    ["manga_tools_manga", "manga_tools_censorship"],
+    "…whichever of the two it is"
+  );
+  NS.fieldLanguage = true;
+  assert.deepStrictEqual(
+    bulkChildren().map((r) => r.props["data-field"]),
+    ["manga_tools_manga", "manga_tools_language", "manga_tools_censorship"],
+    "and both are back"
+  );
   assert.strictEqual(
     selectOf("manga_tools_language").props.value.value,
     "zh-Hans",

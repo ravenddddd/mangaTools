@@ -200,6 +200,47 @@ module.exports = () => {
   });
   console.log("✓ dialog card component (click listener / DOM watcher)");
 
+  // ── 10f2. Both doors into the field shut with it ───────────────────
+  // The card and the criterion are two ways into the same field, so turning the
+  // field off closes both: a card for a field the plugin does not manage is a way
+  // into a filter nothing else on the page would then draw.
+  //
+  // Each half is checked against a model of its own: the options array belongs to
+  // the model, and adding our criterion to it is exactly what is being asked about.
+  NS.fieldLanguage = false;
+  const offModel = makeFilterModel();
+  const offList = call("GalleryList", {
+    filter: offModel,
+    selectedIds: new Set(),
+  });
+  assert.strictEqual(
+    offList.props.children[0],
+    null,
+    "no card is mounted while the language field is off"
+  );
+  assert.ok(
+    !offModel.options.criterionOptions.some((o) => o.type === "language"),
+    "…and the dialog is not offered the criterion either"
+  );
+
+  NS.fieldLanguage = true;
+  const onModel = makeFilterModel();
+  const onList = call("GalleryList", {
+    filter: onModel,
+    selectedIds: new Set(),
+  });
+  assert.strictEqual(
+    typeof onList.props.children[0].type,
+    "function",
+    "with the field on the card is back"
+  );
+  assert.strictEqual(
+    onModel.options.criterionOptions.filter((o) => o.type === "language")
+      .length,
+    1,
+    "and so is the criterion — once, however many times the list renders"
+  );
+
   // ── 10g. What Stash does with the criterion, and with its tag ──────
   // The criterion is stored as a custom field (see 10e), which left Stash treating
   // it as one: its tag opened the custom-fields card, and the Language card never

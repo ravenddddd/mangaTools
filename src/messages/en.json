@@ -32,6 +32,18 @@
 
   "mangaTools.select.placeholder": "Select language…",
 
+  "mangaTools.settings.readerTakeover.heading": "Take over Stash's lightbox",
+  "mangaTools.settings.readerTakeover.description": "A gallery marked as manga is read in this plugin's own lightbox, redesigned from the ground up. Nothing about Stash's own lightbox settings is changed.",
+  "mangaTools.settings.readerTakeover.note": "The lightbox's own settings are adjusted on the lightbox page, not here.",
+
+  "mangaTools.settings.manageChapters.heading": "Take over the Chapters tab",
+  "mangaTools.settings.manageChapters.description": "Creating and editing chapters is this plugin's job, and writing them stores this plugin's own chapter field. Stash's existing chapters are brought over quietly, and are never modified.",
+  "mangaTools.settings.manageChapters.warning": "From here on, editing chapters does not touch Stash's own chapter rows.",
+
+  "mangaTools.settings.fields.heading": "Custom fields",
+  "mangaTools.settings.fields.description": "The plugin's fields are written as custom fields, so none of Stash's own data is touched. Turning one off does not clear the values already on your galleries.",
+  "mangaTools.settings.field.description": "Turned off, this field leaves every page it appears on: the cover badge, the detail row, the edit row, the bulk dialog and the filters. The values already on your galleries are kept.",
+
   "mangaTools.settings.enabledLanguages.heading": "Enabled languages",
   "mangaTools.settings.enabledLanguages.description": "Only these languages appear in the edit-page dropdown. Display (badge and detail row) is unaffected. Leave empty to show every language.",
   "mangaTools.settings.enabledLanguages.placeholder": "All languages",
@@ -41,27 +53,24 @@
 
   "mangaTools.settings.showCoverBadge.heading": "Show the language on gallery covers",
   "mangaTools.settings.showCoverBadge.description": "The badge in the bottom-right of a gallery's cover. With flags turned off it shows the language name instead of a flag.",
+  "mangaTools.settings.showCoverBadge.help": "This is only about drawing the badge: turned off, a cover carries no language. Nothing is cleared from the gallery, which keeps the value and shows it again the moment this is back on.",
 
-  "mangaTools.settings.openDetailsBlock.heading": "Start the details block expanded",
+  "mangaTools.settings.display.heading": "How the manga info is shown",
+  "mangaTools.settings.openDetailsBlock.heading": "Start the manga info section expanded",
   "mangaTools.settings.openDetailsBlock.description": "The Manga info section in a gallery's details tab. Collapsed, its heading is what says the section is there. This decides the state a block opens in, not whether it can be opened.",
-  "mangaTools.settings.openEditBlock.heading": "Start the edit block expanded",
+  "mangaTools.settings.openEditBlock.heading": "Start the manga info block expanded",
   "mangaTools.settings.openEditBlock.description": "The Manga info block in a gallery's edit form, where its language, censorship and translation group are set. This decides the state a block opens in, not whether it can be opened.",
-
-  "mangaTools.settings.hidePerformers.heading": "Hide the performers field on a manga gallery",
+  "mangaTools.settings.hidePerformers.heading": "Hide the performers field on the edit page",
   "mangaTools.settings.hidePerformers.description": "A manga gallery rarely has performers, so its edit page leaves the field out. Only the field is hidden — whatever a gallery already has stays on the gallery and is kept when it is saved. The bulk edit dialog and the details tab are unaffected.",
 
-  "mangaTools.settings.chapters.heading": "Import chapters from Stash",
-  "mangaTools.settings.chapters.description": "Copies every marked gallery's Stash chapters into this plugin's own chapters field — the one the reader prefers, and the one nothing has ever written. Nothing of Stash's is changed. Galleries that already have a list of this plugin's own are left alone unless you ask to replace them.",
-  "mangaTools.settings.chapters.check": "Check what would be imported",
-  "mangaTools.settings.chapters.checking": "Checking…",
-  "mangaTools.settings.chapters.toImport": "Galleries to import",
-  "mangaTools.settings.chapters.owned": "Already imported",
-  "mangaTools.settings.chapters.replace": "Also replace the ones already imported",
-  "mangaTools.settings.chapters.start": "Import",
-  "mangaTools.settings.chapters.progress": "Imported",
-  "mangaTools.settings.chapters.of": "of",
-  "mangaTools.settings.chapters.skipped": "Skipped, nothing to bring over",
-  "mangaTools.settings.chapters.failed": "Failed",
+  "mangaTools.settings.mark.heading": "The manga mark",
+  "mangaTools.settings.confirmUnmark.heading": "Ask before unmarking",
+  "mangaTools.settings.confirmUnmark.description": "A gallery stops being manga only after a confirmation.",
+  "mangaTools.settings.deleteOnUnmark.heading": "Remove this plugin's fields when unmarking",
+  "mangaTools.settings.deleteOnUnmark.description": "On, unmarking a gallery takes its language, censorship, translation group and raw values off with the mark. Off, the values stay on the gallery — hidden, and back if it is marked again.",
+  "mangaTools.settings.coverIcon.heading": "Show the manga icon on gallery covers",
+  "mangaTools.settings.coverIcon.description": "The icon at the end of a cover's info row — the row that appears on hover, with the image count and the tag count. Turned off, the cover carries no mark, and the gallery is still managed.",
+  "mangaTools.settings.coverIcon.help": "Not the same thing as the language badge: this one says the gallery is one the plugin manages, which is not a value anyone scans a cover for.",
 
   "mangaTools.manga.mark": "Mark as manga",
   "mangaTools.manga.marked": "Manga",

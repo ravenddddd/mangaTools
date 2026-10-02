@@ -11,7 +11,6 @@ const {
   capturedQueries,
   find,
   makeFilterModel,
-  mutationWrites,
   original,
   patched,
   patchedAfter,
@@ -186,6 +185,74 @@ module.exports = () => {
   );
   assert.strictEqual(NS.showFlags, true, "flags default to on");
   assert.strictEqual(NS.showCoverBadge, true, "the cover badge defaults to on");
+
+  // ── 7b2. Whether a field is drawn at all ───────────────────────────
+  // One question, asked by every surface that draws a field, so that none of them
+  // has to remember that the master switch is about all four.
+  NS.fields = true;
+  NS.fieldLanguage = true;
+  NS.fieldCensorship = true;
+  NS.fieldTranslationGroup = true;
+  NS.fieldOriginal = true;
+  assert.strictEqual(NS.fieldShowing("language"), true);
+  assert.strictEqual(NS.anyFieldShowing(), true);
+
+  NS.fieldLanguage = false;
+  assert.strictEqual(
+    NS.fieldShowing("language"),
+    false,
+    "a field's own switch is enough on its own"
+  );
+  assert.strictEqual(
+    NS.fieldShowing("censorship"),
+    true,
+    "…and reaches only the field it belongs to"
+  );
+  assert.strictEqual(
+    NS.anyFieldShowing(),
+    true,
+    "one field left on is enough for a block of them to be worth drawing"
+  );
+  NS.fieldCensorship = false;
+  NS.fieldTranslationGroup = false;
+  NS.fieldOriginal = false;
+  assert.strictEqual(
+    NS.anyFieldShowing(),
+    false,
+    "with all four off there is nothing to draw"
+  );
+
+  NS.fieldLanguage = true;
+  NS.fields = false;
+  assert.strictEqual(
+    NS.fieldShowing("language"),
+    false,
+    "the master covers all four"
+  );
+  assert.strictEqual(NS.anyFieldShowing(), false);
+  NS.fields = true;
+  assert.strictEqual(
+    NS.fieldShowing("language"),
+    true,
+    "and turning it back on gives the field back as it was — hiding is not writing"
+  );
+  NS.fieldCensorship = true;
+  NS.fieldTranslationGroup = true;
+  NS.fieldOriginal = true;
+
+  // Which keys this plugin owns is a different question from whether it draws them.
+  // A field nobody is showing still has to be recognised, or a gallery's own JSON
+  // would come back as somebody else's custom field in Stash's edit form.
+  NS.fieldLanguage = false;
+  assert.strictEqual(
+    NS.ownField("plugin.mangaTools.language"),
+    NS.FIELD_NAME,
+    "a hidden field is still this plugin's"
+  );
+  NS.fieldLanguage = true;
+  console.log(
+    "✓ fieldShowing (the master, the four, and what a hidden field is)"
+  );
   console.log("✓ settings parse/serialise (including the booleans)");
 
   // ── 7c. Settings UI: the multiselect writes the setting back ───────
@@ -246,45 +313,195 @@ module.exports = () => {
   );
 
   // The switches, laid out like Stash's own BooleanSetting, in the order the page
-  // shows them.
-  const switches = [];
-  find(settingsEl, (n) => {
-    if (n.type === "Switch") switches.push(n);
-    return false;
-  });
+  // shows them: the two things the plugin takes over, the fields and what is under
+  // them, and the mark's own three.
+  const switchesIn = (el) => {
+    const out = [];
+    find(el, (n) => {
+      if (n.type === "Switch") out.push(n);
+      return false;
+    });
+    return out;
+  };
+  const switches = switchesIn(settingsEl);
   assert.deepStrictEqual(
     switches.map((n) => n.props.id),
     [
+      "mangaTools-readerTakeover",
+      "mangaTools-manageChapters",
+      "mangaTools-fields",
+      "mangaTools-fieldLanguage",
       "mangaTools-showFlags",
       "mangaTools-showCoverBadge",
+      "mangaTools-fieldCensorship",
+      "mangaTools-fieldTranslationGroup",
+      "mangaTools-fieldOriginal",
       "mangaTools-openDetailsBlock",
       "mangaTools-openEditBlock",
       "mangaTools-hidePerformers",
+      "mangaTools-confirmUnmark",
+      "mangaTools-deleteOnUnmark",
+      "mangaTools-coverIcon",
     ],
-    "all five should render"
+    "every switch on the page, in the order it is drawn"
   );
-  assert.strictEqual(switches[0].props.checked, true, "flags default to on");
+
+  const sw = {};
+  for (const s of switches) sw[s.props.id] = s;
+
+  // The five features are on by default, which is what the plugin did before any
+  // of them could be turned off.
+  for (const id of [
+    "mangaTools-readerTakeover",
+    "mangaTools-manageChapters",
+    "mangaTools-fields",
+    "mangaTools-fieldCensorship",
+    "mangaTools-fieldTranslationGroup",
+    "mangaTools-fieldOriginal",
+    "mangaTools-confirmUnmark",
+    "mangaTools-deleteOnUnmark",
+    "mangaTools-coverIcon",
+    "mangaTools-showFlags",
+    "mangaTools-showCoverBadge",
+    "mangaTools-hidePerformers",
+  ]) {
+    assert.strictEqual(sw[id].props.checked, true, `${id} defaults to on`);
+  }
+  // The two defaults that are *not* on, which is the point of them being settings:
+  // a section of a dense page starts folded, a field does not.
   assert.strictEqual(
-    switches[1].props.checked,
-    true,
-    "the cover badge defaults to on"
-  );
-  // The two defaults are not the same value, which is the point of them being two
-  // settings: a section of a dense page starts folded, a field does not.
-  assert.strictEqual(
-    switches[2].props.checked,
+    sw["mangaTools-openDetailsBlock"].props.checked,
     false,
     "the details block starts collapsed"
   );
   assert.strictEqual(
-    switches[3].props.checked,
+    sw["mangaTools-openEditBlock"].props.checked,
     true,
     "the edit block starts open — it holds the only way to set a language"
   );
+
+  // ── 7c2. Progressive disclosure ────────────────────────────────────
+  // Everything a switch holds is drawn only while it is on, and that is the *only*
+  // thing the switch does to it: nothing here writes a sub-setting, so a feature
+  // turned off and on again comes back exactly as it was.
+  NS.fields = false;
+  const bare = call("PluginSettings", { pluginID: "mangaTools" });
+  assert.deepStrictEqual(
+    switchesIn(bare).map((n) => n.props.id),
+    [
+      "mangaTools-readerTakeover",
+      "mangaTools-manageChapters",
+      "mangaTools-fields",
+      "mangaTools-confirmUnmark",
+      "mangaTools-deleteOnUnmark",
+      "mangaTools-coverIcon",
+    ],
+    "the four fields and the display rows go with the master switch"
+  );
   assert.strictEqual(
-    switches[4].props.checked,
-    true,
-    "and a manga gallery's edit page hides the performers field by default"
+    find(
+      bare,
+      (n) => n.props && Array.isArray(n.props.options) && n.props.isMulti
+    ),
+    null,
+    "…including the language multiselect, three levels down"
+  );
+
+  NS.fields = true;
+  NS.fieldLanguage = false;
+  const noLanguage = call("PluginSettings", { pluginID: "mangaTools" });
+  assert.strictEqual(
+    find(
+      noLanguage,
+      (n) => n.props && Array.isArray(n.props.options) && n.props.isMulti
+    ),
+    null,
+    "a field's own settings go with that field's switch"
+  );
+  assert.ok(
+    find(noLanguage, (n) => n.props?.id === "mangaTools-fieldCensorship"),
+    "…while the other fields under the master stay where they were"
+  );
+  NS.fieldLanguage = true;
+
+  // A feature turned off and on again brings its sub-settings back untouched: the
+  // master switch hides, it does not write. `NS.fieldCensorship` is set here by
+  // hand for the same reason the switches themselves are what is being read.
+  NS.fieldCensorship = false;
+  NS.fields = false;
+  NS.fields = true;
+  assert.strictEqual(
+    NS.fieldCensorship,
+    false,
+    "the master switch must not touch the switches under it"
+  );
+  NS.fieldCensorship = true;
+
+  // The rows that are *not* one thing's sub-settings are not wrapped in a group —
+  // Stash's `.setting-group` is the class that makes a row read as belonging to the
+  // one above it, and the pair below reads as a parent and a child if it is.
+  //
+  // Walked with the trail of class names rather than checked on one node: what
+  // wraps a row in the element tree is what wraps it in the DOM.
+  const classesAround = (root, pred, trail = []) => {
+    if (root === null || root === undefined) return null;
+    if (Array.isArray(root)) {
+      for (const n of root) {
+        const hit = classesAround(n, pred, trail);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    if (root.__portal) return classesAround(root.node, pred, trail);
+    if (typeof root !== "object") return null;
+    if (typeof root.type === "function") {
+      return classesAround(root.type(root.props), pred, trail);
+    }
+    if (pred(root)) return trail;
+    return classesAround(root.props?.children, pred, [
+      ...trail,
+      root.props?.className,
+    ]);
+  };
+  const groupsAround = (el, id) =>
+    (classesAround(el, (n) => n.props?.id === id, []) || []).filter(
+      (c) => typeof c === "string" && c.includes("setting-group")
+    );
+
+  assert.deepStrictEqual(
+    groupsAround(settingsEl, "mangaTools-confirmUnmark"),
+    [],
+    "asking before unmarking is not a sub-setting of anything"
+  );
+  assert.deepStrictEqual(
+    groupsAround(settingsEl, "mangaTools-deleteOnUnmark"),
+    [],
+    "…and neither is clearing the fields with the mark"
+  );
+  assert.deepStrictEqual(
+    groupsAround(settingsEl, "mangaTools-coverIcon"),
+    [],
+    "…nor the icon, which is a third sibling rather than a third level"
+  );
+  assert.strictEqual(
+    groupsAround(settingsEl, "mangaTools-showFlags").length,
+    2,
+    "while a field's own settings really are nested — twice over, in fact: under " +
+      "the field, which is under the master"
+  );
+  // The two groups that have no switch of their own: their heading is on the page
+  // and is not a `.setting` row, because Stash's rules would right-align a lone
+  // heading in one.
+  assert.ok(
+    find(settingsEl, (n) => n.props?.children === "The manga mark"),
+    "the mark's rows are under a heading of their own"
+  );
+  assert.ok(
+    find(
+      settingsEl,
+      (n) => n.props?.children === "How the manga info is shown"
+    ),
+    "and so are the three display rows"
   );
 
   // Selecting a new set writes it back through configurePlugin and updates the
@@ -296,6 +513,18 @@ module.exports = () => {
       plugin_id: "mangaTools",
       input: {
         enabledLanguages: "ja,zh-Hans",
+        // The ten switches that say what the plugin does at all, and which fields it
+        // manages. All on, which is what the plugin did before they existed.
+        readerTakeover: true,
+        manageChapters: true,
+        fields: true,
+        fieldLanguage: true,
+        fieldCensorship: true,
+        fieldTranslationGroup: true,
+        fieldOriginal: true,
+        coverIcon: true,
+        confirmUnmark: true,
+        deleteOnUnmark: true,
         showFlags: true,
         showCoverBadge: true,
         openDetailsBlock: false,
@@ -326,7 +555,7 @@ module.exports = () => {
 
   // Flipping a block's default updates the shared state and persists the lot,
   // exactly as the display switches do.
-  switches[2].props.onChange();
+  sw["mangaTools-openDetailsBlock"].props.onChange();
   assert.strictEqual(NS.openDetailsBlock, true, "the details default flips");
   assert.strictEqual(
     state.capturedConfigWrite.input.openDetailsBlock,
@@ -339,7 +568,7 @@ module.exports = () => {
   NS.openDetailsBlock = false;
 
   // Flipping a switch updates the shared state and persists the lot.
-  switches[0].props.onChange();
+  sw["mangaTools-showFlags"].props.onChange();
   assert.strictEqual(
     NS.showFlags,
     false,
@@ -349,6 +578,18 @@ module.exports = () => {
     plugin_id: "mangaTools",
     input: {
       enabledLanguages: "",
+      // The ten switches that say what the plugin does at all, and which fields it
+      // manages. All on, which is what the plugin did before they existed.
+      readerTakeover: true,
+      manageChapters: true,
+      fields: true,
+      fieldLanguage: true,
+      fieldCensorship: true,
+      fieldTranslationGroup: true,
+      fieldOriginal: true,
+      coverIcon: true,
+      confirmUnmark: true,
+      deleteOnUnmark: true,
       showFlags: false,
       showCoverBadge: true,
       openDetailsBlock: false,
@@ -365,7 +606,7 @@ module.exports = () => {
 
   // Turning the performers switch off is how a reader asks for Stash's field
   // back; the gallery's edit page follows it, since the switch is read there.
-  switches[4].props.onChange();
+  sw["mangaTools-hidePerformers"].props.onChange();
   assert.strictEqual(
     NS.hidePerformers,
     false,
@@ -381,65 +622,19 @@ module.exports = () => {
     "✓ settings UI (multiselect + switches write configurePlugin, update shared state)"
   );
 
-  // ── 7c. The chapter import, which is a job rather than a setting ────
-  // It is on this page because a library-wide action belongs on the page where the
-  // plugin's other controls are, and it is *not* a setting: it stores nothing, and
-  // what it writes is each gallery's own chapters field. What a click does is plan
-  // — a read-only query — and only then ask, which is what makes it safe to put a
-  // button next to a switch that looks the same.
-  //
-  // The smoke world has no gallery with chapters of Stash's to bring over, so the
-  // plan comes back empty and nothing is written. The job itself is exercised
-  // against fixtures in ./reader.js, which is where the chapter states live.
-  {
-    const el = call("PluginSettings", { pluginID: "mangaTools" });
-
-    assert.strictEqual(
-      find(
-        el,
-        (n) => n.props?.children === "mangaTools.settings.chapters.heading"
-      ),
-      null,
-      "the heading is a string this plugin's catalogs resolve, not a raw id"
-    );
-    const heading = find(
-      el,
-      (n) => n.props?.children === "Import chapters from Stash"
-    );
-    assert.ok(heading, "the panel offers the chapter import");
-    assert.strictEqual(
-      heading.type,
-      "h3",
-      "under a heading, like the settings around it"
-    );
-
-    const button = find(
-      el,
-      (n) => n.props?.children === "Check what would be imported"
-    );
-    assert.ok(button, "with a button that asks what there is to do");
-
-    const writesBefore = mutationWrites.length;
-    button.props.onClick();
-
-    assert.strictEqual(
-      mutationWrites.length,
-      writesBefore,
-      "and asking writes nothing — the plan is a read, and the question comes next"
-    );
-    assert.ok(
-      find(
-        call("PluginSettings", { pluginID: "mangaTools" }),
-        (n) => n.props?.children === "Checking…"
-      ),
-      "the button says what it is doing rather than looking like nothing happened"
-    );
-  }
+  // The library-wide chapter import used to be on this page, and is not any more:
+  // the reader half still does the job — see its own Chapters tab, and the import
+  // it runs there — but the button that drove it from here, and everything this
+  // half held to drive it, is gone. What replaces it is the silent import the
+  // Chapters tab does for a gallery nobody has opened yet.
 
   // ── 7d. The plugin's own strings follow Stash's UI language ────────
   // Only the strings this plugin writes itself have catalogs: the headings, the
   // descriptions and the placeholders. Everything else on screen comes from Stash's
   // messages, which its own provider resolves.
+  // The page's first heading is the lightbox switch's, and the multiselect deeper
+  // down carries a localised placeholder of its own; between them they cover the
+  // catalogs, the fallback chain and the ids.
   const headingIn = (locale) => {
     state.currentLocale = locale;
     const el = call("PluginSettings", { pluginID: "mangaTools" });
@@ -454,10 +649,10 @@ module.exports = () => {
     ).props.placeholder;
   };
 
-  assert.strictEqual(headingIn("en-US"), "Enabled languages");
+  assert.strictEqual(headingIn("en-US"), "Take over Stash's lightbox");
   assert.strictEqual(
     headingIn("zh-CN"),
-    "启用的语言",
+    "接管 Stash 原生灯箱",
     "a Stash set to Simplified Chinese should read the Chinese heading"
   );
   assert.strictEqual(
@@ -467,7 +662,7 @@ module.exports = () => {
   );
   assert.strictEqual(
     headingIn("zh-Hant"),
-    "啟用的語言",
+    "接管 Stash 原生燈箱",
     "Traditional Chinese has its own catalog"
   );
 
@@ -475,13 +670,13 @@ module.exports = () => {
   // English. A regional variant reads its language's catalog.
   assert.strictEqual(
     headingIn("zh-Hant-HK"),
-    "啟用的語言",
+    "接管 Stash 原生燈箱",
     "zh-Hant-HK should fall back to the zh-Hant catalog"
   );
-  assert.strictEqual(headingIn("en-GB"), "Enabled languages");
+  assert.strictEqual(headingIn("en-GB"), "Take over Stash's lightbox");
   assert.strictEqual(
     headingIn("de-DE"),
-    "Enabled languages",
+    "Take over Stash's lightbox",
     "a language with no catalog of its own reads English rather than showing ids"
   );
 

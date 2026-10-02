@@ -486,8 +486,20 @@ module.exports = () => {
   NS.showCoverBadge = true;
   NS.showFlags = true;
   assert.strictEqual(card("1").type, React.Fragment, "restored");
+
+  // And a third switch above both of them: with the language field turned off there
+  // is no badge whatever the two display switches say, because there is no language
+  // field for them to be about.
+  NS.fieldLanguage = false;
+  assert.strictEqual(
+    card("1"),
+    overlaysResult,
+    "no badge while the language field itself is off"
+  );
+  NS.fieldLanguage = true;
+  assert.strictEqual(card("1").type, React.Fragment, "and back when it is on");
   console.log(
-    "✓ display switches (flags off = names only / badge off / independent)"
+    "✓ display switches (flags off = names only / badge off / independent / the field above them)"
   );
 
   // ── 13b. Censorship: the card mark and the toolbar button ─────────
@@ -2106,6 +2118,64 @@ module.exports = () => {
     renderChild(panelOf({ alsoNotOurs: "x" })),
     null,
     "with none of the three set there is no panel at all"
+  );
+
+  // ── 13a2. A field turned off leaves the panel ──────────────────────
+  // The four switches, one surface along from the edit block. Each field is read
+  // only while it is drawn, so turning one off cannot leave its row behind on a
+  // gallery that happens to hold a value — and the gallery's value is not touched
+  // either way, which is what makes the switch reversible.
+  const allFour = {
+    [NS.FIELD_NAME]: "zh-Hans",
+    [NS.CENSORSHIP_FIELD_NAME]: "censored",
+    [TG]: "Lily Manga",
+    [NS.ORIGINAL_FIELD_NAME]: "true",
+  };
+  const panelText = (values) => renderChild(panelOf(values));
+
+  assert.ok(hasText(panelText(allFour), "简体中文"), "all four, to start from");
+
+  NS.fieldLanguage = false;
+  const noLanguage = panelText(allFour);
+  assert.ok(
+    !hasText(noLanguage, "简体中文"),
+    "a field turned off takes its row"
+  );
+  assert.ok(hasText(noLanguage, "有修正"), "…and leaves the others alone");
+  assert.ok(
+    hasText(noLanguage, "生肉（无翻译组）"),
+    "the raw mark has no language row left to ride on, so it stands on its own"
+  );
+  NS.fieldLanguage = true;
+
+  NS.fieldCensorship = false;
+  assert.ok(
+    !hasText(panelText(allFour), "有修正"),
+    "the censorship row goes the same way"
+  );
+  assert.ok(hasText(panelText(allFour), "简体中文"));
+  NS.fieldCensorship = true;
+
+  NS.fieldTranslationGroup = false;
+  assert.ok(!hasText(panelText(allFour), "Lily Manga"));
+  NS.fieldTranslationGroup = true;
+
+  NS.fieldOriginal = false;
+  assert.ok(!hasText(panelText(allFour), "生肉"));
+  NS.fieldOriginal = true;
+
+  // With all four off there is nothing left to draw, so there is no panel — and the
+  // master switch is the same question asked of all four at once.
+  NS.fields = false;
+  assert.strictEqual(
+    panelText(allFour),
+    null,
+    "no fields at all means no panel, not an empty fold"
+  );
+  NS.fields = true;
+  assert.ok(
+    hasText(panelText(allFour), "简体中文"),
+    "and the panel comes back whole when the master does"
   );
 
   const languageOnly = renderChild(panelOf({ [NS.FIELD_NAME]: "zh-Hans" }));

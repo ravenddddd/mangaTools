@@ -75,9 +75,11 @@ module.exports = () => {
   );
   // Stash's `.setting-section .setting > div:last-child { text-align: right }`
   // right-aligns the heading and description of this full-width settings block
-  // unless it is explicitly undone.
+  // unless it is explicitly undone. The selector is written twice — once for the
+  // page's own level, once for the block's place inside a field's sub-settings —
+  // so what is read here is the pair, not just the first.
   assert.ok(
-    /\.setting-section\s+\.setting\.manga-tools-settings\s*>\s*div:last-child\s*\{[^}]*text-align:\s*left/.test(
+    /\.setting-section\s+\.setting\.manga-tools-settings\s*>\s*div:last-child[^{]*\{[^}]*text-align:\s*left/.test(
       css
     ),
     "the settings block must reset Stash's text-align: right"

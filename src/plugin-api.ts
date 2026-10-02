@@ -92,6 +92,17 @@ export interface MangaToolsCustomFields {
 }
 
 /** The namespace languages.ts and fields.ts publish on window.MangaTools */
+/**
+ * The four attributes this plugin manages, named as the surfaces that draw them call
+ * them — not as the fields, which is a question about keys rather than about anything
+ * anyone looks at. See fieldShowing.
+ */
+export type MangaToolsFieldName =
+  | "language"
+  | "censorship"
+  | "translationGroup"
+  | "original";
+
 export interface MangaToolsNamespace {
   LANGUAGES: { [code: string]: MangaToolsLanguage };
   FALLBACK_LOCALE: string;
@@ -229,6 +240,71 @@ export interface MangaToolsNamespace {
   enabledLanguages: Set<string> | null;
   parseEnabledLanguages(raw: unknown): Set<string> | null;
   serializeEnabledLanguages(codes: Iterable<string>): string;
+
+  /**
+   * Whether a field is drawn at all: the master and the field's own switch together.
+   *
+   * Every surface asks this rather than reading the two — the master is about *all* of
+   * them, so nothing that draws one should have to remember it.
+   */
+  fieldShowing(field: MangaToolsFieldName): boolean;
+
+  /**
+   * Whether any of the four is drawn.
+   *
+   * The question a block *made of* the fields asks before drawing itself: an empty
+   * fold with a heading over it is worse than no fold at all. Not the same question
+   * as `NS.fields` — one field left on is enough to be worth drawing.
+   */
+  anyFieldShowing(): boolean;
+
+  /**
+   * Whether each of the plugin's four fields is shown and managed at all.
+   *
+   * Turned off, a field leaves every surface it appears on — the badge, the details
+   * row, the edit row, the bulk row, the sidebar section and any filter that names it —
+   * and the values already on galleries are kept. What it does **not** change is which
+   * keys this plugin recognises: see `ownField`, which has to keep answering for a
+   * field nobody is showing, or a gallery's own JSON would appear as somebody else's
+   * custom field in Stash's edit form.
+   */
+  fieldLanguage: boolean;
+  fieldCensorship: boolean;
+  fieldTranslationGroup: boolean;
+  fieldOriginal: boolean;
+  /**
+   * Whether the fields are managed at all. The master over the four above: turned off,
+   * they all leave the interface together, and so do the two Manga info blocks — a block
+   * whose fields are not drawn is an empty box.
+   */
+  fields: boolean;
+
+  /**
+   * Whether a marked gallery is read in this plugin's own lightbox.
+   *
+   * Off, Stash's own lightbox is left to draw — and nothing else changes: the fields,
+   * the badges and the panels are all still there.
+   */
+  readerTakeover: boolean;
+  /**
+   * Whether the Chapters tab's Create and Edit belong to this plugin.
+   *
+   * On, they write this plugin's own chapter field, and Stash's own chapter rows are
+   * never touched. Off, the tab is Stash's again — its editor writes Stash's rows,
+   * which is what it does without this plugin.
+   */
+  manageChapters: boolean;
+  /** Whether the mark's icon is drawn in a gallery cover's info row. */
+  coverIcon: boolean;
+  /**
+   * What taking the mark off does: whether it is asked about first, and whether this
+   * plugin's fields come off with the mark.
+   *
+   * The mark itself always goes — that is what unmarking means. With `deleteOnUnmark`
+   * off, the values stay on the gallery: hidden, and back if it is marked again.
+   */
+  confirmUnmark: boolean;
+  deleteOnUnmark: boolean;
 
   /** Whether flags are drawn. Populated by mangaTools.tsx from the plugin settings. */
   showFlags: boolean;

@@ -296,6 +296,18 @@ function step(): void {
     return;
   }
 
+  // The switch that turns this half off, and it is asked here — before anything at
+  // all is done *to* the lightbox, not only before something is drawn in it. Off is
+  // Stash's own lightbox, and Stash's own is not a lightbox this plugin claims, asks
+  // the server about, or hands chapters to. `claim` is why it cannot wait for
+  // `wanted` below: claiming happens the moment the lightbox is known to be one of
+  // this gallery's, and a lightbox claimed and then abandoned is one whose own chrome
+  // is hidden with nothing of ours in its place.
+  if (!NS.readerTakeover) {
+    leaveUnmarked(lightbox);
+    return;
+  }
+
   // Claimed before anything can be drawn in it.
   //
   // Stash's lightbox opens wearing its own chrome — its own counter, its own idea of
@@ -346,6 +358,12 @@ function claim(lightbox: Element): void {
  * gallery; that is the gate, and the only one.
  */
 function wanted(): boolean {
+  // The one switch that turns *this half* off, asked wherever this half is about to do
+  // something: reading a gallery is the whole of what it does, and off means Stash's own
+  // lightbox, drawn by Stash, with nothing of this half's added to it — while the mark,
+  // the fields, the panels and the badges all stay exactly as they were.
+  if (!NS.readerTakeover) return false;
+
   const id = galleryIdFromPath(window.location.pathname);
   return root !== null && id !== null && NS.markedInStore(id) === true;
 }
@@ -2112,6 +2130,15 @@ export function install(): void {
     if (NS.readerSettingsRaw === null) return;
 
     settings = readSettings();
+
+    // And this *is* one of the plugin's own settings, read straight off the managing
+    // half's state rather than out of the reader's JSON: turning reading off has to hand
+    // the lightbox back where it stands, and stopping drawing over it is not enough —
+    // the chrome and the container are this half's and have to be taken away by it.
+    if (!NS.readerTakeover) {
+      if (root) deactivate();
+      return;
+    }
 
     if (root) sync(root);
   });
