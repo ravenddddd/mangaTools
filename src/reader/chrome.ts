@@ -77,10 +77,7 @@ const CLASS_GROUP_LABEL = "manga-reader-group-label";
 const CLASS_DIVIDER = "manga-reader-divider";
 /** One row of the panel: a label, and the control that belongs to it */
 const CLASS_ROW = "manga-reader-row";
-/** The words in that row — the label, and the quiet line under it when there is one */
-const CLASS_ROW_WORDS = "manga-reader-row-words";
 const CLASS_ROW_LABEL = "manga-reader-row-label";
-const CLASS_HINT = "manga-reader-hint";
 /**
  * The single-page/double-page pair.
  *
@@ -586,28 +583,15 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     const row = (
       id: string,
       textId: string,
-      control: HTMLElement,
-      hintId?: string
+      control: HTMLElement
     ): HTMLElement => {
       const node = text(CLASS_ROW, "div");
 
-      const words = text(CLASS_ROW_WORDS);
       const name = document.createElement("label");
       name.className = CLASS_ROW_LABEL;
       name.htmlFor = id;
       labels[textId] = name;
-      words.appendChild(name);
-
-      if (hintId) {
-        const hint = text(CLASS_HINT);
-        // Stash's own two classes for a quiet line under a control, which is what
-        // this is: its own lightbox describes its "scale up" switch the same way.
-        hint.className = CLASS_HINT + " form-text text-muted";
-        labels[hintId] = hint;
-        words.appendChild(hint);
-      }
-
-      node.appendChild(words);
+      node.appendChild(name);
       node.appendChild(control);
       return node;
     };
@@ -690,8 +674,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
       )
     );
 
-    // Two settings that are questions about a *pair*, and are put away with the
-    // pairing itself — see the pass below.
+    // Three settings that are questions about a *pair*, and are put away with the
+    // pairing itself — see the pass below. The shift is one of them now: it was its
+    // own group, named for a gallery, back when it was remembered per gallery.
     parts.coverRow = row(
       COVER_ID,
       "mangaReader.coverAlone",
@@ -704,28 +689,16 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
       "mangaReader.detectSpreads",
       switchAt(SPREAD_ID, (on) =>
         latest?.handlers.onSetting({ detectSpreads: on })
-      ),
-      "mangaReader.detectSpreadsHint"
+      )
     );
     reading.appendChild(parts.spreadsRow);
 
-    // The rule above the gallery group, kept rather than written here: it goes with
-    // the group when there is no pairing to correct — the rule below it is the one
-    // that stays, and stays between the two groups that remain.
-    parts.galleryRule = rule();
-
-    // ── What is wrong with this pairing ───────────────────────────────────
-    // A reading preference like the rest of them, and remembered for the browser:
-    // a reader whose scans are grouped wrongly is reading scans, not one book.
-    parts.galleryGroup = group("mangaReader.groupGallery");
-    parts.galleryGroup.appendChild(
-      row(
-        OFFSET_ID,
-        "mangaReader.offset",
-        switchAt(OFFSET_ID, (on) => latest?.handlers.onOffset(on)),
-        "mangaReader.offsetHint"
-      )
+    parts.offsetRow = row(
+      OFFSET_ID,
+      "mangaReader.offset",
+      switchAt(OFFSET_ID, (on) => latest?.handlers.onOffset(on))
     );
+    reading.appendChild(parts.offsetRow);
 
     rule();
 
@@ -763,7 +736,6 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
   say("mangaReader.options");
   say("mangaReader.groupReading");
-  say("mangaReader.groupGallery");
   say("mangaReader.groupAnimation");
 
   say("mangaReader.singlePage");
@@ -789,9 +761,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
   say("mangaReader.coverAlone");
   say("mangaReader.detectSpreads");
-  say("mangaReader.detectSpreadsHint");
   say("mangaReader.offset");
-  say("mangaReader.offsetHint");
 
   // Three of these settings are about a *pair*, and a reader reading one page at a
   // time has no use for any of them: "cover on a page of its own" and "detect
@@ -802,8 +772,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const paired = state.settings.doublePage;
   showWhen(parts.coverRow, paired);
   showWhen(parts.spreadsRow, paired);
-  showWhen(parts.galleryGroup, paired);
-  showWhen(parts.galleryRule, paired);
+  showWhen(parts.offsetRow, paired);
 }
 
 const SINGLE_PAGE_ID = "manga-reader-single-page";

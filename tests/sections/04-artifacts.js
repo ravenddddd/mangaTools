@@ -394,6 +394,23 @@ module.exports = () => {
     "and the last group should not carry the gap that separates groups"
   );
 
+  // And the space *between* the rows, which is a different rule from the `gap` inside
+  // one. Getting that wrong is not hypothetical: the first attempt at this spacing
+  // widened the gap — the distance between a row's words and its own switch — and left
+  // the rows themselves flush against each other, which is the thing that looked tight.
+  // The value is read rather than pattern-matched: the first attempt at this asked for
+  // a margin beginning with a nonzero digit, which `0.75rem` does not — a check that
+  // failed against the rule it was written for.
+  const rowGap =
+    /\.manga-reader-row:not\(:last-child\)\s*\{[^}]*margin-bottom:\s*([\d.]+)(?:rem|px)/.exec(
+      readerCss
+    );
+  assert.ok(
+    rowGap && Number(rowGap[1]) > 0,
+    "mangaReader.css should separate one row from the next, which is a rule of its own " +
+      "rather than the gap inside a row"
+  );
+
   // No focus ring left behind by a *click*. Bootstrap draws one on `:focus` — a light
   // blue glow — and a press gives the button the focus it keeps, so the chosen half of
   // the pair came out outlined rather than chosen. `:focus-visible` is the difference

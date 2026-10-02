@@ -352,24 +352,24 @@
   gap: 1.25rem;
 }
 
-.manga-reader-row-words {
+/* The label takes the room that is left, which is what holds the control against the
+   far edge of the panel however long the words are. */
+.manga-reader-row-label {
   flex: 1;
   min-width: 0;
-}
-
-.manga-reader-row-label {
-  display: block;
   margin: 0;
   /* Bootstrap's own label size, which is what Stash's settings rows use */
   font-size: 1rem;
 }
 
-.manga-reader-hint {
-  /* `form-text text-muted` is Stash's own pair for this, and carries the colour; it
-     says nothing about size, so a hint would come out the same size as the label it
-     sits under. 12px is what Stash's own `.sub-heading` is. */
-  font-size: 0.85rem;
-  line-height: 1.4;
+/*
+ * And the space *between* the rows, which is a different thing from the `gap` above:
+ * that one is inside a row and this one is what keeps two switches from reading as
+ * one control with two labels. The last row carries none — there is nothing after it
+ * for the gap to separate it from.
+ */
+.manga-reader-row:not(:last-child) {
+  margin-bottom: 0.75rem;
 }
 
 /*

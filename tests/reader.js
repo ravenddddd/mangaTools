@@ -3541,22 +3541,31 @@ async function main() {
       );
     }
 
-    // Three groups, each with its own heading: what the pages are paired like, what
-    // is wrong with this gallery's pairing, and how long a turn takes. Stash's own
-    // panel is one flat list, so this is the arrangement this plugin chose — and a
-    // setting for one gallery sitting in with the reading preferences without a word
-    // between them was the thing it chose against.
+    // Two groups, each with its own heading: how the pages are paired, and whether a
+    // screen fades in as it arrives. Stash's own panel is one flat list, so this is the
+    // arrangement this plugin chose. The shift used to be a third group of its own,
+    // named for a gallery — it is remembered for the browser now, and belongs with the
+    // other pairing settings.
     assert.deepStrictEqual(
       [...body.querySelectorAll(".manga-reader-group")].map(
         (group) => group.querySelector(".manga-reader-group-label").textContent
       ),
-      ["Reading", "This gallery", "Animation"],
-      "in three groups, each named"
+      ["Reading", "Animation"],
+      "in two groups, each named"
     );
     assert.strictEqual(
       body.querySelectorAll(".manga-reader-divider").length,
-      2,
-      "with a rule between one group and the next, and none around the outside"
+      1,
+      "with a rule between them, and none around the outside"
+    );
+
+    // No descriptions: a row is its label and its control, and there is nothing under
+    // either. A quiet line under a switch is Stash's own shape for one, and this panel
+    // has decided against it for now.
+    assert.strictEqual(
+      body.querySelector(".form-text"),
+      null,
+      "and no hint under any row"
     );
 
     // The two settings that had no control until now: stored and obeyed since the
@@ -3738,18 +3747,13 @@ async function main() {
       };
       const away = (node) =>
         node.getAttribute("data-manga-reader-hidden") !== null;
-      const groupOf = (label) => {
-        for (const group of panel.querySelectorAll(".manga-reader-group")) {
-          const heading = group.querySelector(".manga-reader-group-label");
-          if (heading.textContent === label) return group;
-        }
-        return null;
-      };
 
-      for (const id of [
+      const pairedRows = [
         "#manga-reader-cover-alone",
         "#manga-reader-detect-spreads",
-      ]) {
+        "#manga-reader-offset",
+      ];
+      for (const id of pairedRows) {
         assert.strictEqual(
           away(rowAt(id)),
           false,
@@ -3757,20 +3761,16 @@ async function main() {
         );
       }
       assert.strictEqual(
-        away(groupOf("This gallery")),
+        away(panel.querySelector(".manga-reader-divider")),
         false,
-        "and so is the group the shift lives in"
+        "and the one rule between the two groups is where it was"
       );
 
-      // One page at a time: all three go, and the two groups that remain are still
-      // separated by exactly one rule — the one above the pair, put away with the group,
-      // is not left behind to double up with the one below it.
+      // One page at a time: all three go — the shift included, which moves a pairing by
+      // a page — and the rule between the groups that remain stays.
       dom.click(panel.querySelector("#manga-reader-single-page"));
 
-      for (const id of [
-        "#manga-reader-cover-alone",
-        "#manga-reader-detect-spreads",
-      ]) {
+      for (const id of pairedRows) {
         assert.strictEqual(
           away(rowAt(id)),
           true,
@@ -3778,26 +3778,9 @@ async function main() {
         );
       }
       assert.strictEqual(
-        away(groupOf("This gallery")),
-        true,
-        "and the whole group with it, rather than a heading over nothing"
-      );
-      // The two rules, in the order they are drawn: the one above the group goes with
-      // it, and the one below it stays — so the two groups that remain are separated by
-      // one line rather than by two, and not by none.
-      assert.deepStrictEqual(
-        [...panel.querySelectorAll(".manga-reader-divider")].map((line) =>
-          away(line)
-        ),
-        [true, false],
-        "the rule above the group put away and the one below it kept"
-      );
-      assert.strictEqual(
-        panel
-          .querySelector("#manga-reader-fade-on")
-          .getAttribute("data-manga-reader-hidden"),
-        null,
-        "the fade is not a question about pairs, so it stays"
+        away(panel.querySelector(".manga-reader-divider")),
+        false,
+        "with the rule between the groups left in place"
       );
 
       // And back, since the pairing is the browser's setting rather than this section's.
