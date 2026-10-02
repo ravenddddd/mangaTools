@@ -4405,14 +4405,39 @@ async function main() {
       );
       assert.strictEqual(counter(), "3 / 5", "…and turns nothing");
 
+      // Ctrl is the exception, and deliberately: that chord is the browser's *page*
+      // zoom — the whole interface rather than the pages — and both screen modes take
+      // it. Taken here too, so a reader does not zoom Stash itself by accident.
+      const zooming = dom.makeEvent("wheel", { deltaY: -120, ctrlKey: true });
+      container.dispatch("wheel", zooming);
+      assert.strictEqual(
+        zooming.defaultPrevented,
+        true,
+        "while ctrl+wheel is taken rather than passed to the browser's own zoom"
+      );
+      assert.strictEqual(counter(), "3 / 5", "…and zooms nothing either");
+
       // A page is not something to turn either: there is no page on either side of it,
       // only more of the same column.
       dom.click(rows[2].querySelector("img"));
       assert.strictEqual(counter(), "3 / 5", "a click on a page does nothing");
 
+      // And the lightbox says the mode is on, which is what the stylesheet asks to know
+      // about Stash's own next-page chevron — the one that sits where this bar is.
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-position-scrolling"),
+        true,
+        "the lightbox is marked while the column is up"
+      );
+
       // Put back: the mode is the browser's setting, and a section that left the reader
       // in the column would be choosing it for every section after this one.
       dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+      assert.strictEqual(
+        box.lightbox.classList.contains("manga-reader-position-scrolling"),
+        false,
+        "and unmarked the moment the reader goes back to screens"
+      );
 
       stopReader(box);
     }

@@ -76,6 +76,7 @@ import type { MangaReaderGallery, MangaReaderSettings } from "./namespace";
 import { FADE_MS, readSettings, writeSettings } from "./settings";
 import {
   CLASS_SCROLL,
+  CLASS_SCROLLING,
   CLASS_SCROLL_PAGE,
   buildColumn,
   rowOffset,
@@ -847,6 +848,10 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
   if (!container) return;
 
   container.classList.add(CLASS_SCROLL);
+  // And the mode on the lightbox, for the one rule that is about Stash's own furniture
+  // rather than this plugin's: the chevron that sits where this bar now is. See the
+  // stylesheet.
+  lightbox.classList.add(CLASS_SCROLLING);
   container.style.transform = "";
   view = fitView();
 
@@ -890,6 +895,7 @@ function removeColumn(): void {
   // in a mode that has no column.
   shownAt = -1;
   container?.classList.remove(CLASS_SCROLL);
+  root?.classList.remove(CLASS_SCROLLING);
 }
 
 /** Which page the column is showing at its top, from where its rows are */
@@ -1693,13 +1699,18 @@ function onSpreadWheel(event: Event): void {
   const lightbox = root;
   if (!lightbox || !container) return;
 
-  // In the column the wheel is the browser's: scrolling *is* reading there, so this
-  // leaves the event entirely alone — no preventDefault, no ctrl chord of ours. That
-  // is the one thing the third mode could not have been without, and it is why the
-  // two arrangements cannot be one setting.
-  if (settings.readingMode === "scroll") return;
-
   const wheel = event as WheelEvent;
+
+  // In the column the wheel is the browser's: scrolling *is* reading there, so the
+  // plain wheel is left entirely alone. **Ctrl is not**: that is the browser's page
+  // zoom — the whole interface rather than the pages — and both screen modes take the
+  // chord rather than passing it on, so taking it here as well is what keeps a reader
+  // from zooming Stash itself by accident while they are reading a column.
+  if (settings.readingMode === "scroll") {
+    if (wheel.ctrlKey || wheel.metaKey) wheel.preventDefault();
+    return;
+  }
+
   // Taken whatever is done with it: ctrl+wheel is the browser's own page zoom, and
   // without this a reader zooming into a page would zoom the whole interface.
   wheel.preventDefault();

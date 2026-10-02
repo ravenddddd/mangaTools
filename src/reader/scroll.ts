@@ -33,6 +33,15 @@ import type { MangaReaderPage } from "./spreads";
 export const CLASS_SCROLL = "is-scroll";
 /** One page of the column */
 export const CLASS_SCROLL_PAGE = "manga-reader-scroll-page";
+/**
+ * The same mode, marked on the lightbox.
+ *
+ * For the one rule that is about *Stash's* furniture rather than this plugin's: the
+ * next-page chevron sits against the right edge of the picture area, which is where
+ * the column's bar now is. One class on each element, because one is about what this
+ * plugin draws and the other is about where it is drawn.
+ */
+export const CLASS_SCROLLING = "manga-reader-position-scrolling";
 
 /**
  * Which page the reader is on, from where each page's row is.

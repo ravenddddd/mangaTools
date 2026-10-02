@@ -692,11 +692,14 @@ the same thing in all three.
 
 **In the column:**
 
-- **The wheel is the browser's.** Scrolling *is* reading there: no page turns, no
-  `preventDefault`, and no chord of this plugin's. `←`/`→` move one page, because a
-  page is what the counter counts; a screenful would be a measurement and a different
-  answer on every window. A click on a page does nothing — there is no page on either
-  side of it — while a click on the letterbox still closes the lightbox.
+- **The wheel is the browser's**, and the plain one is left entirely alone: no page
+  turns and no `preventDefault`. **`Ctrl`+wheel is the exception** — that chord is the
+  browser's *page* zoom, the whole interface rather than the pages, and both screen
+  modes take it, so taking it here too is what keeps a reader from zooming Stash
+  itself by accident. `←`/`→` move one page, because a page is what the counter
+  counts; a screenful would be a measurement, and a different answer on every window.
+  A click on a page does nothing — there is no page on either side of it — while a
+  click on the letterbox still closes the lightbox.
 - **There is no zoom and no pan.** A page is already as wide as the picture area, and
   the zoom is a transform on the container, which is a scroll box in this mode.
 - **Every row's height is reserved before its picture arrives**, from the size the
@@ -707,7 +710,9 @@ the same thing in all three.
   the bottom: the same four pixels of paint, the same sixteen of aim, the same chapter
   ticks, the same bubble (beside the line rather than above it), the same drag. Its
   length is the picture area's, so nothing about it is measured — and the browser's own
-  scrollbar is hidden, because this *is* the scrollbar here.
+  scrollbar is hidden, because this *is* the scrollbar here. Stash's next-page chevron
+  steps inboard of it on that side: two controls in one place is a control the reader
+  cannot use and a bar they cannot see, and the arrow still turns a page.
 - **The pages are in reading order**, the same list the other two modes read — not
   path order.
 
