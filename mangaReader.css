@@ -118,20 +118,35 @@
  * Where each menu sits. The chapter menu needs nothing: it is a Bootstrap
  * `dropdown-menu` inside a `div.dropdown`, and that is the pair Bootstrap positions.
  * The options popover needs this much — Stash renders its own into the lightbox and
- * places it with a library, and this header has none, so the popover is measured
- * from the box it is drawn in, centred under the gear. Without a positioned box to
- * be measured from it is measured from the page, and `top: 100%` of a page is below
- * the bottom of the screen.
+ * places it with a library, and this header has none, so the popover is measured from
+ * the box it is drawn in. Without a positioned box to be measured from it is measured
+ * from the page, and `top: 100%` of a page is below the bottom of the screen.
  */
 .manga-reader-options-anchor {
   position: relative;
 }
 
+/*
+ * Hung from the gear's **right** edge rather than centred under it.
+ *
+ * Centred is what Stash's own popover does, and it works there because a library
+ * measures it and pushes it back inside the window. This header has no such library,
+ * and the gear sits three buttons from the edge of the screen — so a panel centred on
+ * it runs off the right of the window, which is what it did.
+ *
+ * Above the chevrons, which are `z-index: 1045` in Stash's own stylesheet: they are
+ * positioned over the picture area, the menu hangs down into it, and at anything lower
+ * the chevron took the clicks meant for the row under it. `1050` is Bootstrap's own
+ * layer for a modal, so this is as high as a panel belongs.
+ */
+.manga-reader-chrome .popover.show,
+.manga-reader-chrome .dropdown-menu.show {
+  z-index: 1050;
+}
+
 .manga-reader-chrome .popover.show {
-  left: 50%;
+  right: 0;
   top: 100%;
-  transform: translateX(-50%);
-  z-index: 20;
 }
 
 /*
@@ -181,7 +196,7 @@
 .manga-reader-menu-heading,
 .manga-reader-menu-count {
   color: #bfccd6; /* Stash's $text-muted */
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   letter-spacing: 0.06em;
 }
 
@@ -204,7 +219,9 @@
   padding: 0.4rem 0.8rem 0.4rem 0.65rem;
   border-left: 2px solid transparent;
   color: #bfccd6;
-  font-size: 0.85rem;
+  /* Stash's own size for an item in one of its menus: `.dropdown-item` is 1rem, and
+     the root font is 14px — so 14px, which is what its own menus read at. */
+  font-size: 1rem;
 }
 
 .manga-reader-chrome .manga-reader-menu-chapters .manga-reader-menu-item:hover {
@@ -240,7 +257,7 @@
 .manga-reader-chapter-range {
   flex-shrink: 0;
   color: #8b9aa6;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -280,7 +297,7 @@
 .manga-reader-group-label {
   margin-bottom: 0.4rem;
   color: #bfccd6;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   letter-spacing: 0.06em;
 }
 
@@ -307,12 +324,15 @@
 .manga-reader-row-label {
   display: block;
   margin: 0;
-  font-size: 0.85rem;
+  /* Bootstrap's own label size, which is what Stash's settings rows use */
+  font-size: 1rem;
 }
 
 .manga-reader-hint {
-  /* `form-text text-muted` is Stash's own pair for this, and carries the size and
-     the colour; what is here is only what it does not say. */
+  /* `form-text text-muted` is Stash's own pair for this, and carries the colour; it
+     says nothing about size, so a hint would come out the same size as the label it
+     sits under. 12px is what Stash's own `.sub-heading` is. */
+  font-size: 0.85rem;
   line-height: 1.4;
 }
 
@@ -347,9 +367,9 @@
 
 .manga-reader-segment {
   flex: 1;
-  padding: 4px 0;
+  padding: 5px 0;
   border-radius: 4px;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 /* The half that is not chosen stays quieter than the half that is: both are
@@ -368,6 +388,18 @@
    and the class it used to wear was Bootstrap 5's name for the same control. */
 .manga-reader-group > .custom-range {
   margin-top: 0.4rem;
+}
+
+/*
+ * The last group in the panel, and the panel's own bottom edge.
+ *
+ * Every group is a `form-group` — that is where the gap *between* one group and the
+ * next comes from — and a `form-group` carries its margin at the bottom. On the last
+ * one there is nothing after it for the gap to separate it from, so all it did was
+ * put a strip of nothing under the final switch.
+ */
+.manga-reader-chrome .manga-reader-settings .manga-reader-group:last-child {
+  margin-bottom: 0;
 }
 
 /*

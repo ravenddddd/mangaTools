@@ -342,6 +342,48 @@ module.exports = () => {
     ),
     "and should place that popover under the gear that opened it"
   );
+  // Under the gear's right edge rather than centred on it. Centred is what Stash's
+  // own popover does, and it gets away with it because a library measures it and
+  // pushes it back inside the window; this header has none, and the gear is three
+  // buttons from the edge of the screen — so a centred panel ran off the right of it.
+  assert.ok(
+    /\.manga-reader-chrome \.popover\.show\s*\{[^}]*right:\s*0[^}]*\}/.test(
+      readerCss
+    ),
+    "and should hang it from the gear's own right edge, or it leaves the screen"
+  );
+  // …and not by a transform, which is what centring it took. Read out of that one
+  // rule rather than off the whole file: the bar's own bubble is centred with the
+  // same transform, and it is meant to be.
+  const popoverRule =
+    /\.manga-reader-chrome \.popover\.show\s*\{([^}]*)\}/.exec(readerCss);
+  assert.ok(
+    popoverRule && popoverRule[1].indexOf("transform") === -1,
+    "…which is to say not centred: anchoring it and shifting it back was what put " +
+      "it off the edge of the screen"
+  );
+
+  // Above Stash's own chevrons, which are `z-index: 1045` in its lightbox stylesheet
+  // and sit over the picture area the menus hang down into. Below them the chevron
+  // takes the clicks meant for the row under it — a settings panel that opened and
+  // could not be used, because every press on it went to the next-page button.
+  assert.ok(
+    /\.manga-reader-chrome \.popover\.show,\s*\.manga-reader-chrome \.dropdown-menu\.show\s*\{[^}]*z-index:\s*1050/.test(
+      readerCss
+    ),
+    "both menus should be above the chevrons that overlap them: at 1045 they take " +
+      "the clicks, and the panel is there but unusable"
+  );
+
+  // The panel's own bottom edge. Every group is a `form-group`, which carries its
+  // margin at the bottom — that is the gap *between* one group and the next — so the
+  // last one put a strip of nothing under the final switch.
+  assert.ok(
+    /\.manga-reader-group:last-child\s*\{[^}]*margin-bottom:\s*0/.test(
+      readerCss
+    ),
+    "and the last group should not carry the gap that separates groups"
+  );
   // And the same, the other way round, for the pages: the spread is measured from
   // the display it is drawn into, which is what makes it the size of the screen
   // rather than the size of its own contents.
