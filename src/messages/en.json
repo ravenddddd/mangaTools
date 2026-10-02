@@ -73,9 +73,8 @@
   "mangaTools.settings.coverIcon.help": "Not the same thing as the language badge: this one says the gallery is one the plugin manages, which is not a value anyone scans a cover for.",
 
   "mangaTools.settings.help.cover": "Cover",
-  "mangaTools.settings.help.card.title": "A manga title, over two lines",
+  "mangaTools.settings.help.card.title": "A sample manga title",
   "mangaTools.settings.help.card.date": "2026-09-30",
-  "mangaTools.settings.help.card.description": "And the line or two of description a card shows under it.",
 
   "mangaTools.manga.mark": "Mark as manga",
   "mangaTools.manga.marked": "Manga",

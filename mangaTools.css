@@ -572,6 +572,18 @@
   border-radius: 3px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
   /*
+   * The type Stash's card expects, put back. The panel hangs off the "?" inside
+   * the setting's own `<h3>`, and an h3 is a heading: its weight (Bootstrap's
+   * 500) and its line-height (1.2) are inherited by everything in here — so the
+   * date and the language on the badge came out heavier and tighter than they are
+   * on a real card, which is what "the font looks a bit off" was. The size is
+   * reset for the same reason: this page's headings are 1.25rem at the top level
+   * and 1rem under a group, and the card should not follow either.
+   */
+  font-size: 1rem;
+  font-weight: normal;
+  line-height: 1.5;
+  /*
    * Not `pointer-events: none`, which is the obvious way to say "this is a
    * picture". Two things are worse with it: the panel stops being part of what
    * the pointer is hovering, so it closes the moment the mouse leaves the "?" —
@@ -598,16 +610,43 @@
 }
 
 /*
- * The ring. `outline` and not a border: the badge it goes around is absolutely
- * positioned in the cover's corner, and an outline is drawn outside the box
- * without touching it. Nothing here sets `position`, for the same reason — a
- * `position` on this class would drop that badge back into the flow, which is
- * exactly what the mock did before the browser showed it.
+ * What the panel is about gets a ring and a spotlight: the rest of the card is
+ * pushed back, and that one part is left at full brightness. The ring answers
+ * "which of these is it", the dim answers it from a glance.
+ *
+ * The dim is a `box-shadow` with a spread wide enough to cover the card, drawn
+ * with the element — which is why nothing else here needs a mask or an overlay.
+ * The card clips it: Stash's own `.gallery-card.card` is `overflow: hidden`, so
+ * the shadow stops at the card's edge.
+ *
+ * `outline` and not a border, and no `position` in this rule: the badge it goes
+ * around is absolutely positioned in the cover's corner, and a `position` on this
+ * class would drop it back into the flow — which is exactly what the mock did
+ * until the browser showed it.
+ *
+ * The shadow has to be painted *above* everything else in the card, which is
+ * what `z-index` says. The badge already has one (its own rule gives it 9), so
+ * the one element that needs a `position` to go with it is the mark's slot — and
+ * that is written below, on the slot's own class, so that it cannot reach the
+ * badge.
  */
 .manga-tools-help-lit {
   outline: 2px solid #48aff0;
   outline-offset: 2px;
   border-radius: 3px;
+  box-shadow: 0 0 0 9999px rgba(12, 17, 22, 0.62);
+}
+
+/*
+ * The mark's slot is a plain span in the info row, so `z-index` needs a
+ * `position` to go with it — and it needs to be *above* the badge's own `z-index`
+ * (9, set so the badge sits over Stash's studio overlay). Below it, the badge
+ * would stay bright while everything else dimmed, which is the one thing a
+ * spotlight must not do.
+ */
+.manga-tools-popover-slot.manga-tools-help-lit {
+  position: relative;
+  z-index: 10;
 }
 
 /*

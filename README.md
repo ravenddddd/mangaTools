@@ -666,17 +666,36 @@ never gated on them: it is what makes a gallery this plugin's at all.
 **Two settings carry a "?" and it opens a picture, not a paragraph.** "Cover badge"
 and "the mark's icon" are both answered by *where* something is on a card, which is
 a sentence nobody should have to assemble in their head — so the panel holds a
-gallery card with the part in question ringed. The card is Stash's own markup and
-class names, drawn by Stash's own stylesheet, with the cover as the one stand-in (no
-gallery is behind the settings page); the ring is drawn with an `outline`, which
-goes outside the box without touching it, because the badge it circles is
-absolutely positioned in the cover's corner and a `position` in that rule would pull
-it back into the flow. Every word on the example — the caption, the title, the date,
-the description — is in the message catalogues, and the language on the badge is
-described in the reader's locale, so nothing on it is a Chinese string in an English
-UI. The wording that used to be shown there is the button's own name, read out to
-whoever cannot see the picture. Opening it is CSS: hover, or focus, which is what
-gives a keyboard and a finger what a mouse gets — nothing about it is stateful.
+gallery card with the part in question ringed and everything else on the card
+pushed back. The card is Stash's own markup and class names, drawn by Stash's own
+stylesheet, with the cover as the one stand-in (no gallery is behind the settings
+page): a square wearing `.gallery-card-image` at the `zoom-1` height, so the card
+is not stretched by a portrait cover. The date line alone is what a card whose
+gallery has no description draws, so nothing is being left out.
+
+The spotlight is a `box-shadow` with a spread wide enough to cover the card, drawn
+with the element and clipped by the card's own `overflow: hidden` — no overlay to
+keep in step. The ring is an `outline`, which goes outside the box without touching
+it, and its rule sets no `position`: the badge it circles is absolutely positioned
+in the cover's corner, and a `position` there would pull it back into the flow. The
+mark's slot, which is a plain span, is the one element that needs both a `position`
+and a `z-index` above the badge's own — below it, the mark's spotlight would leave
+the badge standing out while everything else dimmed.
+
+**The example puts the type back.** The panel hangs off the "?" inside the setting's
+own `<h3>`, so a heading's font weight, line-height and size are inherited by the
+card unless they are reset — and on a real cover the date and the language on the
+badge are neither heavier nor tighter than the rest. That reset is what makes the
+example read as the same card as the one in the list rather than as a card drawn
+inside a heading.
+
+Every word on the example — the caption, the title, the date — is in the message
+catalogues, and the language on the badge is described in the reader's locale: the
+reader's own language when the language table has it, English when it does not,
+since an unknown value describes itself as the raw code. The wording that used to be
+shown there is the button's own name, read out to whoever cannot see the picture.
+Opening it is CSS: hover, or focus, which is what gives a keyboard and a finger what
+a mouse gets — nothing about it is stateful.
 
 **Every switch defaults to what the plugin already did, and an absent value reads as
 the default** — all of them on, except the details block, which starts folded. So an

@@ -616,7 +616,7 @@ module.exports = () => {
     );
   }
 
-  // The words are the catalogues', every one of them: the four ids below are the
+  // The words are the catalogues', every one of them: the three ids below are the
   // whole of the example's text, and an example that hardcoded its caption would
   // read Chinese in an English UI. Checked per locale, against the catalogue the
   // UI is in.
@@ -638,20 +638,19 @@ module.exports = () => {
     "mangaTools.settings.help.cover",
     "mangaTools.settings.help.card.title",
     "mangaTools.settings.help.card.date",
-    "mangaTools.settings.help.card.description",
   ];
   for (const locale of ["zh-Hans", "en"]) {
     const words = wordsIn(locale);
     const expected = EXAMPLE_TEXT.map((key) => NS.catalogs()[locale][key]);
     // Equal, not merely present: the panel is a picture rather than more prose, so
-    // these four ids are the whole of what it says. A sentence left in from a
+    // these three ids are the whole of what it says. A sentence left in from a
     // mock, or a caption written into the component instead of the catalogue,
-    // shows up here as a fifth word — and one of the two would be the language the
+    // shows up here as one word too many — and that one would be the language the
     // UI is not in.
     assert.deepStrictEqual(
       words.slice().sort(),
       expected.slice().sort(),
-      `${locale}: the example's text should be exactly these four catalogue ids ` +
+      `${locale}: the example's text should be exactly these three catalogue ids ` +
         "(the badge's own language name draws as a flag while flags are on)"
     );
   }

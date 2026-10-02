@@ -2707,12 +2707,15 @@ function HelpExampleCard(props: { highlight: HelpExample }) {
 
   return (
     <div className="manga-tools-help-card" aria-hidden="true">
-      {/* The zoom class is what gives the cover its height — zoom-1 is what the
-          gallery list opens at, and a card narrower than the list's own is a
-          card with the same proportions at a smaller size. */}
+      {/* The zoom class still gives the cover its height — that is Stash's own
+          `zoom-1`, 240px — and the width is that same number, so the cover is
+          square and the card is not stretched by a portrait one. The list's own
+          zoom-1 card is wider than this (340) and therefore wider than it is
+          tall; the example is deliberately the compact version of the same card,
+          at the same cover height. */}
       <div
         className="gallery-card card grid-card zoom-1"
-        style={{ width: 200 }}
+        style={{ width: 240 }}
       >
         <div className="thumbnail-section">
           <span className="gallery-card-header">
@@ -2730,16 +2733,12 @@ function HelpExampleCard(props: { highlight: HelpExample }) {
               {t(intl, "mangaTools.settings.help.card.title")}
             </div>
           </h5>
+          {/* The date alone: a card whose gallery has no description draws
+              exactly this, so leaving it out is not leaving anything out. */}
           <div className="gallery-card__details">
             <span className="gallery-card__date">
               {t(intl, "mangaTools.settings.help.card.date")}
             </span>
-            <div
-              className="TruncatedText gallery-card__description"
-              style={{ WebkitLineClamp: 3 }}
-            >
-              {t(intl, "mangaTools.settings.help.card.description")}
-            </div>
           </div>
         </div>
         <hr />

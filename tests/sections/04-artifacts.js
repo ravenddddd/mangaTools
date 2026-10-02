@@ -146,6 +146,45 @@ module.exports = () => {
     "the ring must not set `position`: the badge it goes around is absolutely " +
       "positioned in the cover's corner, and this would pull it into the flow"
   );
+  // The spotlight: the rest of the card pushed back so the ringed part is the
+  // only bright thing on it. A shadow with a spread wide enough to cover the card,
+  // drawn with the element itself and clipped by the card's own overflow — so
+  // there is no overlay element to keep in step, and nothing to go wrong but the
+  // one thing asserted here: the shadow is only visible if it is painted over the
+  // card's other content, which is what the spread does.
+  assert.ok(
+    /box-shadow:\s*0 0 0 \d+px rgba\(/.test(ringRule[1]),
+    "the part a help panel is about should be spotlit, not just ringed — a card " +
+      "with the whole of it at full brightness says less at a glance"
+  );
+  // …which needs a `position` on the mark's slot, and a z-index above the badge's
+  // own (9) or the badge would be the one thing left bright in the mark's panel.
+  const slotLitRule =
+    /\.manga-tools-popover-slot\.manga-tools-help-lit\s*\{([^}]*)\}/.exec(css);
+  assert.ok(
+    slotLitRule,
+    "the mark's slot needs its own rule for the spotlight — it is a plain span, " +
+      "and the ring's own rule cannot carry a `position`"
+  );
+  assert.ok(
+    /position:\s*relative/.test(slotLitRule[1]) &&
+      Number(/z-index:\s*(\d+)/.exec(slotLitRule[1])?.[1] ?? 0) > 9,
+    "…and it has to sit above the badge's z-index, or the mark's spotlight would " +
+      "leave the badge standing out while everything else dimmed"
+  );
+  // The type. The panel hangs off the "?" inside the setting's `<h3>`, so a
+  // heading's own font weight and line-height are inherited by the card unless
+  // they are put back — which is a difference you can see and hard to place.
+  const exampleCardRule = /\.manga-tools-help-card\s*\{([^}]*)\}/.exec(css);
+  assert.ok(exampleCardRule, "the example needs a frame of its own");
+  assert.ok(
+    /font-weight:\s*normal/.test(exampleCardRule[1]) &&
+      /line-height:\s*1\.5/.test(exampleCardRule[1]) &&
+      /font-size:\s*1rem/.test(exampleCardRule[1]),
+    "the example should not inherit the heading it sits in: without this the " +
+      "date and the language on the badge come out heavier and tighter than they " +
+      "are on a real card"
+  );
   // The performers field is hidden by CSS rather than by not rendering the row —
   // Stash's form keeps the value, so nothing can clear it. That makes this rule
   // the whole of the feature, and its sibling combinator the load-bearing part of
