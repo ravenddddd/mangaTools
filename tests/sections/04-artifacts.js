@@ -393,6 +393,32 @@ module.exports = () => {
     ),
     "and the last group should not carry the gap that separates groups"
   );
+
+  // No focus ring left behind by a *click*. Bootstrap draws one on `:focus` — a light
+  // blue glow — and a press gives the button the focus it keeps, so the chosen half of
+  // the pair came out outlined rather than chosen. `:focus-visible` is the difference
+  // between a press and a Tab, and keeping it means the ring still lands for the
+  // reader who is moving through the panel with the keyboard.
+  // The declaration and not just the selector: a rule whose body was emptied would
+  // satisfy a pattern that stopped at the `{`, which is how the previous check of this
+  // kind went on passing with the thing it was checking removed.
+  for (const control of ["segment", "menu-item"]) {
+    assert.ok(
+      new RegExp(
+        "\\.manga-reader-chrome\\s+\\.manga-reader-" +
+          control +
+          ":focus:not\\(:focus-visible\\)[^{]*\\{[^}]*box-shadow:\\s*none"
+      ).test(readerCss),
+      `mangaReader.css should drop the focus ring a click leaves on the ${control}, ` +
+        "and keep the one a Tab draws"
+    );
+  }
+  assert.ok(
+    /custom-control-input:focus:not\(:focus-visible\)[\s\S]{0,120}box-shadow:\s*none/.test(
+      readerCss
+    ),
+    "…including the switches, whose ring is a shadow on the label's own track"
+  );
   // And the same, the other way round, for the pages: the spread is measured from
   // the display it is drawn into, which is what makes it the size of the screen
   // rather than the size of its own contents.

@@ -681,6 +681,12 @@ library that measures it and flips or shifts it until it fits; this header is DO
 work with no React of its own, so the placement is the stylesheet's and the shifting
 is a measurement taken whenever a menu is open.
 
+**No focus ring is left behind by a click.** Bootstrap draws one on `:focus`, and a
+press gives the control the focus it keeps — so the chosen half of the pair came out
+outlined rather than chosen. The ring is dropped for a pointer and kept for a Tab:
+Stash's own `.no-focus` drops it in both cases, and the keyboard is the case worth
+keeping it for.
+
 While the pairing is on, and while you are reading a **gallery**:
 
 | | |

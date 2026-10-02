@@ -300,6 +300,32 @@
   padding: 0.75rem;
 }
 
+/*
+ * No ring around a control that was just *clicked*.
+ *
+ * Bootstrap draws one on `:focus` — a light blue glow from its own `$primary` — and a
+ * button keeps the focus it was given by a press, so the chosen half of the pair came
+ * out outlined rather than chosen, and stayed that way. The switches wear the same
+ * ring, drawn as a shadow on the label's track.
+ *
+ * `:focus-visible` is the distinction the browser already makes for us: a press with a
+ * pointer does not match it, and a Tab does. So the ring stays for the reader moving
+ * through the panel with the keyboard — where it is the only thing saying where they
+ * are — and goes for the one who just clicked. Stash has a class for this (`.no-focus`,
+ * on its own buttons): it drops the ring in both cases, and the keyboard is the case
+ * worth keeping.
+ */
+.manga-reader-chrome .manga-reader-segment:focus:not(:focus-visible),
+.manga-reader-chrome .manga-reader-menu-item:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+.manga-reader-chrome
+  .custom-control-input:focus:not(:focus-visible)
+  ~ .custom-control-label::before {
+  box-shadow: none;
+}
+
 .manga-reader-group-label {
   margin-bottom: 0.4rem;
   color: #bfccd6;
