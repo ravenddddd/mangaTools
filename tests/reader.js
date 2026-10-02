@@ -4717,6 +4717,80 @@ async function main() {
   });
 
   /**
+   * Half a pair is not the width of a pair.
+   *
+   * This is the shape of what a reader saw in double-page mode: the two images of a
+   * screen arrive one at a time, the first to land is measured on its own, and the bar
+   * narrows to that one page — reading as the bar collapsing — until the second one
+   * arrives. It cannot happen on a single page, where the one image landing *is* the
+   * whole measurement, which is why it was only ever seen with two.
+   *
+   * So a measurement with a page missing is no measurement, and the bar holds the
+   * width it had — the same answer the bar already gives for a screen that measures
+   * nothing at all.
+   */
+  await runSection(
+    "a page that has not arrived does not shrink the bar",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const track = box.lightbox.querySelector(".manga-reader-progress-track");
+
+      // Laid out as a browser lays out a page that has arrived. This DOM has no layout
+      // of its own: every box is zero-sized until a section says otherwise, which is
+      // also exactly what a page that has not loaded measures.
+      const laidOut = () => {
+        [...container().querySelectorAll("img")].forEach((image, at) => {
+          image.offsetLeft = at * 520;
+          image.offsetWidth = 500;
+        });
+        dom.flush();
+      };
+      const measured = () => track.style.width;
+
+      laidOut();
+      assert.strictEqual(measured(), "500px", "the cover, which stands alone");
+
+      // The pair on the next screen, both of its pages arrived.
+      turn(box);
+      laidOut();
+      assert.strictEqual(
+        measured(),
+        "1020px",
+        "then a pair, measuring as the pair"
+      );
+
+      const pair = [...container().querySelectorAll("img")];
+      assert.strictEqual(pair.length, 2, "two images on the screen");
+
+      // The first of the two has arrived and the second has not. What the first one
+      // measures is a real measurement of a real image — that is what makes this
+      // different from a screen with nothing on it — and it is still not the width of
+      // what the reader is looking at.
+      pair[0].offsetLeft = 0;
+      pair[0].offsetWidth = 500;
+      pair[1].offsetLeft = 520;
+      pair[1].offsetWidth = 0;
+      dom.flush();
+      assert.strictEqual(
+        measured(),
+        "1020px",
+        "and the second one still on its way does not shrink the bar to the first"
+      );
+
+      // And when it lands, the measurement is the one that was being held: the bar has
+      // not moved, and does not move.
+      laidOut();
+      assert.strictEqual(
+        measured(),
+        "1020px",
+        "…and the pair measures as the pair again"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
    * The bar sleeps when nothing is happening, and wakes when something is.
    *
    * The clock is the test's: waiting two and a half seconds to see a bar go away is

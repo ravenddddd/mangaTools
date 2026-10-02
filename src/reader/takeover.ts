@@ -1299,15 +1299,30 @@ function turnBy(lightbox: Element, direction: 1 | -1): boolean {
  * itself. Nothing has been laid out yet on the first pass of a fresh lightbox, and a
  * width of zero is answered for in the stylesheet: the track's own maximum keeps it
  * from drawing wider than the row it is in.
+ *
+ * **Every image on screen has to have a size before any of this counts.** The two
+ * pages of a screen arrive one at a time, and the first to land measures as itself:
+ * half a pair is not the width of a pair, and taking that measurement is what made
+ * the bar narrow to one page and then jump back out — a bar "collapsing", and only
+ * ever in double-page mode, since on a single page the one image landing *is* the
+ * whole measurement. A partial measurement is no measurement, so this answers zero
+ * and the bar holds the width it had, exactly as it does for a screen that has
+ * measured nothing at all. See `lastWidth` in progress.ts.
  */
 function pictureWidth(pages: number): number {
   if (!container || pages <= 0) return 0;
 
+  const images = Array.from(container.querySelectorAll("img")) as HTMLElement[];
+  if (!images.length) return 0;
+
+  for (const image of images) {
+    if (!image.offsetWidth) return 0;
+  }
+
   let left = Number.POSITIVE_INFINITY;
   let right = 0;
 
-  for (const node of Array.from(container.querySelectorAll("img"))) {
-    const image = node as HTMLElement;
+  for (const image of images) {
     left = Math.min(left, image.offsetLeft);
     right = Math.max(right, image.offsetLeft + image.offsetWidth);
   }
