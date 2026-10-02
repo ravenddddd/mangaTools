@@ -14,6 +14,7 @@
   "mangaReader.offsetHint": "只对这本生效，用来修拼错的对。",
   "mangaReader.groupAnimation": "动画",
   "mangaReader.fade": "淡入",
+  "mangaReader.fadeOff": "无",
   "mangaReader.importChapters": "导入 Stash 的章节",
   "mangaReader.reimportChapters": "重新导入 Stash 的章节",
   "mangaReader.importingChapters": "正在导入…",

@@ -25,7 +25,6 @@ import { numbered, stringFor } from "../i18n";
 import { NR } from "./namespace";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderSettings } from "./namespace";
-import { FADE_MAX_MS } from "./settings";
 import type { LightboxImage } from "./stash-lightbox";
 
 /** This plugin's own header, and the menus inside it */
@@ -116,8 +115,8 @@ export interface ChromeHandlers {
   onChapter(at: number): void;
   /** A setting changed — written by the caller, which owns them */
   onSetting(next: Partial<MangaReaderSettings>): void;
-  /** The pairing shift, which belongs to the gallery rather than to the reader */
-  onOffset(next: 0 | 1): void;
+  /** The pairing shift, which is a reading preference like the rest of them */
+  onOffset(next: boolean): void;
   /** Back to the fitted size, from whatever the pages have been zoomed to */
   onResetZoom(): void;
   /** Close, by Stash's own path */
@@ -136,8 +135,6 @@ export interface ChromeState {
   chapters: MangaReaderChapter[];
   placed: MangaReaderPlacedChapter[];
   settings: MangaReaderSettings;
-  /** The pairing shift for this gallery: 0, or 1 to pair everything one page over */
-  offset: 0 | 1;
   /** Whether the pages are zoomed, which is when there is a zoom to reset */
   zoomed: boolean;
   locale: string | null;
@@ -288,6 +285,15 @@ function redraw(): void {
  * either way.
  */
 const labels: { [key: string]: HTMLElement } = {};
+
+/**
+ * The nodes a pass shows and hides, kept by name.
+ *
+ * The same reason as `labels`: the panel is built once, so the pass that follows has
+ * to reach the boxes it means to put away, and rebuilding them to ask would be a
+ * change per pass.
+ */
+const parts: { [key: string]: HTMLElement } = {};
 
 /** Whether the header's menus are open, and which */
 let openMenu: "chapters" | "settings" | null = null;
@@ -562,10 +568,11 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     };
 
     /** Stash's own rule between one group and the next, edge to edge. */
-    const rule = (): void => {
+    const rule = (): HTMLElement => {
       const line = document.createElement("hr");
       line.className = CLASS_DIVIDER;
       body.appendChild(line);
+      return line;
     };
 
     /**
@@ -640,97 +647,97 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     // ── How the pages are paired ──────────────────────────────────────────
     const reading = group("mangaReader.groupReading");
 
-    // One of two rather than on or off, so not a switch. See CLASS_PAGES for why it
-    // is not Stash's button group either.
-    const pages = text(CLASS_PAGES, "div");
-    const segment = (id: string, textId: string): void => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.id = id;
-      // `minimal` is Stash's own class for a button with nothing behind it — what its
-      // lightbox header draws its icons with.
-      button.className = "btn minimal " + CLASS_SEGMENT;
-      button.addEventListener("click", () => {
-        // A press on the half already chosen says nothing: the reader re-lays the
-        // pages whenever it hears this setting, and re-laying them for a press that
-        // chose what was already true is a screen redrawn for nothing. The class is
-        // the state — see the pass below, which is what writes it.
-        if (button.classList.contains("is-on")) return;
-        latest?.handlers.onSetting({ doublePage: id === DOUBLE_PAGE_ID });
-      });
-      labels[textId] = button;
-      pages.appendChild(button);
+    /**
+     * A pair of buttons: one of two, rather than on or off, so not a switch.
+     *
+     * See CLASS_PAGES for why it is not Stash's own button group. `choose` is asked
+     * which half was pressed, by its id, and says what to write.
+     */
+    const pair = (
+      first: { id: string; textId: string },
+      second: { id: string; textId: string },
+      choose: (id: string) => void
+    ): HTMLElement => {
+      const track = text(CLASS_PAGES, "div");
+      for (const half of [first, second]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.id = half.id;
+        // `minimal` is Stash's own class for a button with nothing behind it — what
+        // its lightbox header draws its icons with.
+        button.className = "btn minimal " + CLASS_SEGMENT;
+        button.addEventListener("click", () => {
+          // A press on the half already chosen says nothing: the reader re-lays the
+          // pages whenever it hears this setting, and re-laying them for a press that
+          // chose what was already true is a screen redrawn for nothing. The class is
+          // the state — see the pass below, which is what writes it.
+          if (button.classList.contains("is-on")) return;
+          choose(half.id);
+        });
+        labels[half.textId] = button;
+        track.appendChild(button);
+      }
+
+      return track;
     };
-    segment(SINGLE_PAGE_ID, "mangaReader.singlePage");
-    segment(DOUBLE_PAGE_ID, "mangaReader.doublePage");
-    reading.appendChild(pages);
 
     reading.appendChild(
-      row(
-        COVER_ID,
-        "mangaReader.coverAlone",
-        switchAt(COVER_ID, (on) =>
-          latest?.handlers.onSetting({ coverAlone: on })
-        )
+      pair(
+        { id: SINGLE_PAGE_ID, textId: "mangaReader.singlePage" },
+        { id: DOUBLE_PAGE_ID, textId: "mangaReader.doublePage" },
+        (id) =>
+          latest?.handlers.onSetting({ doublePage: id === DOUBLE_PAGE_ID })
       )
     );
 
-    reading.appendChild(
-      row(
-        SPREAD_ID,
-        "mangaReader.detectSpreads",
-        switchAt(SPREAD_ID, (on) =>
-          latest?.handlers.onSetting({ detectSpreads: on })
-        ),
-        "mangaReader.detectSpreadsHint"
-      )
+    // Two settings that are questions about a *pair*, and are put away with the
+    // pairing itself — see the pass below.
+    parts.coverRow = row(
+      COVER_ID,
+      "mangaReader.coverAlone",
+      switchAt(COVER_ID, (on) => latest?.handlers.onSetting({ coverAlone: on }))
     );
+    reading.appendChild(parts.coverRow);
 
-    rule();
+    parts.spreadsRow = row(
+      SPREAD_ID,
+      "mangaReader.detectSpreads",
+      switchAt(SPREAD_ID, (on) =>
+        latest?.handlers.onSetting({ detectSpreads: on })
+      ),
+      "mangaReader.detectSpreadsHint"
+    );
+    reading.appendChild(parts.spreadsRow);
 
-    // ── What is wrong with this one gallery ───────────────────────────────
-    // Not a reading preference like the rest: it belongs to this gallery's pages, and
-    // it is remembered for the gallery rather than for the browser.
-    const gallery = group("mangaReader.groupGallery");
-    gallery.appendChild(
+    // The rule above the gallery group, kept rather than written here: it goes with
+    // the group when there is no pairing to correct — the rule below it is the one
+    // that stays, and stays between the two groups that remain.
+    parts.galleryRule = rule();
+
+    // ── What is wrong with this pairing ───────────────────────────────────
+    // A reading preference like the rest of them, and remembered for the browser:
+    // a reader whose scans are grouped wrongly is reading scans, not one book.
+    parts.galleryGroup = group("mangaReader.groupGallery");
+    parts.galleryGroup.appendChild(
       row(
         OFFSET_ID,
         "mangaReader.offset",
-        switchAt(OFFSET_ID, (on) => latest?.handlers.onOffset(on ? 1 : 0)),
+        switchAt(OFFSET_ID, (on) => latest?.handlers.onOffset(on)),
         "mangaReader.offsetHint"
       )
     );
 
     rule();
 
-    // ── How long a turn takes to arrive ───────────────────────────────────
+    // ── How a screen arrives ──────────────────────────────────────────────
     const animation = group("mangaReader.groupAnimation");
-
-    const fade = text(CLASS_ROW, "div");
-    const fadeLabel = document.createElement("label");
-    fadeLabel.className = CLASS_ROW_LABEL;
-    fadeLabel.htmlFor = FADE_ID;
-    labels["mangaReader.fade"] = fadeLabel;
-    const readout = text("manga-reader-readout");
-    fade.appendChild(fadeLabel);
-    fade.appendChild(readout);
-    animation.appendChild(fade);
-
-    const range = document.createElement("input");
-    range.type = "range";
-    // `custom-range` is Bootstrap 4's own styled range — the version this app is
-    // built on. It was `form-range` until now, which is Bootstrap *5*'s name for the
-    // same thing: against this stylesheet that class matched nothing, so the reader
-    // was dragging a bare input with the browser's own idea of what one looks like.
-    range.className = "custom-range";
-    range.id = FADE_ID;
-    range.min = "0";
-    range.max = String(FADE_MAX_MS);
-    range.step = "20";
-    range.addEventListener("input", () => {
-      latest?.handlers.onSetting({ fadeMs: Number(range.value) });
-    });
-    animation.appendChild(range);
+    animation.appendChild(
+      pair(
+        { id: FADE_OFF_ID, textId: "mangaReader.fadeOff" },
+        { id: FADE_ON_ID, textId: "mangaReader.fade" },
+        (id) => latest?.handlers.onSetting({ fade: id === FADE_ON_ID })
+      )
+    );
   }
 
   /**
@@ -761,17 +768,24 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
   say("mangaReader.singlePage");
   say("mangaReader.doublePage");
+  say("mangaReader.fadeOff");
+  say("mangaReader.fade");
 
-  // Which half of the pair is the chosen one. `is-on` rather than Stash's `active`,
+  // Which half of a pair is the chosen one. `is-on` rather than Stash's `active`,
   // which is a solid blue: see drawChapters.
-  const single = panel.querySelector("#" + SINGLE_PAGE_ID);
-  const double = panel.querySelector("#" + DOUBLE_PAGE_ID);
-  if (single) single.classList.toggle("is-on", !state.settings.doublePage);
-  if (double) double.classList.toggle("is-on", state.settings.doublePage);
+  const chosen = (id: string, on: boolean): void => {
+    const half = panel.querySelector("#" + id);
+    if (half) half.classList.toggle("is-on", on);
+  };
+
+  chosen(SINGLE_PAGE_ID, !state.settings.doublePage);
+  chosen(DOUBLE_PAGE_ID, state.settings.doublePage);
+  chosen(FADE_OFF_ID, !state.settings.fade);
+  chosen(FADE_ON_ID, state.settings.fade);
 
   set(COVER_ID, state.settings.coverAlone);
   set(SPREAD_ID, state.settings.detectSpreads);
-  set(OFFSET_ID, state.offset === 1);
+  set(OFFSET_ID, state.settings.offset);
 
   say("mangaReader.coverAlone");
   say("mangaReader.detectSpreads");
@@ -779,14 +793,17 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   say("mangaReader.offset");
   say("mangaReader.offsetHint");
 
-  const range = panel.querySelector("#" + FADE_ID) as HTMLInputElement | null;
-  if (range && range.value !== String(state.settings.fadeMs)) {
-    range.value = String(state.settings.fadeMs);
-  }
-  const readout = panel.querySelector(".manga-reader-readout");
-  const shown = state.settings.fadeMs + " ms";
-  if (readout && readout.textContent !== shown) readout.textContent = shown;
-  say("mangaReader.fade");
+  // Three of these settings are about a *pair*, and a reader reading one page at a
+  // time has no use for any of them: "cover on a page of its own" and "detect
+  // spreads" describe how two pages are put together, and the shift moves that
+  // pairing by a page. So they go with the pairing — the switches, the group they
+  // live in, and the rule that separates it, with the rule above it left in place so
+  // the panel still has one between the two groups that remain.
+  const paired = state.settings.doublePage;
+  showWhen(parts.coverRow, paired);
+  showWhen(parts.spreadsRow, paired);
+  showWhen(parts.galleryGroup, paired);
+  showWhen(parts.galleryRule, paired);
 }
 
 const SINGLE_PAGE_ID = "manga-reader-single-page";
@@ -794,7 +811,8 @@ const DOUBLE_PAGE_ID = "manga-reader-double-page";
 const COVER_ID = "manga-reader-cover-alone";
 const SPREAD_ID = "manga-reader-detect-spreads";
 const OFFSET_ID = "manga-reader-offset";
-const FADE_ID = "manga-reader-fade";
+const FADE_OFF_ID = "manga-reader-fade-off";
+const FADE_ON_ID = "manga-reader-fade-on";
 
 function text(className: string, tag = "span"): HTMLElement {
   const node = document.createElement(tag);

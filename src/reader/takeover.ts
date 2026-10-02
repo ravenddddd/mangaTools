@@ -73,12 +73,7 @@ import {
 } from "./chapters";
 import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderGallery, MangaReaderSettings } from "./namespace";
-import {
-  readOffset,
-  readSettings,
-  writeOffset,
-  writeSettings,
-} from "./settings";
+import { FADE_MS, readSettings, writeSettings } from "./settings";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import { layout, screenAt, stepsToAdjacent } from "./spreads";
 import {
@@ -199,16 +194,6 @@ let drawGeneration = 0;
  * resetting the wait it needed to finish. The two questions are now two variables.
  */
 let awaiting = -1;
-
-/**
- * The offset for the gallery in hand, and which gallery that was.
- *
- * Per gallery, and remembered for it — see the note on OFFSET_KEY. Only one
- * gallery is being read at a time, so the value in hand is the one for `offsetFor`
- * and the two are set together.
- */
-let offset: 0 | 1 = 0;
-let offsetFor: string | null = null;
 
 let reinsers = 0;
 let language: string | null = null;
@@ -372,16 +357,44 @@ function current(): MangaReaderGallery | null {
   return galleryId ? loaded.get(galleryId) || null : null;
 }
 
+/**
+ * A gallery's pages, cut into screens the way the settings in hand say.
+ *
+ * One place rather than three. The call sites differ only in which gallery they are
+ * laying out, and an option written in one of them and forgotten in another is a
+ * gallery that reads differently depending on how it was opened — which is what the
+ * offset did while it was a per-gallery value read at load: a gallery opened one way
+ * was paired one way and opened another way was paired the other.
+ */
+function laidOut(pages: MangaReaderPage[]): MangaReaderScreen[] {
+  return layout(pages, {
+    coverAlone: settings.coverAlone,
+    detectSpreads: settings.detectSpreads,
+    // The setting is a yes or no; the layout's own word for it is a page count.
+    offset: settings.offset ? 1 : 0,
+    double: settings.doublePage,
+  });
+}
+
+/**
+ * What a gallery's screens were laid out by, as one string.
+ *
+ * Everything `laidOut` reads, in one value, so that "is this gallery cut the way the
+ * settings say" is a comparison rather than a list of flags to keep in step — and so
+ * that a setting added to the layout changes the answer without anyone remembering to
+ * come back here.
+ */
+function pairingKey(): string {
+  return [
+    settings.doublePage,
+    settings.coverAlone,
+    settings.detectSpreads,
+    settings.offset,
+  ].join("|");
+}
+
 /** Asks Stash for the gallery's pages, unless they are already in hand */
 function loadGallery(id: string): void {
-  // The offset belongs to one gallery, and is remembered for it: a gallery whose
-  // pages are grouped wrongly is opened again and again, and being made to shift
-  // the pairing every time would be the feature failing at its one job.
-  if (offsetFor !== id) {
-    offsetFor = id;
-    offset = readOffset(id);
-  }
-
   const already = loaded.get(id);
   if (already) {
     galleryId = id;
@@ -414,12 +427,8 @@ function loadGallery(id: string): void {
         id,
         pages: answer.pages,
         images: answer.images,
-        paired: settings.doublePage,
-        screens: layout(answer.pages, {
-          ...settings,
-          offset,
-          double: settings.doublePage,
-        }),
+        pairedWith: pairingKey(),
+        screens: laidOut(answer.pages),
         chapters: placeChapters(chaptersOf(answer), answer.pages),
       };
       remember(id, gallery);
@@ -552,15 +561,12 @@ function sync(lightbox: Element): void {
   // Where the reader is, once: the lightbox says which image it is showing, and this
   // plugin's pages say where that image is. After this the position is this plugin's
   // own — a turn moves it, a chapter sets it, and Stash's index is never asked again.
-  // The screens are a function of the pairing, so a gallery laid out under the other
-  // setting is laid out again here rather than drawn the old way.
-  if (gallery.paired !== settings.doublePage) {
-    gallery.screens = layout(gallery.pages, {
-      ...settings,
-      offset,
-      double: settings.doublePage,
-    });
-    gallery.paired = settings.doublePage;
+  // The screens are a function of the settings, so a gallery laid out under other ones
+  // is laid out again here rather than drawn the old way — including one fetched
+  // earlier in the session and opened again after a switch was moved.
+  if (gallery.pairedWith !== pairingKey()) {
+    gallery.screens = laidOut(gallery.pages);
+    gallery.pairedWith = pairingKey();
     shownAt = -1;
   }
 
@@ -667,7 +673,6 @@ function chromeState(
     chapters: gallery.chapters,
     placed: gallery.chapters,
     settings,
-    offset,
     locale: language,
     zoomed: isZoomed(view),
     handlers: {
@@ -690,25 +695,17 @@ function chromeState(
         // fade length is the one that is not: re-laying the pages because somebody
         // dragged a slider would redraw the screen they are looking at, for a setting
         // that cannot change it.
-        const relaid =
-          next.doublePage !== undefined ||
-          next.coverAlone !== undefined ||
-          next.detectSpreads !== undefined;
-        if (!relaid) return;
-
-        if (galleryId && loaded.has(galleryId)) {
-          remember(galleryId, {
-            ...gallery,
-            screens: layout(gallery.pages, {
-              ...settings,
-              offset,
-              double: settings.doublePage,
-            }),
-            paired: settings.doublePage,
-          });
-          shownAt = -1;
-          sync(lightbox);
-        }
+        // Nothing is re-laid here: the pass that follows compares what the settings
+        // say against what this gallery was cut by — `pairedWith` — and lays it out
+        // again when they differ. One place that decides a layout rather than two,
+        // which is how the stale cache and the freshly-pushed setting stayed in step.
+        //
+        // The pass runs whatever changed, including a setting that moves no page at
+        // all: a switch carries its own state and would look right either way, but a
+        // pair of buttons does not — the half that was pressed has to *become* the
+        // chosen one, and a mark that only moves on the next pass is a press that
+        // looks like it did nothing.
+        sync(lightbox);
       },
       onOffset: (next) => {
         setOffset(gallery, next);
@@ -864,16 +861,17 @@ NR.PROGRESS_IDLE_MS = PROGRESS_IDLE_MS;
  * what a fade is for. The carousel is hidden rather than gone, so what shows through
  * is Stash's own backdrop.
  *
- * How long it lasts is the reader's setting — the slider in the options menu — and 0
- * draws the screen at once. Skipped entirely for a reader who has asked their system
- * for less motion: this is decoration, and decoration does not get to overrule that.
+ * Whether it happens at all is the reader's setting — the pair of buttons in the
+ * options panel — and how long it takes is FADE_MS, which is not. Skipped entirely
+ * for a reader who has asked their system for less motion: this is decoration, and
+ * decoration does not get to overrule that.
  */
 function fadeIn(element: HTMLElement): void {
-  if (settings.fadeMs <= 0) return;
+  if (!settings.fade) return;
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   element.animate([{ opacity: 0 }, { opacity: 1 }], {
-    duration: settings.fadeMs,
+    duration: FADE_MS,
     easing: "ease-out",
   });
 }
@@ -1009,7 +1007,7 @@ function draw(screen: MangaReaderScreen, at: number): void {
         " screen(s) from " +
         gallery.pages.length +
         " page(s), offset " +
-        offset +
+        (settings.offset ? 1 : 0) +
         " — the lightbox's options menu can shift the pairing, and O does the same"
     );
   }
@@ -1241,7 +1239,7 @@ function onKeyDown(event: KeyboardEvent): void {
   if (event.key === "o" || event.key === "O") {
     if (event.repeat) return;
 
-    setOffset(gallery, offset === 0 ? 1 : 0);
+    setOffset(gallery, !settings.offset);
 
     event.preventDefault();
     event.stopPropagation();
@@ -1643,16 +1641,14 @@ function redrawChrome(): void {
  * Two ways in — the key and the switch in the options menu — and both come through
  * here, so they cannot disagree about what the offset is.
  */
-function setOffset(gallery: MangaReaderGallery, next: 0 | 1): void {
-  offset = next;
-  offsetFor = gallery.id;
-  writeOffset(gallery.id, next);
+function setOffset(gallery: MangaReaderGallery, next: boolean): void {
+  settings = writeSettings({ offset: next });
 
-  gallery.screens = layout(gallery.pages, {
-    ...settings,
-    offset,
-    double: settings.doublePage,
-  });
+  // Laid out again here rather than left to the pass, because the turn that follows
+  // (the O key) is arithmetic on the screens: they have to be this gallery's own
+  // before it happens.
+  gallery.screens = laidOut(gallery.pages);
+  gallery.pairedWith = pairingKey();
   shownAt = -1;
 
   step();

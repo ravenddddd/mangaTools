@@ -14,6 +14,7 @@
   "mangaReader.offsetHint": "Only for this gallery — for a pairing that came out wrong.",
   "mangaReader.groupAnimation": "Animation",
   "mangaReader.fade": "Fade in",
+  "mangaReader.fadeOff": "None",
   "mangaReader.importChapters": "Import Stash's chapters",
   "mangaReader.reimportChapters": "Re-import Stash's chapters",
   "mangaReader.importingChapters": "Importing…",

@@ -666,14 +666,19 @@ menu — the one behind the gear icon in its header — opens the reader's own p
 | **Reading** | **Single page / Double page** | How the pages are paired |
 | | **Cover on a page of its own** | A cover is not the left half of anything |
 | | **Detect spreads automatically** | A page wider than it is tall is taken for one image spanning two pages |
-| **This gallery** | **Shift the pairing by one page** | For a gallery whose pages are grouped wrongly, or `O` |
-| **Animation** | **Fade in** | How long a screen takes to arrive, down to 0 for none |
+| **This pairing** | **Shift the pairing by one page** | For pages that are grouped wrongly, or `O` |
+| **Animation** | **None / Fade in** | Whether a screen arrives or appears. The length is the plugin's — 200 ms |
 
 The last two of the reading group are **stored settings that had no control until
 now**: the pairing has read `coverAlone` and `detectSpreads` from the browser's
 settings since the mode was written, and nothing could change them. Turning either
 off re-lays the pages there and then — as the single/double pair does — because a
 switch that writes a setting the screen does not obey is worse than no switch.
+
+**They go away when there is no pairing.** "Cover on a page of its own" and "detect
+spreads" describe how two pages are put together, and the shift moves that pairing by
+a page: reading one page at a time, all three are put away, group and rule with them.
+A switch that changes nothing is worse than no switch.
 
 **The panel hangs from the gear's right edge**, and slides itself back inside the
 window when the window is too narrow for it. Stash's own popover gets that from a
@@ -698,23 +703,24 @@ While the pairing is on, and while you are reading a **gallery**:
 | **Clicks** | Clicking a page turns it, right half forward and left half back, exactly as Stash's own image click does. Clicking the space around the pages still closes the lightbox |
 | **Zoom** | `Ctrl` + the wheel: away from you to zoom in, towards you to zoom out, `Shift` + the wheel to scroll up and down instead. **Not Stash's own arrangement** — its wheel zooms and its `Shift`+wheel scrolls, by its `scrollMode` default — but a browser puts its own page zoom on `Ctrl`+wheel, so that chord is taken rather than passed on. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
 | **Pan** | Press and drag to move the pages — as far as you take them, past the edge of the screen and all, exactly as Stash's own image does; turning the page is what puts them back in the middle. A drag never turns the page, and a click never moves it. Nor does a press held longer than a click: Stash's own other half of the test, so a press you thought better of sends you nowhere |
-| **Shift the pairing** | Its own switch in the options panel — the "this gallery" group — or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
+| **Shift the pairing** | Its own switch in the options panel — the "this pairing" group, which is there while a pairing is — or `O`, for pages that are grouped wrongly. Remembered for the browser, like every other switch in that panel |
 | **The chapter menu** | The header's chapter control opens a list of the chapters, each with the **range of pages it covers** — its own first and last page on screen, so a cover in no chapter is not claimed by the one after it. The chapter being read is marked down its side, and the list has a heading that stays put while the list scrolls under it |
 | **The progress bar** | Its own line between the picture and the footer, as wide as the pages it is measuring — so a spread's bar is wider than a lone page's, and it never lies across the picture: how far through the book you are, with a tick where each chapter begins. Drag it to cross four hundred pages in one gesture — the handle follows your hand exactly, while the pictures follow as fast as they can be fetched — and letting go lands you on the page you were nearest. Hover a tick to see which chapter it is, in the bar's own bubble — at once, rather than after the second a browser's tooltip takes — and click it to jump straight there. It is out of the way to begin with, fades again after a couple of seconds, and the pointer reaching the bar is what brings it back |
-| **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. A slider in the options menu sets how long, down to 0 for none. Nothing is animated for a reader who has asked their system for less motion |
+| **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. Two buttons in the options panel choose whether, and how long is the plugin's own answer (200 ms): the length was a slider, and what a reader did with it was look for the one that stopped being noticeable. Nothing is animated for a reader who has asked their system for less motion |
 | **Fullscreen** | Stash's own button in Stash's own place. While the lightbox is filling the screen, a click on the space around the pages does nothing at all — the margin of a book is not a way out of it — so leaving fullscreen is the button, or Escape |
 | **Back closes it** | Pressing Back closes the lightbox instead of leaving it over the page you land on. Stash's own does not: its lightbox is in its own state and not in the route, so Back moves the page out from under it |
 | **Everything else** | Untouched: the nav strip, Escape, the slideshow, and the footer that names the image and links back to the gallery it came from — though the rating stars and the O counter at its left end are not drawn at all: a reader holding a book open is not rating anything. The footer's own name is kept on the page you are on, since Stash renders it from an index this half never moves, and clicking it is an ordinary page load rather than the router's own navigation — a plugin has no router to ask. The header is this half's own, because its counter has to count in the order you are reading |
 
 All of it is remembered per browser, like the lightbox options the controls sit
-beside — except the shift, which is remembered *per gallery*, because that is what
-it belongs to: one scan's pages need shifting and the gallery next to it does not.
+beside — the shift included, which used to be remembered per gallery: a reader whose
+scans are grouped wrongly is reading scans, and being made to set the same switch on
+each of them was the feature failing at its one job. A shift stored by an older build
+is not read; that switch is worth setting once more.
 
-The fade length is a **slider rather than a number box**, with the value shown at the
-end of its own label row, and its range reaches 1000 ms on purpose: a reader who
-cannot see a short fade has to be able to push it somewhere unmistakable and find
-out whether it is doing anything at all. 0 is a setting too — the screen is drawn at
-once.
+**The fade's length is not a choice.** It was a slider, and the two answers a reader
+actually had for it were "yes" and "no" — the ones in between were a reader looking
+for a length that stopped being noticeable, which is what 200 ms is. So the panel
+offers those two and the length belongs to the plugin.
 
 Off a gallery page — an image list, a scene's stills — the mode draws nothing, even
 switched on: pairing pages only means something inside a gallery.
@@ -955,9 +961,6 @@ does, done for you — and from then on the reader reads this plugin's field.
   panning. Change one of
   them in Stash's settings and this half will not follow; the options menu here has
   its own three settings and no room for those.
-- **Two of the pairing rules are settings without a UI**: `coverAlone` and
-  `detectSpreads` are stored and honoured, but the options menu offers only the
-  mode, the fade and the shift. Both default to what a manga wants.
 - **The switches are worded in English the first time.** Their language comes from
   Stash's own configuration, which is read with the gallery — so the wording is
   right from the second time the menu is opened in a session.
@@ -1415,9 +1418,6 @@ The reading half's own:
 
 - **No zoom or pan in spread mode.** Stash's zoom acts on the carousel, which is
   hidden while the reader draws. Pages are fitted to the screen and that is all.
-- **Two of the pairing rules are settings without a UI**: `coverAlone` and
-  `detectSpreads` are stored and honoured, but the options menu offers only the
-  mode, the fade and the shift.
 - **The switches are worded in English the first time.** Their language comes from
   Stash's own configuration, read with the gallery — so the wording is right from
   the second time the menu is opened in a session.
@@ -1576,8 +1576,8 @@ deliberately faulted, to prove the rest still register.
 
 The plugin's own strings are the ids in `src/messages/en.json` — the edit-page
 placeholder, the field headings, the settings blocks, the names a censorship state
-has (current, and what a click would make it), and the reading half's three (the
-two switches in the lightbox's options menu and the fade slider). Everything else
+has (current, and what a click would make it), and the reading half's own — the
+lightbox's options panel, the chapter menu, and the two controls in it). Everything else
 either half puts on screen comes from Stash's messages, which Stash already
 translates.
 

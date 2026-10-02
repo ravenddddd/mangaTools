@@ -41,14 +41,16 @@ export interface MangaReaderSettings {
   coverAlone: boolean;
   /** Whether a page wider than it is tall is taken for a spread. */
   detectSpreads: boolean;
+  /** Whether a screen fades in at all. The length is FADE_MS, and is not a choice. */
+  fade: boolean;
   /**
-   * How long a screen takes to fade in, in milliseconds. 0 draws it at once.
-   *
-   * A setting rather than a constant because how much of this is pleasant is a
-   * matter of taste and of screen, and because "is it doing anything at all" is a
-   * question a reader can only answer by moving it to an extreme.
+   * Whether the pairing starts one page over, for a gallery whose pages are grouped
+   * wrongly — the escape hatch for a page that was taken for a spread and was not
+   * one. Remembered for the browser rather than for the gallery: it is a reading
+   * preference, and a reader who needs it needs it for the scan they are reading
+   * rather than for one book.
    */
-  fadeMs: number;
+  offset: boolean;
 }
 
 /** What is being read: the pages, where the reader is, and where its chapters are. */
@@ -65,12 +67,17 @@ export interface MangaReaderGallery {
   /**
    * Whether those screens were laid out with two pages a screen.
    *
-   * The pairing is a setting and the screens are a function of it, so a cached gallery
-   * is only good for the setting it was laid out under. Without this, a gallery read
-   * once and opened again after the switch was moved would be drawn the old way — the
-   * cache outliving the setting it was built from.
+   * The screens are a function of the settings, so a cached gallery is only good for
+   * the settings it was laid out under. Without this, a gallery read once and opened
+   * again after a switch was moved would be drawn the old way — the cache outliving
+   * the settings it was built from.
+   *
+   * The four that decide a layout, as one string, rather than a flag per setting: the
+   * question the pass asks is "were these cut by what is set now", and a fifth setting
+   * added to the layout has to change the answer without anyone remembering to add it
+   * here. See pairingKey in takeover.ts.
    */
-  paired: boolean;
+  pairedWith: string;
   /**
    * The gallery's chapters, placed in the order the pages came back in.
    *
@@ -94,7 +101,6 @@ export interface MangaReaderGallery {
  */
 export interface MangaReaderNamespace {
   parseSettings(raw: string | null): MangaReaderSettings;
-  parseOffsets(raw: string | null): { [galleryId: string]: 0 | 1 };
   /**
    * What this browser is set to, including the keys the reader wrote before it
    * was bundled with the tools — see storedValue in settings.ts.
@@ -104,8 +110,6 @@ export interface MangaReaderNamespace {
    * a setting that was migrated from one that was simply there.
    */
   readSettings(): MangaReaderSettings;
-  /** A gallery's remembered shift, from either key. Published for the same reason. */
-  readOffset(galleryId: string): 0 | 1;
   parseIndicator(text: string): { current: number; total: number } | null;
   galleryIdFromPath(pathname: string): string | null;
   /** The order the lightbox is showing its images in, read from the URL */
@@ -138,8 +142,8 @@ export interface MangaReaderNamespace {
    * screen give up and show what it has. See draw in takeover.ts.
    */
   REVEAL_BUDGET_MS: number;
-  /** The longest a screen may take to fade in. See FADE_MAX_MS in settings.ts. */
-  FADE_MAX_MS: number;
+  /** How long a screen takes to fade in, when it fades. See FADE_MS in settings.ts. */
+  FADE_MS: number;
   layout(
     pages: MangaReaderPage[],
     options?: Partial<{

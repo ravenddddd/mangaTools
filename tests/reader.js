@@ -948,7 +948,8 @@ async function main() {
       doublePage: false,
       coverAlone: true,
       detectSpreads: true,
-      fadeMs: 140,
+      fade: true,
+      offset: false,
     };
 
     assert.deepStrictEqual(
@@ -972,32 +973,54 @@ async function main() {
       "nor is something else's value under our key"
     );
 
-    // The fade is the one setting that is a number, and it ends up as a duration in
-    // a Web Animation: something that is not a finite number of milliseconds would
-    // be a screen that never arrives, so it is checked rather than trusted.
-    const fade = (raw) => NR.parseSettings(raw).fadeMs;
-    assert.strictEqual(fade('{"fadeMs":250}'), 250, "a number is a setting");
+    // The fade used to be a length in milliseconds — a slider, where the two answers
+    // a reader wanted out of it were "yes" and "no". A stored length becomes one of
+    // those: nought meant no fading and was the one value chosen deliberately, and
+    // anything else was some length of their own that this build no longer offers.
+    const fade = (raw) => NR.parseSettings(raw).fade;
+    assert.strictEqual(
+      fade('{"fadeMs":250}'),
+      true,
+      "a length that was set is a yes"
+    );
     assert.strictEqual(
       fade('{"fadeMs":0}'),
-      0,
-      "and 0 is one — no fade at all"
+      false,
+      "and nought was a reader asking for no fade at all, which they keep"
     );
     assert.strictEqual(
       fade('{"fadeMs":-40}'),
-      0,
-      "a negative one is clamped, not obeyed"
-    );
-    assert.strictEqual(
-      fade('{"fadeMs":99999}'),
-      NR.FADE_MAX_MS,
-      "and an absurd one is capped at what the slider offers"
+      false,
+      "a negative length is nought"
     );
     assert.strictEqual(
       fade('{"fadeMs":"140"}'),
-      140,
-      "a string is not a number"
+      true,
+      "a string is not a length, so it is not a no: the default stands"
     );
-    assert.strictEqual(fade('{"fadeMs":null}'), 140, "nor is null");
+    assert.strictEqual(
+      fade('{"fade":false}'),
+      false,
+      "and the pair's own value wins"
+    );
+    assert.strictEqual(
+      fade('{"fade":true,"fadeMs":0}'),
+      true,
+      "…even over a length"
+    );
+
+    // The shift is a setting of the browser's now, like the rest of them — it was
+    // remembered per gallery, which is a thing this build does not do.
+    assert.strictEqual(
+      NR.parseSettings('{"offset":true}').offset,
+      true,
+      "the pairing shift is read like any other switch"
+    );
+    assert.strictEqual(
+      NR.parseSettings('{"offset":"yes"}').offset,
+      false,
+      "…and a value of the wrong type is not one"
+    );
   });
 
   await runSection("the lightbox header is read as a position", () => {
@@ -2060,66 +2083,81 @@ async function main() {
     stopReader(box);
   });
 
+  /**
+   * The fade, which is a pair of buttons rather than a choice of lengths.
+   *
+   * It was a slider, and what a reader did with it was look for the length that
+   * stopped being noticeable — which is what FADE_MS is. So the length is the
+   * plugin's and the choice is yes or no.
+   */
   await runSection(
-    "the fade is a setting, in the menu beside the switch",
+    "the fade is a pair of buttons, and a length nobody picks",
     async () => {
       const { box } = await startReader({ galleryId: "8", on: true });
+      const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
 
-      const fade = box.lightbox.querySelector("#manga-reader-fade");
-      assert.ok(fade, "the options menu offers the fade length as a slider");
-      assert.strictEqual(
-        fade.type,
-        "range",
-        "a range, so it can be found by dragging"
+      const off = panel.querySelector("#manga-reader-fade-off");
+      const on = panel.querySelector("#manga-reader-fade-on");
+      assert.ok(off && on, "the panel offers the fade as two buttons");
+      assert.deepStrictEqual(
+        [off.textContent, on.textContent],
+        ["None", "Fade in"],
+        "named for what they do, one of which is nothing"
       );
       assert.strictEqual(
-        fade.max,
-        "1000",
-        "and it reaches somewhere unmistakable"
+        on.classList.contains("is-on"),
+        true,
+        "fading is what a screen does by default"
       );
-      assert.strictEqual(fade.value, "140", "starting where the default is");
-      // The value is shown beside the label — the readout inside the label is where
-      // the number lives, so it is readable from the menu without a render.
       assert.strictEqual(
-        fade.parentNode.querySelector(".manga-reader-readout").textContent,
-        "140 ms",
-        "and showing what it is set to, beside it"
+        off.classList.contains("is-on"),
+        false,
+        "…and the other half is not chosen"
       );
 
-      // Dragging it changes what the next screen does, which is the only way to tell
-      // that this setting is connected to anything.
+      // Which is connected to the pages: a turn fades, for as long as the constant says.
       const before = container().animations.length;
-      fade.value = "600";
-      fade.dispatch("input");
       turn(box);
 
       const animations = container().animations;
       assert.strictEqual(
         animations.length,
         before + 1,
-        "a turn after the drag still fades"
+        "a turn fades as it arrives"
       );
       assert.strictEqual(
         animations[animations.length - 1].options.duration,
-        600,
-        "…for as long as the slider says"
+        NR.FADE_MS,
+        "for a length that is the plugin's rather than the reader's — there is one, and " +
+          "it is not on this panel"
       );
 
-      // Zero is a setting too, and it means what it says: the screen arrives at once.
-      fade.value = "0";
-      fade.dispatch("input");
+      // And the other half means what it says: the screen arrives at once.
+      dom.click(off);
+      assert.strictEqual(
+        off.classList.contains("is-on") && !on.classList.contains("is-on"),
+        true,
+        "choosing no fading moves the mark to that half"
+      );
+
       box.move(4);
       dom.flush();
       assert.strictEqual(
         container().animations.length,
         before + 1,
-        "and 0 draws the screen with no animation at all"
+        "and a screen after it is drawn with no animation at all"
       );
 
-      // Put back: the setting is remembered across sections, and one left at 0 would
-      // be changing what every section after this one reads.
-      fade.value = "140";
-      fade.dispatch("input");
+      // Put back: the setting is the browser's, and one left off would be changing what
+      // every section after this one reads.
+      dom.click(on);
+      assert.strictEqual(
+        JSON.parse(
+          dom.window.localStorage.getItem("plugin.mangaTools.settings")
+        ).fade,
+        true,
+        "and the choice is written where the settings live"
+      );
 
       stopReader(box);
     }
@@ -2154,16 +2192,22 @@ async function main() {
     stopReader(box);
   });
 
+  /**
+   * The pairing shift: a setting of the browser's, like the rest of them.
+   *
+   * It was remembered per gallery — a map from gallery id to shift — on the argument
+   * that a gallery whose pages are grouped wrongly is a gallery, not a reader. It is
+   * the other way round: a reader whose scans are grouped wrongly is reading scans,
+   * and being made to set the same switch on each of them is the feature failing at
+   * its one job.
+   */
   await runSection(
-    "the offset is a switch, and is remembered for the gallery",
+    "the pairing shift is a setting, and re-pairs at once",
     async () => {
       const { box } = await startReader({ galleryId: "36", on: true });
 
       const offsetSwitch = box.lightbox.querySelector("#manga-reader-offset");
-      assert.ok(
-        offsetSwitch,
-        "the options menu offers the offset while a gallery is in hand"
-      );
+      assert.ok(offsetSwitch, "the options panel offers the shift");
       assert.strictEqual(
         offsetSwitch.checked,
         false,
@@ -2179,30 +2223,51 @@ async function main() {
         ["/image/402/image"],
         "turning it on re-pairs the gallery there and then"
       );
-      assert.deepStrictEqual(
+
+      const stored = () =>
         JSON.parse(
-          dom.window.localStorage.getItem("plugin.mangaTools.offsets")
-        ),
-        { 36: 1 },
-        "and the gallery's shift is remembered, so it need not be set again"
+          dom.window.localStorage.getItem("plugin.mangaTools.settings")
+        );
+      assert.strictEqual(
+        stored().offset,
+        true,
+        "and it is written where the settings live, like every other switch"
+      );
+      assert.strictEqual(
+        dom.window.localStorage.getItem("plugin.mangaTools.offsets"),
+        null,
+        "…rather than into a map of galleries, which is what it used to be"
       );
 
       stopReader(box);
 
-      // Opened again — a fresh lightbox, a fresh popover — it starts where the reader
-      // left it.
-      const again = await startReader({ galleryId: "36", on: true });
+      // A fresh lightbox — and a *different* gallery, which is the part that changed:
+      // this is the browser's setting, so the next gallery the reader opens is shifted
+      // too, without being asked again.
+      const again = await startReader({ galleryId: "8", on: true });
       assert.strictEqual(
         again.box.lightbox.querySelector("#manga-reader-offset").checked,
         true,
-        "the gallery opens with the shift it was given"
+        "a gallery opened afterwards has the shift the reader chose"
       );
 
       turn(again.box);
       assert.deepStrictEqual(
         drawn(),
         ["/image/402/image"],
-        "and with the pairing it had"
+        "and is paired with it"
+      );
+
+      // Put back: the setting is the browser's, so a section that left it on would be
+      // deciding for every section after it — which is exactly what it did when this
+      // was written per gallery and a failing section could not turn it off.
+      const back = again.box.lightbox.querySelector("#manga-reader-offset");
+      back.checked = false;
+      back.dispatch("change");
+      assert.strictEqual(
+        stored().offset,
+        false,
+        "and the section puts it back"
       );
 
       stopReader(again.box);
@@ -2342,9 +2407,11 @@ async function main() {
           doublePage: true,
           coverAlone: true,
           detectSpreads: true,
-          fadeMs: 140,
+          fade: true,
+          offset: false,
         },
-        "and the settings are where they were found"
+        "and the settings are where they were found — this section flipped two of " +
+          "them and put both back, which is where they started"
       );
 
       stopReader(box);
@@ -2365,7 +2432,13 @@ async function main() {
 
     assert.deepStrictEqual(
       JSON.parse(dom.window.localStorage.getItem("plugin.mangaTools.settings")),
-      { doublePage: true, coverAlone: true, detectSpreads: true, fadeMs: 140 },
+      {
+        doublePage: true,
+        coverAlone: true,
+        detectSpreads: true,
+        fade: true,
+        offset: false,
+      },
       "the pairing writes the setting it changed and leaves the rest alone"
     );
 
@@ -3450,7 +3523,8 @@ async function main() {
       "#manga-reader-cover-alone",
       "#manga-reader-detect-spreads",
       "#manga-reader-offset",
-      "#manga-reader-fade",
+      "#manga-reader-fade-off",
+      "#manga-reader-fade-on",
     ]) {
       const control = settings.querySelector(id);
       assert.ok(control, `${id} should be in the panel`);
@@ -3504,13 +3578,13 @@ async function main() {
       );
     }
 
-    // The slider, which wore Bootstrap 5's class name against a Bootstrap 4 app
-    // until now — so it was the browser's own range rather than Stash's.
-    const range = settings.querySelector("#manga-reader-fade");
+    // The fade is two buttons rather than a slider, so there is no range control in
+    // the panel at all — the class it used to wear was Bootstrap 5's name for one,
+    // against an app built on 4, and the control it was on is gone.
     assert.strictEqual(
-      range.classList.contains("custom-range"),
-      true,
-      "the fade is Bootstrap 4's own range"
+      settings.querySelector("input[type=range]"),
+      null,
+      "nothing in the panel is a slider any more"
     );
 
     assert.strictEqual(
@@ -3630,6 +3704,108 @@ async function main() {
         panel.style.transform,
         applied,
         "…leaving it exactly where it already was, because there was nothing to fix"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * The settings that only mean something about a *pair* go away with the pairing.
+   *
+   * "Cover on a page of its own" and "detect spreads" describe how two pages are put
+   * together, and the shift moves that pairing by a page: a reader reading one page at
+   * a time has no use for any of them, and a switch that changes nothing is worse than
+   * no switch. They are put away rather than removed — this panel is built once and
+   * updated in place, which is the same rule as the zoom button's.
+   */
+  await runSection(
+    "the pairing's own settings go with the pairing",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
+
+      /** The row a control sits in — the stub has no `closest`, so the walk is ours */
+      const rowAt = (id) => {
+        for (
+          let at = panel.querySelector(id);
+          at && at !== panel;
+          at = at.parentNode
+        ) {
+          if (at.classList?.contains("manga-reader-row")) return at;
+        }
+        return null;
+      };
+      const away = (node) =>
+        node.getAttribute("data-manga-reader-hidden") !== null;
+      const groupOf = (label) => {
+        for (const group of panel.querySelectorAll(".manga-reader-group")) {
+          const heading = group.querySelector(".manga-reader-group-label");
+          if (heading.textContent === label) return group;
+        }
+        return null;
+      };
+
+      for (const id of [
+        "#manga-reader-cover-alone",
+        "#manga-reader-detect-spreads",
+      ]) {
+        assert.strictEqual(
+          away(rowAt(id)),
+          false,
+          `${id} is there to be set while there is a pairing`
+        );
+      }
+      assert.strictEqual(
+        away(groupOf("This gallery")),
+        false,
+        "and so is the group the shift lives in"
+      );
+
+      // One page at a time: all three go, and the two groups that remain are still
+      // separated by exactly one rule — the one above the pair, put away with the group,
+      // is not left behind to double up with the one below it.
+      dom.click(panel.querySelector("#manga-reader-single-page"));
+
+      for (const id of [
+        "#manga-reader-cover-alone",
+        "#manga-reader-detect-spreads",
+      ]) {
+        assert.strictEqual(
+          away(rowAt(id)),
+          true,
+          `${id} is put away when the pages are read one at a time`
+        );
+      }
+      assert.strictEqual(
+        away(groupOf("This gallery")),
+        true,
+        "and the whole group with it, rather than a heading over nothing"
+      );
+      // The two rules, in the order they are drawn: the one above the group goes with
+      // it, and the one below it stays — so the two groups that remain are separated by
+      // one line rather than by two, and not by none.
+      assert.deepStrictEqual(
+        [...panel.querySelectorAll(".manga-reader-divider")].map((line) =>
+          away(line)
+        ),
+        [true, false],
+        "the rule above the group put away and the one below it kept"
+      );
+      assert.strictEqual(
+        panel
+          .querySelector("#manga-reader-fade-on")
+          .getAttribute("data-manga-reader-hidden"),
+        null,
+        "the fade is not a question about pairs, so it stays"
+      );
+
+      // And back, since the pairing is the browser's setting rather than this section's.
+      dom.click(panel.querySelector("#manga-reader-double-page"));
+      assert.strictEqual(
+        away(rowAt("#manga-reader-cover-alone")),
+        false,
+        "and choosing two pages brings them back"
       );
 
       stopReader(box);
@@ -5637,41 +5813,56 @@ async function main() {
    * Reader that may still be installed beside this plugin.
    */
   await runSection(
-    "settings and shifts from before the merge are still read",
+    "settings from before the merge are still read, and the old shifts are not",
     async () => {
       const store = dom.window.localStorage;
-      const settings = {
+      // What the standalone reader wrote: the same settings under its own key, and a
+      // shift remembered per gallery.
+      const old = {
         doublePage: true,
         coverAlone: false,
         detectSpreads: true,
         fadeMs: 300,
       };
+      const now = {
+        doublePage: true,
+        coverAlone: false,
+        detectSpreads: true,
+        // A length that was set is a yes: the slider's two real answers were "yes" and
+        // "no", and it was there that a reader turned fading off. See parseSettings.
+        fade: true,
+        // Never a key in the old shape. The shift was a map from gallery to page, which
+        // this build does not read — one shift for the browser replaced it, and a
+        // reader who had set one sets the switch once more.
+        offset: false,
+      };
 
       store.removeItem("plugin.mangaTools.settings");
       store.removeItem("plugin.mangaTools.offsets");
-      store.setItem("mangaReader.settings", JSON.stringify(settings));
+      store.setItem("mangaReader.settings", JSON.stringify(old));
       store.setItem("mangaReader.offsets", JSON.stringify({ 8: 1 }));
 
       assert.deepStrictEqual(
         NR.readSettings(),
-        settings,
-        "the old key's settings are the ones read"
+        now,
+        "the old key's settings are the ones read, in this build's own shape"
       );
-      assert.strictEqual(NR.readOffset("8"), 1, "…and its per gallery shifts");
       assert.deepStrictEqual(
         JSON.parse(store.getItem("plugin.mangaTools.settings")),
-        settings,
-        "…and they are copied to the key this plugin writes"
-      );
-      assert.deepStrictEqual(
-        JSON.parse(store.getItem("plugin.mangaTools.offsets")),
-        { 8: 1 },
-        "…shifts included, so a later write merges rather than replaces"
+        old,
+        "…and the old value is copied verbatim — the copy is what makes dropping the " +
+          "fallback possible, and rewriting it on the way would be a conversion nobody " +
+          "asked for"
       );
       assert.ok(
-        store.getItem("mangaReader.settings") &&
-          store.getItem("mangaReader.offsets"),
-        "and the old keys are left where they are, for the plugin that still reads them"
+        store.getItem("mangaReader.settings"),
+        "and the old key is left where it is, for the plugin that still reads it"
+      );
+      assert.strictEqual(
+        store.getItem("plugin.mangaTools.offsets"),
+        null,
+        "while the old map of per-gallery shifts is not read, and not copied: the " +
+          "shift is one setting for the browser now"
       );
     }
   );

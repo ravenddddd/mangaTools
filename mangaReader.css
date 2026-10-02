@@ -178,10 +178,12 @@
   padding: 0;
   max-height: none;
   overflow: hidden;
-  /* Rounded a little past Bootstrap's 4px, because this panel is a panel: it has a
-     heading and a body rather than being a list of items, and the sharper corner
-     reads as an item list with something on top of it. */
-  border-radius: 10px;
+  /* Bootstrap's own radius for a popover, which is what the other panel is: the two
+     hang off the same header and hold the same kind of thing, so a corner that
+     differs between them is a corner the eye reads as a mistake. It is a hair rounder
+     than the .25rem a `dropdown-menu` gets, and that is the point — the options panel
+     is what this is matching, not the list Stash would have drawn here. */
+  border-radius: 0.3rem;
   /* Wide enough for a chapter's name and its page range on one line. Left to itself
      a `dropdown-menu` is as wide as its widest row, and a row holds a name that can be
      any length — so the menu would come out narrower or wider from one gallery to the
@@ -345,7 +347,9 @@
 .manga-reader-row {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  /* The words take the room there is, so this is the whole of the space between them
+     and the switch. Roomier than it looks: the root font is 14px. */
+  gap: 1.25rem;
 }
 
 .manga-reader-row-words {
@@ -414,12 +418,6 @@
 .manga-reader-segment.is-on {
   background-color: rgba(138, 155, 168, 0.3);
   color: #f5f8fa;
-}
-
-/* The slider, which Bootstrap 4 draws itself under this class — the app is on 4,
-   and the class it used to wear was Bootstrap 5's name for the same control. */
-.manga-reader-group > .custom-range {
-  margin-top: 0.4rem;
 }
 
 /*
@@ -649,19 +647,6 @@
  */
 .Lightbox.manga-reader-takeover .Lightbox-footer-left > * {
   display: none;
-}
-
-/*
- * The fade length, read off the slider.
- *
- * In the label's own row rather than after the slider: the row is the one the words
- * and the switch share everywhere else in this panel, and putting the number at its
- * far end keeps the slider the full width of the body — a number sitting after a
- * slider shortens the one control in here that is dragged.
- */
-.manga-reader-readout {
-  opacity: 0.7;
-  font-variant-numeric: tabular-nums;
 }
 
 /*
