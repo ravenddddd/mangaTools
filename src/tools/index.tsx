@@ -2649,7 +2649,10 @@ function BooleanSetting(props: {
   }
 
   return (
-    <div className="setting">
+    // `manga-tools-setting` is what the stylesheet needs to undo Stash's
+    // `flex-wrap: wrap` on a plugin's rows, which puts a switch with a long
+    // sub-heading on a line of its own — see the rule in mangaTools.css.
+    <div className="setting manga-tools-setting">
       <div>
         {/* The heading is a plain string when nothing hangs off it — a heading that
             is an array with a null in it is a different shape to every other one on

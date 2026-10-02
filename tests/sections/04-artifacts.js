@@ -84,6 +84,35 @@ module.exports = () => {
     ),
     "the settings block must reset Stash's text-align: right"
   );
+  // Stash's `.setting-group .setting { flex-wrap: wrap }` covers the rows on a
+  // plugin's page, and with a sub-heading long enough the switch wraps under the
+  // text instead of staying beside it. That is a browser's layout engine disagreeing
+  // with the DOM stub, so the check is on the stylesheet: the row has to be the one
+  // that says `nowrap`, and it has to say it with the class the row actually wears.
+  assert.ok(
+    /\.setting-section\s+\.setting-group\s+\.setting\.manga-tools-setting\s*\{[^}]*flex-wrap:\s*nowrap/.test(
+      css
+    ),
+    "a settings row must be allowed to keep its switch beside its text: Stash's " +
+      "flex-wrap: wrap puts it on a line of its own, and the DOM stub cannot see it"
+  );
+  // The group's own indent is all that is left of the nesting signal, and the line
+  // that used to run down its left edge is gone rather than merely unused: a border
+  // left in the file would come back the moment the indent changed.
+  const groupRule = /\.manga-tools-settings-group\s*\{([^}]*)\}/.exec(css);
+  assert.ok(groupRule, "the settings group should still carry its own indent");
+  assert.ok(
+    !/border/.test(groupRule[1]),
+    "the rule drawn down a group's left edge should be gone — the indent says the " +
+      "same thing without making the page read as a table"
+  );
+  // A group heading that is not a `.setting` is not covered by the rule that puts
+  // the rows 2.5rem in, and sat that far to the left of the rows under it.
+  assert.ok(
+    /\.manga-tools-settings-heading\s*\{[^}]*margin-left:\s*2\.5rem/.test(css),
+    "a group heading has to stand where the rows under it stand — Stash indents " +
+      "those by 2.5rem, and nothing indents a heading that is not a `.setting`"
+  );
   // The performers field is hidden by CSS rather than by not rendering the row —
   // Stash's form keeps the value, so nothing can clear it. That makes this rule
   // the whole of the feature, and its sibling combinator the load-bearing part of

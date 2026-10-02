@@ -324,6 +324,28 @@ module.exports = () => {
     return out;
   };
   const switches = switchesIn(settingsEl);
+  // Every switch sits in a row the stylesheet can name. Stash gives a plugin's rows
+  // `flex-wrap: wrap`, and as soon as a sub-heading is long enough that is the switch
+  // on a line of its own, under the text; the rule that undoes it is keyed on this
+  // class (see 04-artifacts), so a switch whose row lost it is a switch under its own
+  // text again. Which is what a browser would show — the DOM stub has no idea, which
+  // is why the two halves are checked in the two places that can see them.
+  let rowCount = 0;
+  find(settingsEl, (n) => {
+    if (
+      typeof n.props?.className === "string" &&
+      n.props.className.split(" ").includes("manga-tools-setting")
+    ) {
+      rowCount += 1;
+    }
+    return false;
+  });
+  assert.strictEqual(
+    rowCount,
+    switches.length,
+    "every switch should be in a `.setting` row carrying the class the stylesheet " +
+      "uses to keep the switch beside its text"
+  );
   assert.deepStrictEqual(
     switches.map((n) => n.props.id),
     [
