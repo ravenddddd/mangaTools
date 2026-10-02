@@ -2735,7 +2735,7 @@ function BooleanSetting(props: {
   );
 }
 
-function MangaToolsSettings(props: { pluginID: string }) {
+function MangaToolsSettings() {
   useGlobalVersion();
 
   const intl = PluginApi.libraries.Intl.useIntl();
@@ -4057,8 +4057,11 @@ registerPatch("instead", "PluginSettings", (...args: unknown[]) => {
   const Original = originalFrom(args);
   noteFired("PluginSettings");
 
+  // The ID is not handed down: the plugin's own is a constant here, and it is what
+  // everything that writes settings uses — see settingsInput and saveSettings, which is
+  // where the whole map is built and which owns the ID rather than taking it.
   if (props.pluginID === PLUGIN_ID) {
-    return <MangaToolsSettings pluginID={props.pluginID} />;
+    return <MangaToolsSettings />;
   }
 
   return <Original {...props} />;
