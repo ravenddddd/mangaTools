@@ -162,14 +162,28 @@ module.exports = () => {
   );
   // The spotlight: the rest of the card pushed back so the ringed part is the
   // only bright thing on it. A shadow with a spread wide enough to cover the card,
-  // drawn with the element itself and clipped by the card's own overflow — so
-  // there is no overlay element to keep in step, and nothing to go wrong but the
-  // one thing asserted here: the shadow is only visible if it is painted over the
-  // card's other content, which is what the spread does.
+  // drawn with the element itself — so there is no overlay element to keep in
+  // step, and nothing to go wrong but the one thing asserted here: the shadow is
+  // only visible if it is painted over the card's other content, which is what the
+  // spread does.
+  //
+  // Two rules carry it, and the badge's is not a duplicate: the badge's text chips
+  // declare a drop shadow of their own on two class names, and a spotlight on one
+  // class loses to it — which is what "no dim when the flags are off" was. So both
+  // are read, and the badge's is the one that has to win.
   assert.ok(
-    /box-shadow:\s*0 0 0 \d+px rgba\(/.test(ringRule[1]),
+    /\.manga-tools-help-card\s+\.manga-tools-help-lit[^{}]*\{[^}]*box-shadow:\s*0 0 0 \d+px rgba\(/.test(
+      css
+    ),
     "the part a help panel is about should be spotlit, not just ringed — a card " +
       "with the whole of it at full brightness says less at a glance"
+  );
+  assert.ok(
+    /\.manga-tools-help-card\s+\.manga-tools-badge\.manga-tools-help-lit[^{}]*\{[^}]*box-shadow:\s*0 0 0 \d+px rgba\(/.test(
+      css
+    ),
+    "…and the badge needs one more class name than the chip's own shadow has, or " +
+      "the dim is missing whenever the badge is drawn as a name instead of a flag"
   );
   // …which needs a `position` on the mark's slot, and a z-index above the badge's
   // own (9) or the badge would be the one thing left bright in the mark's panel.

@@ -678,7 +678,10 @@ with the element — no overlay to keep in step. What clips it is the frame arou
 example, one box further out than Stash's card: the card's own `overflow: hidden`
 would do it, and did, until the ring around the mark turned out to be cut off by it —
 the mark sits at the card's own bottom edge, and the frame's padding is what the ring
-needs to live in. The ring is an `outline`, which goes outside the box without
+needs to live in. It is declared twice, and the second declaration is not a
+duplicate: the badge's *text* chips carry a drop shadow of their own on two class
+names, and a spotlight on one class lost to it — which is what "no dim once the flags
+are switched off" was, with the badge drawn as a name instead of a flag. The ring is an `outline`, which goes outside the box without
 touching it, and its rule sets no `position`: the badge it circles is absolutely
 positioned in the cover's corner, and a `position` there would pull it back into the
 flow. The mark's slot, which is a plain span, is the one element that needs both a
