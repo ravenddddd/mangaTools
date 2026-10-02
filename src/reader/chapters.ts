@@ -56,6 +56,17 @@ export interface MangaReaderChapter {
 export interface MangaReaderPlacedChapter extends MangaReaderChapter {
   /** Index into the page list on screen of this chapter's *earliest* page */
   at: number;
+  /**
+   * …and of its *latest* one, which is the other end of the range the chapter menu
+   * shows.
+   *
+   * Measured off the chapter's own images rather than off where the next chapter
+   * begins. The two agree for every list this plugin has written and for every
+   * Stash list it has imported — both are contiguous runs — but they part company
+   * the moment a chapter in the middle is deleted, because a deletion leaves its
+   * pages unowned: the run would go on claiming them, and its own images would not.
+   */
+  to: number;
 }
 
 /**
@@ -210,6 +221,10 @@ export function chaptersFromStash(
  * it should land on, and the page the menu has to point at. Everything after it
  * belongs to it or does not, and that is a fact the chapter already holds.
  *
+ * Its **latest** page comes back with it, so the menu can say what range a chapter
+ * covers without a second walk over the pages. See `to` on the placed shape for why
+ * that end is measured off the chapter's own images.
+ *
  * Chapters with nothing on screen at all are dropped: an image that has left the
  * gallery, or one another entry point is showing instead. The caller can say so;
  * what it must not do is place them somewhere plausible, because a boundary drawn
@@ -232,13 +247,16 @@ export function placeChapters(
   const placed: MangaReaderPlacedChapter[] = [];
   for (const chapter of chapters) {
     let at = -1;
+    let to = -1;
     for (const id of chapter.images) {
       const index = position.get(id);
-      if (index !== undefined && (at < 0 || index < at)) at = index;
+      if (index === undefined) continue;
+      if (at < 0 || index < at) at = index;
+      if (index > to) to = index;
     }
 
     if (at < 0) continue;
-    placed.push({ title: chapter.title, images: chapter.images, at });
+    placed.push({ title: chapter.title, images: chapter.images, at, to });
   }
 
   placed.sort((a, b) => a.at - b.at);

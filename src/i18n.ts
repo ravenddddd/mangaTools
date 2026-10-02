@@ -113,6 +113,27 @@ export function stringFor(
   return catalogFor(locale ?? "")[id] ?? CATALOGS.en[id] ?? id;
 }
 
+/**
+ * One of this plugin's own strings with its `{n}` filled in.
+ *
+ * The catalogs are a lookup rather than a formatter, and nothing in either half
+ * needed a number *inside* a string until the reader had to name a chapter that has
+ * no name: "第 6 章" and "Chapter 6" put the number in a different place, so the
+ * whole string has to come from the catalog. One token with one replacement, rather
+ * than a placeholder syntax with no translator to serve.
+ *
+ * Shared rather than written twice, because the two things that name a chapter —
+ * the header's menu and the progress bar's bubble — must not be able to disagree
+ * about what an unnamed one is called.
+ */
+export function numbered(
+  locale: string | null | undefined,
+  id: string,
+  n: number
+): string {
+  return stringFor(locale, id).replace("{n}", String(n));
+}
+
 // Published on the namespace alongside the rest of the plugin's pure logic, so
 // the smoke tests can exercise the fallback chain without rendering anything.
 NS.t = t;

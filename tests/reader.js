@@ -632,10 +632,20 @@ const buildChaptersTab = (chapters) => {
  *
  * The chapters are not handed to Stash's lightbox any more — they are this plugin's
  * own menu, in its own header — so this is where a section looks for them.
+ *
+ * The name out of each row, not the row's whole `textContent`: a row also carries the
+ * range of pages the chapter covers, and a section asking what the chapters are
+ * called is not asking about that.
  */
 const chapterMenu = (box) =>
   [...box.lightbox.querySelectorAll(".manga-reader-menu-item")].map(
-    (item) => item.textContent
+    (item) => item.querySelector(".manga-reader-chapter-name").textContent
+  );
+
+/** The same rows' page ranges, as they are shown: `"40–61"` */
+const chapterRanges = (box) =>
+  [...box.lightbox.querySelectorAll(".manga-reader-menu-item")].map(
+    (item) => item.querySelector(".manga-reader-chapter-range").textContent
   );
 
 /** The rows this plugin drew in Stash's container */
@@ -1215,25 +1225,24 @@ async function main() {
     const popover = box.openPopover();
     dom.flush();
 
-    // The switch is the reader's own now, in its own header — see chrome.ts. It is
-    // there for a marked gallery whether or not the mode is on, because the mode is
-    // not what puts the reader on a gallery: the mark is.
+    // The pairing is the reader's own now, in its own header — see chrome.ts. It is
+    // there for a marked gallery whether or not a pair is on, because the mode is not
+    // what puts the reader on a gallery: the mark is.
     await settle();
-    const input = box.lightbox.querySelector("#manga-reader-double-page");
+    const input = box.lightbox.querySelector(
+      on ? "#manga-reader-double-page" : "#manga-reader-single-page"
+    );
     if (expectSwitch) {
       assert.ok(
         input,
-        "the switch should be in the lightbox's own options menu"
+        "the pairing should be in the lightbox's own options menu"
       );
     }
 
-    if (input && input.checked !== on) {
-      // Only when it would be a change: a browser does not fire `change` for a value
-      // that was already that value, and the reader re-lays the pages when it hears
-      // one — which would be a redraw this section never asked for.
-      input.checked = on;
-      input.dispatch("change");
-    }
+    // Whether to press it, read off the control: a press on the half already chosen
+    // says nothing at all, so doing it unconditionally would be a section turning the
+    // mode on twice and calling the second one a change.
+    if (input && !input.classList.contains("is-on")) dom.click(input);
     await settle();
 
     return { box, input, popover };
@@ -1285,11 +1294,24 @@ async function main() {
   await runSection("the switches are in the reader's own header", async () => {
     const { box, input } = await startReader({ on: false });
 
-    assert.strictEqual(input.type, "checkbox");
+    // The single half is the chosen one when the mode is off — the control shows the
+    // state, it does not set it.
     assert.strictEqual(
-      input.checked,
+      input.classList.contains("manga-reader-segment"),
+      true,
+      "the pairing is one of the panel's two segments"
+    );
+    assert.strictEqual(
+      input.classList.contains("is-on"),
+      true,
+      "and the single page is the chosen half, because the mode is off"
+    );
+    assert.strictEqual(
+      box.lightbox
+        .querySelector("#manga-reader-double-page")
+        .classList.contains("is-on"),
       false,
-      "off, because the mode is off — the switch shows the state, it does not set it"
+      "…while the other half is not"
     );
 
     // In the reader's own header, which is the only home it has: the one that used
@@ -1309,10 +1331,19 @@ async function main() {
       true,
       "in the reader's own header, not in somebody else's menu"
     );
+    // The two halves are Stash's own `minimal` buttons — what its lightbox header
+    // draws its own buttons with — and the track they sit in is this plugin's, so
+    // that the chosen one can be seen at all against a popover of the same colour.
     assert.strictEqual(
-      box.lightbox.querySelector(".manga-reader-chrome .form-check") !== null,
+      input.classList.contains("btn") && input.classList.contains("minimal"),
       true,
-      "and in Stash's own markup, so it reads as one of its settings"
+      "and in Stash's own button markup, so it reads as one of its own"
+    );
+    assert.strictEqual(
+      box.lightbox.querySelector(".custom-switch .custom-control-input") !==
+        null,
+      true,
+      "beside switches in Bootstrap's own markup, which is what Stash's toggles are"
     );
 
     stopReader(box);
@@ -1333,11 +1364,11 @@ async function main() {
       });
 
       const label = box.lightbox.querySelector(
-        ".manga-reader-chrome .form-check-label"
+        ".manga-reader-chrome .manga-reader-row-label"
       );
       assert.strictEqual(
         label.textContent,
-        "雙頁閱讀",
+        "封面單獨一頁",
         "a traditional-Chinese interface reads the traditional wording"
       );
 
@@ -1694,7 +1725,7 @@ async function main() {
   await runSection(
     "a focused field does not take the arrows from the reader",
     async () => {
-      const { box, input } = await startReader({ galleryId: "8", on: true });
+      const { box } = await startReader({ galleryId: "8", on: true });
       const sent = [];
       dom.document.addEventListener("keydown", (event) => sent.push(event.key));
 
@@ -1704,11 +1735,18 @@ async function main() {
           dom.makeEvent("keydown", { key, isTrusted: true })
         );
 
-      // The options menu is open and the focus is on the switch the reader just
-      // clicked — a checkbox. The arrows do nothing to a checkbox (space toggles it),
-      // so a press here is still the reader's. Treating every `<input>` as a field
-      // that owns the arrows meant these went past the reader to Stash's own handler,
-      // a page at a time: "it only happens while the menu is open".
+      // The options menu is open and the focus is on a switch the reader just clicked
+      // in it — a checkbox. The arrows do nothing to a checkbox (space toggles it), so
+      // a press here is still the reader's. Treating every `<input>` as a field that
+      // owns the arrows meant these went past the reader to Stash's own handler, a page
+      // at a time: "it only happens while the menu is open".
+      //
+      // The switch, rather than the pairing beside it: the pairing is a pair of
+      // buttons now, and a button is not an `<input>` — this section is about the rule
+      // that has to tell an input that owns its arrows from one that does not.
+      const input = box.lightbox.querySelector("#manga-reader-cover-alone");
+      assert.ok(input, "the panel has switches in it to put the focus on");
+
       turn(box);
       sent.length = 0;
       const onSwitch = keyTo(input, "ArrowRight");
@@ -2174,7 +2212,7 @@ async function main() {
   await runSection(
     "turning the pairing off leaves one page a screen",
     async () => {
-      const { box, input } = await startReader({ galleryId: "8", on: true });
+      const { box } = await startReader({ galleryId: "8", on: true });
       turn(box);
       assert.deepStrictEqual(
         drawn(),
@@ -2182,8 +2220,10 @@ async function main() {
         "drawing pairs first"
       );
 
-      input.checked = false;
-      input.dispatch("change");
+      // The other half of the pair, pressed. A press on the half already chosen says
+      // nothing at all — see the next section — which is why this one has to be the
+      // half that is not.
+      dom.click(box.lightbox.querySelector("#manga-reader-single-page"));
 
       assert.deepStrictEqual(
         drawn(),
@@ -2200,22 +2240,133 @@ async function main() {
     }
   );
 
+  /**
+   * A press on the half that is already chosen says nothing.
+   *
+   * The reader re-lays the pages whenever it hears this setting, and re-laying them
+   * for a press that chose what was already true is a screen redrawn for nothing —
+   * a flicker, for a reader who pressed a button that was already on.
+   */
+  await runSection(
+    "a press on the half already chosen says nothing",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+
+      // What a re-lay looks like from outside: the screen is drawn again, and being
+      // drawn is what the fade is. Nothing else about this press would show.
+      const before = container().animations.length;
+      dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+      assert.strictEqual(
+        container().animations.length,
+        before,
+        "pressing the half that is already chosen draws nothing again"
+      );
+
+      dom.click(box.lightbox.querySelector("#manga-reader-single-page"));
+      assert.notStrictEqual(
+        container().animations.length,
+        before,
+        "…while pressing the other half draws the screen again, because that is a change"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * The two switches that have been stored since the pairing was written and had no
+   * control until now.
+   *
+   * `coverAlone` and `detectSpreads` were read by the layout and written by nothing:
+   * settings a reader could neither see nor change. Both are in the panel now, and
+   * what matters is not that they are drawn but that they reach the pages — a switch
+   * that writes a setting the screen does not obey is worse than no switch.
+   */
+  await runSection(
+    "the two switches that had no control reach the pairing",
+    async () => {
+      // Gallery 7: 101 | 102 | 103(wide) | 104+105 — a cover, an ordinary page, a page
+      // that is two pages wide, and a pair. Each of the two switches has something in
+      // this gallery to change.
+      const { box } = await startReader({ galleryId: "7", on: true, total: 5 });
+      const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
+      const flip = (id) => {
+        const input = panel.querySelector(id);
+        input.checked = !input.checked;
+        input.dispatch("change");
+        dom.flush();
+      };
+
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/101/image"],
+        "the cover stands alone by default"
+      );
+      turn(box);
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/102/image"],
+        "and the wide page after it stands alone, so nothing pairs with it"
+      );
+
+      flip("#manga-reader-detect-spreads");
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/102/image", "/image/103/image"],
+        "turning the detection off lets the wide page pair with its neighbour"
+      );
+
+      flip("#manga-reader-cover-alone");
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/101/image", "/image/102/image"],
+        "and turning the cover off pairs it, which moves the page being read into " +
+          "that pair"
+      );
+
+      // Put back, both of them: these are the browser's settings rather than this
+      // gallery's, so a section that left them flipped would be deciding for every
+      // section after it.
+      flip("#manga-reader-cover-alone");
+      flip("#manga-reader-detect-spreads");
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/102/image"],
+        "with both back, the reader is on the page they were on, alone again"
+      );
+      assert.deepStrictEqual(
+        JSON.parse(
+          dom.window.localStorage.getItem("plugin.mangaTools.settings")
+        ),
+        {
+          doublePage: true,
+          coverAlone: true,
+          detectSpreads: true,
+          fadeMs: 140,
+        },
+        "and the settings are where they were found"
+      );
+
+      stopReader(box);
+    }
+  );
+
   await runSection("the mode is remembered for the next session", async () => {
     // Off first, so turning it on is a change — which is what a switch reports, and
     // what makes it write anything at all.
     const off = await startReader({ galleryId: "8", on: false });
     stopReader(off.box);
 
-    const { box, input } = await startReader({ galleryId: "8", on: false });
+    const { box } = await startReader({ galleryId: "8", on: false });
     assert.ok(container(), "drawing either way");
 
-    input.checked = true;
-    input.dispatch("change");
+    // Pressed back: the same setting, the other way, which is a change again.
+    dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
 
     assert.deepStrictEqual(
       JSON.parse(dom.window.localStorage.getItem("plugin.mangaTools.settings")),
       { doublePage: true, coverAlone: true, detectSpreads: true, fadeMs: 140 },
-      "the switch writes the setting it changed and leaves the rest alone"
+      "the pairing writes the setting it changed and leaves the rest alone"
     );
 
     stopReader(box);
@@ -2451,6 +2602,20 @@ async function main() {
         placed[0].images,
         ["704", "702"],
         "…keeping the images it was given, in the order they were written"
+      );
+
+      // And how far it runs, which is the other end of what the menu shows. Its own
+      // last page rather than the page before the next chapter begins: those agree
+      // for every list this plugin writes and every Stash list it imports — both are
+      // runs — and part company the moment a chapter in the middle is deleted, when
+      // the pages between the two are in no chapter at all.
+      assert.deepStrictEqual(
+        placed.map((c) => [c.at, c.to]),
+        [
+          [1, 3],
+          [4, 7],
+        ],
+        "each placed with its own last page, read on screen"
       );
 
       // The pair, from the writing side. What is written has to be what reading it
@@ -2738,6 +2903,74 @@ async function main() {
         "and the chapters, in the order they begin on screen"
       );
 
+      // Each row says which pages its chapter covers — the chapter's own first and
+      // last page on screen, one-based. The first two pages of this gallery are in no
+      // chapter at all, which is why the first range starts at 3: the range is what
+      // the chapter holds, not what follows its beginning.
+      assert.deepStrictEqual(
+        chapterRanges(box),
+        ["3–4", "5–8"],
+        "with the range of pages each one covers"
+      );
+
+      // The chapter being read, marked down its side — and the menu's own jump, which
+      // is how this section gets the reader into a chapter to have something to mark.
+      const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+      const chapterToggle = [
+        ...chrome.querySelectorAll(".manga-reader-menu-button"),
+      ].find((button) => button.dataset.opens === "chapters");
+      const marked = () =>
+        [...box.lightbox.querySelectorAll(".manga-reader-menu-item")]
+          .filter((item) => item.classList.contains("is-current"))
+          .map(
+            (item) =>
+              item.querySelector(".manga-reader-chapter-name").textContent
+          );
+
+      assert.deepStrictEqual(
+        marked(),
+        [],
+        "nothing is marked before anything is read"
+      );
+
+      dom.click(chapterToggle);
+      const rows = [
+        ...box.lightbox.querySelectorAll(".manga-reader-menu-item"),
+      ];
+      dom.click(rows[1]);
+      dom.flush();
+
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/704/image", "/image/705/image"],
+        "the second row jumps to the screen the second chapter begins on — page 5 of " +
+          "8, which the cover being on its own pairs with the page before it"
+      );
+      // Which row is marked is the header's own answer, and this is the assertion
+      // that says the two cannot disagree: the header names the chapter of the page
+      // its screen *starts* on, and the jump asked for a page inside it — so here it
+      // is 開幕, because page 5 of 8 pairs with the page before it, which is the last
+      // page of the chapter before.
+      assert.strictEqual(
+        chrome.querySelector(".manga-reader-chapter").textContent,
+        "開幕",
+        "the header names the chapter of the page the screen begins on"
+      );
+      assert.deepStrictEqual(
+        marked(),
+        ["開幕"],
+        "and the menu marks the same one, once"
+      );
+
+      // Marked with this plugin's own class, not Bootstrap's: `active` is a solid blue
+      // slab across the row, and in a header of white icons it was the loudest thing
+      // on the screen for a mark that only says where the reader is.
+      assert.strictEqual(
+        box.lightbox.querySelector(".manga-reader-menu-item.active"),
+        null,
+        "with this plugin's own class rather than Bootstrap's"
+      );
+
       // And it is handed over again the next time the lightbox is opened. A reader
       // opens one, closes it, opens it again — and the *second* lightbox is the one
       // where the footer's gallery link was reported missing, so this is the case to
@@ -3008,9 +3241,16 @@ async function main() {
       "and the button in the header opens it"
     );
     assert.deepStrictEqual(
-      [...menu("chapters").children].map((item) => item.textContent),
+      [...menu("chapters").querySelectorAll(".manga-reader-menu-item")].map(
+        (item) => item.querySelector(".manga-reader-chapter-name").textContent
+      ),
       ["開幕", "中盤"],
       "onto the gallery's chapters"
+    );
+    assert.strictEqual(
+      menu("chapters").querySelector(".manga-reader-menu-head") !== null,
+      true,
+      "under a heading of its own, which is what a list this long needs"
     );
 
     dom.click(toggle("settings"));
@@ -3198,13 +3438,17 @@ async function main() {
     );
     assert.strictEqual(
       header.textContent,
-      "Options",
-      "worded as Stash words its own"
+      "Reading options",
+      "its own words, because this panel is this plugin's own — Stash's says " +
+        '"Options" over a flat list of controls, and this one has three groups'
     );
     const body = settings.querySelector(".popover-body");
     assert.ok(body, "and a body, which is where its padding comes from");
     for (const id of [
+      "#manga-reader-single-page",
       "#manga-reader-double-page",
+      "#manga-reader-cover-alone",
+      "#manga-reader-detect-spreads",
       "#manga-reader-offset",
       "#manga-reader-fade",
     ]) {
@@ -3222,6 +3466,52 @@ async function main() {
           "one control and the next comes from"
       );
     }
+
+    // Three groups, each with its own heading: what the pages are paired like, what
+    // is wrong with this gallery's pairing, and how long a turn takes. Stash's own
+    // panel is one flat list, so this is the arrangement this plugin chose — and a
+    // setting for one gallery sitting in with the reading preferences without a word
+    // between them was the thing it chose against.
+    assert.deepStrictEqual(
+      [...body.querySelectorAll(".manga-reader-group")].map(
+        (group) => group.querySelector(".manga-reader-group-label").textContent
+      ),
+      ["Reading", "This gallery", "Animation"],
+      "in three groups, each named"
+    );
+    assert.strictEqual(
+      body.querySelectorAll(".manga-reader-divider").length,
+      2,
+      "with a rule between one group and the next, and none around the outside"
+    );
+
+    // The two settings that had no control until now: stored and obeyed since the
+    // pairing was written, and reachable from nothing.
+    for (const id of [
+      "#manga-reader-cover-alone",
+      "#manga-reader-detect-spreads",
+    ]) {
+      const control = settings.querySelector(id);
+      assert.strictEqual(
+        control.classList.contains("custom-control-input"),
+        true,
+        `${id} should be a switch in Bootstrap's own markup`
+      );
+      assert.strictEqual(
+        control.checked,
+        true,
+        `${id} should start on, which is what this plugin has always read it as`
+      );
+    }
+
+    // The slider, which wore Bootstrap 5's class name against a Bootstrap 4 app
+    // until now — so it was the browser's own range rather than Stash's.
+    const range = settings.querySelector("#manga-reader-fade");
+    assert.strictEqual(
+      range.classList.contains("custom-range"),
+      true,
+      "the fade is Bootstrap 4's own range"
+    );
 
     assert.strictEqual(
       chapterButton.dataset.icon,
@@ -3613,18 +3903,37 @@ async function main() {
     assert.deepStrictEqual(
       NR.progressNodes(
         [
-          { title: "開幕", at: 0, images: [] },
-          { title: "中盤", at: 4, images: [] },
-          { title: "同名", at: 4, images: [] },
-          { title: "越界", at: 99, images: [] },
+          { title: "開幕", at: 0, to: 1, images: [] },
+          { title: "中盤", at: 4, to: 5, images: [] },
+          { title: "同名", at: 4, to: 4, images: [] },
+          { title: "越界", at: 99, to: 99, images: [] },
         ],
-        20
+        20,
+        "zh-Hans"
       ),
       [
         { name: "開幕", at: 0, fraction: 0 },
         { name: "中盤", at: 4, fraction: 4 / 20 },
       ],
       "at the page each chapter begins on, and once"
+    );
+
+    // A chapter with no name is named by its place, in the reader's own language, by
+    // the one helper the header's menu names it with — the two must not be able to
+    // disagree about what a chapter is called.
+    assert.deepStrictEqual(
+      NR.progressNodes(
+        [{ title: "", at: 2, to: 3, images: [] }],
+        20,
+        "zh-Hans"
+      ),
+      [{ name: "第 1 章", at: 2, fraction: 2 / 20 }],
+      "an unnamed chapter is numbered in the interface's own words"
+    );
+    assert.deepStrictEqual(
+      NR.progressNodes([{ title: "", at: 2, to: 3, images: [] }], 20, "en"),
+      [{ name: "Chapter 1", at: 2, fraction: 2 / 20 }],
+      "…which is the same number in a different place in English"
     );
   });
 

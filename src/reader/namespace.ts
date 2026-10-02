@@ -285,7 +285,8 @@ export interface MangaReaderNamespace {
   pageAtFraction(fraction: number, total: number): number;
   progressNodes(
     chapters: MangaReaderPlacedChapter[],
-    total: number
+    total: number,
+    locale: string | null
   ): { name: string; at: number; fraction: number }[];
   PROGRESS_SCRUB_MS: number;
   PROGRESS_IDLE_MS: number;

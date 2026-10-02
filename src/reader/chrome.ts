@@ -21,7 +21,7 @@
  * and the "in no chapter" answer finally say what this plugin means by them.
  */
 import { requirePluginApi } from "../plugin-api";
-import { stringFor } from "../i18n";
+import { numbered, stringFor } from "../i18n";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderSettings } from "./namespace";
 import { FADE_MAX_MS } from "./settings";
@@ -57,6 +57,43 @@ export const CLASS_SETTINGS = "manga-reader-settings";
 /** Each menu's panel, by class: a selector the tests' DOM stub understands too */
 const CLASS_MENU_CHAPTERS = "manga-reader-menu-chapters";
 const CLASS_MENU_SETTINGS = "manga-reader-menu-settings";
+/** The chapter menu's heading, and the list under it — the list is what scrolls */
+const CLASS_MENU_HEAD = "manga-reader-menu-head";
+const CLASS_MENU_HEADING = "manga-reader-menu-heading";
+const CLASS_MENU_COUNT = "manga-reader-menu-count";
+const CLASS_MENU_LIST = "manga-reader-chapter-list";
+/** A row in that list: the name, and the range of pages it covers */
+const CLASS_CHAPTER_NAME = "manga-reader-chapter-name";
+const CLASS_CHAPTER_RANGE = "manga-reader-chapter-range";
+/**
+ * A group in the options panel, and the little heading over it.
+ *
+ * Deliberately this plugin's own, and its own look: Stash has no grouped options
+ * panel to copy — its own is a flat list of controls — so a heading and a rule
+ * between one set and the next is a thing this plugin decides rather than borrows.
+ */
+const CLASS_GROUP = "manga-reader-group";
+const CLASS_GROUP_LABEL = "manga-reader-group-label";
+const CLASS_DIVIDER = "manga-reader-divider";
+/** One row of the panel: a label, and the control that belongs to it */
+const CLASS_ROW = "manga-reader-row";
+/** The words in that row — the label, and the quiet line under it when there is one */
+const CLASS_ROW_WORDS = "manga-reader-row-words";
+const CLASS_ROW_LABEL = "manga-reader-row-label";
+const CLASS_HINT = "manga-reader-hint";
+/**
+ * The single-page/double-page pair.
+ *
+ * A track with two buttons in it — this plugin's own arrangement, out of Stash's
+ * own parts: the track is its `$textfield-bg` (what its inputs are filled with) and
+ * the chosen half is lifted by the very `rgba(138, 155, 168, .3)` its own toolbar
+ * buttons use when they are the chosen one. The alternative was a checkbox, which
+ * says "on" rather than "one of these two", and Stash's button *group*, which does
+ * not show at all inside a popover: the group's fill is the same colour as the
+ * popover's.
+ */
+const CLASS_PAGES = "manga-reader-pages";
+const CLASS_SEGMENT = "manga-reader-segment";
 
 /**
  * What Stash's own header puts on each of the three buttons it has, copied from it
@@ -309,32 +346,77 @@ function update(chrome: HTMLElement, state: ChromeState): void {
   drawSettings(settingsPanel, state);
 }
 
-/** The chapter menu, and the mark on the one the reader is in */
+/**
+ * The chapter menu: what is in the book, and which of them the reader is in.
+ *
+ * A heading, then one row per chapter — its name on the left, the pages it covers
+ * on the right, and a bar down the side of the one being read. The heading is what
+ * the list is scrolled past: the list is the part that scrolls, so the heading stays
+ * where it is without any of the sticky positioning that would have been needed if
+ * the two had shared one scrolling box.
+ */
 function drawChapters(panel: HTMLElement, state: ChromeState): void {
-  const key = state.placed.map((c) => c.at + ":" + c.title).join("|");
+  const rows = state.placed.map((chapter, index) => ({
+    chapter,
+    // A chapter with no name is named by its place, which is what the reader sees in
+    // the list — the same number the jump goes to.
+    name:
+      chapter.title ||
+      numbered(state.locale, "mangaReader.chapterNumber", index + 1),
+    range: chapter.at + 1 + "–" + (chapter.to + 1),
+  }));
+
+  // The heading and the count are this plugin's own strings, so the language is part
+  // of what the panel was drawn from: a reader who changes Stash's language gets a
+  // header in it rather than the one the first pass happened to be drawn in.
+  const key = [
+    state.locale ?? "",
+    String(rows.length),
+    ...rows.map((row) => row.chapter.at + ":" + row.name + ":" + row.range),
+  ].join("|");
+
   if (panel.getAttribute("data-drawn") !== key) {
     panel.setAttribute("data-drawn", key);
     panel.textContent = "";
 
-    for (const chapter of state.placed) {
+    const head = text(CLASS_MENU_HEAD);
+    const heading = text(CLASS_MENU_HEADING);
+    heading.textContent = stringFor(state.locale, "mangaReader.chapters");
+    const count = text(CLASS_MENU_COUNT);
+    count.textContent = numbered(
+      state.locale,
+      "mangaReader.chapterCount",
+      rows.length
+    );
+    head.appendChild(heading);
+    head.appendChild(count);
+    panel.appendChild(head);
+
+    const list = text(CLASS_MENU_LIST, "div");
+    for (const row of rows) {
       const item = document.createElement("button");
       item.type = "button";
       // Stash's own class for an entry in its chapter menu, plus this plugin's so the
       // tests can find them.
       item.className = "dropdown-item " + CLASS_MENU_ITEM;
-      item.dataset.at = String(chapter.at);
-      // A chapter with no name is named by its place, which is what the reader sees in
-      // the list — the same number the jump goes to.
-      item.textContent =
-        chapter.title || "#" + (state.placed.indexOf(chapter) + 1);
+      item.dataset.at = String(row.chapter.at);
+
+      const name = text(CLASS_CHAPTER_NAME);
+      name.textContent = row.name;
+      const range = text(CLASS_CHAPTER_RANGE);
+      range.textContent = row.range;
+      item.appendChild(name);
+      item.appendChild(range);
+
       item.addEventListener("click", () => {
         openMenu = null;
         // The jump lays a screen out, and the pass after it draws the header again —
         // so this one only has to say what it wants.
-        state.handlers.onChapter(chapter.at);
+        state.handlers.onChapter(row.chapter.at);
       });
-      panel.appendChild(item);
+      list.appendChild(item);
     }
+    panel.appendChild(list);
   }
 
   for (const item of panel.querySelectorAll("." + CLASS_MENU_ITEM)) {
@@ -343,26 +425,33 @@ function drawChapters(panel: HTMLElement, state: ChromeState): void {
     // browser's own leniency makes work — the tests' DOM is not lenient.
     const mine =
       (item as HTMLElement).dataset.at === String(state.chapter?.at ?? -1);
-    item.classList.toggle("active", mine);
+    // Not Stash's `active`: Bootstrap paints that one a solid blue, which in a
+    // lightbox full of white icons is the loudest thing on the screen — for a mark
+    // that only says "you are here". The stylesheet draws a bar instead.
+    item.classList.toggle("is-current", mine);
   }
 }
 
 /**
- * The switches, which used to live in Stash's options popover.
+ * The options panel: the switches, grouped by what they are about.
  *
- * They are the same three settings, drawn the same way they were — a `form-check`, a
- * range input, and Stash's own `form-group` between one control and the next. What is
- * different is whose menu they are in, and that this panel is built by hand rather
- * than by react-bootstrap: Stash's popover gets its heading and its padding from
- * `Popover.Title` and `Popover.Content`, and a `popover` without those two has its
- * contents against the border with nothing between them.
+ * Three groups, because the things in here are not the same kind of thing — how the
+ * pages are paired, what is wrong with *this* gallery's pairing, and how long a turn
+ * takes to arrive. Stash's own panel is one flat list of controls, so the grouping is
+ * this plugin's decision; it is drawn out of Stash's own `form-group`s and its own
+ * rule, so the parts are still borrowed even where the arrangement is not.
+ *
+ * Two of these switches have been stored since the mode was written and have never
+ * had a control to reach them: `coverAlone` and `detectSpreads` were read by the
+ * pairing and written by nothing. They are here now.
+ *
+ * Built once and updated after, like the chapter menu and for a sharper reason: a
+ * rebuild per input event would replace the element under the pointer, and a slider
+ * that is rebuilt mid-drag is a slider that stops following the drag.
  */
 function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const label = (id: string) => stringFor(state.locale, id);
 
-  // Built once and updated after: a re-render per input event would replace the
-  // element under the pointer, and a slider that is rebuilt mid-drag is a slider that
-  // stops following the drag.
   if (panel.getAttribute("data-built") !== "yes") {
     panel.setAttribute("data-built", "yes");
     // Added, not assigned: the class that identifies this panel is how the pass finds
@@ -373,70 +462,190 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
     const heading = document.createElement("div");
     heading.className = "popover-header";
-    labels.options = heading;
+    labels["mangaReader.options"] = heading;
     panel.appendChild(heading);
 
     const body = document.createElement("div");
     body.className = "popover-body";
     panel.appendChild(body);
 
-    // A `form-group` per control, which is what holds one off the next: Stash wraps
-    // each of its own in one, and `.form-group` is where the gap comes from.
-    const pageGroup = document.createElement("div");
-    pageGroup.className = "form-group";
-    const wrap = document.createElement("div");
-    wrap.className = "form-check";
+    /**
+     * One group: a heading, and then the controls, all in a `form-group` — Stash's
+     * own class for exactly this, one control held off the next, so the gap between
+     * them comes from its stylesheet rather than from a margin written here.
+     */
+    const group = (labelId: string): HTMLElement => {
+      const node = document.createElement("div");
+      node.className = "form-group " + CLASS_GROUP;
+      const title = text(CLASS_GROUP_LABEL);
+      labels[labelId] = title;
+      node.appendChild(title);
+      body.appendChild(node);
+      return node;
+    };
 
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.className = "form-check-input";
-    input.id = DOUBLE_PAGE_ID;
-    input.addEventListener("change", () => {
-      latest?.handlers.onSetting({ doublePage: input.checked });
-    });
+    /** Stash's own rule between one group and the next, edge to edge. */
+    const rule = (): void => {
+      const line = document.createElement("hr");
+      line.className = CLASS_DIVIDER;
+      body.appendChild(line);
+    };
 
-    const box = document.createElement("label");
-    box.className = "form-check-label";
-    box.htmlFor = DOUBLE_PAGE_ID;
+    /**
+     * One row: the words on the left, the control on the right — which is how Stash
+     * lays out the settings on its own settings page.
+     *
+     * The words are their own label rather than a `form-check`'s, because the control
+     * this label is for is not inside it: a hint under the words belongs to them, so
+     * the two go in one column and the control in the other.
+     */
+    const row = (
+      id: string,
+      textId: string,
+      control: HTMLElement,
+      hintId?: string
+    ): HTMLElement => {
+      const node = text(CLASS_ROW, "div");
 
-    labels.doublePage = box;
-    wrap.appendChild(input);
-    wrap.appendChild(box);
-    pageGroup.appendChild(wrap);
-    body.appendChild(pageGroup);
+      const words = text(CLASS_ROW_WORDS);
+      const name = document.createElement("label");
+      name.className = CLASS_ROW_LABEL;
+      name.htmlFor = id;
+      labels[textId] = name;
+      words.appendChild(name);
 
-    // The pairing shift, which is not a reading preference like the two above it: it
-    // is about this gallery's pages, so it is remembered for the gallery.
-    const shiftGroup = document.createElement("div");
-    shiftGroup.className = "form-group";
-    const shift = document.createElement("div");
-    shift.className = "form-check";
-    const shiftInput = document.createElement("input");
-    shiftInput.type = "checkbox";
-    shiftInput.className = "form-check-input";
-    shiftInput.id = OFFSET_ID;
-    shiftInput.addEventListener("change", () => {
-      latest?.handlers.onOffset(shiftInput.checked ? 1 : 0);
-    });
-    const shiftLabel = document.createElement("label");
-    shiftLabel.className = "form-check-label";
-    shiftLabel.htmlFor = OFFSET_ID;
-    labels.offset = shiftLabel;
-    shift.appendChild(shiftInput);
-    shift.appendChild(shiftLabel);
-    shiftGroup.appendChild(shift);
-    body.appendChild(shiftGroup);
+      if (hintId) {
+        const hint = text(CLASS_HINT);
+        // Stash's own two classes for a quiet line under a control, which is what
+        // this is: its own lightbox describes its "scale up" switch the same way.
+        hint.className = CLASS_HINT + " form-text text-muted";
+        labels[hintId] = hint;
+        words.appendChild(hint);
+      }
 
-    const fade = document.createElement("div");
-    fade.className = "form-group";
+      node.appendChild(words);
+      node.appendChild(control);
+      return node;
+    };
 
+    /**
+     * A switch, in Bootstrap's own markup for one.
+     *
+     * `custom-switch` is what Stash's `Form.Switch` renders — the toggles on its
+     * settings page — so this is that control, colours and all. The label is empty
+     * because the words are the row's, on the other side: Bootstrap draws the switch
+     * as two pseudo-elements of the label, so a label there has to be.
+     */
+    const switchAt = (
+      id: string,
+      onChange: (on: boolean) => void
+    ): HTMLElement => {
+      const wrap = document.createElement("div");
+      wrap.className = "custom-control custom-switch";
+
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "custom-control-input";
+      input.id = id;
+      input.addEventListener("change", () => {
+        onChange(input.checked);
+      });
+
+      const empty = document.createElement("label");
+      empty.className = "custom-control-label";
+      empty.htmlFor = id;
+
+      wrap.appendChild(input);
+      wrap.appendChild(empty);
+      return wrap;
+    };
+
+    // ── How the pages are paired ──────────────────────────────────────────
+    const reading = group("mangaReader.groupReading");
+
+    // One of two rather than on or off, so not a switch. See CLASS_PAGES for why it
+    // is not Stash's button group either.
+    const pages = text(CLASS_PAGES, "div");
+    const segment = (id: string, textId: string): void => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.id = id;
+      // `minimal` is Stash's own class for a button with nothing behind it — what its
+      // lightbox header draws its icons with.
+      button.className = "btn minimal " + CLASS_SEGMENT;
+      button.addEventListener("click", () => {
+        // A press on the half already chosen says nothing: the reader re-lays the
+        // pages whenever it hears this setting, and re-laying them for a press that
+        // chose what was already true is a screen redrawn for nothing. The class is
+        // the state — see the pass below, which is what writes it.
+        if (button.classList.contains("is-on")) return;
+        latest?.handlers.onSetting({ doublePage: id === DOUBLE_PAGE_ID });
+      });
+      labels[textId] = button;
+      pages.appendChild(button);
+    };
+    segment(SINGLE_PAGE_ID, "mangaReader.singlePage");
+    segment(DOUBLE_PAGE_ID, "mangaReader.doublePage");
+    reading.appendChild(pages);
+
+    reading.appendChild(
+      row(
+        COVER_ID,
+        "mangaReader.coverAlone",
+        switchAt(COVER_ID, (on) =>
+          latest?.handlers.onSetting({ coverAlone: on })
+        )
+      )
+    );
+
+    reading.appendChild(
+      row(
+        SPREAD_ID,
+        "mangaReader.detectSpreads",
+        switchAt(SPREAD_ID, (on) =>
+          latest?.handlers.onSetting({ detectSpreads: on })
+        ),
+        "mangaReader.detectSpreadsHint"
+      )
+    );
+
+    rule();
+
+    // ── What is wrong with this one gallery ───────────────────────────────
+    // Not a reading preference like the rest: it belongs to this gallery's pages, and
+    // it is remembered for the gallery rather than for the browser.
+    const gallery = group("mangaReader.groupGallery");
+    gallery.appendChild(
+      row(
+        OFFSET_ID,
+        "mangaReader.offset",
+        switchAt(OFFSET_ID, (on) => latest?.handlers.onOffset(on ? 1 : 0)),
+        "mangaReader.offsetHint"
+      )
+    );
+
+    rule();
+
+    // ── How long a turn takes to arrive ───────────────────────────────────
+    const animation = group("mangaReader.groupAnimation");
+
+    const fade = text(CLASS_ROW, "div");
     const fadeLabel = document.createElement("label");
+    fadeLabel.className = CLASS_ROW_LABEL;
     fadeLabel.htmlFor = FADE_ID;
-    labels.fade = fadeLabel;
+    labels["mangaReader.fade"] = fadeLabel;
+    const readout = text("manga-reader-readout");
+    fade.appendChild(fadeLabel);
+    fade.appendChild(readout);
+    animation.appendChild(fade);
 
     const range = document.createElement("input");
     range.type = "range";
-    range.className = "form-range";
+    // `custom-range` is Bootstrap 4's own styled range — the version this app is
+    // built on. It was `form-range` until now, which is Bootstrap *5*'s name for the
+    // same thing: against this stylesheet that class matched nothing, so the reader
+    // was dragging a bare input with the browser's own idea of what one looks like.
+    range.className = "custom-range";
     range.id = FADE_ID;
     range.min = "0";
     range.max = String(FADE_MAX_MS);
@@ -444,41 +653,54 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     range.addEventListener("input", () => {
       latest?.handlers.onSetting({ fadeMs: Number(range.value) });
     });
-
-    const readout = text("manga-reader-readout");
-
-    fade.appendChild(fadeLabel);
-    fade.appendChild(range);
-    fade.appendChild(readout);
-    body.appendChild(fade);
+    animation.appendChild(range);
   }
 
-  const heading = label("mangaReader.options");
-  if (labels.options && labels.options.textContent !== heading) {
-    labels.options.textContent = heading;
-  }
+  /**
+   * One of this plugin's words, written only where it is not already there.
+   *
+   * The key is the message id itself, which is also how the pass that builds the
+   * panel files each label. Two names for one thing is how this went wrong once
+   * already: the build filed a label under its message id and the update looked it up
+   * under a short name of the same setting, found nothing, and left every label in the
+   * language the first pass happened to be drawn in.
+   */
+  const say = (id: string): void => {
+    const node = labels[id];
+    const words = label(id);
+    if (node && node.textContent !== words) node.textContent = words;
+  };
 
-  const check = panel.querySelector(
-    "#" + DOUBLE_PAGE_ID
-  ) as HTMLInputElement | null;
-  if (check && check.checked !== state.settings.doublePage) {
-    check.checked = state.settings.doublePage;
-  }
-  const doubleName = label("mangaReader.doublePage");
-  if (labels.doublePage && labels.doublePage.textContent !== doubleName) {
-    labels.doublePage.textContent = doubleName;
-  }
+  /** A switch's state, written only where it differs — a write is a change */
+  const set = (id: string, on: boolean): void => {
+    const box = panel.querySelector("#" + id) as HTMLInputElement | null;
+    if (box && box.checked !== on) box.checked = on;
+  };
 
-  const offset = panel.querySelector(
-    "#" + OFFSET_ID
-  ) as HTMLInputElement | null;
-  if (offset && offset.checked !== (state.offset === 1)) {
-    offset.checked = state.offset === 1;
-  }
-  const offsetName = label("mangaReader.offset");
-  if (labels.offset && labels.offset.textContent !== offsetName) {
-    labels.offset.textContent = offsetName;
-  }
+  say("mangaReader.options");
+  say("mangaReader.groupReading");
+  say("mangaReader.groupGallery");
+  say("mangaReader.groupAnimation");
+
+  say("mangaReader.singlePage");
+  say("mangaReader.doublePage");
+
+  // Which half of the pair is the chosen one. `is-on` rather than Stash's `active`,
+  // which is a solid blue: see drawChapters.
+  const single = panel.querySelector("#" + SINGLE_PAGE_ID);
+  const double = panel.querySelector("#" + DOUBLE_PAGE_ID);
+  if (single) single.classList.toggle("is-on", !state.settings.doublePage);
+  if (double) double.classList.toggle("is-on", state.settings.doublePage);
+
+  set(COVER_ID, state.settings.coverAlone);
+  set(SPREAD_ID, state.settings.detectSpreads);
+  set(OFFSET_ID, state.offset === 1);
+
+  say("mangaReader.coverAlone");
+  say("mangaReader.detectSpreads");
+  say("mangaReader.detectSpreadsHint");
+  say("mangaReader.offset");
+  say("mangaReader.offsetHint");
 
   const range = panel.querySelector("#" + FADE_ID) as HTMLInputElement | null;
   if (range && range.value !== String(state.settings.fadeMs)) {
@@ -487,13 +709,13 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const readout = panel.querySelector(".manga-reader-readout");
   const shown = state.settings.fadeMs + " ms";
   if (readout && readout.textContent !== shown) readout.textContent = shown;
-  const fadeName = label("mangaReader.fade");
-  if (labels.fade && labels.fade.textContent !== fadeName) {
-    labels.fade.textContent = fadeName;
-  }
+  say("mangaReader.fade");
 }
 
+const SINGLE_PAGE_ID = "manga-reader-single-page";
 const DOUBLE_PAGE_ID = "manga-reader-double-page";
+const COVER_ID = "manga-reader-cover-alone";
+const SPREAD_ID = "manga-reader-detect-spreads";
 const OFFSET_ID = "manga-reader-offset";
 const FADE_ID = "manga-reader-fade";
 

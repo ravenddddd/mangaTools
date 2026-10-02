@@ -135,6 +135,242 @@
 }
 
 /*
+ * ── The chapter menu ──────────────────────────────────────────────────────────
+ *
+ * A heading, then the chapters as rows: the name, and the range of pages that
+ * chapter covers, with a bar down the side of the one being read.
+ *
+ * The panel is Stash's own `dropdown-menu` — its fill, its shadow, its hover — with
+ * two things changed. Its padding goes, because the heading has its own and a
+ * `dropdown-menu`'s padding would push the heading off the top edge of the panel.
+ * And the scrolling moves off the panel and onto the list: Stash caps a
+ * `dropdown-menu` at 300px and scrolls the whole of it, which for a panel with a
+ * heading means the reader can scroll the name of the list out of sight, leaving a
+ * column of chapters with nothing saying what they are.
+ *
+ * The selectors carry `manga-reader-chrome` for a reason: Stash's own rule for a
+ * menu (`div.dropdown-menu .dropdown-item`, and the fill and cap on the menu
+ * itself) is specific enough to beat a single class of this plugin's, and it is the
+ * *usual* shape of a dropdown this panel is departing from.
+ */
+.manga-reader-chrome .manga-reader-menu-chapters {
+  padding: 0;
+  max-height: none;
+  overflow: hidden;
+  /* Rounded a little past Bootstrap's 4px, because this panel is a panel: it has a
+     heading and a body rather than being a list of items, and the sharper corner
+     reads as an item list with something on top of it. */
+  border-radius: 10px;
+  /* Wide enough for a chapter's name and its page range on one line. Left to itself
+     a `dropdown-menu` is as wide as its widest row, and a row holds a name that can be
+     any length — so the menu would come out narrower or wider from one gallery to the
+     next, and jump about as the reader turns pages. */
+  width: 18.5rem;
+  max-width: calc(100vw - 2rem);
+}
+
+.manga-reader-menu-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.manga-reader-menu-heading,
+.manga-reader-menu-count {
+  color: #bfccd6; /* Stash's $text-muted */
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+.manga-reader-menu-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.manga-reader-chapter-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.manga-reader-chrome .manga-reader-menu-chapters .manga-reader-menu-item {
+  align-items: center;
+  gap: 0.65rem;
+  /* Asymmetric on purpose: the left padding plus the transparent border keeps the
+     name of the chapter being read on the same vertical line as every other name,
+     so the bar appears beside the list rather than pushing it across. */
+  padding: 0.4rem 0.8rem 0.4rem 0.65rem;
+  border-left: 2px solid transparent;
+  color: #bfccd6;
+  font-size: 0.85rem;
+}
+
+.manga-reader-chrome .manga-reader-menu-chapters .manga-reader-menu-item:hover {
+  background-color: rgba(138, 155, 168, 0.15);
+  color: #f5f8fa;
+}
+
+/*
+ * The chapter being read: a bar down its side, and its name brightened.
+ *
+ * Not Bootstrap's `active`, which is what this used to be — that one is a solid
+ * blue slab across the row, and in a lightbox whose buttons are all white icons it
+ * was the loudest thing on the screen for a mark that only says "you are here".
+ */
+.manga-reader-chrome .manga-reader-menu-chapters
+  .manga-reader-menu-item.is-current {
+  border-left-color: #48aff0; /* Stash's $link-color */
+  color: #f5f8fa;
+}
+
+.manga-reader-chapter-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.manga-reader-menu-item.is-current .manga-reader-chapter-name {
+  font-weight: 600;
+}
+
+.manga-reader-chapter-range {
+  flex-shrink: 0;
+  color: #8b9aa6;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * ── The options panel ─────────────────────────────────────────────────────────
+ *
+ * Three groups — the pairing, this gallery's own correction, and the fade — with a
+ * rule between them and a quiet heading over each. Stash's own panel is one flat
+ * list of controls, so the grouping is this plugin's arrangement; the parts are
+ * still its own: a `form-group` between one group and the next, a rule, and rows
+ * shaped like the ones on its settings page (the words on the left, the control on
+ * the right).
+ */
+/*
+ * The panel's width, said out loud.
+ *
+ * Bootstrap caps a popover at 276px, but Stash overrides that with `max-width:
+ * inherit` — so the cap is whatever the box it is drawn in has, which is nothing. It
+ * was invisible while this panel was three `form-group`s of short labels; it is not
+ * now that a row is a label and a sentence in a flex line, because a flex line's
+ * natural width is the sum of everything in it and the popover would come out as wide
+ * as the longest hint. 276px is Bootstrap's own number, which is what this would have
+ * been capped at if Stash had not lifted it.
+ */
+.manga-reader-chrome .manga-reader-menu-settings {
+  width: 17.25rem;
+  max-width: calc(100vw - 2rem);
+}
+
+.manga-reader-chrome .manga-reader-settings .popover-body {
+  /* Named rather than inherited from Bootstrap's `.popover-body`: the rules between
+     the groups are drawn edge to edge, and that means knowing the padding they have
+     to reach back over. */
+  padding: 0.75rem;
+}
+
+.manga-reader-group-label {
+  margin-bottom: 0.4rem;
+  color: #bfccd6;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
+.manga-reader-divider {
+  border: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.25);
+  /* Stash's own `hr` margin is 5px 0; this one reaches the panel's edges instead,
+     which is what makes it read as a boundary between groups rather than as another
+     line inside one. The -0.75rem is the body's padding, above. */
+  margin: 0.65rem -0.75rem;
+}
+
+.manga-reader-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.manga-reader-row-words {
+  flex: 1;
+  min-width: 0;
+}
+
+.manga-reader-row-label {
+  display: block;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.manga-reader-hint {
+  /* `form-text text-muted` is Stash's own pair for this, and carries the size and
+     the colour; what is here is only what it does not say. */
+  line-height: 1.4;
+}
+
+/*
+ * Bootstrap's switch is drawn as the label's two pseudo-elements, and the label it
+ * expects to sit beside them is the words this panel puts on the other side of the
+ * row. The empty label still reserves that space — 0.5rem of it — so the row takes
+ * it back, or the switch floats away from the edge every other control lines up on.
+ */
+.manga-reader-row .custom-control {
+  margin-right: -0.5rem;
+}
+
+/*
+ * One of two, rather than on or off: the track is Stash's own field fill
+ * (`$textfield-bg`), and the chosen half is lifted by the same
+ * `rgba(138, 155, 168, 0.3)` its own chosen buttons use.
+ *
+ * Not Stash's button *group*, which is what it uses for the same choice in its list
+ * toolbar: that one is filled with `$secondary`, which is the fill of the popover
+ * this sits in, so inside here it has no shape at all — the two buttons and the gap
+ * between them are the same colour as the panel behind them.
+ */
+.manga-reader-pages {
+  display: flex;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 2px;
+  border-radius: 6px;
+  background-color: rgba(16, 22, 26, 0.3);
+}
+
+.manga-reader-segment {
+  flex: 1;
+  padding: 4px 0;
+  border-radius: 4px;
+  font-size: 0.82rem;
+}
+
+/* The half that is not chosen stays quieter than the half that is: both are
+   `$text-color` otherwise, and the only thing saying which is which would be a
+   shade of grey. */
+.manga-reader-segment:not(.is-on) {
+  color: #bfccd6;
+}
+
+.manga-reader-segment.is-on {
+  background-color: rgba(138, 155, 168, 0.3);
+  color: #f5f8fa;
+}
+
+/* The slider, which Bootstrap 4 draws itself under this class — the app is on 4,
+   and the class it used to wear was Bootstrap 5's name for the same control. */
+.manga-reader-group > .custom-range {
+  margin-top: 0.4rem;
+}
+
+/*
  * The pages are cut off at the edge of the picture area, so a zoom cannot reach the
  * header.
  *
@@ -352,13 +588,16 @@
 }
 
 /*
- * The fade length, read off the slider. The switches themselves are Stash's own
- * `form-check`s and its range input, so they are drawn by its stylesheet; this is only
- * the number beside them.
+ * The fade length, read off the slider.
+ *
+ * In the label's own row rather than after the slider: the row is the one the words
+ * and the switch share everywhere else in this panel, and putting the number at its
+ * far end keeps the slider the full width of the body — a number sitting after a
+ * slider shortens the one control in here that is dragged.
  */
 .manga-reader-readout {
-  margin-left: 0.5rem;
   opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 /*

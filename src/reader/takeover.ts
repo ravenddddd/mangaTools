@@ -634,6 +634,7 @@ function progressState(
     chapters: gallery.chapters,
     chapterNameAt: (page) =>
       chapterAt(gallery.chapters, gallery.pages[page]?.id || "")?.title || "",
+    locale: language,
     handlers: {
       onSeek: (to: number) => seekTo(lightbox, to),
     },
@@ -682,10 +683,18 @@ function chromeState(
       onSetting: (next: Partial<MangaReaderSettings>) => {
         settings = writeSettings(next);
 
-        // Only the pairing is a question about how the pages are laid out. The fade
-        // length is not: re-laying the pages because somebody dragged a slider would
-        // redraw the screen they are looking at, for a setting that cannot change it.
-        if (next.doublePage === undefined) return;
+        // Three of these settings are questions about how the pages are laid out —
+        // one page or two, whether the cover stands alone, whether a wide page is a
+        // spread — and every one of them has to re-lay the pages, or the reader
+        // flips one and watches nothing happen until they reopen the lightbox. The
+        // fade length is the one that is not: re-laying the pages because somebody
+        // dragged a slider would redraw the screen they are looking at, for a setting
+        // that cannot change it.
+        const relaid =
+          next.doublePage !== undefined ||
+          next.coverAlone !== undefined ||
+          next.detectSpreads !== undefined;
+        if (!relaid) return;
 
         if (galleryId && loaded.has(galleryId)) {
           remember(galleryId, {

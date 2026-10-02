@@ -32,6 +32,7 @@
  * the fractions and the snapping are where a mistake would be invisible in a DOM
  * test and obvious on a bar.
  */
+import { numbered } from "../i18n";
 import type { MangaReaderPlacedChapter } from "./chapters";
 
 /** Everything the bar draws from, gathered at the moment it is drawn */
@@ -57,6 +58,8 @@ export interface ProgressState {
    * chapter is its own list's answer, and this half has page *numbers* only.
    */
   chapterNameAt(page: number): string;
+  /** Stash's language, for the one thing here that is a string: an unnamed chapter */
+  locale: string | null;
   handlers: {
     /** The page the reader picked, by dragging the bar or clicking a chapter's tick */
     onSeek(at: number): void;
@@ -96,8 +99,12 @@ export function pageAtFraction(fraction: number, total: number): number {
  */
 export function progressNodes(
   chapters: MangaReaderPlacedChapter[],
-  total: number
+  total: number,
+  locale: string | null
 ): { name: string; at: number; fraction: number }[] {
+  // The locale is the third rather than the second of the inputs on purpose: it
+  // decides one word of one name and nothing about where a tick sits, so a caller
+  // reading this for the arithmetic can ignore it.
   const nodes: { name: string; at: number; fraction: number }[] = [];
   const seen = new Set<number>();
 
@@ -105,9 +112,12 @@ export function progressNodes(
     if (chapter.at < 0 || chapter.at >= total || seen.has(chapter.at)) return;
     seen.add(chapter.at);
     nodes.push({
-      // A chapter with no name is named by its place, which is what the header's own
-      // menu calls it too.
-      name: chapter.title || "#" + (index + 1),
+      // A chapter with no name is named by its place, through the one helper the
+      // header's menu also names it with: the two must not be able to disagree about
+      // what an unnamed chapter is called.
+      name:
+        chapter.title ||
+        numbered(locale, "mangaReader.chapterNumber", index + 1),
       at: chapter.at,
       fraction: fractionOfPage(chapter.at, total),
     });
@@ -432,7 +442,7 @@ function drawNodes(state: ProgressState): void {
 
   nodes.textContent = "";
 
-  for (const node of progressNodes(state.chapters, state.total)) {
+  for (const node of progressNodes(state.chapters, state.total, state.locale)) {
     const tick = document.createElement("div");
     tick.className = CLASS_NODE;
     tick.style.left = (node.fraction * 100).toFixed(3) + "%";

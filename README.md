@@ -655,11 +655,27 @@ never filtered, while only the option *list* is filtered.
 
 A two-page (**spread**) view for Stash's image lightbox, for reading manga the way
 it was printed: two pages side by side, the earlier one on the right. **Off until
-you turn it on.** Open any gallery, open an image, open the lightbox's options
-menu — the one behind the gear icon in its header — and there is a **Double page**
-switch at the bottom with the rest of the options.
+you turn it on.** Open any gallery, open an image, and the lightbox's own options
+menu — the one behind the gear icon in its header — opens the reader's own panel:
+**Single page / Double page** as a pair, then the switches, in three groups.
 
-While the switch is on, and while you are reading a **gallery**:
+**Everything is in that one panel, and it is grouped by what each setting is about:**
+
+| Group | | |
+|---|---|---|
+| **Reading** | **Single page / Double page** | How the pages are paired |
+| | **Cover on a page of its own** | A cover is not the left half of anything |
+| | **Detect spreads automatically** | A page wider than it is tall is taken for one image spanning two pages |
+| **This gallery** | **Shift the pairing by one page** | For a gallery whose pages are grouped wrongly, or `O` |
+| **Animation** | **Fade in** | How long a screen takes to arrive, down to 0 for none |
+
+The last two of the reading group are **stored settings that had no control until
+now**: the pairing has read `coverAlone` and `detectSpreads` from the browser's
+settings since the mode was written, and nothing could change them. Turning either
+off re-lays the pages there and then — as the single/double pair does — because a
+switch that writes a setting the screen does not obey is worse than no switch.
+
+While the pairing is on, and while you are reading a **gallery**:
 
 | | |
 |---|---|
@@ -670,7 +686,8 @@ While the switch is on, and while you are reading a **gallery**:
 | **Clicks** | Clicking a page turns it, right half forward and left half back, exactly as Stash's own image click does. Clicking the space around the pages still closes the lightbox |
 | **Zoom** | `Ctrl` + the wheel: away from you to zoom in, towards you to zoom out, `Shift` + the wheel to scroll up and down instead. **Not Stash's own arrangement** — its wheel zooms and its `Shift`+wheel scrolls, by its `scrollMode` default — but a browser puts its own page zoom on `Ctrl`+wheel, so that chord is taken rather than passed on. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
 | **Pan** | Press and drag to move the pages — as far as you take them, past the edge of the screen and all, exactly as Stash's own image does; turning the page is what puts them back in the middle. A drag never turns the page, and a click never moves it. Nor does a press held longer than a click: Stash's own other half of the test, so a press you thought better of sends you nowhere |
-| **Shift the pairing** | A second switch in the options menu, or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
+| **Shift the pairing** | Its own switch in the options panel — the "this gallery" group — or `O`, for a gallery whose pages are grouped wrongly. Remembered for that gallery |
+| **The chapter menu** | The header's chapter control opens a list of the chapters, each with the **range of pages it covers** — its own first and last page on screen, so a cover in no chapter is not claimed by the one after it. The chapter being read is marked down its side, and the list has a heading that stays put while the list scrolls under it |
 | **The progress bar** | Its own line between the picture and the footer, as wide as the pages it is measuring — so a spread's bar is wider than a lone page's, and it never lies across the picture: how far through the book you are, with a tick where each chapter begins. Drag it to cross four hundred pages in one gesture — the handle follows your hand exactly, while the pictures follow as fast as they can be fetched — and letting go lands you on the page you were nearest. Hover a tick to see which chapter it is, in the bar's own bubble — at once, rather than after the second a browser's tooltip takes — and click it to jump straight there. It is out of the way to begin with, fades again after a couple of seconds, and the pointer reaching the bar is what brings it back |
 | **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. A slider in the options menu sets how long, down to 0 for none. Nothing is animated for a reader who has asked their system for less motion |
 | **Fullscreen** | Stash's own button in Stash's own place. While the lightbox is filling the screen, a click on the space around the pages does nothing at all — the margin of a book is not a way out of it — so leaving fullscreen is the button, or Escape |
@@ -681,10 +698,11 @@ All of it is remembered per browser, like the lightbox options the controls sit
 beside — except the shift, which is remembered *per gallery*, because that is what
 it belongs to: one scan's pages need shifting and the gallery next to it does not.
 
-The fade length is a **slider rather than a number box**, with the value shown beside
-it, and its range reaches 1000 ms on purpose: a reader who cannot see a short fade
-has to be able to push it somewhere unmistakable and find out whether it is doing
-anything at all. 0 is a setting too — the screen is drawn at once.
+The fade length is a **slider rather than a number box**, with the value shown at the
+end of its own label row, and its range reaches 1000 ms on purpose: a reader who
+cannot see a short fade has to be able to push it somewhere unmistakable and find
+out whether it is doing anything at all. 0 is a setting too — the screen is drawn at
+once.
 
 Off a gallery page — an image list, a scene's stills — the mode draws nothing, even
 switched on: pairing pages only means something inside a gallery.
@@ -824,6 +842,16 @@ cannot make Stash show is a menu that is simply missing, so this half draws its 
 in Stash's markup and in Stash's place: the lightbox's own chapter control, offering
 this plugin's chapters, and jumping to where each one begins **on screen**. The
 header's chapter name is drawn from the same list, so it cannot disagree with it.
+
+**Each row says which pages its chapter covers**, as a range of page numbers — the
+chapter's own first and last page *on screen*. The last one is measured off the
+chapter's own images rather than off where the next chapter begins: those two agree
+for every list this plugin has written and every Stash list it has imported, because
+both are runs of pages, and they part company the day a chapter in the middle is
+deleted — a deletion leaves its pages in no chapter, and the run would go on claiming
+them. A chapter with no name is named by its place in the interface's own words
+("Chapter 6", "第 6 章"), which is also what the progress bar's bubble calls it: one
+helper names it for both, so the two cannot disagree either.
 
 **What is handed over is the images, not the chapters.** The lightbox is given the
 list this half is drawing from, in the order it is drawing it — which is what makes
