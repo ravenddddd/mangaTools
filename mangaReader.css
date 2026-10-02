@@ -328,10 +328,19 @@
   box-shadow: none;
 }
 
+/*
+ * A group's heading: Stash's own body colour and size, and a little air under it.
+ *
+ * It was quieter than this — `$text-muted` at 12px — on the argument that a heading
+ * over three controls is a signpost rather than a label. At this size and colour it is
+ * a label, and what tells it apart from the rows under it is the letter-spacing (which
+ * Stash's own `.sub-heading` does not have) and its place: a heading is followed by a
+ * control rather than sharing its line with one.
+ */
 .manga-reader-group-label {
-  margin-bottom: 0.4rem;
-  color: #bfccd6;
-  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+  color: #f5f8fa; /* Stash's $text-color */
+  font-size: 1rem;
   letter-spacing: 0.06em;
 }
 
