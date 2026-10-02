@@ -675,6 +675,12 @@ settings since the mode was written, and nothing could change them. Turning eith
 off re-lays the pages there and then — as the single/double pair does — because a
 switch that writes a setting the screen does not obey is worse than no switch.
 
+**The panel hangs from the gear's right edge**, and slides itself back inside the
+window when the window is too narrow for it. Stash's own popover gets that from a
+library that measures it and flips or shifts it until it fits; this header is DOM
+work with no React of its own, so the placement is the stylesheet's and the shifting
+is a measurement taken whenever a menu is open.
+
 While the pairing is on, and while you are reading a **gallery**:
 
 | | |

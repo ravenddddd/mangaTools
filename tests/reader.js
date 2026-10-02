@@ -3541,6 +3541,102 @@ async function main() {
   });
 
   /**
+   * A menu is placed by the stylesheet and nudged back inside the window.
+   *
+   * The stylesheet anchors both menus to a button, and a button is a place rather than
+   * a promise: the gear is three buttons from the edge of the window, and the window is
+   * as narrow as the reader made it. Stash's own popover gets this from react-overlays,
+   * which measures it and flips or slides it until it fits; this header is DOM work
+   * with no React in it, so it measures and slides the panel itself.
+   *
+   * The arithmetic first, on its own, because the DOM these tests draw with has no
+   * layout at all — every box is zero-sized and nothing can be measured — so a
+   * placement is a number a section has to be able to ask for directly. A negative
+   * shift is leftwards, a positive one rightwards.
+   */
+  await runSection(
+    "a menu that lands off an edge is moved back inside the window",
+    async () => {
+      assert.strictEqual(
+        NR.fitShift(100, 276, 1200, 8),
+        0,
+        "a menu with room on both sides is left where the stylesheet put it"
+      );
+      assert.strictEqual(
+        NR.fitShift(1100, 276, 1200, 8),
+        -184,
+        "one hanging off the right is slid left, as far as the margin and no further"
+      );
+      assert.strictEqual(
+        NR.fitShift(-168, 348, 380, 8),
+        176,
+        "and one hanging off the left, on a narrow window, is slid back the other way"
+      );
+      assert.strictEqual(
+        NR.fitShift(0, 600, 380, 8),
+        8,
+        "a menu wider than the window keeps its left margin and loses its right — at " +
+          "that width, sliding it further would only choose which end is cut off"
+      );
+
+      // And the wiring. Where the panel *landed* is a thing this section has to state,
+      // because nothing in this DOM can lay anything out: the stub reports the box it
+      // was handed, as a browser would — which is to say including whatever shift has
+      // already been applied to it.
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const chrome = box.lightbox.querySelector(".manga-reader-chrome");
+      const toggle = [
+        ...chrome.querySelectorAll(".manga-reader-menu-button"),
+      ].find((button) => button.dataset.opens === "settings");
+      const panel = chrome.querySelector(".manga-reader-menu-settings");
+
+      dom.window.innerWidth = 380;
+      panel.getBoundingClientRect = () => ({
+        left: -168 + Number(panel.dataset.shift || 0),
+        width: 348,
+      });
+      dom.click(toggle);
+
+      assert.strictEqual(
+        panel.style.transform,
+        "translateX(176px)",
+        "a panel that landed off the left of the window is moved back into it"
+      );
+
+      // Opened again on the same screen: the same answer — and *nothing written* to
+      // say so, because this is where the panel already is. The pass that keeps this
+      // header up to date runs on every change the lightbox makes, and a write per
+      // pass is the shape of change that makes a change: the observer hears its own
+      // write and runs again. Counting the writes, not comparing the value, since a
+      // second write of the same transform leaves the same transform behind.
+      dom.click(toggle);
+      const applied = panel.style.transform;
+      let writes = 0;
+      Object.defineProperty(panel.style, "transform", {
+        configurable: true,
+        get: () => applied,
+        set: () => {
+          writes++;
+        },
+      });
+
+      dom.click(toggle);
+      assert.strictEqual(
+        writes,
+        0,
+        "and opening it again on the same screen writes nothing at all"
+      );
+      assert.strictEqual(
+        panel.style.transform,
+        applied,
+        "…leaving it exactly where it already was, because there was nothing to fix"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
    * A gallery in no chapters has no chapter menu: no menu, and no button to open one.
    *
    * Stash's own header is empty of them on such a gallery — it renders its chapter

@@ -145,6 +145,12 @@
 }
 
 .manga-reader-chrome .popover.show {
+  /* `left: auto` is the line that matters, and the one that was missing: Bootstrap's
+     own `.popover` is `left: 0`, and a box given both `left` and `right` with a width
+     is over-constrained — in a left-to-right language the `right` is thrown away. So
+     saying `right: 0` alone moved the panel's *left* edge to the gear and sent it
+     further right than the centring it replaced. */
+  left: auto;
   right: 0;
   top: 100%;
 }

@@ -22,6 +22,7 @@
  */
 import { requirePluginApi } from "../plugin-api";
 import { numbered, stringFor } from "../i18n";
+import { NR } from "./namespace";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderSettings } from "./namespace";
 import { FADE_MAX_MS } from "./settings";
@@ -344,6 +345,82 @@ function update(chrome: HTMLElement, state: ChromeState): void {
 
   drawChapters(chapterPanel, state);
   drawSettings(settingsPanel, state);
+
+  // Then, if one of them is open, out of the edges of the window. After the drawing
+  // rather than before it: what is measured is what the stylesheet did with the panel,
+  // and that is only true once the panel is drawn and shown.
+  if (openMenu === "chapters") fitMenu(chapterPanel);
+  else if (openMenu === "settings") fitMenu(settingsPanel);
+}
+
+/** How close to the edge of the window a menu is allowed to land, in pixels */
+const MENU_MARGIN = 8;
+
+/**
+ * Whether a menu would hang off the right of the lightbox, and by how much.
+ *
+ * The style sheet places both menus with an anchor and an edge — the chapter menu
+ * under the chapter button's left, the options panel under the gear's right — and an
+ * anchor is a position, not a promise: the gear is three buttons from the edge of the
+ * window, and the window is as narrow as the reader made it. So what the stylesheet
+ * lands outside is nudged back in, by this much.
+ *
+ * A pure number in, a pure number out, because the tests' DOM has no layout at all:
+ * there is nothing to measure in it, so the arithmetic has to be callable on its own.
+ * A shift is negative when the menu has to go left, positive when it has to go right.
+ */
+export function fitShift(
+  left: number,
+  width: number,
+  viewport: number,
+  margin: number
+): number {
+  const over = left + width + margin - viewport;
+  if (over > 0) {
+    // Leftwards, but never past the left margin. A menu narrower than the window can
+    // always be made to fit on one side or the other, so the interesting case is the
+    // one that cannot: sliding it further would only choose which end is cut off, and
+    // the left end is the one with the words in it.
+    return Math.max(-over, margin - left);
+  }
+
+  if (left < margin) return margin - left;
+  return 0;
+}
+
+/**
+ * The open menu, moved back inside the window when it hangs off an edge.
+ *
+ * Stash's own popover gets this from a library — react-overlays measures it and flips
+ * it, slides it, or pins it to the window until it fits. That library is on the page
+ * (react-bootstrap is, and the tools half renders Stash's own controls with it), but
+ * this header is DOM work with no React of its own, and the pass that keeps it up to
+ * date is a MutationObserver that rewrites it in place: a React tree rendered into it
+ * would be fighting that pass rather than living in it. So the placement stays in the
+ * stylesheet and the shifting is this — the same answer, arrived at in the half's own
+ * terms.
+ *
+ * Measured, and only while a menu is open: the panel is one box on one screen, and
+ * `getBoundingClientRect` is the only thing that knows where the stylesheet actually
+ * put it. Written only when it differs, because a write here is a change the observer
+ * would hear.
+ */
+function fitMenu(panel: HTMLElement): void {
+  if (typeof panel.getBoundingClientRect !== "function") return;
+  const viewport = window.innerWidth;
+  if (!viewport) return;
+
+  const rect = panel.getBoundingClientRect();
+  if (!rect.width) return;
+
+  // Where it would be with no shift of its own: the rect is where the panel *is*, and
+  // the question is what the stylesheet alone would have done with it.
+  const had = Number(panel.dataset.shift || 0);
+  const shift = fitShift(rect.left - had, rect.width, viewport, MENU_MARGIN);
+  if (shift === had) return;
+
+  panel.dataset.shift = String(shift);
+  panel.style.transform = shift === 0 ? "" : "translateX(" + shift + "px)";
 }
 
 /**
@@ -886,3 +963,7 @@ function closeButton(): HTMLElement {
 export function forgetOpenMenu(): void {
   openMenu = null;
 }
+
+// Published for the tests, which reach the reader's own logic through the window —
+// see the note on MangaReaderNamespace in plugin-api.ts.
+NR.fitShift = fitShift;

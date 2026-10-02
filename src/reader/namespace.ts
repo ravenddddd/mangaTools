@@ -295,6 +295,19 @@ export interface MangaReaderNamespace {
     pageIndex: number,
     direction: 1 | -1
   ): number;
+  /**
+   * How far a menu has to move sideways to be inside the window — see chrome.ts.
+   *
+   * Here rather than reached through the DOM for the same reason as the bar's
+   * arithmetic: the tests' DOM has no layout, so a placement is a number they have to
+   * be able to ask for directly.
+   */
+  fitShift(
+    left: number,
+    width: number,
+    viewport: number,
+    margin: number
+  ): number;
 }
 
 /** The one namespace object, created here because this module is the types' home */

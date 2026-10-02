@@ -346,11 +346,20 @@ module.exports = () => {
   // own popover does, and it gets away with it because a library measures it and
   // pushes it back inside the window; this header has none, and the gear is three
   // buttons from the edge of the screen — so a centred panel ran off the right of it.
+  // `left: auto` is the line that matters and the one this check was written without:
+  // Bootstrap's own `.popover` is `left: 0`, and a box given both a left and a right
+  // edge with a width is over-constrained — in a left-to-right language the `right` is
+  // the one thrown away. So `right: 0` on its own moved the panel's *left* edge to the
+  // gear and sent it further right than the centring it replaced.
+  // The semicolons are load-bearing: the rule's own comment explains this placement in
+  // prose, and prose that *mentions* `left: auto` would satisfy a looser pattern —
+  // which is what happened, and the check went on passing with the declaration gone.
   assert.ok(
-    /\.manga-reader-chrome \.popover\.show\s*\{[^}]*right:\s*0[^}]*\}/.test(
+    /\.manga-reader-chrome \.popover\.show\s*\{[^}]*left:\s*auto\s*;[^}]*right:\s*0\s*;[^}]*\}/.test(
       readerCss
     ),
-    "and should hang it from the gear's own right edge, or it leaves the screen"
+    "and should hang it from the gear's own right edge, with the left edge released: " +
+      "Bootstrap's own `left: 0` wins over a `right` that is set beside it"
   );
   // …and not by a transform, which is what centring it took. Read out of that one
   // rule rather than off the whole file: the bar's own bubble is centred with the
