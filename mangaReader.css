@@ -385,6 +385,13 @@
  * control rather than sharing its line with one.
  */
 .manga-reader-group-label {
+  /*
+   * A block, and that is the whole of why this rule has a `display` in it: the heading
+   * is a `span`, a span is inline, and **a vertical margin on an inline box does
+   * nothing at all** — which is what "the number changed and nothing moved" was. The
+   * space under it is this margin, so it has to be a box that has one.
+   */
+  display: block;
   margin-bottom: 0.85rem;
   color: #f5f8fa; /* Stash's $text-color */
   font-size: 1rem;

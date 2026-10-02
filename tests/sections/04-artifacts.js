@@ -394,6 +394,15 @@ module.exports = () => {
     "and the last group should not carry the gap that separates groups"
   );
 
+  // And a group's heading is a *block*. It is a `<span>`, and a vertical margin on an
+  // inline box does nothing at all — which is how a spacing change that was made,
+  // written down and shipped moved nothing on the screen.
+  assert.ok(
+    /\.manga-reader-group-label\s*\{[^}]*display:\s*block/.test(readerCss),
+    "mangaReader.css should make a group's heading a block: a span is inline, and the " +
+      "space under it is a vertical margin, which an inline box has none of"
+  );
+
   // And the space *between* the rows, which is a different rule from the `gap` inside
   // one. Getting that wrong is not hypothetical: the first attempt at this spacing
   // widened the gap — the distance between a row's words and its own switch — and left
