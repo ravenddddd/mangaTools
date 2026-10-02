@@ -1732,13 +1732,28 @@ function onSpreadWheel(event: Event): void {
 
     wheel.preventDefault();
     const was = columnZoom();
-    setColumnZoom(zoomedBy(was, wheel.deltaY < 0 ? VIEW_STEP : 1 / VIEW_STEP));
-    if (columnZoom() === was) return;
+    const next = zoomedBy(was, wheel.deltaY < 0 ? VIEW_STEP : 1 / VIEW_STEP);
+    if (next === was) return;
 
-    // And the reader stays on the page they were reading. Every row has a different
-    // height at a different zoom, so where they were *in the column* does not survive
-    // the change — the page does, which is what this half keeps and why.
-    scrollTo = Math.max(place, 0);
+    // Where the reader is *in the column*, read before the pages change size — a read
+    // forces the layout, so read after it and this is already the clamped new position
+    // rather than the one they were reading at.
+    const wasAt = container
+      ? { top: container.scrollTop || 0, left: container.scrollLeft || 0 }
+      : null;
+
+    setColumnZoom(next);
+
+    // And put back, in proportion. A row's height is its width times its own ratio, so
+    // a zoom multiplies *every* height by the same factor: the position that keeps the
+    // same words under the reader's eyes is the old one times that factor. Snapping to
+    // the page's own top instead — which is what this did — is a reader looking at the
+    // middle of a long page being thrown back to the beginning of it.
+    if (container && wasAt) {
+      container.scrollTop = wasAt.top * (next / was);
+      container.scrollLeft = wasAt.left * (next / was);
+    }
+
     sync(lightbox);
     return;
   }

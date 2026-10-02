@@ -4528,19 +4528,24 @@ async function main() {
       "two pages on, two rows down"
     );
 
-    // The rows are taller now, as they are in a browser at a bigger zoom: a scroll
-    // position kept as a number would leave the reader somewhere else entirely.
+    // Reading *into* that page rather than at its top — which is where this went wrong:
+    // the reader was thrown back to the beginning of the page they were in the middle
+    // of. Every row's height is its width times its own ratio, so a zoom multiplies them
+    // all by the same factor, and the position that keeps the same words under the
+    // reader's eyes is the old position times that same factor.
+    container.scrollTop = 1250;
     rows.forEach((row, index) => {
-      row.offsetTop = index * 800;
+      row.offsetTop = index * 550;
     });
+
     container.dispatch(
       "wheel",
       dom.makeEvent("wheel", { deltaY: -120, ctrlKey: true })
     );
     assert.strictEqual(
       container.scrollTop,
-      1600,
-      "and zooming lands them on the same page's row again, at its new height"
+      Math.round(1250 * 1.1),
+      "and zooming keeps them where they were reading, not at the top of the page"
     );
 
     // Out again, past where it started, to the bottom of the range: a page narrower

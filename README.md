@@ -708,8 +708,9 @@ the same thing in all three.
   mode is already as wide as the area. So the page itself grows — which is the
   browser's own model of page zoom — because a transform on a scroll box leaves its
   scroll range where it was and puts the edges of a zoomed page out of reach. Whichever
-  zoom is in hand, the header's reset button puts it back, and the reader stays on the
-  page they were reading rather than at the scroll position they were at.
+  zoom is in hand, the header's reset button puts it back, and the reader stays exactly
+  where they were reading — the position is scaled by the same factor the pages are,
+  rather than snapped to the top of the page they happened to be in.
 - **Every row's height is reserved before its picture arrives**, from the size the
   gallery answer carries: a column of images that are not there yet has no height at
   all, and each one landing would push the rest down — which for a reader halfway
