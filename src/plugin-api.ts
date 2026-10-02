@@ -125,6 +125,34 @@ export interface MangaToolsNamespace {
   /** Runs a function whenever the store is refreshed; returns the way to stop. */
   watchStore(fn: () => void): () => void;
   /**
+   * The reading half's own settings, as the JSON string they are stored as — or null
+   * before Stash has answered with the plugin's configuration.
+   *
+   * **They live with the library, not with the browser.** They used to be this
+   * browser's alone, beside the lightbox options they sit next to; they are the same
+   * on every browser now, which is a departure from Stash's own lightbox options and a
+   * deliberate one — see the README. What the browser still holds is the *old* value,
+   * which is what a library that has never been written to falls back on.
+   */
+  readerSettingsRaw: string | null;
+  /**
+   * Writes the reading half's settings — the whole of them, as one JSON string.
+   *
+   * Through the tools half rather than straight through a client of its own: saving
+   * plugin settings means writing the plugin's *whole* settings map, and half of that
+   * map belongs to the managing half. One place that knows the whole of it, and the
+   * reader is not it.
+   */
+  writeReaderSettings(raw: string): void;
+  /**
+   * Runs `fn` when the plugin's settings are re-read, and returns the way to stop.
+   *
+   * Fires on any change to the plugin's state rather than only on these settings,
+   * because it is the same notification as the store's: cheap, and the reader's own
+   * answer costs it one comparison.
+   */
+  watchReaderSettings(fn: () => void): () => void;
+  /**
    * Where this plugin keeps a gallery's chapters — a JSON string, read and
    * written by the reader half's chapters.ts and by nothing else.
    */

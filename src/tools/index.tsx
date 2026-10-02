@@ -618,6 +618,16 @@ function refreshSettings(): void {
         pluginCfg ? pluginCfg.hidePerformers : null,
         HIDE_PERFORMERS_BY_DEFAULT
       );
+      // The reading half's own settings, kept as the string they arrived as. Null
+      // rather than "" for a library that has none: absent is a state the reader reads
+      // as "fall back to what this browser remembers", and an empty string is a value
+      // it would have to special-case.
+      NS.readerSettingsRaw =
+        pluginCfg &&
+        typeof pluginCfg.readerSettings === "string" &&
+        pluginCfg.readerSettings
+          ? pluginCfg.readerSettings
+          : null;
       emit();
     })
     .catch((e) => {
@@ -1560,6 +1570,83 @@ NS.markedInStore = (galleryId: string | null | undefined): boolean | null =>
 
 /** Runs `fn` whenever the store is refreshed, and returns the way to stop. */
 NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
+
+/**
+ * The reading half's settings, as the JSON string they are stored as.
+ *
+ * A string rather than an object, and deliberately: what this half does with them is
+ * carry them to and from the plugin's configuration, and the reading half is the one
+ * that knows what is in them — including how to read the shapes they used to be
+ * written in. Parsing them here would be a second opinion about a format this half has
+ * no business having.
+ */
+NS.readerSettingsRaw = null;
+
+/**
+ * Saves every setting at once, which is what Stash's own mutation takes.
+ *
+ * `configurePlugin`'s input is the plugin's **whole** settings map, so a write that
+ * carried only what changed would take the rest of it with them. Everything that saves
+ * anything goes through here, and here is where the whole map is built — the one place
+ * that knows it.
+ */
+function settingsInput(): { [key: string]: unknown } {
+  return {
+    enabledLanguages: NS.enabledLanguages
+      ? NS.serializeEnabledLanguages(NS.enabledLanguages)
+      : "",
+    showFlags: NS.showFlags,
+    showCoverBadge: NS.showCoverBadge,
+    openDetailsBlock: NS.openDetailsBlock,
+    openEditBlock: NS.openEditBlock,
+    hidePerformers: NS.hidePerformers,
+    // Absent reads as a library that has never been written to, which is what puts the
+    // browser's own remembered value back in force — see readSettings in the reader.
+    readerSettings: NS.readerSettingsRaw ?? "",
+  };
+}
+
+function saveSettings(): void {
+  const client = stashClient();
+  if (!client) {
+    console.error("[mangaTools] no Apollo client, the settings were not saved");
+    return;
+  }
+
+  client
+    .mutate({
+      mutation: gqlDoc(
+        [
+          "mutation MangaToolsSettings($plugin_id: ID!, $input: Map!) {",
+          "  configurePlugin(plugin_id: $plugin_id, input: $input)",
+          "}",
+        ].join("\n"),
+        "write settings"
+      ),
+      variables: { plugin_id: PLUGIN_ID, input: settingsInput() },
+    })
+    .catch((e) => {
+      console.error("[mangaTools] failed to save plugin settings:", e);
+    });
+}
+
+/**
+ * Writes the reading half's settings: kept here, and saved with everything else.
+ *
+ * The reader calls this rather than a client of its own, because saving plugin
+ * settings means writing the whole map and half of that map is this half's. It is
+ * applied to the answer first — so the reader's own next read sees it, with no round
+ * trip in the way — and then saved.
+ */
+NS.writeReaderSettings = (raw: string): void => {
+  if (NS.readerSettingsRaw === raw) return;
+
+  NS.readerSettingsRaw = raw;
+  saveSettings();
+};
+
+/** Runs `fn` when the settings are re-read, and returns the way to stop. */
+NS.watchReaderSettings = (fn: () => void): (() => void) => subscribe(fn);
 
 /**
  * Whether Stash's edit form has changes that have not been saved.
@@ -2654,34 +2741,14 @@ function MangaToolsSettings(props: { pluginID: string }) {
   const intl = PluginApi.libraries.Intl.useIntl();
   const Select = resolveSelect();
 
-  const savePlugin = PluginApi.utils.StashService.useConfigurePlugin()[0];
-
   /**
-   * Writes every setting at once.
-   *
-   * Deliberately not just the one that changed: configurePlugin's input is the
-   * plugin's whole settings map, and writing the full map is correct whether
-   * that map is replaced or merged — which cannot be confirmed from the plugin
-   * side, since the resolver is not part of the published API.
+   * Writes every setting at once — see `saveSettings`, which is where the map is built
+   * and which is also what the reading half's own writes go through. It is not the
+   * settings *page*'s map: the reader's settings are on it too, and a page that saved
+   * only its own six would take them with it.
    */
   function persist() {
-    savePlugin({
-      variables: {
-        plugin_id: props.pluginID,
-        input: {
-          enabledLanguages: NS.enabledLanguages
-            ? NS.serializeEnabledLanguages(NS.enabledLanguages)
-            : "",
-          showFlags: NS.showFlags,
-          showCoverBadge: NS.showCoverBadge,
-          openDetailsBlock: NS.openDetailsBlock,
-          openEditBlock: NS.openEditBlock,
-          hidePerformers: NS.hidePerformers,
-        },
-      },
-    }).catch((e) => {
-      console.error("[mangaTools] failed to save plugin settings:", e);
-    });
+    saveSettings();
   }
 
   const options: MangaToolsOption[] = NS.languageOptions(intl.locale);

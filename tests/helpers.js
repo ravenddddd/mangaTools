@@ -76,7 +76,17 @@ const state = {
 let patchRegistrationFault = null;
 const patchRegistrationFaultError = new Error("no such patch method");
 const capturedQueries = [];
-const settingsEnabled = ""; // what the config endpoint reports for the setting
+/**
+ * What the configuration query answers with, and what a settings write changes.
+ *
+ * State rather than a constant, because the real thing is state: the plugin's settings
+ * live in Stash's configuration, a `configurePlugin` write replaces them, and the next
+ * read answers with what was written. A stub that answered the same thing before and
+ * after a write would be a Stash where nothing anybody changes is ever read back —
+ * which is exactly the shape of bug it would then hide: the reading half's settings are
+ * written by the reader and read again on the next pass.
+ */
+let storedPluginConfig = { enabledLanguages: "" };
 
 const React = {
   Fragment: Symbol("Fragment"),
@@ -265,6 +275,23 @@ const fakeClient = {
     // went through `gql` is what one of the assertions is about. `String()` on it
     // still answers with the query text, for the assertions about its shape.
     mutationWrites.push({ mutation, variables });
+
+    // A plugin-settings write, which the settings page reads back as
+    // `capturedConfigWrite`. Both halves save through the client — the settings page
+    // and the reading half's own writes — so this is where the one place that builds
+    // the whole settings map can be checked from either side.
+    if (String(mutation).includes("configurePlugin")) {
+      // `variables` whole: that is the shape the settings page reads back, and the
+      // shape the hook it used to go through handed over.
+      state.capturedConfigWrite = variables;
+      // And applied, because a write that is not read back is not a write: the next
+      // configuration query has to answer with it.
+      storedPluginConfig = {
+        ...storedPluginConfig,
+        ...(variables?.input || {}),
+      };
+      return Promise.resolve({ data: { configurePlugin: true } });
+    }
     return state.galleryWriteResult
       ? Promise.reject(state.galleryWriteResult)
       : Promise.resolve({
@@ -281,7 +308,7 @@ const fakeClient = {
       return Promise.resolve({
         data: {
           configuration: {
-            plugins: { mangaTools: { enabledLanguages: settingsEnabled } },
+            plugins: { mangaTools: storedPluginConfig },
           },
         },
       });

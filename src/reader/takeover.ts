@@ -2097,6 +2097,25 @@ export function install(): void {
   // when it arrives, rather than waiting for something else to change the page.
   NS.watchStore(() => step());
 
+  // The settings live with the library now, so they arrive with it — asynchronously,
+  // and possibly after a lightbox is already open and reading. What a change to them
+  // means for the pages is the same thing it means when they are changed from the
+  // lightbox's own menu, and it happens in the same place: the pass, comparing what this
+  // gallery was laid out by against what is set now (see pairingKey). So this only has to
+  // put the new values in `settings` and ask for a pass.
+  NS.watchReaderSettings?.(() => {
+    // Nothing on the server is not the same as nothing set. A library that has never been
+    // written to answers with null, and re-reading the settings then would be the
+    // server's *silence* undoing whatever this session or this browser had chosen — which
+    // it did, on every navigation, until this line was here: the notification is the same
+    // one the store uses, so it fires for reasons that have nothing to do with settings.
+    if (NS.readerSettingsRaw === null) return;
+
+    settings = readSettings();
+
+    if (root) sync(root);
+  });
+
   // The switch is a setting, not a mode: nothing is drawn until the reader turns it
   // on, but the observer has to be running for the switch to be there at all.
   step();

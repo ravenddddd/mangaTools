@@ -1,46 +1,21 @@
 /**
- * What the reader remembers, between sessions.
+ * What the reader remembers, and where it remembers it.
  *
- * **Per browser, not per Stash install, and that is deliberate.** These are
- * reading preferences, and the switches they sit beside in the lightbox's own
- * options menu (fit, zoom, scroll mode) are stored the same way — Stash keeps them
- * in its per-browser interface settings, not in the server's configuration. A
- * plugin that put its switches in the server config would make the one menu they
- * all live in behave in two different ways.
+ * **With the library rather than with the browser**, which is a departure from Stash
+ * itself: the switches in the lightbox's own options menu (fit, zoom, scroll mode) are
+ * per-browser interface settings, and these are not. The reason is that this plugin's
+ * settings are one set — the managing half's and the reading half's — and they all live
+ * in the plugin's configuration, where every browser reads the same thing. The cost is
+ * real and worth stating: one menu now holds two kinds of setting, and the ones this
+ * plugin put there follow the reader to another machine.
  *
- * `localStorage` rather than Stash's own store, which is localForage behind a hook
- * this plugin cannot reach. A separate key means nothing here can corrupt the
- * settings Stash owns, and nothing Stash does can drop ours.
- *
- * The keys carry the plugin's own prefix, `plugin.mangaTools`, the way its custom
- * fields do: everything this plugin leaves in a browser or in a library is
- * findable by that one string, and the prefix says whose it is in a place where
- * something else could have written. They were `mangaReader.*` when the reader was
- * its own plugin, and `storedValue` still reads those — see below.
+ * There is no migration and nothing is read from this browser: a library with no
+ * settings in it reads as the defaults, and the first change writes the whole of them.
+ * Doing more than that — carrying each browser's old value up, once — is a branch and a
+ * write nobody asked for, to spare one click in each browser that had chosen something.
  */
 import { NR, type MangaReaderSettings } from "./namespace";
-
-const STORAGE_KEY = "plugin.mangaTools.settings";
-/** The key this half wrote before it was bundled with the tools half */
-const LEGACY_STORAGE_KEY = "mangaReader.settings";
-
-/**
- * A stored value, from the key this plugin writes or from the one it used to.
- *
- * The old key is **copied, not moved**: the standalone Manga Reader can still be
- * installed beside this plugin — it is until it is uninstalled — and taking its
- * key away would take its settings with it. The copy is what makes the next
- * version free to drop the fallback.
- */
-function storedValue(key: string, legacyKey: string): string | null {
-  const current = window.localStorage.getItem(key);
-  if (current !== null) return current;
-
-  const legacy = window.localStorage.getItem(legacyKey);
-  if (legacy !== null) window.localStorage.setItem(key, legacy);
-
-  return legacy;
-}
+import { NS } from "../languages";
 
 /**
  * How long a screen takes to arrive, in milliseconds.
@@ -97,58 +72,40 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
       : (DEFAULT_SETTINGS[key] as boolean);
 
   /**
-   * How the pages are laid out — read from the three-way selector, or from the switch
-   * that was there before it.
+   * Which of the three ways the pages are laid out.
    *
-   * That switch was on or off and meant two pages or one, so a stored boolean becomes
-   * one of those two answers. Anything else — a hand-written value, a mode this build
-   * does not know — is not a setting, and the default stands.
+   * A value of the wrong shape — a hand-edited configuration, a mode some later build
+   * knows and this one does not — is not a setting, and the default stands. The two
+   * shapes this replaced are not read: they were written by older builds into a
+   * browser, and a browser is not where these settings live any more.
    */
   const readingMode = (): MangaReaderSettings["readingMode"] => {
     const value = stored.readingMode;
-    if (value === "single" || value === "double" || value === "scroll") {
-      return value;
-    }
 
-    // The switch it used to be: on was two pages, off one. Read once, and never
-    // written back — the first press of the new selector writes this shape.
-    if (typeof stored.doublePage === "boolean") {
-      return stored.doublePage ? "double" : "single";
-    }
-
-    return DEFAULT_SETTINGS.readingMode;
-  };
-
-  /**
-   * Whether a screen fades in — read from the pair of buttons, or from the slider it
-   * used to be.
-   *
-   * That slider was a length in milliseconds, and the two answers a reader wanted out
-   * of it were "yes" and "no", so a stored length becomes one of those: nought meant
-   * no fading and was the one value a reader chose deliberately, and anything else
-   * was fading at some length of their choosing that this plugin no longer offers.
-   * Read once and never written back — the first turn of the new switch writes the
-   * shape this build understands.
-   */
-  const fade = (): boolean => {
-    if (typeof stored.fade === "boolean") return stored.fade;
-    if (typeof stored.fadeMs === "number") return stored.fadeMs > 0;
-    return DEFAULT_SETTINGS.fade;
+    return value === "single" || value === "double" || value === "scroll"
+      ? value
+      : DEFAULT_SETTINGS.readingMode;
   };
 
   return {
     readingMode: readingMode(),
     coverAlone: flag("coverAlone"),
     detectSpreads: flag("detectSpreads"),
-    fade: fade(),
+    fade: flag("fade"),
     offset: flag("offset"),
   };
 }
 
-/** What this browser is set to. Read fresh each time: it is cheap and always current. */
+/**
+ * What this plugin is set to. Read fresh each time: it is cheap and always current.
+ *
+ * Out of the library's copy, and out of nothing else. `NS.readerSettingsRaw` is null
+ * until Stash has answered — and for a library nobody has written to — which reads as
+ * the defaults, the same way any other value of the wrong shape does.
+ */
 export function readSettings(): MangaReaderSettings {
   try {
-    return parseSettings(storedValue(STORAGE_KEY, LEGACY_STORAGE_KEY));
+    return parseSettings(NS.readerSettingsRaw);
   } catch (e) {
     // Storage can be unavailable (a browser with it switched off, a sandboxed
     // frame). That is not a reason to stop reading — the defaults are a working
@@ -161,13 +118,26 @@ export function readSettings(): MangaReaderSettings {
   }
 }
 
-/** Remembers the settings, and returns what was written. */
+/**
+ * Remembers the settings, and returns what was written.
+ *
+ * The whole of them, every time: saving plugin settings means writing the plugin's
+ * whole settings map, so a write carrying only what changed would take the rest of the
+ * map with it. Applied to the answer at once — `readSettings` reads the value these
+ * lines just wrote — so the change is in force before the network has been asked, and
+ * the settings half of a gallery that is already on screen re-lays on the next pass.
+ *
+ * Tolerated missing: the reader runs in the lightbox whatever the managing half is
+ * doing, and a bundle whose tools half failed to start has nowhere to write but still
+ * has to read.
+ */
 export function writeSettings(
   next: Partial<MangaReaderSettings>
 ): MangaReaderSettings {
   const merged = { ...readSettings(), ...next };
+
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    NS.writeReaderSettings?.(JSON.stringify(merged));
   } catch (e) {
     console.error("[mangaReader] settings are not writable:", e);
   }

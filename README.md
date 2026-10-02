@@ -760,11 +760,18 @@ While the pairing is on, and while you are reading a **gallery**:
 | **Back closes it** | Pressing Back closes the lightbox instead of leaving it over the page you land on. Stash's own does not: its lightbox is in its own state and not in the route, so Back moves the page out from under it |
 | **Everything else** | Untouched: the nav strip, Escape, the slideshow, and the footer that names the image and links back to the gallery it came from — though the rating stars and the O counter at its left end are not drawn at all: a reader holding a book open is not rating anything. The footer's own name is kept on the page you are on, since Stash renders it from an index this half never moves, and clicking it is an ordinary page load rather than the router's own navigation — a plugin has no router to ask. The header is this half's own, because its counter has to count in the order you are reading |
 
-All of it is remembered per browser, like the lightbox options the controls sit
-beside — the shift included, which used to be remembered per gallery: a reader whose
-scans are grouped wrongly is reading scans, and being made to set the same switch on
-each of them was the feature failing at its one job. A shift stored by an older build
-is not read; that switch is worth setting once more.
+All of it is remembered **with the library**, not with the browser, which is a departure
+from Stash itself: the switches in the lightbox's own options menu (fit, zoom, scroll
+mode) are per-browser interface settings, and these are not. This plugin's settings are
+one set — the managing half's and the reading half's — and they live in the plugin's
+configuration, where every browser reads the same thing. The cost is real and worth
+naming: one menu holds two kinds of setting, and these follow you to another machine.
+
+**Nothing is migrated, and nothing is read from the browser.** What a browser holds
+under the old keys is left there: a library with no settings in it reads as the defaults,
+and the first change writes the lot. Carrying each browser's old value up — once, on the
+first visit — would be a branch and a write nobody asked for, to spare one click in each
+browser that had chosen a mode.
 
 **The fade's length is not a choice.** It was a slider, and the two answers a reader
 actually had for it were "yes" and "no" — the ones in between were a reader looking

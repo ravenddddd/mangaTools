@@ -32,9 +32,25 @@ const state = {
   failing: false,
   /** Set by a test to hold the next gallery query open: see the client below */
   holdGallery: null,
+  /**
+   * What the library's copy of the reader's settings holds, or undefined for a library
+   * nobody has written to — the state that makes the reader fall back to what this
+   * browser remembers. Set by a section that wants the reading half to hear about a
+   * change made *with the library*.
+   */
+  readerSettingsInConfig: undefined,
 };
 
 const mutations = [];
+
+/**
+ * Every settings write this suite saw, as the reader's own JSON.
+ *
+ * A list of its own rather than entries in `mutations`: the sections below walk that
+ * one looking for `custom_fields`, and the plugin's settings are a different mutation
+ * with a different shape. What the reader writes into the config is all this holds.
+ */
+const settingsWrites = [];
 const client = {
   query: ({ query, variables, fetchPolicy }) => {
     state.queries.push({ query: String(query), variables, fetchPolicy });
@@ -94,7 +110,17 @@ const client = {
         : gallery.images;
     const answer = {
       data: {
-        configuration: { interface: { language: state.language } },
+        configuration: {
+          interface: { language: state.language },
+          // What the managing half reads the plugin's own settings out of. Only the
+          // reading half's part of it is ever set here — a section that wants the reader
+          // to hear about a change made *with the library* writes it and navigates.
+          plugins: {
+            mangaTools: {
+              readerSettings: state.readerSettingsInConfig,
+            },
+          },
+        },
         pages: { images: pages },
         // The gallery itself: this plugin's own custom fields, and Stash's own
         // chapters. A fixture that says nothing about either gets the empty
@@ -131,6 +157,19 @@ const client = {
   // fields, never Stash's own data — so what a test reads here is which mutation went
   // out and with what in it. Never Stash's rows: see the note on the chapter field.
   mutate: (options) => {
+    // Plugin-settings writes go in a list of their own. The reader saves its settings
+    // through the tools half — the plugin's settings are one map and the managing half
+    // is what builds it — and every one of those carries an `input` but no
+    // `custom_fields`, which is what the sections below walk `mutations` looking for.
+    const settings = options?.variables?.input?.readerSettings;
+    if (typeof settings === "string") {
+      // The whole map, not just the reading half's part of it: what a section may want
+      // to check is that saving one half's settings does not take the other half's with
+      // it, and that is a question about the input.
+      settingsWrites.push(options.variables.input);
+      return Promise.resolve({ data: { configurePlugin: true } });
+    }
+
     mutations.push(options);
 
     // **Applied to the fixture, the way a server would.** This used to record the
@@ -648,6 +687,20 @@ const chapterRanges = (box) =>
     (item) => item.querySelector(".manga-reader-chapter-range").textContent
   );
 
+/**
+ * The reader's settings where they now live: with the library.
+ *
+ * Read back out of the settings write Stash was sent — the last one, which is the one a
+ * section's own action caused — rather than out of `localStorage`, which is where they
+ * used to be and is not where they are. Null when nothing has been written, which is a
+ * state in its own right rather than a failure: a library nobody has changed yet has no
+ * settings in it, and the reader falls back to what the browser remembers.
+ */
+const savedReaderSettings = () => {
+  const written = settingsWrites[settingsWrites.length - 1]?.readerSettings;
+  return written ? JSON.parse(written) : null;
+};
+
 /** The rows this plugin drew in Stash's container */
 const drawnRows = (container) =>
   [...container.children].map(
@@ -968,36 +1021,27 @@ async function main() {
       "and a value of the wrong type is not a setting"
     );
 
-    // How the pages are laid out used to be a boolean — the switch that said two pages
-    // or one — and the third answer is why it is not one any more. A stored boolean
-    // becomes one of the two it could mean, and a stored mode that this build does not
-    // know is not a setting at all.
+    // How the pages are laid out: one of three, and a value of the wrong shape — a mode
+    // this build has never heard of, or one written by a build that has more — is not a
+    // setting at all. The two shapes this replaced are not read, and have not been
+    // since the settings left the browser: nothing can write them any more.
     const mode = (raw) => NR.parseSettings(raw).readingMode;
-    assert.strictEqual(
-      mode('{"doublePage":true}'),
-      "double",
-      "on was two pages"
-    );
-    assert.strictEqual(mode('{"doublePage":false}'), "single", "off was one");
     assert.strictEqual(
       mode('{"readingMode":"scroll"}'),
       "scroll",
-      "and each mode reads"
+      "each mode reads"
     );
-    assert.strictEqual(
-      mode('{"readingMode":"doublePage"}'),
-      "single",
-      "as itself"
-    );
+    assert.strictEqual(mode('{"readingMode":"double"}'), "double", "as itself");
     assert.strictEqual(
       mode('{"readingMode":"sideways"}'),
       "single",
       "while a mode this build has never heard of is the default, not a guess"
     );
     assert.strictEqual(
-      mode('{"readingMode":"scroll","doublePage":true}'),
-      "scroll",
-      "and the mode wins over the switch it replaced"
+      mode('{"doublePage":true}'),
+      "single",
+      "and the boolean it used to be is nothing now — it was written by a browser, " +
+        "which is not where these settings live"
     );
     assert.deepStrictEqual(
       NR.parseSettings("not json"),
@@ -1005,40 +1049,24 @@ async function main() {
       "nor is something else's value under our key"
     );
 
-    // The fade used to be a length in milliseconds — a slider, where the two answers
-    // a reader wanted out of it were "yes" and "no". A stored length becomes one of
-    // those: nought meant no fading and was the one value chosen deliberately, and
-    // anything else was some length of their own that this build no longer offers.
+    // The fade is a yes or a no, and the length it used to be is not read — see the
+    // note above the mode.
     const fade = (raw) => NR.parseSettings(raw).fade;
+    assert.strictEqual(fade('{"fade":false}'), false, "a stored no is a no");
     assert.strictEqual(
-      fade('{"fadeMs":250}'),
+      fade('{"fade":true}'),
       true,
-      "a length that was set is a yes"
+      "and a stored yes is a yes"
+    );
+    assert.strictEqual(
+      fade('{"fade":"yes"}'),
+      true,
+      "a value of the wrong type is not a setting, so the default stands"
     );
     assert.strictEqual(
       fade('{"fadeMs":0}'),
-      false,
-      "and nought was a reader asking for no fade at all, which they keep"
-    );
-    assert.strictEqual(
-      fade('{"fadeMs":-40}'),
-      false,
-      "a negative length is nought"
-    );
-    assert.strictEqual(
-      fade('{"fadeMs":"140"}'),
       true,
-      "a string is not a length, so it is not a no: the default stands"
-    );
-    assert.strictEqual(
-      fade('{"fade":false}'),
-      false,
-      "and the pair's own value wins"
-    );
-    assert.strictEqual(
-      fade('{"fade":true,"fadeMs":0}'),
-      true,
-      "…even over a length"
+      "and the length the slider used to write is nothing now"
     );
 
     // The shift is a setting of the browser's now, like the rest of them — it was
@@ -2187,15 +2215,14 @@ async function main() {
         "and a screen after it is drawn with no animation at all"
       );
 
-      // Put back: the setting is the browser's, and one left off would be changing what
+      // Put back: the setting is the library's, and one left off would be changing what
       // every section after this one reads.
       dom.click(on);
       assert.strictEqual(
-        JSON.parse(
-          dom.window.localStorage.getItem("plugin.mangaTools.settings")
-        ).fade,
+        savedReaderSettings().fade,
         true,
-        "and the choice is written where the settings live"
+        "and the choice is written where the settings live — the plugin's own settings, " +
+          "which go to Stash with the rest of them"
       );
 
       stopReader(box);
@@ -2263,12 +2290,8 @@ async function main() {
         "turning it on re-pairs the gallery there and then"
       );
 
-      const stored = () =>
-        JSON.parse(
-          dom.window.localStorage.getItem("plugin.mangaTools.settings")
-        );
       assert.strictEqual(
-        stored().offset,
+        savedReaderSettings().offset,
         true,
         "and it is written where the settings live, like every other switch"
       );
@@ -2304,7 +2327,7 @@ async function main() {
       back.checked = false;
       back.dispatch("change");
       assert.strictEqual(
-        stored().offset,
+        savedReaderSettings().offset,
         false,
         "and the section puts it back"
       );
@@ -2439,9 +2462,7 @@ async function main() {
         "with both back, the reader is on the page they were on, alone again"
       );
       assert.deepStrictEqual(
-        JSON.parse(
-          dom.window.localStorage.getItem("plugin.mangaTools.settings")
-        ),
+        savedReaderSettings(),
         {
           readingMode: "double",
           coverAlone: true,
@@ -2454,6 +2475,75 @@ async function main() {
       );
 
       stopReader(box);
+    }
+  );
+
+  /**
+   * The settings live with the library, and the library's copy is the one that is read.
+   *
+   * Which is the whole of where they come from now: this browser holds nothing, and
+   * what an older build left in one is not read — a library with no settings in it reads
+   * as the defaults, and the first change writes the lot. See the note at the top of
+   * settings.ts for why carrying each browser's old value up was not worth the branch.
+   *
+   * **What is checked here is the reading half's side of it.** Getting the value into
+   * `NS.readerSettingsRaw` is the managing half's job — it is the half that reads the
+   * plugin's configuration and tells everybody when it has — and the settings sections
+   * of the smoke suite are where that is checked.
+   */
+  await runSection(
+    "the library's copy of the settings is what is read",
+    async () => {
+      // What an older build left in this browser, which nothing reads any more.
+      dom.window.localStorage.setItem(
+        "plugin.mangaTools.settings",
+        JSON.stringify({
+          readingMode: "scroll",
+          coverAlone: false,
+          detectSpreads: false,
+          fade: false,
+          offset: true,
+        })
+      );
+
+      NS.readerSettingsRaw = null;
+      assert.deepStrictEqual(
+        NR.readSettings(),
+        {
+          readingMode: "single",
+          coverAlone: true,
+          detectSpreads: true,
+          fade: true,
+          offset: false,
+        },
+        "a library with nothing in it reads as the defaults, and not as what this " +
+          "browser happens to remember"
+      );
+
+      NS.readerSettingsRaw = JSON.stringify({
+        readingMode: "double",
+        coverAlone: false,
+        detectSpreads: false,
+        fade: false,
+        offset: true,
+      });
+      assert.deepStrictEqual(
+        NR.readSettings(),
+        {
+          readingMode: "double",
+          coverAlone: false,
+          detectSpreads: false,
+          fade: false,
+          offset: true,
+        },
+        "and with something in the library, that is what is read — every one of the " +
+          "five, not only the ones a section happened to set"
+      );
+
+      // Put back: this browser's leftovers, so the sections after this one start from the
+      // state they expect.
+      NS.readerSettingsRaw = null;
+      dom.window.localStorage.removeItem("plugin.mangaTools.settings");
     }
   );
 
@@ -2470,7 +2560,7 @@ async function main() {
     dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
 
     assert.deepStrictEqual(
-      JSON.parse(dom.window.localStorage.getItem("plugin.mangaTools.settings")),
+      savedReaderSettings(),
       {
         readingMode: "double",
         coverAlone: true,
@@ -2478,7 +2568,22 @@ async function main() {
         fade: true,
         offset: false,
       },
-      "the pairing writes the setting it changed and leaves the rest alone"
+      "the pairing writes the setting it changed and leaves the rest alone — the whole " +
+        "settings map, the managing half's on it too"
+    );
+    assert.deepStrictEqual(
+      Object.keys(settingsWrites[settingsWrites.length - 1]).sort(),
+      [
+        "enabledLanguages",
+        "hidePerformers",
+        "openDetailsBlock",
+        "openEditBlock",
+        "readerSettings",
+        "showCoverBadge",
+        "showFlags",
+      ],
+      "…and it is the whole map: saving the reader's settings cannot take the " +
+        "managing half's with it, because there is one place that builds all of it"
     );
 
     stopReader(box);
@@ -6470,62 +6575,6 @@ async function main() {
    * must not do, which is take the old value away from the standalone Manga
    * Reader that may still be installed beside this plugin.
    */
-  await runSection(
-    "settings from before the merge are still read, and the old shifts are not",
-    async () => {
-      const store = dom.window.localStorage;
-      // What the standalone reader wrote: the same settings under its own key, and a
-      // shift remembered per gallery.
-      const old = {
-        doublePage: true,
-        coverAlone: false,
-        detectSpreads: true,
-        fadeMs: 300,
-      };
-      const now = {
-        // The switch, read as the mode it meant. See parseSettings.
-        readingMode: "double",
-        coverAlone: false,
-        detectSpreads: true,
-        // A length that was set is a yes: the slider's two real answers were "yes" and
-        // "no", and it was there that a reader turned fading off. See parseSettings.
-        fade: true,
-        // Never a key in the old shape. The shift was a map from gallery to page, which
-        // this build does not read — one shift for the browser replaced it, and a
-        // reader who had set one sets the switch once more.
-        offset: false,
-      };
-
-      store.removeItem("plugin.mangaTools.settings");
-      store.removeItem("plugin.mangaTools.offsets");
-      store.setItem("mangaReader.settings", JSON.stringify(old));
-      store.setItem("mangaReader.offsets", JSON.stringify({ 8: 1 }));
-
-      assert.deepStrictEqual(
-        NR.readSettings(),
-        now,
-        "the old key's settings are the ones read, in this build's own shape"
-      );
-      assert.deepStrictEqual(
-        JSON.parse(store.getItem("plugin.mangaTools.settings")),
-        old,
-        "…and the old value is copied verbatim — the copy is what makes dropping the " +
-          "fallback possible, and rewriting it on the way would be a conversion nobody " +
-          "asked for"
-      );
-      assert.ok(
-        store.getItem("mangaReader.settings"),
-        "and the old key is left where it is, for the plugin that still reads it"
-      );
-      assert.strictEqual(
-        store.getItem("plugin.mangaTools.offsets"),
-        null,
-        "while the old map of per-gallery shifts is not read, and not copied: the " +
-          "shift is one setting for the browser now"
-      );
-    }
-  );
-
   /**
    * Also last, and for a related reason: it loads the bundle a *second* time, in
    * a world where the tools half cannot start, to see the one promise the merge

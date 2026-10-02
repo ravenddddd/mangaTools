@@ -301,6 +301,10 @@ module.exports = () => {
         openDetailsBlock: false,
         openEditBlock: true,
         hidePerformers: true,
+        // The reading half's own settings are part of this map too, and empty here
+        // because nothing has been written to the library — see the reader's
+        // readSettings, where absent is what puts the browser's value back in force.
+        readerSettings: "",
       },
     },
     "every setting is written together, so replace-vs-merge cannot matter"
@@ -350,6 +354,11 @@ module.exports = () => {
       openDetailsBlock: false,
       openEditBlock: true,
       hidePerformers: true,
+      // The reading half's own settings ride along, as the string the library holds
+      // them as. Empty here because this library has never been written to — see
+      // readSettings in the reader, where an absent value is what puts the browser's
+      // own remembered one back in force.
+      readerSettings: "",
     },
   });
   NS.showFlags = true;
