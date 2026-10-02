@@ -85,6 +85,53 @@
 }
 
 /*
+ * ── The third mode's column ───────────────────────────────────────────────────
+ *
+ * The same container the other two modes put a screen in, turned into a scroll box:
+ * a row per page, in reading order, the width of the picture area rather than of a
+ * screen. `display: flex` is the container's own in every mode — the mode changes
+ * *direction*, never the display, because a mode that set `display: block` would have
+ * to put the centring back by hand (and the first attempt at this mock did exactly
+ * that, and drew a column pinned to the left).
+ */
+.manga-reader-spread.is-scroll {
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 2px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* The browser's own scrollbar goes: this plugin's bar *is* the scrollbar here, and
+     two of them on one edge is one of them too many. */
+  scrollbar-width: none;
+}
+
+.manga-reader-spread.is-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/*
+ * One page: as wide as the picture area allows, and no wider than its own pixels —
+ * a page drawn wider than it was is a page made blurry — with the height its own
+ * shape asks for. The reserved height is what keeps the column still while the
+ * pictures arrive (see buildColumn in scroll.ts).
+ */
+.manga-reader-scroll-page {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  background: #000;
+}
+
+.manga-reader-scroll-page img {
+  width: 100%;
+  height: auto;
+  display: block;
+  cursor: pointer;
+}
+
+/*
  * Stash's own header, while this plugin draws its own.
  *
  * `:not(.manga-reader-chrome)` because this plugin's header wears the same class — it
@@ -629,6 +676,107 @@
   opacity: 0;
   transition: opacity 0.15s ease;
   pointer-events: none;
+}
+
+/*
+ * ── The same bar, down the side ───────────────────────────────────────────────
+ *
+ * The third mode's picture is a column taller than it is wide, so the question "how
+ * far through the book am I" is asked along the *other* axis — and the bar that
+ * answers it is this one with one axis swapped. Every number below is the number
+ * above it: the same 4px of paint, the same 16px of aim, the same ticks, the same
+ * handle, the same bubble. What changes is which property each one is written in, and
+ * the code that writes them is one pair of helpers with the axis in them (see
+ * setAlong and setAlongLength in progress.ts).
+ *
+ * It is drawn *over* the picture area rather than in a row of its own, because that
+ * is what it is as long as: the pages.
+ */
+.manga-reader-progress.is-vertical {
+  position: absolute;
+  right: 10px;
+  top: 18px;
+  bottom: 18px;
+  width: 16px;
+  height: auto;
+  z-index: 5;
+}
+
+/* The aim, and what it is a fraction of: the height of the picture area. Written
+   nowhere — this is the rule that decides it. */
+.manga-reader-progress.is-vertical .manga-reader-progress-track {
+  width: 16px;
+  height: 100%;
+  max-width: none;
+  transition: none;
+}
+
+.manga-reader-progress.is-vertical .manga-reader-progress-track::before {
+  left: 50%;
+  right: auto;
+  width: 4px;
+  margin-left: -2px;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  margin-top: 0;
+}
+
+.manga-reader-progress.is-vertical .manga-reader-progress-read {
+  left: 50%;
+  top: 0;
+  width: 4px;
+  margin-left: -2px;
+  height: 0;
+  margin-top: 0;
+  transition: height 0.15s ease;
+}
+
+/* The tick: 4px of paint along the line, in a box the full 16px across it — the same
+   division as the horizontal one, where the paint is a 4×4 square and the box it
+   answers to is 16px tall. */
+.manga-reader-progress.is-vertical .manga-reader-progress-node {
+  top: auto;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  margin-left: 0;
+  height: 4px;
+  margin-top: -2px;
+}
+
+.manga-reader-progress.is-vertical .manga-reader-progress-node::before {
+  left: 50%;
+  right: auto;
+  width: 4px;
+  margin-left: -2px;
+  top: 0;
+  bottom: 0;
+  height: auto;
+  margin-top: 0;
+}
+
+.manga-reader-progress.is-vertical .manga-reader-progress-node:hover {
+  height: 6px;
+  margin-top: -3px;
+}
+
+.manga-reader-progress.is-vertical .manga-reader-progress-thumb {
+  left: 50%;
+}
+
+/*
+ * The bubble, beside the line rather than above it: `translateY(-50%)` where the
+ * horizontal one has `translateX(-50%)`, and `top` where it has `left` — which the
+ * drawing code writes, in whichever of the two the axis says.
+ */
+.manga-reader-progress.is-vertical .manga-reader-progress-label {
+  bottom: auto;
+  right: 100%;
+  margin-right: 6px;
+  margin-bottom: 0;
+  transform: translateY(-50%);
 }
 
 /* Where the reader is — a number, and no line of its own when a tick is named */

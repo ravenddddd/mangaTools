@@ -39,6 +39,16 @@ import type { MangaReaderPlacedChapter } from "./chapters";
 export interface ProgressState {
   /** The page the book is open at: the first page of the screen on show */
   at: number;
+  /**
+   * Whether the bar runs down the side of the picture rather than along the bottom.
+   *
+   * The third mode is a column of pages rather than a screen, and what a reader wants
+   * out of a bar there is what they want out of a scrollbar: the same question — how
+   * far through the book am I — asked of a picture that is taller than it is wide.
+   * Everything below is the same bar with one axis swapped: the same four pixels of
+   * paint, the same sixteen of aim, the same ticks, the same bubble, the same drag.
+   */
+  vertical: boolean;
   /** How many pages the gallery has, which is what the bar is a fraction of */
   total: number;
   /**
@@ -140,6 +150,8 @@ const CLASS_LABEL = "manga-reader-progress-label";
 const CLASS_SCRUBBING = "is-scrubbing";
 /** While it is asleep: out of sight, and out of the way of clicks */
 const CLASS_IDLE = "is-idle";
+/** The arrangement: down the side of the picture rather than along its bottom */
+const CLASS_VERTICAL = "is-vertical";
 /** While the bubble is up: the drag's page, or the chapter a tick is for */
 const CLASS_SHOWING = "is-showing";
 /** The state the bar was last drawn from, which its gestures read */
@@ -158,7 +170,10 @@ let nodes: HTMLElement | null = null;
 /** What the last pass drew, so a pass that changes nothing writes nothing */
 let drawn: { nodes: string; at: number; total: number } | null = null;
 /** How wide the label came out, measured when its words change rather than per move */
+let lastVertical: boolean | null = null;
 let labelWidth = 0;
+/** The same, down the side: the bubble is placed along whichever axis the bar runs */
+let labelHeight = 0;
 
 /**
  * What the bubble is saying, and where it is saying it, or null when it is down.
@@ -233,10 +248,13 @@ export function ensureProgress(
   // page, and this one has nothing to put there.
   if (state.total <= 1) return null;
 
-  if (!bar) build(lightbox);
+  const parent = parentFor(lightbox);
+  if (!parent) return null;
+
+  if (!bar) build();
   // React owns the lightbox's children and can take this row away with them; the
   // observer puts it back, the same way the pages' container is put back.
-  else if (bar.parentNode !== lightbox) place(lightbox);
+  place(parent);
 
   if (!bar || !track || !read || !thumb || !label || !nodes) return bar;
 
@@ -279,10 +297,56 @@ export function removeProgress(lightbox: Element): void {
   pointer = null;
   pressed = false;
   labelWidth = 0;
+  labelHeight = 0;
+}
+
+/**
+ * Which way the bar runs, as the last pass was told.
+ *
+ * Read from the state rather than kept in a variable of its own: the mode is the
+ * state's to know, and a second copy of it here is a second thing to keep in step.
+ */
+function vertical(): boolean {
+  return latest?.vertical === true;
+}
+
+/**
+ * How far along the bar something sits: a fraction, in the bar's own direction.
+ *
+ * The other axis is **cleared** rather than left where it was. The bar is one element
+ * in both arrangements — the mode is a setting and can be turned while it is open —
+ * and a reader who switched from the column back to a screen would otherwise be left
+ * with a fill whose `height` the stylesheet wants and whose `width` an inline style
+ * still says: an inline style wins, and the line would be the wrong length in a way
+ * nothing in the drawing code could see.
+ */
+function setAlong(node: HTMLElement, fraction: number): void {
+  const at = (fraction * 100).toFixed(3) + "%";
+
+  if (vertical()) {
+    if (node.style.top !== at) node.style.top = at;
+    if (node.style.left) node.style.left = "";
+  } else {
+    if (node.style.left !== at) node.style.left = at;
+    if (node.style.top) node.style.top = "";
+  }
+}
+
+/** How long the filled part of the bar is, along it */
+function setAlongLength(node: HTMLElement, fraction: number): void {
+  const at = (fraction * 100).toFixed(3) + "%";
+
+  if (vertical()) {
+    if (node.style.height !== at) node.style.height = at;
+    if (node.style.width) node.style.width = "";
+  } else {
+    if (node.style.width !== at) node.style.width = at;
+    if (node.style.height) node.style.height = "";
+  }
 }
 
 /** The elements the bar is made of, once per lightbox */
-function build(lightbox: Element): void {
+function build(): void {
   bar = document.createElement("div");
   // Asleep to begin with: a lightbox that has just opened has said nothing yet, and a
   // bar that appears over the picture with it is a bar to be got rid of before the
@@ -334,37 +398,70 @@ function build(lightbox: Element): void {
   track.addEventListener("mouseleave", onLeaveTrack);
 
   track.addEventListener("mousedown", onPress);
-
-  place(lightbox);
 }
 
-/**
- * Puts the bar in its own row, between the picture and the footer.
- *
- * A row rather than an overlay: the bar is about the pages, and a line drawn across
- * the bottom of them is a line drawn across the pages themselves. It sits against
- * the footer, so it goes before the footer in the lightbox's column.
- */
-function place(lightbox: Element): void {
-  if (!bar) return;
+/** The picture area, which the column's bar is drawn over rather than beside */
+const SELECTOR_DISPLAY = ".Lightbox-display";
 
-  const footer = lightbox.querySelector(".Lightbox-footer");
-  if (footer) lightbox.insertBefore(bar, footer);
-  else lightbox.appendChild(bar);
+/**
+ * Where the bar belongs, which is a different place in each arrangement.
+ *
+ * Along the bottom it gets **a row of its own**, between the picture and the footer:
+ * a line drawn across the bottom of the pages would be a line across the pages, so it
+ * sits against the footer, in the lightbox's own column.
+ *
+ * Down the side it goes **into the picture area**, because that is what it is as tall
+ * as — the pages themselves. An overlay, by the same argument the other way: a
+ * vertical strip beside the picture would be a strip taken off the picture.
+ */
+function parentFor(lightbox: Element): Element | null {
+  if (!vertical()) return lightbox;
+  return lightbox.querySelector(SELECTOR_DISPLAY);
+}
+
+/** Puts the bar where this arrangement wants it */
+function place(parent: Element): void {
+  if (!bar || bar.parentNode === parent) return;
+
+  if (parent.classList.contains("Lightbox-display")) {
+    parent.appendChild(bar);
+    return;
+  }
+
+  const footer = parent.querySelector(".Lightbox-footer");
+  if (footer) parent.insertBefore(bar, footer);
+  else parent.appendChild(bar);
 }
 
 /** Draws the bar from a state: the ticks, the fill, the handle, the words */
 function update(state: ProgressState): void {
   if (!bar || !track || !read || !thumb || !label || !nodes) return;
 
+  // The bar's own arrangement, which can change while it is on screen: the mode is a
+  // setting, and the same bar is the same bar.
+  //
+  // A change of axis draws the ticks again, and *here*, above the gate that decides
+  // whether to: they are written in one property or the other, and nothing else about
+  // them changes when the bar turns — so a gate asking whether the *chapters* are the
+  // same would leave them pointing along the axis they were made for. Below that gate
+  // the invalidation would only be read by the next pass, and for a bar that has
+  // stopped changing there is no next pass.
+  if (state.vertical !== lastVertical) {
+    lastVertical = state.vertical;
+    drawn = null;
+  }
+
   const key = state.chapters.map((c) => c.at + ":" + c.title).join("|");
   if (!drawn || drawn.nodes !== key || drawn.total !== state.total) {
     drawNodes(state);
   }
 
+  bar.classList.toggle(CLASS_VERTICAL, state.vertical);
+
   // What the pages measure, remembered whenever there is a measurement to remember:
   // a screen whose pictures are still arriving measures nothing, and the width of the
-  // screen before it is the better answer.
+  // screen before it is the better answer. The column's bar is measured by nobody: its
+  // length is the picture area's, which the stylesheet says.
   if (state.width > 0) lastWidth = state.width;
 
   // And it is written to the track only with no pointer down. The bar's width is half
@@ -372,17 +469,20 @@ function update(state: ProgressState): void {
   // would move the pages out from under the hand that was choosing them; the drag
   // takes the width it has been holding when it is let go of, and the easing above
   // carries it there.
-  if (!pressed && lastWidth > 0) {
+  if (state.vertical) {
+    // The column's bar is as long as the picture area, and the stylesheet is what says
+    // so — a width left over from the other arrangement would win over it.
+    if (track.style.width) track.style.width = "";
+  } else if (!pressed && lastWidth > 0) {
     const wanted = Math.round(lastWidth) + "px";
     if (track.style.width !== wanted) track.style.width = wanted;
   }
 
   const settled = fractionOfPage(state.at, state.total);
   const fraction = pointer === null ? settled : pointer;
-  const where = (fraction * 100).toFixed(3) + "%";
 
-  if (read.style.width !== where) read.style.width = where;
-  if (thumb.style.left !== where) thumb.style.left = where;
+  setAlongLength(read, fraction);
+  setAlong(thumb, fraction);
 
   // The bubble, when there is one. What it says was decided where it was set — see
   // setBubble — and a pass only draws it: writing it here is what let the reader's
@@ -391,10 +491,12 @@ function update(state: ProgressState): void {
     if (labelPage?.textContent !== bubble.page) {
       if (labelPage) labelPage.textContent = bubble.page;
       labelWidth = label.offsetWidth;
+      labelHeight = label.offsetHeight;
     }
     if (labelChapter?.textContent !== bubble.chapter) {
       if (labelChapter) labelChapter.textContent = bubble.chapter;
       labelWidth = label.offsetWidth;
+      labelHeight = label.offsetHeight;
     }
   }
 
@@ -402,13 +504,17 @@ function update(state: ProgressState): void {
   // point at, and moving the label to the handle is what made it slide across the bar
   // during the fade it was on its way out with.
   if (bubble) {
-    const half = labelWidth / 2;
-    const width = track.clientWidth || 0;
+    const half = (vertical() ? labelHeight : labelWidth) / 2;
+    const span = vertical() ? track.clientHeight : track.clientWidth;
     const px =
-      Math.max(half, Math.min(bubble.fraction * width, width - half)).toFixed(
-        0
-      ) + "px";
-    if (label.style.left !== px) label.style.left = px;
+      Math.max(
+        half,
+        Math.min(bubble.fraction * (span || 0), (span || 0) - half)
+      ).toFixed(0) + "px";
+
+    if (vertical()) {
+      if (label.style.top !== px) label.style.top = px;
+    } else if (label.style.left !== px) label.style.left = px;
   }
 
   // A bar with something new to say comes back: the reader who turned a page is
@@ -416,7 +522,7 @@ function update(state: ProgressState): void {
   // first pass, though — a lightbox that has just opened has said nothing yet, and a
   // bar that appears with it is a bar that has to be dismissed before it can be read.
   // A wake that was owed, now that there is a width to draw the bar at.
-  if (owed && state.width > 0) {
+  if (owed && (state.vertical || state.width > 0)) {
     owed = false;
     wake();
   }
@@ -445,7 +551,7 @@ function drawNodes(state: ProgressState): void {
   for (const node of progressNodes(state.chapters, state.total, state.locale)) {
     const tick = document.createElement("div");
     tick.className = CLASS_NODE;
-    tick.style.left = (node.fraction * 100).toFixed(3) + "%";
+    setAlong(tick, node.fraction);
     // What this tick is, kept on it: a press on it is that chapter — on the press, as
     // a press anywhere else on the line goes to where it landed — and the bubble says
     // its name. Both are read back from the DOM, because a tick redrawn under a
@@ -535,7 +641,10 @@ function wake(): void {
   // worse than no bar — least of all here, where there is no earlier width to stand
   // on. The row keeps its place so the picture does not move; what brings the bar out
   // is the pass an image's own `load` asks for. See the load listener in takeover.ts.
-  if (lastWidth <= 0) {
+  //
+  // The column's bar is never in that position: nothing about it is measured, so
+  // there is always something to draw it at.
+  if (!vertical() && lastWidth <= 0) {
     bar.classList.add(CLASS_IDLE);
     owed = true;
     return;
@@ -560,13 +669,26 @@ function stopTimers(): void {
 /** Whether a pointer is down on the bar */
 let pressed = false;
 
-/** Where a pointer is along the track, as a fraction of its width */
-function fractionAt(clientX: number): number {
+/**
+ * Where a pointer is along the track, as a fraction of its length.
+ *
+ * The one place the axis has to be chosen twice: which of the pointer's two
+ * coordinates is the one along the bar, and which of the box's two extents it is a
+ * fraction of. Everything above this line is the same arithmetic either way, which is
+ * what makes the two arrangements one bar rather than two.
+ */
+function fractionAt(event: MouseEvent): number {
   if (!track) return 0;
 
   const rect = track.getBoundingClientRect();
-  const width = rect.width || track.clientWidth || 1;
-  return Math.min(Math.max((clientX - rect.left) / width, 0), 1);
+  const span = vertical()
+    ? rect.height || track.clientHeight || 1
+    : rect.width || track.clientWidth || 1;
+  const from = vertical()
+    ? event.clientY - rect.top
+    : event.clientX - rect.left;
+
+  return Math.min(Math.max(from / span, 0), 1);
 }
 
 function onPress(event: Event): void {
@@ -597,7 +719,7 @@ function onPress(event: Event): void {
   } else {
     // Whatever the pointer was over, it is dragging now.
     bubble = null;
-    scrubTo(fractionAt(press.clientX));
+    scrubTo(fractionAt(press));
   }
 
   document.addEventListener("mousemove", onMove);
@@ -606,7 +728,7 @@ function onPress(event: Event): void {
 
 function onMove(event: Event): void {
   if (!pressed) return;
-  scrubTo(fractionAt((event as MouseEvent).clientX));
+  scrubTo(fractionAt(event as MouseEvent));
 }
 
 function onRelease(): void {

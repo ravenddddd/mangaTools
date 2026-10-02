@@ -34,9 +34,19 @@ export interface MangaReaderStrip {
 }
 
 /** Just the settings the reader keeps. See settings.ts. */
+/**
+ * How the pages are laid out to be read.
+ *
+ * Three, and they are exclusive: one page at a time, two pages at a time (the pairing
+ * rules are about *that*), or the whole gallery as one continuous column scrolled
+ * downwards. It was a boolean — `doublePage` — and a third answer is what a boolean
+ * cannot hold.
+ */
+export type MangaReaderReadingMode = "single" | "double" | "scroll";
+
 export interface MangaReaderSettings {
-  /** The mode itself. Off until somebody turns it on. */
-  doublePage: boolean;
+  /** Which of the three ways the pages are laid out. See MangaReaderReadingMode */
+  readingMode: MangaReaderReadingMode;
   /** Whether the first page is given a screen of its own. */
   coverAlone: boolean;
   /** Whether a page wider than it is tall is taken for a spread. */
@@ -299,6 +309,13 @@ export interface MangaReaderNamespace {
     pageIndex: number,
     direction: 1 | -1
   ): number;
+  /**
+   * Which page of the scrolled column the reader is on, from where its rows are —
+   * see scroll.ts. Here rather than reached through the DOM for the same reason as
+   * the bar's arithmetic: the tests' DOM has no layout, so the decision has to be
+   * callable on numbers a section made up.
+   */
+  pageAtTop(rows: { top: number; bottom: number }[], edge: number): number;
   /**
    * How far a menu has to move sideways to be inside the window — see chrome.ts.
    *

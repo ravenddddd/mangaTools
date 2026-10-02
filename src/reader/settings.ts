@@ -63,7 +63,7 @@ export const FADE_MS = 200;
  * manga.
  */
 export const DEFAULT_SETTINGS: MangaReaderSettings = {
-  doublePage: false,
+  readingMode: "single",
   coverAlone: true,
   detectSpreads: true,
   fade: true,
@@ -97,6 +97,29 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
       : (DEFAULT_SETTINGS[key] as boolean);
 
   /**
+   * How the pages are laid out — read from the three-way selector, or from the switch
+   * that was there before it.
+   *
+   * That switch was on or off and meant two pages or one, so a stored boolean becomes
+   * one of those two answers. Anything else — a hand-written value, a mode this build
+   * does not know — is not a setting, and the default stands.
+   */
+  const readingMode = (): MangaReaderSettings["readingMode"] => {
+    const value = stored.readingMode;
+    if (value === "single" || value === "double" || value === "scroll") {
+      return value;
+    }
+
+    // The switch it used to be: on was two pages, off one. Read once, and never
+    // written back — the first press of the new selector writes this shape.
+    if (typeof stored.doublePage === "boolean") {
+      return stored.doublePage ? "double" : "single";
+    }
+
+    return DEFAULT_SETTINGS.readingMode;
+  };
+
+  /**
    * Whether a screen fades in — read from the pair of buttons, or from the slider it
    * used to be.
    *
@@ -114,7 +137,7 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
   };
 
   return {
-    doublePage: flag("doublePage"),
+    readingMode: readingMode(),
     coverAlone: flag("coverAlone"),
     detectSpreads: flag("detectSpreads"),
     fade: fade(),

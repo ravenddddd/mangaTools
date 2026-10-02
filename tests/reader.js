@@ -945,7 +945,7 @@ async function main() {
 
   await runSection("settings are parsed defensively", () => {
     const defaults = {
-      doublePage: false,
+      readingMode: "single",
       coverAlone: true,
       detectSpreads: true,
       fade: true,
@@ -958,14 +958,46 @@ async function main() {
       "a browser that has never been asked gets the defaults — the mode off"
     );
     assert.deepStrictEqual(
-      NR.parseSettings('{"doublePage":true}'),
-      { ...defaults, doublePage: true },
+      NR.parseSettings('{"coverAlone":false}'),
+      { ...defaults, coverAlone: false },
       "a stored object may be missing a field: the rest are defaults"
     );
     assert.deepStrictEqual(
-      NR.parseSettings('{"doublePage":"yes"}'),
+      NR.parseSettings('{"coverAlone":"yes"}'),
       defaults,
       "and a value of the wrong type is not a setting"
+    );
+
+    // How the pages are laid out used to be a boolean — the switch that said two pages
+    // or one — and the third answer is why it is not one any more. A stored boolean
+    // becomes one of the two it could mean, and a stored mode that this build does not
+    // know is not a setting at all.
+    const mode = (raw) => NR.parseSettings(raw).readingMode;
+    assert.strictEqual(
+      mode('{"doublePage":true}'),
+      "double",
+      "on was two pages"
+    );
+    assert.strictEqual(mode('{"doublePage":false}'), "single", "off was one");
+    assert.strictEqual(
+      mode('{"readingMode":"scroll"}'),
+      "scroll",
+      "and each mode reads"
+    );
+    assert.strictEqual(
+      mode('{"readingMode":"doublePage"}'),
+      "single",
+      "as itself"
+    );
+    assert.strictEqual(
+      mode('{"readingMode":"sideways"}'),
+      "single",
+      "while a mode this build has never heard of is the default, not a guess"
+    );
+    assert.strictEqual(
+      mode('{"readingMode":"scroll","doublePage":true}'),
+      "scroll",
+      "and the mode wins over the switch it replaced"
     );
     assert.deepStrictEqual(
       NR.parseSettings("not json"),
@@ -2404,7 +2436,7 @@ async function main() {
           dom.window.localStorage.getItem("plugin.mangaTools.settings")
         ),
         {
-          doublePage: true,
+          readingMode: "double",
           coverAlone: true,
           detectSpreads: true,
           fade: true,
@@ -2433,7 +2465,7 @@ async function main() {
     assert.deepStrictEqual(
       JSON.parse(dom.window.localStorage.getItem("plugin.mangaTools.settings")),
       {
-        doublePage: true,
+        readingMode: "double",
         coverAlone: true,
         detectSpreads: true,
         fade: true,
@@ -3835,7 +3867,6 @@ async function main() {
     "the wheel turns, ctrl+wheel zooms, and the drag pans",
     async () => {
       const { box } = await startReader({ galleryId: "8", on: true });
-
       const spread = container();
       const chrome = box.lightbox.querySelector(".manga-reader-chrome");
       const transform = () => spread.style.transform;
@@ -4199,6 +4230,303 @@ async function main() {
    * throttled — and both are pinned here, including the half that must not happen:
    * a drag that turns the page, or a press on the bar that pans it.
    */
+  /**
+   * The third mode: the whole gallery as one column, scrolled rather than turned.
+   *
+   * A second *renderer* rather than a third setting — a screen at a time is discrete
+   * and a column is not — and what the two have in common is the reader's place: a
+   * page. That is what lets the header, the counter, the chapter menu and the bar go
+   * on meaning the same thing in all three modes, and it is what this section is
+   * about.
+   */
+  await runSection(
+    "the third mode lays the gallery out as a column",
+    async () => {
+      // The decision first, on its own: which page of a column the reader is looking at
+      // is arithmetic over where the rows are, and this DOM cannot lay anything out.
+      const box01 = (top, bottom) => ({ top, bottom });
+      assert.strictEqual(
+        NR.pageAtTop([box01(0, 500), box01(500, 1000), box01(1000, 1500)], 0),
+        0,
+        "the first row is the page at the top of an unscrolled column"
+      );
+      assert.strictEqual(
+        NR.pageAtTop([box01(-1000, -500), box01(-500, 0), box01(0, 500)], 0),
+        2,
+        "…and after two pages of scrolling it is the third"
+      );
+      assert.strictEqual(
+        NR.pageAtTop([box01(0, 500), box01(500, 1000)], 499),
+        0,
+        "a row still below the top edge is the page the reader is looking into"
+      );
+      assert.strictEqual(
+        NR.pageAtTop([box01(-900, -400)], 0),
+        0,
+        "scrolled past the end, they are on the last page rather than on none"
+      );
+      assert.strictEqual(
+        NR.pageAtTop([], 0),
+        -1,
+        "and an empty column has no answer"
+      );
+
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const counter = () =>
+        box.lightbox.querySelector(".manga-reader-counter").textContent;
+
+      const scroll = box.lightbox.querySelector("#manga-reader-scroll");
+      assert.ok(
+        scroll,
+        "the options panel offers a third way to lay the pages out"
+      );
+      dom.click(scroll);
+
+      const container = box.lightbox.querySelector(".manga-reader-spread");
+      assert.strictEqual(
+        container.classList.contains("is-scroll"),
+        true,
+        "the container a screen would go in becomes a scroll box"
+      );
+
+      const rows = [...container.querySelectorAll(".manga-reader-scroll-page")];
+      assert.strictEqual(
+        rows.length,
+        5,
+        "with a row for every page of the gallery"
+      );
+      assert.deepStrictEqual(
+        rows.map((row) => row.querySelector("img").src),
+        [
+          "/image/401/image",
+          "/image/402/image",
+          "/image/403/image",
+          "/image/404/image",
+          "/image/405/image",
+        ],
+        "in reading order — the order both other modes read in, not path order"
+      );
+      assert.strictEqual(
+        rows[0].style.aspectRatio,
+        "1000 / 1500",
+        "each row reserving the height its page asks for, so the column does not move " +
+          "as the pictures arrive"
+      );
+      assert.strictEqual(
+        rows[0].style.maxWidth,
+        "1000px",
+        "and no page drawn wider than the page it is"
+      );
+      assert.strictEqual(
+        rows[0].querySelector("img").loading,
+        "lazy",
+        "with the browser left to fetch what the reader is coming to"
+      );
+      assert.strictEqual(
+        counter(),
+        "1 / 5",
+        "the reader begins where they already were"
+      );
+
+      // The panel, in this mode: the pairing's own settings have nothing to say and the
+      // fade has nothing to arrive — the column has no screen. What is left is the
+      // selector that got the reader here.
+      const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
+      const away = (node) =>
+        node.getAttribute("data-manga-reader-hidden") !== null;
+      assert.deepStrictEqual(
+        [
+          "#manga-reader-cover-alone",
+          "#manga-reader-detect-spreads",
+          "#manga-reader-offset",
+        ].map((id) => {
+          let at = panel.querySelector(id);
+          while (at && !at.classList?.contains("manga-reader-row"))
+            at = at.parentNode;
+          return away(at);
+        }),
+        [true, true, true],
+        "the pairing's settings are put away, as they are for a single page"
+      );
+      const groups = [...panel.querySelectorAll(".manga-reader-group")];
+      assert.strictEqual(groups.length, 2, "the panel keeps its two groups");
+      assert.strictEqual(
+        away(groups[1]),
+        true,
+        "and the animation group is put away as well: the column has no screen to arrive"
+      );
+      assert.strictEqual(
+        away(groups[0]),
+        false,
+        "while the group holding the selector stays, which is the one that got here"
+      );
+
+      // A turn in the column is a page and not a screenful: a screenful is however much
+      // fits, which is a measurement, and a different answer on every window.
+      rows.forEach((row, index) => {
+        row.offsetTop = index * 500;
+      });
+      press("ArrowRight");
+      assert.strictEqual(
+        container.scrollTop,
+        500,
+        "a turn scrolls to the next page's row rather than drawing a screen"
+      );
+      assert.strictEqual(counter(), "2 / 5", "and the reader is on it");
+
+      // The reader's own scrolling is the same thing from the other end. Where the rows
+      // are on screen is what says which page is at the top, and nothing here lays
+      // anything out, so the section says where they are — two pages scrolled past.
+      container.rect = { left: 0, top: 0, width: 800, height: 600 };
+      rows.forEach((row, index) => {
+        row.rect = {
+          left: 0,
+          top: (index - 2) * 500,
+          bottom: (index - 1) * 500,
+          width: 800,
+          height: 500,
+        };
+      });
+      container.dispatch("scroll");
+      assert.strictEqual(
+        counter(),
+        "3 / 5",
+        "and scrolling to a page is being on that page"
+      );
+
+      // The wheel belongs to the browser here, which is the point of the mode: no
+      // preventDefault, no ctrl chord of this plugin's, and no turn.
+      const wheel = dom.makeEvent("wheel", { deltaY: 120 });
+      container.dispatch("wheel", wheel);
+      assert.strictEqual(
+        wheel.defaultPrevented,
+        false,
+        "the wheel is left alone: scrolling is reading in the column"
+      );
+      assert.strictEqual(counter(), "3 / 5", "…and turns nothing");
+
+      // A page is not something to turn either: there is no page on either side of it,
+      // only more of the same column.
+      dom.click(rows[2].querySelector("img"));
+      assert.strictEqual(counter(), "3 / 5", "a click on a page does nothing");
+
+      // Put back: the mode is the browser's setting, and a section that left the reader
+      // in the column would be choosing it for every section after this one.
+      dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * The bar, down the side — and the same bar.
+   *
+   * One axis swapped, so what is worth pinning is that it is the same bar: the same
+   * ticks, the same drag, the same length rule, and every one of them written in the
+   * other property.
+   */
+  await runSection(
+    "the bar turns down the side, and drags the same way",
+    async () => {
+      // A gallery with chapters in it, since the ticks are half of what is being asked
+      // about here.
+      const { box } = await startReader({
+        galleryId: "31",
+        on: true,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
+      });
+      const counter = () =>
+        box.lightbox.querySelector(".manga-reader-counter").textContent;
+
+      dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+
+      const container = box.lightbox.querySelector(".manga-reader-spread");
+      const rows = [...container.querySelectorAll(".manga-reader-scroll-page")];
+      rows.forEach((row, index) => {
+        row.offsetTop = index * 500;
+      });
+      // A turn, so that there is a position worth reading off the bar: the reader starts
+      // on the first page of the gallery, every time.
+      press("ArrowRight");
+      press("ArrowRight");
+
+      const bar = box.lightbox.querySelector(".manga-reader-progress");
+      assert.strictEqual(
+        bar.classList.contains("is-vertical"),
+        true,
+        "the bar knows which way it runs"
+      );
+      assert.strictEqual(
+        bar.parentNode.classList.contains("Lightbox-display"),
+        true,
+        "and is drawn over the picture area rather than in a row of its own"
+      );
+
+      const track = bar.querySelector(".manga-reader-progress-track");
+      const read = bar.querySelector(".manga-reader-progress-read");
+      const tick = bar.querySelector(".manga-reader-progress-node");
+
+      // Two pages of eight gone: a quarter of the way down.
+      assert.strictEqual(
+        read.style.height,
+        "25.000%",
+        "the fill runs down the bar"
+      );
+      assert.strictEqual(
+        Boolean(read.style.width),
+        false,
+        "…and not across it, which is the other arrangement's property — cleared rather " +
+          "than left behind, because an inline style outranks the stylesheet"
+      );
+      assert.strictEqual(
+        Boolean(track.style.height),
+        false,
+        "the bar is as long as the picture area, which the stylesheet says and no " +
+          "measurement does"
+      );
+      assert.strictEqual(
+        Boolean(tick.style.left),
+        false,
+        "and a tick sits down the bar"
+      );
+      assert.strictEqual(
+        typeof tick.style.top,
+        "string",
+        "…at the fraction its chapter begins at"
+      );
+
+      // The drag, along the other axis: a pointer four fifths of the way down asks for
+      // the page four fifths of the way in.
+      track.rect = { left: 0, top: 0, width: 16, height: 500 };
+      track.dispatch(
+        "mousedown",
+        dom.makeEvent("mousedown", { button: 0, clientY: 400 })
+      );
+      dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+      assert.strictEqual(
+        counter(),
+        "7 / 8",
+        "a drag down the bar seeks along the book, in the column's own coordinates"
+      );
+
+      // And then outlast the throttle, which is the *reader's* clock rather than this
+      // section's: a drag leaves it hot, and the next section's drag would be held back
+      // by it and land a moment late. The sections that drag the bar already wait this
+      // long to see where a drag arrives.
+      await new Promise((resolve) =>
+        setTimeout(resolve, NR.PROGRESS_SCRUB_MS + 40)
+      );
+
+      // Put back: the mode is the browser's setting, and a section that left the reader
+      // in the column would be choosing it for every section after this one.
+      dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+
+      stopReader(box);
+    }
+  );
+
   await runSection("the progress bar shows the way, and moves it", async () => {
     const { box } = await startReader({
       galleryId: "31",
@@ -5882,7 +6210,8 @@ async function main() {
         fadeMs: 300,
       };
       const now = {
-        doublePage: true,
+        // The switch, read as the mode it meant. See parseSettings.
+        readingMode: "double",
         coverAlone: false,
         detectSpreads: true,
         // A length that was set is a yes: the slider's two real answers were "yes" and

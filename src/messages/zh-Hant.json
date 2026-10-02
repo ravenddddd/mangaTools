@@ -6,6 +6,7 @@
   "mangaReader.groupReading": "閱讀",
   "mangaReader.singlePage": "單頁",
   "mangaReader.doublePage": "雙頁",
+  "mangaReader.scrollMode": "縱向",
   "mangaReader.coverAlone": "封面單獨一頁",
   "mangaReader.detectSpreads": "自動偵測跨頁",
   "mangaReader.offset": "配對偏移一頁",

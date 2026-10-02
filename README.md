@@ -651,23 +651,24 @@ the value is simply no longer offered as a new choice. This is react-select's
 `value`/`options` split: the selected value is rendered from `value`, which is
 never filtered, while only the option *list* is filtered.
 
-## Reading: two pages at a time
+## Reading: three ways
 
-A two-page (**spread**) view for Stash's image lightbox, for reading manga the way
-it was printed: two pages side by side, the earlier one on the right. **Off until
-you turn it on.** Open any gallery, open an image, and the lightbox's own options
-menu — the one behind the gear icon in its header — opens the reader's own panel:
-**Single page / Double page** as a pair, then the switches, in three groups.
+A reader for Stash's image lightbox, for reading manga the way it was printed — two
+pages side by side, the earlier one on the right — or one page at a time, or the
+whole gallery as a column scrolled downwards. **Off until you turn it on.** Open any
+gallery, open an image, and the lightbox's own options menu — the one behind the gear
+icon in its header — opens the reader's own panel: **Single page / Double page /
+Scroll** as a row of buttons, then the switches, grouped.
 
 **Everything is in that one panel, and it is grouped by what each setting is about:**
 
 | Group | | |
 |---|---|---|
-| **Reading** | **Single page / Double page** | How the pages are paired |
-| | **Cover on a page of its own** | A cover is not the left half of anything |
-| | **Detect spreads automatically** | A page wider than it is tall is taken for one image spanning two pages |
-| | **Shift the pairing by one page** | For pages that are grouped wrongly, or `O` |
-| **Animation** | **None / Fade in** | Whether a screen arrives or appears. The length is the plugin's — 200 ms |
+| **Reading** | **Single page / Double page / Scroll** | Which of the three ways the pages are laid out — see below |
+| | **Cover on a page of its own** | A cover is not the left half of anything. Double page only |
+| | **Detect spreads automatically** | A page wider than it is tall is taken for one image spanning two pages. Double page only |
+| | **Shift the pairing by one page** | For pages that are grouped wrongly, or `O`. Double page only |
+| **Animation** | **None / Fade in** | Whether a screen arrives or appears. The two screen modes only; the length is the plugin's — 200 ms |
 
 The last two of the reading group are **stored settings that had no control until
 now**: the pairing has read `coverAlone` and `detectSpreads` from the browser's
@@ -675,10 +676,40 @@ settings since the mode was written, and nothing could change them. Turning eith
 off re-lays the pages there and then — as the single/double pair does — because a
 switch that writes a setting the screen does not obey is worse than no switch.
 
-**The last three go away when there is no pairing.** "Cover on a page of its own" and
-"detect spreads" describe how two pages are put together, and the shift moves that
-pairing by a page: reading one page at a time, all three are put away. A switch that
-changes nothing is worse than no switch.
+**The pairing's three go away unless the pages are actually paired.** "Cover on a
+page of its own" and "detect spreads" describe how two pages are put together, and the
+shift moves that pairing by a page: one page at a time, or a column, all three are put
+away. A switch that changes nothing is worse than no switch. The fade goes with them
+in the column, which has no screen to arrive.
+
+**Three ways, and the third is a different renderer rather than a third setting.** A
+screen at a time is *discrete*: a spread is one screen, a turn is arithmetic on the
+place in the book, and the bar's width is measured from the pages on show. A column is
+*not*: the pages are stacked, the browser scrolls them, and where the reader is
+depends on where the column is. What the two share is the place itself — a page — and
+that is what lets the header, the counter, the chapter menu and the bar go on meaning
+the same thing in all three.
+
+**In the column:**
+
+- **The wheel is the browser's.** Scrolling *is* reading there: no page turns, no
+  `preventDefault`, and no chord of this plugin's. `←`/`→` move one page, because a
+  page is what the counter counts; a screenful would be a measurement and a different
+  answer on every window. A click on a page does nothing — there is no page on either
+  side of it — while a click on the letterbox still closes the lightbox.
+- **There is no zoom and no pan.** A page is already as wide as the picture area, and
+  the zoom is a transform on the container, which is a scroll box in this mode.
+- **Every row's height is reserved before its picture arrives**, from the size the
+  gallery answer carries: a column of images that are not there yet has no height at
+  all, and each one landing would push the rest down — which for a reader halfway
+  through is the page moving under their eyes.
+- **The bar turns.** It is the same bar down the side of the picture instead of along
+  the bottom: the same four pixels of paint, the same sixteen of aim, the same chapter
+  ticks, the same bubble (beside the line rather than above it), the same drag. Its
+  length is the picture area's, so nothing about it is measured — and the browser's own
+  scrollbar is hidden, because this *is* the scrollbar here.
+- **The pages are in reading order**, the same list the other two modes read — not
+  path order.
 
 **No row has a description under it.** Each is its words and its control. A quiet line
 under a switch is Stash's own shape for one, and this panel has decided against it for
@@ -1420,8 +1451,9 @@ canonical spelling.
 
 The reading half's own:
 
-- **No zoom or pan in spread mode.** Stash's zoom acts on the carousel, which is
-  hidden while the reader draws. Pages are fitted to the screen and that is all.
+- **No zoom or pan in the column.** By design rather than by omission: a page is
+  already as wide as the picture area, and the zoom is a transform on a container that
+  scrolls in this mode. The two screen modes both zoom, with `Ctrl`+wheel.
 - **The switches are worded in English the first time.** Their language comes from
   Stash's own configuration, read with the gallery — so the wording is right from
   the second time the menu is opened in a session.

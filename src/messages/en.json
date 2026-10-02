@@ -6,6 +6,7 @@
   "mangaReader.groupReading": "Reading",
   "mangaReader.singlePage": "Single page",
   "mangaReader.doublePage": "Double page",
+  "mangaReader.scrollMode": "Scroll",
   "mangaReader.coverAlone": "Cover on a page of its own",
   "mangaReader.detectSpreads": "Detect spreads automatically",
   "mangaReader.offset": "Shift the pairing by one page",

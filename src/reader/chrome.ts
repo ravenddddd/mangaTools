@@ -638,12 +638,11 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
      * which half was pressed, by its id, and says what to write.
      */
     const pair = (
-      first: { id: string; textId: string },
-      second: { id: string; textId: string },
+      halves: { id: string; textId: string }[],
       choose: (id: string) => void
     ): HTMLElement => {
       const track = text(CLASS_PAGES, "div");
-      for (const half of [first, second]) {
+      for (const half of halves) {
         const button = document.createElement("button");
         button.type = "button";
         button.id = half.id;
@@ -667,10 +666,20 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
     reading.appendChild(
       pair(
-        { id: SINGLE_PAGE_ID, textId: "mangaReader.singlePage" },
-        { id: DOUBLE_PAGE_ID, textId: "mangaReader.doublePage" },
+        [
+          { id: SINGLE_PAGE_ID, textId: "mangaReader.singlePage" },
+          { id: DOUBLE_PAGE_ID, textId: "mangaReader.doublePage" },
+          { id: SCROLL_ID, textId: "mangaReader.scrollMode" },
+        ],
         (id) =>
-          latest?.handlers.onSetting({ doublePage: id === DOUBLE_PAGE_ID })
+          latest?.handlers.onSetting({
+            readingMode:
+              id === DOUBLE_PAGE_ID
+                ? "double"
+                : id === SCROLL_ID
+                  ? "scroll"
+                  : "single",
+          })
       )
     );
 
@@ -700,14 +709,19 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     );
     reading.appendChild(parts.offsetRow);
 
-    rule();
+    parts.animationRule = rule();
 
     // ── How a screen arrives ──────────────────────────────────────────────
+    // A screen, in the two screen modes: the column has nothing that arrives, so this
+    // group goes with the pairing's when there is no screen — see the pass below.
     const animation = group("mangaReader.groupAnimation");
+    parts.animationGroup = animation;
     animation.appendChild(
       pair(
-        { id: FADE_OFF_ID, textId: "mangaReader.fadeOff" },
-        { id: FADE_ON_ID, textId: "mangaReader.fade" },
+        [
+          { id: FADE_OFF_ID, textId: "mangaReader.fadeOff" },
+          { id: FADE_ON_ID, textId: "mangaReader.fade" },
+        ],
         (id) => latest?.handlers.onSetting({ fade: id === FADE_ON_ID })
       )
     );
@@ -740,6 +754,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
   say("mangaReader.singlePage");
   say("mangaReader.doublePage");
+  say("mangaReader.scrollMode");
   say("mangaReader.fadeOff");
   say("mangaReader.fade");
 
@@ -750,8 +765,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     if (half) half.classList.toggle("is-on", on);
   };
 
-  chosen(SINGLE_PAGE_ID, !state.settings.doublePage);
-  chosen(DOUBLE_PAGE_ID, state.settings.doublePage);
+  chosen(SINGLE_PAGE_ID, state.settings.readingMode === "single");
+  chosen(DOUBLE_PAGE_ID, state.settings.readingMode === "double");
+  chosen(SCROLL_ID, state.settings.readingMode === "scroll");
   chosen(FADE_OFF_ID, !state.settings.fade);
   chosen(FADE_ON_ID, state.settings.fade);
 
@@ -769,14 +785,21 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   // pairing by a page. So they go with the pairing — the switches, the group they
   // live in, and the rule that separates it, with the rule above it left in place so
   // the panel still has one between the two groups that remain.
-  const paired = state.settings.doublePage;
+  const paired = state.settings.readingMode === "double";
   showWhen(parts.coverRow, paired);
   showWhen(parts.spreadsRow, paired);
   showWhen(parts.offsetRow, paired);
+
+  // And the fade, which is about a screen arriving: the column has no screen to
+  // arrive, so the group goes, and the rule above it goes with it.
+  const screening = state.settings.readingMode !== "scroll";
+  showWhen(parts.animationGroup, screening);
+  showWhen(parts.animationRule, screening);
 }
 
 const SINGLE_PAGE_ID = "manga-reader-single-page";
 const DOUBLE_PAGE_ID = "manga-reader-double-page";
+const SCROLL_ID = "manga-reader-scroll";
 const COVER_ID = "manga-reader-cover-alone";
 const SPREAD_ID = "manga-reader-detect-spreads";
 const OFFSET_ID = "manga-reader-offset";

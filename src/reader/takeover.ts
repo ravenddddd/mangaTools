@@ -74,6 +74,12 @@ import {
 import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderGallery, MangaReaderSettings } from "./namespace";
 import { FADE_MS, readSettings, writeSettings } from "./settings";
+import {
+  CLASS_SCROLL,
+  CLASS_SCROLL_PAGE,
+  buildColumn,
+  rowOffset,
+} from "./scroll";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import { layout, screenAt, stepsToAdjacent } from "./spreads";
 import {
@@ -372,7 +378,7 @@ function laidOut(pages: MangaReaderPage[]): MangaReaderScreen[] {
     detectSpreads: settings.detectSpreads,
     // The setting is a yes or no; the layout's own word for it is a page count.
     offset: settings.offset ? 1 : 0,
-    double: settings.doublePage,
+    double: settings.readingMode === "double",
   });
 }
 
@@ -386,7 +392,7 @@ function laidOut(pages: MangaReaderPage[]): MangaReaderScreen[] {
  */
 function pairingKey(): string {
   return [
-    settings.doublePage,
+    settings.readingMode,
     settings.coverAlone,
     settings.detectSpreads,
     settings.offset,
@@ -592,13 +598,21 @@ function sync(lightbox: Element): void {
   // render is of the place it mounted at, and this half is the only thing that knows
   // where the reader is now. See footer.ts. Before the screen's own early return,
   // because a footer left stale is stale whatever the screen is doing.
-  syncFooter(
-    lightbox,
-    at < 0 ? null : gallery.images[gallery.screens[at].start] || null
-  );
+  const page = pageAt(gallery, at);
+  syncFooter(lightbox, page < 0 ? null : gallery.images[page] || null);
 
   // The same position said as a fraction of the book, and the one gesture that
-  // crosses it. See progress.ts.
+  // crosses it. See progress.ts. In the third mode the bar is a column too, and it is
+  // drawn in the picture area rather than in a row of its own.
+  const scrolling = settings.readingMode === "scroll";
+
+  if (scrolling) {
+    ensureProgress(lightbox, progressState(gallery, at, lightbox));
+    ensureColumn(lightbox, gallery);
+    return;
+  }
+
+  removeColumn();
   if (at >= 0) ensureProgress(lightbox, progressState(gallery, at, lightbox));
 
   if (at < 0) return;
@@ -633,10 +647,14 @@ function progressState(
   lightbox: Element
 ): Parameters<typeof ensureProgress>[1] {
   const screen = gallery.screens[at];
+  const scrolling = settings.readingMode === "scroll";
   return {
-    at: gallery.screens[at]?.start ?? 0,
+    at: Math.max(pageAt(gallery, at), 0),
     total: gallery.pages.length,
-    width: pictureWidth(screen?.pages.length ?? 0),
+    // The column's bar is a column too, and its extent is the picture area's rather
+    // than a measurement of the pages — see progress.ts.
+    width: scrolling ? 0 : pictureWidth(screen?.pages.length ?? 0),
+    vertical: scrolling,
     chapters: gallery.chapters,
     chapterNameAt: (page) =>
       chapterAt(gallery.chapters, gallery.pages[page]?.id || "")?.title || "",
@@ -662,8 +680,7 @@ function chromeState(
   const at = screenNow(gallery);
   const image =
     at < 0 ? null : gallery.images[gallery.screens[at].start] || null;
-  const pageId =
-    at < 0 ? "" : gallery.pages[gallery.screens[at].start]?.id || "";
+  const pageId = gallery.pages[pageAt(gallery, at)]?.id || "";
 
   return {
     image,
@@ -683,6 +700,9 @@ function chromeState(
       },
       onChapter: (to: number) => {
         place = to;
+        // A chapter is a page to go to, and in the column that means scrolling to it;
+        // in the screen modes the next pass draws the screen it is in.
+        if (settings.readingMode === "scroll") scrollTo = to;
         step();
       },
       onSetting: (next: Partial<MangaReaderSettings>) => {
@@ -769,6 +789,9 @@ function ensureContainer(lightbox: Element): void {
     container.addEventListener("click", onSpreadClick);
     container.addEventListener("wheel", onSpreadWheel);
     container.addEventListener("mousedown", onSpreadPress);
+    // The third mode's own way of moving the reader. Harmless in the other two: a
+    // screen is not a scroll box and fires nothing.
+    container.addEventListener("scroll", onColumnScroll);
     // An image that has not arrived measures nothing, and the progress bar is as wide
     // as the pages: this is the one event that says they are here, since a picture
     // finishing is not a change to the document for the observer to see.
@@ -786,6 +809,120 @@ function ensureContainer(lightbox: Element): void {
   (display as HTMLElement).style.position = "relative";
   display.appendChild(container);
   lightbox.classList.add(CLASS_ACTIVE);
+}
+
+/**
+ * The gallery the column was built for, or null when no column is up.
+ *
+ * A column is not redrawn per pass the way a screen is: its rows are every page of
+ * the gallery, and rebuilding them would throw away the reader's scroll position —
+ * which in this mode *is* where they are.
+ */
+let columnFor: string | null = null;
+
+/**
+ * A page the column is to be scrolled to, or null when nothing has asked.
+ *
+ * Written only by the things that *move* the reader: a turn, a chapter, the bar, and
+ * the mode being entered. Never by the reader's own scrolling, because a request put
+ * in by that would be this plugin undoing what they just did.
+ */
+let scrollTo: number | null = null;
+
+/**
+ * The column of pages: built once per gallery, and then scrolled rather than drawn.
+ *
+ * `ensureContainer` first, because this is the same container the other two modes
+ * draw a screen into — the one that covers Stash's carousel. What changes is what is
+ * inside it and how it behaves: a row per page, in reading order, scrolled by the
+ * browser rather than turned a screen at a time.
+ *
+ * The transform goes: the zoom is a transform on this container and a scroll box
+ * cannot be transformed (`clientX` stops meaning what it meant, and the scrolled
+ * content moves with it). There is nothing to zoom in this mode anyway — a page is
+ * already as wide as the picture area.
+ */
+function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
+  ensureContainer(lightbox);
+  if (!container) return;
+
+  container.classList.add(CLASS_SCROLL);
+  container.style.transform = "";
+  view = fitView();
+
+  let built = false;
+  if (columnFor !== gallery.id) {
+    buildColumn(container, gallery.pages, (page) => pageUrl(page));
+    columnFor = gallery.id;
+    built = true;
+    // Nothing to wait for: every row's height comes from the page's own shape, so the
+    // column is complete the moment it is built.
+    awaiting = -1;
+  }
+
+  // Where the reader is, in the column's own coordinates. On a fresh column that is
+  // the page they were on — the mode was switched, and the place did not move — and
+  // otherwise only when something asked.
+  const to = built ? place : scrollTo;
+  scrollTo = null;
+  if (to === null || to < 0) return;
+
+  const offset = rowOffset(container, to);
+  if (offset !== null) container.scrollTop = offset;
+}
+
+/**
+ * Takes the column away, for a mode that draws screens.
+ *
+ * Only when there is one: this is called on every pass of the other two modes, and
+ * doing its work then — clearing the class, and the transform with it — would be this
+ * function undoing the zoom on every pass of a lightbox that never had a column in it.
+ */
+function removeColumn(): void {
+  if (columnFor === null) return;
+
+  columnFor = null;
+  scrollTo = null;
+  view = fitView();
+  // And the screen is drawn again: while the column was up, nothing was drawn into
+  // this container and `shownAt` still says the screen from before it — which the pass
+  // would take for the screen already on show, leaving the reader the column's own rows
+  // in a mode that has no column.
+  shownAt = -1;
+  container?.classList.remove(CLASS_SCROLL);
+}
+
+/** Which page the column is showing at its top, from where its rows are */
+function columnPageAt(column: HTMLElement): number {
+  const rows = Array.from(column.querySelectorAll("." + CLASS_SCROLL_PAGE)).map(
+    (row) => (row as HTMLElement).getBoundingClientRect()
+  );
+
+  return NR.pageAtTop(
+    rows.map((rect) => ({ top: rect.top, bottom: rect.bottom })),
+    column.getBoundingClientRect().top
+  );
+}
+
+/**
+ * The reader scrolled the column, so the page at the top is where they are now.
+ *
+ * This is not the same thing as the pass that follows it. That pass draws whatever
+ * the mode says, and in this mode what it draws depends on `place` — so if this asked
+ * for a scroll as well, the reader's own scrolling would be undone by the answer to
+ * it. It does not: only a turn, a chapter, the bar, or the mode being entered puts a
+ * request in `scrollTo`, and this is none of those.
+ */
+function onColumnScroll(): void {
+  const lightbox = root;
+  if (!lightbox || !container) return;
+  if (settings.readingMode !== "scroll" || !wanted()) return;
+
+  const at = columnPageAt(container);
+  if (at < 0 || at === place) return;
+
+  place = at;
+  sync(lightbox);
 }
 
 /**
@@ -1039,6 +1176,23 @@ function preload(at: number): void {
 
 // ── Moving the lightbox, a page at a time ──────────────────────────
 
+/**
+ * The page the reader is on, as the mode means it.
+ *
+ * The screen modes mean the page their *screen* begins with: a screen is what they
+ * draw and what the counter counts, and a pair is one screen — so the header names the
+ * chapter the reader came into the screen by, which is what it has always done. The
+ * column has no screens: its pages are its own rows, and the page at the top *is* the
+ * page the reader is on.
+ *
+ * One place, because three surfaces ask: the footer's name for the page, the bar's
+ * position in the book, and the chapter the header shows.
+ */
+function pageAt(gallery: MangaReaderGallery, at: number): number {
+  if (settings.readingMode === "scroll") return Math.max(place, 0);
+  return at < 0 ? -1 : gallery.screens[at].start;
+}
+
 /** The page the lightbox says it is on, 0-based, or null when it cannot be read */
 /**
  * Where the reader is on screen, as a screen index, or -1 when it is nowhere yet.
@@ -1238,6 +1392,8 @@ function onKeyDown(event: KeyboardEvent): void {
 
   if (event.key === "o" || event.key === "O") {
     if (event.repeat) return;
+    // The shift is a shift of the pairing, and the column has no pairing to shift.
+    if (settings.readingMode !== "double") return;
 
     setOffset(gallery, !settings.offset);
 
@@ -1275,6 +1431,24 @@ function onKeyDown(event: KeyboardEvent): void {
 function turnBy(lightbox: Element, direction: 1 | -1): boolean {
   const gallery = current();
   if (!gallery) return false;
+
+  // One page in the column, rather than a screenful: a screenful is however much
+  // fits, which is a measurement and a different answer on every window — and a page
+  // is what the counter counts and what a turn is called in the other two modes
+  // ("left and right move a *screen*, not a page" is true there because a screen is
+  // the unit there).
+  if (settings.readingMode === "scroll") {
+    const next = Math.min(
+      Math.max(place + direction, 0),
+      gallery.pages.length - 1
+    );
+    if (next === place) return false;
+
+    place = next;
+    scrollTo = next;
+    sync(lightbox);
+    return true;
+  }
 
   const at = screenNow(gallery);
   if (at < 0) return false;
@@ -1346,6 +1520,11 @@ function seekTo(lightbox: Element, at: number): void {
   if (!gallery) return;
 
   place = Math.min(Math.max(at, 0), gallery.pages.length - 1);
+  // The column goes where the seek asked: it is the only mode where the place and
+  // what is on screen are two different things, so it is the only one that has to be
+  // told. Idempotent, so a seek that changes nothing scrolls nowhere.
+  if (settings.readingMode === "scroll") scrollTo = place;
+
   sync(lightbox);
 }
 
@@ -1432,6 +1611,12 @@ function onSpreadClick(event: Event): void {
   }
 
   const target = event.target as HTMLElement | null;
+
+  // A page in the column is not something to turn: there is no page on either side of
+  // it, only more of the same column, which the reader scrolls. The letterbox below
+  // still closes the lightbox, so this is the one click that means nothing.
+  if (settings.readingMode === "scroll" && target?.tagName === "IMG") return;
+
   if (target?.tagName !== "IMG") {
     // In fullscreen, a click on the space around the pages does nothing at all.
     // Leaving fullscreen is the header's button or Escape, and nobody asking for a
@@ -1508,6 +1693,12 @@ function onSpreadWheel(event: Event): void {
   const lightbox = root;
   if (!lightbox || !container) return;
 
+  // In the column the wheel is the browser's: scrolling *is* reading there, so this
+  // leaves the event entirely alone — no preventDefault, no ctrl chord of ours. That
+  // is the one thing the third mode could not have been without, and it is why the
+  // two arrangements cannot be one setting.
+  if (settings.readingMode === "scroll") return;
+
   const wheel = event as WheelEvent;
   // Taken whatever is done with it: ctrl+wheel is the browser's own page zoom, and
   // without this a reader zooming into a page would zoom the whole interface.
@@ -1557,6 +1748,11 @@ function onSpreadWheel(event: Event): void {
  * lightbox, is still a drag, and it has to end somewhere.
  */
 function onSpreadPress(event: Event): void {
+  // Nothing to pan: the pan is a transform on the container, and in the column there
+  // is no transform — the scrolling is the browser's own. Left unguarded, a press
+  // would record a pan and swallow the click that follows it.
+  if (settings.readingMode === "scroll") return;
+
   const press = event as MouseEvent;
   if (press.button !== 0) return;
 
