@@ -832,6 +832,20 @@ function ensureContainer(lightbox: Element): void {
 let columnFor: string | null = null;
 
 /**
+ * The container that column was built into, which is not the same question.
+ *
+ * A lightbox that closes takes its container with it, and the next one is given a new
+ * one — so a column remembered by the gallery alone would be a column this half
+ * believed was already there, and a reader opening the same gallery twice would find an
+ * empty picture area. That is not hypothetical: it is what happened, and switching the
+ * mode back and forth inside one lightbox *hid* it, because that path goes through
+ * removeColumn, which clears this. Compared as an element rather than tracked by
+ * clearing it in the teardown, so that a teardown path which forgets cannot bring it
+ * back.
+ */
+let columnIn: Element | null = null;
+
+/**
  * A page the column is to be scrolled to, or null when nothing has asked.
  *
  * Written only by the things that *move* the reader: a turn, a chapter, the bar, and
@@ -866,9 +880,10 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
   view = fitView();
 
   let built = false;
-  if (columnFor !== gallery.id) {
+  if (columnFor !== gallery.id || columnIn !== container) {
     buildColumn(container, gallery.pages, (page) => pageUrl(page));
     columnFor = gallery.id;
+    columnIn = container;
     built = true;
     // Nothing to wait for: every row's height comes from the page's own shape, so the
     // column is complete the moment it is built.
@@ -902,6 +917,7 @@ function removeColumn(): void {
   if (columnFor === null) return;
 
   columnFor = null;
+  columnIn = null;
   scrollTo = null;
   view = fitView();
   setColumnZoom(1);

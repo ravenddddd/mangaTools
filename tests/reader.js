@@ -1246,6 +1246,7 @@ async function main() {
       counterText,
       search = "",
       ids = null,
+      mode = null,
       // A page with no gallery, or a gallery this plugin does not touch, has no
       // switch of ours — and a section about that would be asking for the wrong thing.
       expectSwitch = true,
@@ -1284,9 +1285,15 @@ async function main() {
     // there for a marked gallery whether or not a pair is on, because the mode is not
     // what puts the reader on a gallery: the mark is.
     await settle();
-    const input = box.lightbox.querySelector(
-      on ? "#manga-reader-double-page" : "#manga-reader-single-page"
-    );
+    // Which of the three ways the pages are laid out. `on` still says whether they are
+    // paired, because that is what most of the suite means by it; the mode is named
+    // when a section wants the column, which cannot be reached through `on` at all.
+    const wanted = {
+      single: "#manga-reader-single-page",
+      double: "#manga-reader-double-page",
+      scroll: "#manga-reader-scroll",
+    }[mode || (on ? "double" : "single")];
+    const input = box.lightbox.querySelector(wanted);
     if (expectSwitch) {
       assert.ok(
         input,
@@ -4440,6 +4447,76 @@ async function main() {
       );
 
       stopReader(box);
+    }
+  );
+
+  /**
+   * A column is built for the lightbox it is shown in, not just for the gallery.
+   *
+   * What was wrong: the column remembered the *gallery* it had been built for, and a
+   * lightbox that closes takes its container with it — the next one is given a new one
+   * by `ensureContainer`. So the second lightbox on the same gallery found a column it
+   * believed was already there and built nothing, and the reader got an empty picture
+   * area. Switching the mode back and forth inside that lightbox hid the bug rather
+   * than showing it: that path goes through `removeColumn`, which is what clears the
+   * memory.
+   */
+  await runSection(
+    "a column is built again for a lightbox that opens after one",
+    async () => {
+      const pages = [
+        "/image/401/image",
+        "/image/402/image",
+        "/image/403/image",
+        "/image/404/image",
+        "/image/405/image",
+      ];
+      const rowsIn = (box) => [
+        ...box.lightbox.querySelectorAll(".manga-reader-scroll-page"),
+      ];
+
+      const first = await startReader({
+        galleryId: "8",
+        on: true,
+        mode: "scroll",
+      });
+      assert.strictEqual(
+        rowsIn(first.box).length,
+        5,
+        "a column of the gallery's pages"
+      );
+      stopReader(first.box);
+
+      // The same gallery again, in the same mode: this is the lightbox that came up
+      // empty.
+      const again = await startReader({
+        galleryId: "8",
+        on: true,
+        mode: "scroll",
+      });
+      assert.strictEqual(
+        again.box.lightbox
+          .querySelector(".manga-reader-spread")
+          .classList.contains("is-scroll"),
+        true,
+        "the lightbox opens in the column"
+      );
+      assert.strictEqual(
+        rowsIn(again.box).length,
+        5,
+        "with its pages in it rather than an empty picture area"
+      );
+      assert.deepStrictEqual(
+        rowsIn(again.box).map((row) => row.querySelector("img").src),
+        pages,
+        "…the gallery's own pages, in reading order"
+      );
+
+      // Put back: the mode is the browser's setting, and a section that left the reader
+      // in the column would be choosing it for every section after this one.
+      dom.click(again.box.lightbox.querySelector("#manga-reader-double-page"));
+
+      stopReader(again.box);
     }
   );
 
