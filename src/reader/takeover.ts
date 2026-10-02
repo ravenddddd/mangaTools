@@ -79,7 +79,10 @@ import {
   CLASS_SCROLLING,
   CLASS_SCROLL_PAGE,
   buildColumn,
+  columnZoom,
   rowOffset,
+  setColumnZoom,
+  zoomedBy,
 } from "./scroll";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import { layout, screenAt, stepsToAdjacent } from "./spreads";
@@ -692,10 +695,17 @@ function chromeState(
     placed: gallery.chapters,
     settings,
     locale: language,
-    zoomed: isZoomed(view),
+    zoomed: zoomedNow(),
     handlers: {
       onResetZoom: () => {
+        // Which of the two zooms is in hand is the mode's business, and the button
+        // does not care: what a reader pressing it means is "back to the size the
+        // pages fit at", in whichever of the two that is.
         view = fitView();
+        if (settings.readingMode === "scroll") {
+          setColumnZoom(1);
+          scrollTo = Math.max(place, 0);
+        }
         applyView();
         sync(lightbox);
       },
@@ -863,6 +873,11 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
     // Nothing to wait for: every row's height comes from the page's own shape, so the
     // column is complete the moment it is built.
     awaiting = -1;
+    // A fresh column at the size the pages fit at, like a fresh screen: the zoom is
+    // this reader's for as long as they are reading, and coming back to the mode is
+    // not asking for the last one. Here rather than above, because this runs on every
+    // pass — and a reset on every pass is a zoom that never happens.
+    setColumnZoom(1);
   }
 
   // Where the reader is, in the column's own coordinates. On a fresh column that is
@@ -889,6 +904,7 @@ function removeColumn(): void {
   columnFor = null;
   scrollTo = null;
   view = fitView();
+  setColumnZoom(1);
   // And the screen is drawn again: while the column was up, nothing was drawn into
   // this container and `shownAt` still says the screen from before it — which the pass
   // would take for the screen already on show, leaving the reader the column's own rows
@@ -1702,12 +1718,28 @@ function onSpreadWheel(event: Event): void {
   const wheel = event as WheelEvent;
 
   // In the column the wheel is the browser's: scrolling *is* reading there, so the
-  // plain wheel is left entirely alone. **Ctrl is not**: that is the browser's page
-  // zoom — the whole interface rather than the pages — and both screen modes take the
-  // chord rather than passing it on, so taking it here as well is what keeps a reader
-  // from zooming Stash itself by accident while they are reading a column.
+  // plain wheel is left entirely alone. **Ctrl is not** — it is the chord the other
+  // two modes zoom with, and it does the same thing to the pages here, one notch a
+  // step.
+  //
+  // What it does not share is the machinery. There the zoom is a transform over pages
+  // *fitted* to the screen, with slack in both directions to zoom into; here the page
+  // is already as wide as the picture area, so what zooms is the page itself — a
+  // transform on a scroll box would leave the scroll range where it was and put the
+  // edges of a zoomed page out of reach. See the note on `zoom` in scroll.ts.
   if (settings.readingMode === "scroll") {
-    if (wheel.ctrlKey || wheel.metaKey) wheel.preventDefault();
+    if (!wheel.ctrlKey && !wheel.metaKey) return;
+
+    wheel.preventDefault();
+    const was = columnZoom();
+    setColumnZoom(zoomedBy(was, wheel.deltaY < 0 ? VIEW_STEP : 1 / VIEW_STEP));
+    if (columnZoom() === was) return;
+
+    // And the reader stays on the page they were reading. Every row has a different
+    // height at a different zoom, so where they were *in the column* does not survive
+    // the change — the page does, which is what this half keeps and why.
+    scrollTo = Math.max(place, 0);
+    sync(lightbox);
     return;
   }
 
@@ -1759,13 +1791,29 @@ function onSpreadWheel(event: Event): void {
  * lightbox, is still a drag, and it has to end somewhere.
  */
 function onSpreadPress(event: Event): void {
-  // Nothing to pan: the pan is a transform on the container, and in the column there
-  // is no transform — the scrolling is the browser's own. Left unguarded, a press
-  // would record a pan and swallow the click that follows it.
-  if (settings.readingMode === "scroll") return;
-
   const press = event as MouseEvent;
   if (press.button !== 0) return;
+
+  // In the column the press begins a *scroll* the reader makes with the pointer,
+  // which is what a drag on a column of pages means: the same movement the wheel
+  // makes, on the same scroll box, so the two cannot disagree about where the reader
+  // is. Nothing is transformed — a pan is a transform, and this container scrolls.
+  if (settings.readingMode === "scroll") {
+    if (!container) return;
+
+    dragFrom = {
+      x: press.clientX,
+      y: press.clientY,
+      left: container.scrollLeft || 0,
+      top: container.scrollTop || 0,
+      at: press.timeStamp,
+    };
+    held = false;
+    press.preventDefault();
+    document.addEventListener("mousemove", onSpreadMove);
+    document.addEventListener("mouseup", onSpreadRelease);
+    return;
+  }
 
   pressed = { x: press.clientX, y: press.clientY, at: press.timeStamp };
   held = false;
@@ -1773,6 +1821,21 @@ function onSpreadPress(event: Event): void {
   document.addEventListener("mousemove", onSpreadMove);
   document.addEventListener("mouseup", onSpreadRelease);
 }
+
+/**
+ * Where a drag in the column started, and where the box was scrolled to then.
+ *
+ * The container's own scroll position, because the drag *is* a scroll: the pointer
+ * moves, the box follows, and everything that reads the box — the place in the book,
+ * the bar, the header — reads a scroll that happened.
+ */
+let dragFrom: {
+  x: number;
+  y: number;
+  left: number;
+  top: number;
+  at: number;
+} | null = null;
 
 /** Where the pointer went down, and when: the two halves of Stash's click test */
 interface MangaReaderPress {
@@ -1795,7 +1858,25 @@ let pressed: MangaReaderPress | null = null;
 let held = false;
 
 function onSpreadMove(event: Event): void {
-  if (!pressed || !container) return;
+  if (!container) return;
+
+  // The column's drag: the box follows the pointer, which is a scroll like any other
+  // — and this is why it needs no guard against the wheel. Both of them move the same
+  // scroll position, so neither can be surprised by the other, and the pass that reads
+  // it afterwards reads a scroll that happened rather than one this half arranged.
+  if (dragFrom) {
+    const drag = event as MouseEvent;
+    container.scrollLeft = dragFrom.left - (drag.clientX - dragFrom.x);
+    container.scrollTop = dragFrom.top - (drag.clientY - dragFrom.y);
+
+    // Anything at all is a drag, so the release after one is not a click on a page —
+    // and in this mode a click does nothing anyway, which is the one place the two
+    // modes agree for different reasons.
+    held = true;
+    return;
+  }
+
+  if (!pressed) return;
 
   const move = event as MouseEvent;
   const dx = move.clientX - pressed.x;
@@ -1822,8 +1903,10 @@ function onSpreadRelease(event: Event): void {
   // if the pointer stayed put. A reader who pressed and thought better of it has
   // asked for nothing.
   const release = event as MouseEvent;
-  if (pressed && release.timeStamp - pressed.at > VIEW_CLICK_MS) held = true;
+  const from = dragFrom || pressed;
+  if (from && release.timeStamp - from.at > VIEW_CLICK_MS) held = true;
 
+  dragFrom = null;
   pressed = null;
 }
 
@@ -1842,8 +1925,20 @@ function onSpreadRelease(event: Event): void {
 function applyView(): void {
   if (!container) return;
 
-  container.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
-  container.classList.toggle(CLASS_ZOOMED, isZoomed(view));
+  // In the column there is no transform — the zoom is the pages' own width, and a
+  // transform on a scroll box would leave its scroll range behind (see scroll.ts). The
+  // class is toggled all the same, because what it says is that there is something here
+  // to drag, which is true of a zoomed column: the drag scrolls it.
+  if (settings.readingMode !== "scroll") {
+    container.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
+  }
+  container.classList.toggle(CLASS_ZOOMED, zoomedNow());
+}
+
+/** Whether the pages are drawn larger than the size they fit at, in either mode */
+function zoomedNow(): boolean {
+  if (settings.readingMode === "scroll") return columnZoom() !== 1;
+  return isZoomed(view);
 }
 
 /**

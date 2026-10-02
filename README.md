@@ -692,16 +692,24 @@ the same thing in all three.
 
 **In the column:**
 
-- **The wheel is the browser's**, and the plain one is left entirely alone: no page
-  turns and no `preventDefault`. **`Ctrl`+wheel is the exception** — that chord is the
-  browser's *page* zoom, the whole interface rather than the pages, and both screen
-  modes take it, so taking it here too is what keeps a reader from zooming Stash
-  itself by accident. `←`/`→` move one page, because a page is what the counter
+- **The plain wheel is the browser's**, left entirely alone: no page turns and no
+  `preventDefault`, because scrolling *is* reading here. **`Ctrl`+wheel zooms the
+  pages**, as it does in the other two modes — the same 10% a notch, the same range —
+  and is taken for that reason rather than passed to the browser, whose own page zoom
+  is the whole interface. `←`/`→` move one page, because a page is what the counter
   counts; a screenful would be a measurement, and a different answer on every window.
   A click on a page does nothing — there is no page on either side of it — while a
   click on the letterbox still closes the lightbox.
-- **There is no zoom and no pan.** A page is already as wide as the picture area, and
-  the zoom is a transform on the container, which is a scroll box in this mode.
+- **A zoomed column is wider than the picture area, and the drag is how a reader
+  moves around in it.** A drag *scrolls* the box — the same movement the wheel makes,
+  on the same box, so the two cannot disagree about where the reader is. The zoom
+  cannot be a transform here, the way it is in the two screen modes: those zoom pages
+  that are *fitted* to the screen, with slack in both directions, while a page in this
+  mode is already as wide as the area. So the page itself grows — which is the
+  browser's own model of page zoom — because a transform on a scroll box leaves its
+  scroll range where it was and puts the edges of a zoomed page out of reach. Whichever
+  zoom is in hand, the header's reset button puts it back, and the reader stays on the
+  page they were reading rather than at the scroll position they were at.
 - **Every row's height is reserved before its picture arrives**, from the size the
   gallery answer carries: a column of images that are not there yet has no height at
   all, and each one landing would push the rest down — which for a reader halfway
@@ -1456,9 +1464,10 @@ canonical spelling.
 
 The reading half's own:
 
-- **No zoom or pan in the column.** By design rather than by omission: a page is
-  already as wide as the picture area, and the zoom is a transform on a container that
-  scrolls in this mode. The two screen modes both zoom, with `Ctrl`+wheel.
+- **Zoomed all the way in, a column is eight screen-widths across.** The range is the
+  same 0.1–8 the screen modes use, and at the far end the drag has a long way to go —
+  which is the honest shape of zooming a page that is already as wide as the picture
+  area. The reset button in the header is the way back, and `Ctrl`+wheel the way out.
 - **The switches are worded in English the first time.** Their language comes from
   Stash's own configuration, read with the gallery — so the wording is right from
   the second time the menu is opened in a session.

@@ -4444,6 +4444,172 @@ async function main() {
   );
 
   /**
+   * Ctrl+wheel in the column: the same gesture, the same numbers, another mechanism.
+   *
+   * The two screen modes zoom a transform over pages that are *fitted* to the screen,
+   * with slack in both directions to zoom into. A page in the column is already as wide
+   * as the picture area, so what zooms is the page itself — a transform on a scroll box
+   * would leave the scroll range behind and put the edges of a zoomed page out of
+   * reach. Which is also why the drag here is a drag of the *scroll position*: a
+   * zoomed column is wider than the area, and the pointer is how a reader moves around
+   * in it.
+   */
+  await runSection("the column zooms, and the drag scrolls it", async () => {
+    // The arithmetic on its own first, which is where the range and the step live.
+    assert.strictEqual(
+      NR.zoomedBy(1, 1.1),
+      1.1,
+      "a notch is a tenth, as it is there"
+    );
+    assert.strictEqual(
+      NR.zoomedBy(NR.VIEW_MAX_ZOOM, 1.1),
+      NR.VIEW_MAX_ZOOM,
+      "…clamped at the top of the same range"
+    );
+    assert.strictEqual(
+      NR.zoomedBy(NR.VIEW_MIN_ZOOM, 1 / 1.1),
+      NR.VIEW_MIN_ZOOM,
+      "…and at the bottom"
+    );
+
+    const { box } = await startReader({ galleryId: "8", on: true });
+    dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+
+    const container = box.lightbox.querySelector(".manga-reader-spread");
+    const rows = [...container.querySelectorAll(".manga-reader-scroll-page")];
+    rows.forEach((row, index) => {
+      row.offsetTop = index * 500;
+    });
+    const zoomButton = () => box.lightbox.querySelector(".manga-reader-zoom");
+    const offered = () =>
+      zoomButton().getAttribute("data-manga-reader-hidden") === null;
+
+    assert.strictEqual(
+      rows[0].style.width,
+      "100%",
+      "a page fills the picture area"
+    );
+    assert.strictEqual(
+      rows[0].style.maxWidth,
+      "1000px",
+      "…up to its own pixels"
+    );
+    assert.strictEqual(offered(), false, "with no zoom to reset");
+
+    // A notch in. The page is *drawn* wider — that is the zoom here — and the cap
+    // follows it, so a page is still never drawn wider than it was.
+    const inwards = dom.makeEvent("wheel", { deltaY: -120, ctrlKey: true });
+    container.dispatch("wheel", inwards);
+    assert.strictEqual(
+      inwards.defaultPrevented,
+      true,
+      "ctrl+wheel is taken, as it is in the other two modes"
+    );
+    assert.strictEqual(
+      rows[0].style.width,
+      "110.00000000000001%",
+      "and one notch draws every page a tenth wider than the area"
+    );
+    assert.strictEqual(
+      rows[0].style.maxWidth,
+      "1100px",
+      "with the cap at its own pixels, scaled the same way"
+    );
+    assert.strictEqual(offered(), true, "and the header offers a way back");
+
+    // And the reader stays on the page they were reading. Every row is a different
+    // height at a different zoom, so the position *in the column* does not survive the
+    // change — the page does, which is what this half keeps and why.
+    press("ArrowRight");
+    press("ArrowRight");
+    assert.strictEqual(
+      container.scrollTop,
+      1000,
+      "two pages on, two rows down"
+    );
+
+    // The rows are taller now, as they are in a browser at a bigger zoom: a scroll
+    // position kept as a number would leave the reader somewhere else entirely.
+    rows.forEach((row, index) => {
+      row.offsetTop = index * 800;
+    });
+    container.dispatch(
+      "wheel",
+      dom.makeEvent("wheel", { deltaY: -120, ctrlKey: true })
+    );
+    assert.strictEqual(
+      container.scrollTop,
+      1600,
+      "and zooming lands them on the same page's row again, at its new height"
+    );
+
+    // Out again, past where it started, to the bottom of the range: a page narrower
+    // than the area, which never needs to be moved sideways.
+    for (let i = 0; i < 60; i++) {
+      container.dispatch(
+        "wheel",
+        dom.makeEvent("wheel", { deltaY: 120, ctrlKey: true })
+      );
+    }
+    assert.strictEqual(
+      rows[0].style.width,
+      NR.VIEW_MIN_ZOOM * 100 + "%",
+      "and outwards it stops at the same floor the screen modes do"
+    );
+
+    // Back to the size it fits at, from the header's own button — which is the same
+    // button the screen modes put there, doing the same thing to a different zoom.
+    dom.click(zoomButton());
+    assert.strictEqual(
+      rows[0].style.width,
+      "100%",
+      "the reset puts the column back"
+    );
+    assert.strictEqual(offered(), false, "and takes itself away again");
+
+    // The drag: a scroll the pointer makes. Left and up scroll the box right and down,
+    // which is what a hand on a page means — the same movement the wheel makes, on the
+    // same box.
+    rows[0].style.width = "200%";
+    container.scrollLeft = 0;
+    container.scrollTop = 0;
+    container.dispatch(
+      "mousedown",
+      dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
+    );
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 40, clientY: 60 })
+    );
+    assert.strictEqual(
+      container.scrollLeft,
+      60,
+      "dragging left scrolls the box right"
+    );
+    assert.strictEqual(
+      container.scrollTop,
+      40,
+      "and dragging up scrolls it down"
+    );
+
+    // And letting go does not turn a page: in this mode a click does nothing anyway,
+    // and a drag is not a click anywhere.
+    const before = container.scrollTop;
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+    assert.strictEqual(
+      container.scrollTop,
+      before,
+      "the box stays where the hand left it"
+    );
+
+    // Put back: the mode is the browser's setting, and a section that left the reader
+    // in the column would be choosing it for every section after this one.
+    dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+
+    stopReader(box);
+  });
+
+  /**
    * The bar, down the side — and the same bar.
    *
    * One axis swapped, so what is worth pinning is that it is the same bar: the same

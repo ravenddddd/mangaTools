@@ -317,6 +317,12 @@ export interface MangaReaderNamespace {
    */
   pageAtTop(rows: { top: number; bottom: number }[], edge: number): number;
   /**
+   * The column's zoom one notch on, clamped — see scroll.ts, where the range and the
+   * step are explained. Pure, and here for the same reason as the page above: the
+   * tests' DOM has no layout, so the arithmetic has to be callable on its own.
+   */
+  zoomedBy(current: number, factor: number): number;
+  /**
    * How far a menu has to move sideways to be inside the window — see chrome.ts.
    *
    * Here rather than reached through the DOM for the same reason as the bar's

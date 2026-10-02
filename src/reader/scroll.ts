@@ -20,6 +20,7 @@
  */
 import { NR } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
+import { VIEW_MAX_ZOOM, VIEW_MIN_ZOOM } from "./zoom";
 
 /**
  * What the container is, while this mode is on.
@@ -42,6 +43,62 @@ export const CLASS_SCROLL_PAGE = "manga-reader-scroll-page";
  * plugin draws and the other is about where it is drawn.
  */
 export const CLASS_SCROLLING = "manga-reader-position-scrolling";
+
+/**
+ * How much wider than the picture area a page is drawn, as a multiplier.
+ *
+ * In the two screen modes the zoom is a `transform` on the container, and it can be:
+ * the pages are *fitted* into that container, so there is slack in both directions to
+ * zoom into. Here there is none — a page is exactly as wide as the picture area — so
+ * the very first notch of zoom-in makes it wider than the area, and what has to grow
+ * is the **page itself** rather than a transform over it.
+ *
+ * That is not a detail of implementation. A transform on a scroll box does not move
+ * its scroll range: the range is computed from the layout box, the transform is
+ * painted after it, and a reader zoomed in would find the edges of the page
+ * unreachable. A page that is *drawn* wider has a scroll range wide enough by
+ * construction — which is the browser's own model of page zoom, and the reason the
+ * drag in this mode is a drag of the scroll position rather than a pan.
+ *
+ * Kept here rather than in takeover.ts because the rows are here: it is the width of
+ * every row, so it is this module's number.
+ */
+let zoom = 1;
+
+/** How far the column is zoomed, as a multiplier of the picture area's width */
+export function columnZoom(): number {
+  return zoom;
+}
+
+/**
+ * The zoom one notch further in or out, clamped to the same range the screen modes
+ * use — the same numbers, because it is the same gesture and a reader who is used to
+ * one should not find the other stopping somewhere else.
+ *
+ * Pure, so that the range and the step are testable without a DOM: see zoom.ts for
+ * the three numbers.
+ */
+export function zoomedBy(current: number, factor: number): number {
+  return Math.min(Math.max(current * factor, VIEW_MIN_ZOOM), VIEW_MAX_ZOOM);
+}
+
+/** Draws the rows at the zoom in hand — the width, and the cap that keeps them sharp */
+export function setColumnZoom(next: number): number {
+  zoom = next;
+  column?.querySelectorAll("." + CLASS_SCROLL_PAGE).forEach((row) => {
+    const node = row as HTMLElement;
+    // The width is the zoom; the cap is the page's own pixels times it, so a page is
+    // never drawn wider than it was — the same rule as at 1:1, scaled.
+    const natural = Number(node.dataset.width || 0);
+    node.style.width = zoom * 100 + "%";
+    if (natural > 0) node.style.maxWidth = zoom * natural + "px";
+  });
+
+  return zoom;
+}
+
+/** The column in hand, so a zoom can be drawn on it without being handed it again */
+let column: HTMLElement | null = null;
 
 /**
  * Which page the reader is on, from where each page's row is.
@@ -82,16 +139,19 @@ export function pageAtTop(
  * down by one page every time one arrives.
  */
 export function buildColumn(
-  column: HTMLElement,
+  into: HTMLElement,
   pages: MangaReaderPage[],
   urlOf: (page: MangaReaderPage, index: number) => string
 ): void {
-  column.textContent = "";
+  column = into;
+  into.textContent = "";
 
   pages.forEach((page, index) => {
     const row = document.createElement("div");
     row.className = CLASS_SCROLL_PAGE;
-    if (page.width > 0) row.style.maxWidth = page.width + "px";
+    // The page's own pixels, kept on the row: the zoom is a multiple of them, and
+    // asking the picture for them later is asking something that may not have arrived.
+    row.dataset.width = String(page.width > 0 ? page.width : 0);
     if (page.width > 0 && page.height > 0) {
       row.style.aspectRatio = page.width + " / " + page.height;
     }
@@ -109,13 +169,15 @@ export function buildColumn(
     image.draggable = false;
 
     row.appendChild(image);
-    column.appendChild(row);
+    into.appendChild(row);
   });
+
+  setColumnZoom(zoom);
 }
 
 /** How far down a page's row begins, or null when the column has no such row */
-export function rowOffset(column: HTMLElement, index: number): number | null {
-  const row = column.querySelectorAll("." + CLASS_SCROLL_PAGE)[index] as
+export function rowOffset(into: HTMLElement, index: number): number | null {
+  const row = into.querySelectorAll("." + CLASS_SCROLL_PAGE)[index] as
     | HTMLElement
     | undefined;
 
@@ -125,3 +187,4 @@ export function rowOffset(column: HTMLElement, index: number): number | null {
 // Published for the smoke test, which reaches the reader's own logic through the
 // window — see the note on MangaReaderNamespace in plugin-api.ts.
 NR.pageAtTop = pageAtTop;
+NR.zoomedBy = zoomedBy;

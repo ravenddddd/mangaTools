@@ -100,7 +100,11 @@
   align-items: center;
   gap: 2px;
   overflow-y: auto;
-  overflow-x: hidden;
+  /* Both ways, because a zoomed column is wider than the picture area — see the note
+     on `zoom` in scroll.ts. At 1:1 there is nothing to the side and this costs
+     nothing; the browser's own scrollbar stays hidden either way, because the drag and
+     the wheel are what move it. */
+  overflow-x: auto;
   /* The browser's own scrollbar goes: this plugin's bar *is* the scrollbar here, and
      two of them on one edge is one of them too many. */
   scrollbar-width: none;
