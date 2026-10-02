@@ -113,6 +113,39 @@ module.exports = () => {
     "a group heading has to stand where the rows under it stand — Stash indents " +
       "those by 2.5rem, and nothing indents a heading that is not a `.setting`"
   );
+  // The help panel: it is in the page whether it is shown or not, and *opening* it
+  // is the stylesheet's job — which is why the checks for it are here and not
+  // where the panel is rendered (02-settings). Two things can go wrong. It can be
+  // hidden with nothing to show it; and the ring can be written in a way that
+  // moves what it goes around, which is not a hypothetical: the ring is on the
+  // badge, the badge is absolutely positioned in the cover's corner, and a
+  // `position` in the ring's rule (or a `position: relative` written for
+  // `z-index`'s sake) drops it back into the flow.
+  assert.ok(
+    /\.manga-tools-help:hover\s+\.manga-tools-help-panel[^{]*\{[^}]*display:\s*block/.test(
+      css
+    ) && /\.manga-tools-help:focus-within\s+\.manga-tools-help-panel/.test(css),
+    "the help panel should open on hover and on focus — the second is what gives " +
+      "a keyboard and a finger what a mouse gets"
+  );
+  const panelRule = /\.manga-tools-help-panel\s*\{([^}]*)\}/.exec(css);
+  assert.ok(panelRule, "the help panel needs a rule of its own");
+  assert.ok(
+    /display:\s*none/.test(panelRule[1]),
+    "…and should start hidden, or every ? on the page shows its card at once"
+  );
+  const ringRule = /\.manga-tools-help-lit\s*\{([^}]*)\}/.exec(css);
+  assert.ok(ringRule, "the ring is the whole of what a help panel says");
+  assert.ok(
+    /outline:\s*2px/.test(ringRule[1]),
+    "…and should be drawn with an outline, which is drawn outside the box and " +
+      "does not touch the element it goes around"
+  );
+  assert.ok(
+    !/position/.test(ringRule[1]),
+    "the ring must not set `position`: the badge it goes around is absolutely " +
+      "positioned in the cover's corner, and this would pull it into the flow"
+  );
   // The performers field is hidden by CSS rather than by not rendering the row —
   // Stash's form keeps the value, so nothing can clear it. That makes this rule
   // the whole of the feature, and its sibling combinator the load-bearing part of

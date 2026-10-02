@@ -663,6 +663,21 @@ than a parent and its child, so they are not wrapped in the group Stash's styles
 uses to indent a setting's children. The mark is never one of the four fields and is
 never gated on them: it is what makes a gallery this plugin's at all.
 
+**Two settings carry a "?" and it opens a picture, not a paragraph.** "Cover badge"
+and "the mark's icon" are both answered by *where* something is on a card, which is
+a sentence nobody should have to assemble in their head — so the panel holds a
+gallery card with the part in question ringed. The card is Stash's own markup and
+class names, drawn by Stash's own stylesheet, with the cover as the one stand-in (no
+gallery is behind the settings page); the ring is drawn with an `outline`, which
+goes outside the box without touching it, because the badge it circles is
+absolutely positioned in the cover's corner and a `position` in that rule would pull
+it back into the flow. Every word on the example — the caption, the title, the date,
+the description — is in the message catalogues, and the language on the badge is
+described in the reader's locale, so nothing on it is a Chinese string in an English
+UI. The wording that used to be shown there is the button's own name, read out to
+whoever cannot see the picture. Opening it is CSS: hover, or focus, which is what
+gives a keyboard and a finger what a mouse gets — nothing about it is stateful.
+
 **Every switch defaults to what the plugin already did, and an absent value reads as
 the default** — all of them on, except the details block, which starts folded. So an
 install that predates them behaves exactly as it did until something is turned off.

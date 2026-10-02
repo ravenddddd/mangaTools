@@ -72,6 +72,11 @@
   "mangaTools.settings.coverIcon.description": "封面信息栏末尾的那个图标——就是悬停时出现、带图片数和标签数的那一行。关掉后封面不带标记，画廊依然由插件管理。",
   "mangaTools.settings.coverIcon.help": "和语言徽章不是一回事：它说的是「这本归插件管理」，而这不是一个会在封面上去扫的值。",
 
+  "mangaTools.settings.help.cover": "封面",
+  "mangaTools.settings.help.card.title": "示例漫画标题，占两行",
+  "mangaTools.settings.help.card.date": "2026-09-30",
+  "mangaTools.settings.help.card.description": "再下面是这一本的简介，卡片上占三行。",
+
   "mangaTools.manga.mark": "标记为漫画",
   "mangaTools.manga.marked": "漫画",
   "mangaTools.manga.isManga": "是否为漫画",

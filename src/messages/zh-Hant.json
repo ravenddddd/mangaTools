@@ -72,6 +72,11 @@
   "mangaTools.settings.coverIcon.description": "封面資訊欄末尾的那個圖示——就是懸停時出現、帶圖片數和標籤數的那一行。關掉後封面不帶標記，畫廊依然由外掛管理。",
   "mangaTools.settings.coverIcon.help": "和語言徽章不是一回事：它說的是「這本歸外掛管理」，而這不是一個會在封面上去掃的值。",
 
+  "mangaTools.settings.help.cover": "封面",
+  "mangaTools.settings.help.card.title": "範例漫畫標題，佔兩行",
+  "mangaTools.settings.help.card.date": "2026-09-30",
+  "mangaTools.settings.help.card.description": "再下面是這一本的簡介，卡片上佔三行。",
+
   "mangaTools.manga.mark": "標記為漫畫",
   "mangaTools.manga.marked": "漫畫",
   "mangaTools.manga.isManga": "是否為漫畫",

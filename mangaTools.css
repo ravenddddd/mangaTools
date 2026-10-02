@@ -489,20 +489,125 @@
 }
 
 /*
- * The "?" beside a heading. Muted and a size down, so it reads as being *beside*
- * the heading rather than part of it. `margin: 0` on the glyph for the reason the
- * wand button in MangaFieldBlock gives: Stash's index.scss sets an unscoped
- * `.fa-icon { margin: 0 0.4rem }`, and this wrapper already spaces it.
+ * The "?" beside a heading, and the example it opens.
+ *
+ * The icon and the panel are two children of one wrapper rather than one inside
+ * the other: the panel holds a card, and a card inside a <button> is not a thing
+ * a browser is required to lay out. The wrapper is also what the panel is
+ * measured from, which is what makes `left: 100%` mean "beside the icon".
+ *
+ * Opening is the stylesheet's job — hovering the wrapper, or focusing the button
+ * in it, which is how a keyboard or a finger gets what a mouse gets. Nothing is
+ * stateful, and the panel is in the page whether it is shown or not; that is also
+ * what the smoke tests can see of it, since their React stub's state setters do
+ * nothing.
+ *
+ * `margin: 0` on the glyph for the reason the wand button in MangaFieldBlock
+ * gives: Stash's index.scss sets an unscoped `.fa-icon { margin: 0 0.4rem }`, and
+ * this wrapper already spaces it.
  */
 .manga-tools-help {
-  color: rgba(191, 204, 214, 0.5);
-  cursor: help;
-  font-size: 0.85em;
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
   margin-left: 0.4rem;
 }
 
-.manga-tools-help .fa-icon {
+.manga-tools-help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(191, 204, 214, 0.18);
+  color: rgba(191, 204, 214, 0.75);
+  cursor: help;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.manga-tools-help-button:hover,
+.manga-tools-help-button:focus-visible {
+  background: rgba(191, 204, 214, 0.35);
+  color: #f5f8fa;
+}
+
+.manga-tools-help-button .fa-icon {
   margin: 0;
+}
+
+/*
+ * The panel, which is a card's worth of space over whatever it covers. It opens
+ * to the right of the icon: the "?" sits just after a heading, so the left is the
+ * heading and the right is the rest of the row.
+ */
+.manga-tools-help-panel {
+  display: none;
+  position: absolute;
+  z-index: 30;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0.5rem;
+}
+
+.manga-tools-help:hover .manga-tools-help-panel,
+.manga-tools-help:focus-within .manga-tools-help-panel {
+  display: block;
+}
+
+/*
+ * The example inside it. The card wears Stash's own classes — see HelpExampleCard
+ * — so what is here is the frame around it, plus the two things Stash has no
+ * class for: a cover with no image behind it, and the ring that says which part
+ * of the card the setting is about.
+ */
+.manga-tools-help-card {
+  padding: 10px;
+  background: #202b33;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  /*
+   * Not `pointer-events: none`, which is the obvious way to say "this is a
+   * picture". Two things are worse with it: the panel stops being part of what
+   * the pointer is hovering, so it closes the moment the mouse leaves the "?" —
+   * and it lets a click through to whatever is underneath, which on this page is
+   * a switch. Everything inside it is inert instead: the buttons in the example
+   * are `tabIndex={-1}` and carry no handler, so a click on one does nothing.
+   */
+}
+
+/*
+ * The cover. It carries `.gallery-card-image`, so its height is the `zoom-1`
+ * height Stash gives a real cover — and what is left is the surface, which is
+ * standing in for an image the settings page has no gallery to borrow.
+ */
+.manga-tools-help-cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(150deg, #66757f 0%, #45535e 55%, #38434c 100%);
+  border-radius: 2px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+}
+
+/*
+ * The ring. `outline` and not a border: the badge it goes around is absolutely
+ * positioned in the cover's corner, and an outline is drawn outside the box
+ * without touching it. Nothing here sets `position`, for the same reason — a
+ * `position` on this class would drop that badge back into the flow, which is
+ * exactly what the mock did before the browser showed it.
+ */
+.manga-tools-help-lit {
+  outline: 2px solid #48aff0;
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 /*

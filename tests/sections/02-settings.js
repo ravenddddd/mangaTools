@@ -526,6 +526,210 @@ module.exports = () => {
     "and so are the three display rows"
   );
 
+  // ── The "?" and the example it opens ──────────────────────────────
+  // The two settings about a cover carry one, and what opens is a card with the
+  // part in question ringed rather than another paragraph. What this section can
+  // see is the shape — the button, the panel, the card inside it, and the words on
+  // it. Whether the panel *opens* is the stylesheet's business, and is checked
+  // there (04-artifacts).
+  const helpWrapsIn = (locale) => {
+    state.currentLocale = locale;
+    const el = call("PluginSettings", { pluginID: "mangaTools" });
+    const wraps = [];
+    find(el, (n) => {
+      if (n.props?.className === "manga-tools-help") wraps.push(n);
+      return false;
+    });
+    return wraps;
+  };
+
+  const localeBefore = state.currentLocale;
+  const wraps = helpWrapsIn("zh-Hans");
+  assert.strictEqual(
+    wraps.length,
+    2,
+    "the two settings about a cover should carry a ?, and only those two"
+  );
+
+  for (const [i, key] of [
+    [0, "mangaTools.settings.showCoverBadge.help"],
+    [1, "mangaTools.settings.coverIcon.help"],
+  ]) {
+    const [button, panel] = wraps[i].props.children;
+    assert.strictEqual(
+      button.type,
+      "button",
+      "the ? should be a button, so that a keyboard and a finger can open it"
+    );
+    assert.strictEqual(
+      button.props["aria-label"],
+      NS.catalogs()["zh-Hans"][key],
+      "the wording the panel no longer shows should be the button's name — it is " +
+        "read out to whoever cannot see the picture"
+    );
+    assert.ok(
+      panel && String(panel.props.className).includes("manga-tools-help-panel"),
+      "and it should open a panel"
+    );
+  }
+
+  // The example inside it: Stash's own card, drawn with Stash's own classes, so
+  // that what the ring goes around is where a real card keeps it.
+  const exampleCard = (panel) =>
+    find(
+      panel,
+      (n) =>
+        typeof n.props?.className === "string" &&
+        n.props.className.split(" ").includes("gallery-card")
+    );
+  const cardClasses = (panel) => {
+    const card = exampleCard(panel);
+    assert.ok(card, "the panel should hold a card");
+    return card.props.className.split(" ");
+  };
+  for (const cls of ["gallery-card", "card", "grid-card", "zoom-1"]) {
+    assert.ok(
+      cardClasses(wraps[0].props.children[1]).includes(cls),
+      `the example should wear Stash's own \`${cls}\`, or its stylesheet draws ` +
+        "nothing on it"
+    );
+  }
+  const nested = (panel, cls) =>
+    !!find(
+      panel,
+      (n) =>
+        typeof n.props?.className === "string" &&
+        n.props.className.split(" ").includes(cls)
+    );
+  for (const cls of [
+    "thumbnail-section",
+    "gallery-card-cover",
+    "gallery-card-image",
+    "card-section",
+    "card-section-title",
+    "gallery-card__details",
+    "card-popovers",
+  ]) {
+    assert.ok(
+      nested(wraps[0].props.children[1], cls),
+      `…including \`${cls}\`, which is the piece that places what the ring is around`
+    );
+  }
+
+  // The words are the catalogues', every one of them: the four ids below are the
+  // whole of the example's text, and an example that hardcoded its caption would
+  // read Chinese in an English UI. Checked per locale, against the catalogue the
+  // UI is in.
+  const wordsIn = (locale) => {
+    const panel = helpWrapsIn(locale)[0].props.children[1];
+    const words = [];
+    find(panel, (n) => {
+      // `type === undefined` is how the walker hands over a *text node*: an
+      // element whose only child is a string is visited too, and counting that
+      // one would count every word twice.
+      if (n.type === undefined && typeof n.props?.children === "string") {
+        words.push(n.props.children);
+      }
+      return false;
+    });
+    return words;
+  };
+  const EXAMPLE_TEXT = [
+    "mangaTools.settings.help.cover",
+    "mangaTools.settings.help.card.title",
+    "mangaTools.settings.help.card.date",
+    "mangaTools.settings.help.card.description",
+  ];
+  for (const locale of ["zh-Hans", "en"]) {
+    const words = wordsIn(locale);
+    const expected = EXAMPLE_TEXT.map((key) => NS.catalogs()[locale][key]);
+    // Equal, not merely present: the panel is a picture rather than more prose, so
+    // these four ids are the whole of what it says. A sentence left in from a
+    // mock, or a caption written into the component instead of the catalogue,
+    // shows up here as a fifth word — and one of the two would be the language the
+    // UI is not in.
+    assert.deepStrictEqual(
+      words.slice().sort(),
+      expected.slice().sort(),
+      `${locale}: the example's text should be exactly these four catalogue ids ` +
+        "(the badge's own language name draws as a flag while flags are on)"
+    );
+  }
+
+  // The ring, and which of the two it is on. Both panels draw the same card:
+  // one rings the badge in the cover's corner, the other the mark at the end of
+  // the info row — that difference is the whole of what the two panels say.
+  const ringed = (panel) => {
+    const out = [];
+    find(panel, (n) => {
+      if (
+        typeof n.props?.className === "string" &&
+        n.props.className.includes("manga-tools-help-lit")
+      ) {
+        out.push(n.props.className);
+      }
+      return false;
+    });
+    return out;
+  };
+  const [badgeRinged, markRinged] = [
+    ringed(wraps[0].props.children[1]),
+    ringed(wraps[1].props.children[1]),
+  ];
+  assert.strictEqual(badgeRinged.length, 1, "one ring per panel");
+  assert.strictEqual(markRinged.length, 1, "one ring per panel");
+  assert.ok(
+    badgeRinged[0].includes("manga-tools-badge"),
+    "the badge setting rings the badge"
+  );
+  assert.ok(
+    markRinged[0].includes("manga-tools-popover-slot"),
+    "the icon setting rings the slot the icon sits in"
+  );
+  assert.ok(
+    !badgeRinged[0].includes("manga-tools-popover-slot") &&
+      !markRinged[0].includes("manga-tools-badge"),
+    "…and neither rings the other one's"
+  );
+
+  // The badge in the example is the plugin's own, so it follows the plugin's own
+  // setting: with flags off it is the name, which is what the setting does to a
+  // real cover.
+  NS.showFlags = false;
+  const named = find(
+    helpWrapsIn("zh-Hans")[0].props.children[1],
+    (n) =>
+      typeof n.props?.className === "string" &&
+      n.props.className.split(" ").includes("is-name")
+  );
+  assert.ok(
+    named,
+    "with flags off the example's badge should show the language's name, which is " +
+      "what the same setting does on a real cover"
+  );
+  NS.showFlags = true;
+
+  // A UI in a language the language table has no entry for gets English on the
+  // badge, not its own tag: the chip for a value nothing recognises is
+  // `.is-unknown`, and drawing `de-DE` there would be showing the reader an
+  // example of bad data and calling it a language.
+  const badgeIn = (locale) =>
+    find(
+      helpWrapsIn(locale)[0].props.children[1],
+      (n) =>
+        typeof n.props?.className === "string" &&
+        n.props.className.split(" ").includes("manga-tools-badge")
+    );
+  const inGerman = badgeIn("de-DE");
+  assert.ok(inGerman, "the badge should still be drawn");
+  assert.ok(
+    !inGerman.props.className.includes("is-unknown"),
+    "and a locale with no language-table entry must not fall through to the " +
+      "unrecognised-value chip"
+  );
+
+  state.currentLocale = localeBefore;
+
   // Selecting a new set writes it back through configurePlugin and updates the
   // shared NS.enabledLanguages immediately.
   settingsSelect.props.onChange([{ value: "ja" }, { value: "zh-Hans" }]);

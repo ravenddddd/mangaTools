@@ -69,6 +69,7 @@ import type {
   MangaToolsApolloClient,
   MangaToolsApolloOperation,
   MangaToolsCustomFields,
+  MangaToolsDescription,
   MangaToolsIntl,
   MangaToolsOption,
   MangaToolsPatchFn,
@@ -875,16 +876,25 @@ function Flag(props: { flag: string; className?: string }) {
 
 // ─────────────────────────── Cover badge ───────────────────────────
 
-/** Reads the in-memory store only; issues no requests. */
-function LanguageBadge(props: { galleryId: string }) {
-  useGlobalVersion();
-  const locale = useLocale();
-
-  const info = NS.describe(
-    pickLanguage(store?.get(String(props.galleryId))),
-    locale
-  );
-  if (!info) return null;
+/**
+ * The badge itself, from an already-described value.
+ *
+ * Split out of LanguageBadge so that the example in the settings page's help
+ * panel is drawn by this same code: an example built from its own copy of these
+ * three cases is an example that can quietly stop being true, and this one is
+ * looked at to decide what a setting does.
+ *
+ * A plain function rather than a component, so that nothing new appears in the
+ * element tree between LanguageBadge and the div it draws — the tests read that
+ * tree to reach the flag, and a component boundary there would be a level they
+ * have to know about. It has no hooks of its own to lose by being called
+ * directly, and `NS.showFlags` is read at the moment it is drawn either way.
+ */
+function languageChip(info: MangaToolsDescription, className?: string) {
+  // Appended to whichever of the three chips below is drawn, so that the help
+  // panel can ring the badge itself: the ring has to be on the absolutely
+  // positioned chip, not on a wrapper of it, which would be a box in the flow.
+  const extra = className ? " " + className : "";
 
   // No flag to show, for one of two reasons — and they are not the same chip:
   //
@@ -896,17 +906,35 @@ function LanguageBadge(props: { galleryId: string }) {
   //
   // The look is identical; what differs is whether the text may run its length.
   if (!info.known) {
-    return <div className="manga-tools-badge is-unknown">{info.name}</div>;
+    return (
+      <div className={"manga-tools-badge is-unknown" + extra}>{info.name}</div>
+    );
   }
   if (!NS.showFlags) {
-    return <div className="manga-tools-badge is-name">{info.name}</div>;
+    return (
+      <div className={"manga-tools-badge is-name" + extra}>{info.name}</div>
+    );
   }
 
   return (
-    <div className="manga-tools-badge" aria-label={info.name}>
+    <div className={"manga-tools-badge" + extra} aria-label={info.name}>
       <Flag flag={info.flag as string} />
     </div>
   );
+}
+
+/** Reads the in-memory store only; issues no requests. */
+function LanguageBadge(props: { galleryId: string }) {
+  useGlobalVersion();
+  const locale = useLocale();
+
+  const info = NS.describe(
+    pickLanguage(store?.get(String(props.galleryId))),
+    locale
+  );
+  if (!info) return null;
+
+  return languageChip(info);
 }
 
 /** Class of the empty span kept beside Stash's popover row, one per card */
@@ -2609,24 +2637,164 @@ function MangaFieldBlock(props: {
  * (Settings/Inputs.tsx): a `.setting` row with the heading on the left and the
  * switch pushed to the right by Stash's own CSS.
  */
+/** Which part of the example card a setting's help panel is about */
+type HelpExample = "badge" | "mark";
+
 /**
- * A "?" beside a setting's heading, carrying the wording the sub-heading has no
- * room for.
+ * The example a help panel holds: a gallery card, drawn with Stash's own markup
+ * and class names so that Stash's stylesheet draws it.
  *
- * The text goes on a wrapping <span title> rather than on the icon itself: Icon
- * spreads what it is given onto an <svg>, and a title on an SVG is shown by some
- * browsers and not others. With no glyph to draw the "?" is written as text, so
- * the explanation is never unreachable — the same reasoning as the wand button in
- * MangaFieldBlock, which falls back for exactly this reason.
+ * That is the whole point of it. "封面右下角那个徽章" is a sentence that has to
+ * be believed; a card drawn with the plugin's own classes would be *the plugin's
+ * idea of* where the badge goes, and would keep saying so after Stash moved it.
+ * With `.gallery-card`, `.gallery-card-cover`, `.gallery-card-image`,
+ * `.card-popovers` and the rest — every one of them a class Stash defines, and
+ * `.gallery-card-image`'s height coming from the `zoom-N` class rather than from
+ * anything here — the example is a card with the cover taken out.
+ *
+ * Three things are deliberately not Stash's:
+ *
+ *   the links  the cover and the title are links to a gallery on the list; here
+ *              they are spans, because there is nowhere to go. Stash's rules for
+ *              them are colour and text-decoration, and the title keeps both
+ *              (`.card-section-title` sets its own colour).
+ *   the image  there is no gallery behind this, so the cover is a div wearing
+ *              `.gallery-card-image` and a caption instead of an img with a src.
+ *   the badge and the mark  these are the plugin's own, and they are drawn by the
+ *              code that draws them on a real card.
+ *
+ * The words — the caption, the title, the description — come from the message
+ * catalogues, and the language on the badge is described by NS.describe in the
+ * reader's locale. Nothing here is a Chinese string in an English UI.
+ *
+ * `aria-hidden` because it is a picture: the setting's own description says in
+ * words what this says by showing it, and the "?" that opens it is named from
+ * the same catalogue entry.
  */
-function HelpIcon(props: { text: string }) {
+function HelpExampleCard(props: { highlight: HelpExample }) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
+  const Icon = PluginApi.components.Icon;
+
+  // The sample gallery is the reader's own language when the language table has
+  // it — a flag and a name they recognise rather than a stranger's — and English
+  // when it does not. `known` is the whole point of the check: an unknown value
+  // describes itself as the raw code, so a UI in a language this plugin has no
+  // entry for would draw its badge as `de-DE`, which is the chip for *bad data*.
+  const locale = intl.locale;
+  const own = NS.describe(locale, locale);
+  const sample = (own?.known ? own : NS.describe("en", locale)) || undefined;
+
+  // The badge and the mark are ringed, not spotlit: the card around them stays
+  // readable, and "which of these two is it" is the question the panel answers.
+  // No `position` in this: the badge is absolutely positioned in the cover's
+  // corner, and saying otherwise would drop it into the flow.
+  const lit = (which: HelpExample) =>
+    props.highlight === which ? " manga-tools-help-lit" : "";
+
+  // The counting buttons, with the box Stash wraps them in. `tabIndex={-1}`
+  // because these are a picture of a row of buttons: they are inside an
+  // `aria-hidden` box, and something focusable in there is a tab stop that leads
+  // nowhere.
+  const count = (cls: string, icon: unknown, n: number) => (
+    <span className={cls}>
+      <button type="button" tabIndex={-1} className="minimal btn btn-primary">
+        {icon ? <Icon icon={icon} /> : null}
+        <span>{n}</span>
+      </button>
+    </span>
+  );
+
+  return (
+    <div className="manga-tools-help-card" aria-hidden="true">
+      {/* The zoom class is what gives the cover its height — zoom-1 is what the
+          gallery list opens at, and a card narrower than the list's own is a
+          card with the same proportions at a smaller size. */}
+      <div
+        className="gallery-card card grid-card zoom-1"
+        style={{ width: 200 }}
+      >
+        <div className="thumbnail-section">
+          <span className="gallery-card-header">
+            <div className="gallery-card-cover">
+              <div className="gallery-card-image manga-tools-help-cover">
+                {t(intl, "mangaTools.settings.help.cover")}
+              </div>
+            </div>
+          </span>
+          {sample ? languageChip(sample, lit("badge").trim()) : null}
+        </div>
+        <div className="card-section">
+          <h5 className="card-section-title flex-aligned">
+            <div className="TruncatedText" style={{ WebkitLineClamp: 2 }}>
+              {t(intl, "mangaTools.settings.help.card.title")}
+            </div>
+          </h5>
+          <div className="gallery-card__details">
+            <span className="gallery-card__date">
+              {t(intl, "mangaTools.settings.help.card.date")}
+            </span>
+            <div
+              className="TruncatedText gallery-card__description"
+              style={{ WebkitLineClamp: 3 }}
+            >
+              {t(intl, "mangaTools.settings.help.card.description")}
+            </div>
+          </div>
+        </div>
+        <hr />
+        <div role="group" className="card-popovers btn-group">
+          {count("image-count", Solid.faImage || null, 32)}
+          {count("tag-count", Solid.faTag || null, 11)}
+          <span className={"manga-tools-popover-slot" + lit("mark")}>
+            <button
+              type="button"
+              tabIndex={-1}
+              className="minimal btn btn-primary manga-tools-mark"
+            >
+              <MangaIcon />
+            </button>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A "?" beside a setting's heading, holding an example of what the setting is
+ * about.
+ *
+ * The panel is opened by CSS — hover, or focus for a keyboard and a finger — so
+ * nothing here is stateful: the question mark is a real <button> so that it can
+ * be tabbed to and tapped, and everything else is in the stylesheet. That is
+ * also what makes it testable, since the smoke tests' React stub has state
+ * setters that do nothing.
+ *
+ * The wording is not gone, it is off the screen: it is the button's own name,
+ * read out to anyone who cannot see the picture. The icon gets a wrapping
+ * <button aria-label> rather than a title on the glyph, because Icon spreads what
+ * it is given onto an <svg> and a title on an SVG is shown by some browsers and
+ * not others. With no glyph to draw the "?" is written as text, so the panel is
+ * never unreachable — the same reasoning as the wand button in MangaFieldBlock.
+ */
+function HelpIcon(props: { text: string; example: HelpExample }) {
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
   const Icon = PluginApi.components.Icon;
   const icon = Solid.faQuestionCircle || null;
 
   return (
-    <span className="manga-tools-help" title={props.text}>
-      {icon ? <Icon icon={icon} /> : "?"}
+    <span className="manga-tools-help">
+      <button
+        type="button"
+        className="manga-tools-help-button"
+        aria-label={props.text}
+      >
+        {icon ? <Icon icon={icon} /> : "?"}
+      </button>
+      <span className="manga-tools-help-panel">
+        <HelpExampleCard highlight={props.example} />
+      </span>
     </span>
   );
 }
@@ -2637,8 +2805,12 @@ function BooleanSetting(props: {
   subHeading?: string;
   checked: boolean;
   onChange: (next: boolean) => void;
-  /** The wording a "?" beside the heading holds, when the sub-heading cannot */
-  help?: string;
+  /**
+   * The "?" beside the heading: the wording it is named by, and which part of the
+   * example card it opens. One prop rather than two, so that a help icon cannot
+   * be drawn with nothing to show.
+   */
+  help?: { text: string; example: HelpExample };
 }) {
   const Bootstrap = PluginApi.libraries.Bootstrap;
   if (!Bootstrap) {
@@ -2661,7 +2833,7 @@ function BooleanSetting(props: {
           {props.help ? (
             <>
               {props.heading}
-              <HelpIcon text={props.help} />
+              <HelpIcon text={props.help.text} example={props.help.example} />
             </>
           ) : (
             props.heading
@@ -2703,7 +2875,7 @@ function SettingSwitch(props: {
   id: string;
   heading: string;
   subHeading?: string;
-  help?: string;
+  help?: { text: string; example: HelpExample };
   checked: boolean;
   onChange: (next: boolean) => void;
   /** The rows under it, drawn only while `checked` */
@@ -2913,7 +3085,10 @@ function MangaToolsSettings() {
               intl,
               "mangaTools.settings.showCoverBadge.description"
             )}
-            help={t(intl, "mangaTools.settings.showCoverBadge.help")}
+            help={{
+              text: t(intl, "mangaTools.settings.showCoverBadge.help"),
+              example: "badge",
+            }}
             checked={NS.showCoverBadge}
             onChange={writeFlag((next) => {
               NS.showCoverBadge = next;
@@ -3013,7 +3188,10 @@ function MangaToolsSettings() {
         id="mangaTools-coverIcon"
         heading={t(intl, "mangaTools.settings.coverIcon.heading")}
         subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
-        help={t(intl, "mangaTools.settings.coverIcon.help")}
+        help={{
+          text: t(intl, "mangaTools.settings.coverIcon.help"),
+          example: "mark",
+        }}
         checked={NS.coverIcon}
         onChange={writeFlag((next) => {
           NS.coverIcon = next;
