@@ -23,6 +23,7 @@
 import { requirePluginApi } from "../plugin-api";
 import { numbered, stringFor } from "../i18n";
 import { NR } from "./namespace";
+import { PROGRESS_IDLE_MAX_MS, PROGRESS_NEVER } from "./progress";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderSettings } from "./namespace";
 import type { LightboxImage } from "./stash-lightbox";
@@ -78,6 +79,15 @@ const CLASS_DIVIDER = "manga-reader-divider";
 /** One row of the panel: a label, and the control that belongs to it */
 const CLASS_ROW = "manga-reader-row";
 const CLASS_ROW_LABEL = "manga-reader-row-label";
+/**
+ * What a slider is currently set to, read off at the far end of its row.
+ *
+ * In the label's row rather than after the slider, so that the slider keeps the full width
+ * of the body: a number sitting after it would shorten the one control in this panel that
+ * is dragged rather than pressed. Which is where the fade's own readout used to sit, before
+ * that slider became a pair of buttons.
+ */
+const CLASS_READOUT = "manga-reader-readout";
 /**
  * The single-page/double-page pair.
  *
@@ -756,6 +766,39 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
       )
     );
     progress.appendChild(parts.marksRow);
+
+    // ── How long the bar stays ────────────────────────────────────────────
+    // A slider rather than a switch, because the answers in between are ones a reader
+    // wants — and its two ends are not lengths of time but settings of their own: gone the
+    // moment the pointer leaves it, and never gone at all. See the readout below for which
+    // of them the reader is on, in seconds rather than in the half-steps the slider counts.
+    parts.idleRow = text(CLASS_ROW, "div");
+    const idleLabel = document.createElement("label");
+    idleLabel.className = CLASS_ROW_LABEL;
+    idleLabel.htmlFor = IDLE_ID;
+    labels["mangaReader.progressIdle"] = idleLabel;
+    parts.idleReadout = text(CLASS_READOUT);
+    parts.idleRow.appendChild(idleLabel);
+    parts.idleRow.appendChild(parts.idleReadout);
+    progress.appendChild(parts.idleRow);
+
+    const idle = document.createElement("input");
+    idle.type = "range";
+    // Bootstrap 4's own styled range, which is the class the fade's slider wore while it
+    // had one: the version this app is built on, and the same control Stash's settings
+    // use where it has a number to offer.
+    idle.className = "custom-range";
+    idle.id = IDLE_ID;
+    idle.min = "0";
+    idle.max = String(IDLE_NEVER_STEP);
+    idle.step = "1";
+    idle.addEventListener("input", () => {
+      latest?.handlers.onSetting({
+        progressIdleMs: idleMsOf(Number(idle.value)),
+      });
+    });
+    parts.idleSlider = idle;
+    progress.appendChild(idle);
   }
 
   /**
@@ -791,6 +834,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   say("mangaReader.groupProgress");
   say("mangaReader.showProgress");
   say("mangaReader.showChapterMarks");
+  say("mangaReader.progressIdle");
 
   // Which half of a pair is the chosen one. `is-on` rather than Stash's `active`,
   // which is a solid blue: see drawChapters.
@@ -838,6 +882,29 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   // of those to change. The fifth group is the only one that is in every mode — the
   // bar is drawn in all three — so nothing here asks what the mode is.
   showWhen(parts.marksRow, state.settings.showProgress);
+  showWhen(parts.idleRow, state.settings.showProgress);
+  // The slider is the row's control but not inside it — the words take their own line
+  // above it — so it is hidden with the row rather than by it.
+  showWhen(parts.idleSlider, state.settings.showProgress);
+
+  // Where the slider is, and what it is saying. Both written only where they differ, like
+  // every other write in this pass: a value assigned to a range input is a change to it
+  // even when it is the same value, and a change is another pass.
+  const slider = panel.querySelector("#" + IDLE_ID) as HTMLInputElement | null;
+  const step = String(idleStepOf(state.settings.progressIdleMs));
+  if (slider && slider.value !== step) slider.value = step;
+
+  const idleWords =
+    state.settings.progressIdleMs === PROGRESS_NEVER
+      ? stringFor(state.locale, "mangaReader.never")
+      : numbered(
+          state.locale,
+          "mangaReader.seconds",
+          state.settings.progressIdleMs / 1000
+        );
+  if (parts.idleReadout.textContent !== idleWords) {
+    parts.idleReadout.textContent = idleWords;
+  }
 }
 
 const SINGLE_PAGE_ID = "manga-reader-single-page";
@@ -850,6 +917,26 @@ const FADE_OFF_ID = "manga-reader-fade-off";
 const FADE_ON_ID = "manga-reader-fade-on";
 const PROGRESS_ID = "manga-reader-show-progress";
 const MARKS_ID = "manga-reader-show-marks";
+const IDLE_ID = "manga-reader-idle";
+
+/**
+ * The slider's own scale, and the two ends of it that are not lengths of time.
+ *
+ * It counts in half-seconds up to PROGRESS_IDLE_MAX_MS, and its top step is one past that:
+ * "never", which is the other setting in this row. The mapping between what the slider says
+ * and what the bar is told lives here rather than in progress.ts because it is the
+ * *control's* shape — the bar is handed milliseconds and the two sentinels and knows nothing
+ * about steps.
+ */
+const IDLE_STEP_MS = 500;
+const IDLE_TOP_STEP = PROGRESS_IDLE_MAX_MS / IDLE_STEP_MS;
+const IDLE_NEVER_STEP = IDLE_TOP_STEP + 1;
+
+const idleStepOf = (ms: number): number =>
+  ms === PROGRESS_NEVER ? IDLE_NEVER_STEP : Math.round(ms / IDLE_STEP_MS);
+
+const idleMsOf = (step: number): number =>
+  step > IDLE_TOP_STEP ? PROGRESS_NEVER : step * IDLE_STEP_MS;
 
 function text(className: string, tag = "span"): HTMLElement {
   const node = document.createElement(tag);

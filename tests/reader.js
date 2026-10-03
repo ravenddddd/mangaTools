@@ -720,6 +720,9 @@ const settingsWith = (over = {}) => ({
   offset: false,
   showProgress: true,
   showChapterMarks: true,
+  // Read off the bundle rather than written down, so that the default is asserted where it
+  // is declared and a change to it is a change here too.
+  progressIdleMs: NR.PROGRESS_IDLE_MS,
   ...over,
 });
 
@@ -1150,6 +1153,36 @@ async function main() {
       NR.parseSettings('{"offset":"yes"}').offset,
       false,
       "…and a value of the wrong type is not one"
+    );
+
+    // The bar's clock: a length in milliseconds, with the two values of it that are not
+    // lengths at all — the ends of the slider that sets it.
+    const idle = (raw) => NR.parseSettings(raw).progressIdleMs;
+    assert.strictEqual(
+      idle('{"progressIdleMs":3000}'),
+      3000,
+      "a length the reader chose is read back as itself"
+    );
+    assert.strictEqual(
+      idle(`{"progressIdleMs":${NR.PROGRESS_NEVER}}`),
+      NR.PROGRESS_NEVER,
+      "…and so is the setting that never hides"
+    );
+    assert.strictEqual(
+      idle('{"progressIdleMs":0}'),
+      NR.PROGRESS_HOLD_MS,
+      "…and the one where the pointer is the whole of the bar's visibility"
+    );
+    assert.strictEqual(
+      idle('{"progressIdleMs":"long"}'),
+      NR.PROGRESS_IDLE_MS,
+      "while something that is not a number is not a setting, so the default stands"
+    );
+    assert.strictEqual(
+      idle('{"progressIdleMs":900000}'),
+      NR.PROGRESS_IDLE_MAX_MS,
+      "and a length past the top of the slider is clamped rather than refused: a hand-" +
+        "edited file means 'as long as possible', which is what the top of it is"
     );
   });
 
@@ -3859,13 +3892,19 @@ async function main() {
       );
     }
 
-    // The fade is two buttons rather than a slider, so there is no range control in
-    // the panel at all — the class it used to wear was Bootstrap 5's name for one,
-    // against an app built on 4, and the control it was on is gone.
-    assert.strictEqual(
-      settings.querySelector("input[type=range]"),
-      null,
-      "nothing in the panel is a slider any more"
+    // The fade is two buttons rather than a slider — the class it used to wear was
+    // Bootstrap *5*'s name for one, against an app built on 4. The panel does have one
+    // slider now, and it is the bar's clock: read off the inputs by hand, because the
+    // stub answers ids, classes and tags and nothing else. `input[type=range]` matches
+    // *nothing* here — which is how this check came to pass for as long as it did while
+    // proving nothing at all.
+    const ranges = [...settings.querySelectorAll("input")].filter(
+      (input) => input.type === "range"
+    );
+    assert.deepStrictEqual(
+      ranges.map((input) => input.id),
+      ["manga-reader-idle"],
+      "the panel's one slider is the bar's clock, and the fade is not a slider"
     );
 
     assert.strictEqual(
@@ -5232,11 +5271,11 @@ async function main() {
       bar() ? bar().querySelectorAll(".manga-reader-progress-node").length : 0;
     const away = (node) =>
       node.getAttribute("data-manga-reader-hidden") !== null;
-    // The row a control sits in, found the way the panel's own pass finds it: the
-    // control is inside the row rather than the row's own element, and what is hidden is
-    // the row.
-    const rowOf = (id) => {
-      let at = control(id);
+    // The row something sits in, found the way the panel's own pass finds it: what is
+    // hidden and shown is the *row*, and what a test can name is something inside it — a
+    // control, or the readout of the panel's one slider.
+    const rowOf = (selector) => {
+      let at = panel.querySelector(selector);
       while (at && !at.classList?.contains("manga-reader-row")) {
         at = at.parentNode;
       }
@@ -5316,6 +5355,16 @@ async function main() {
       "and the marks row goes with it, since a mark on a bar that is not drawn is a " +
         "setting with nothing to say"
     );
+    assert.strictEqual(
+      away(rowOf(".manga-reader-readout")),
+      true,
+      "…and so does the row that says how long it stays, for the same reason"
+    );
+    assert.strictEqual(
+      away(control("#manga-reader-idle")),
+      true,
+      "…with the slider under it, which is the row's control but not inside the row"
+    );
 
     // And back, so the sections after this one read a panel in the state they expect.
     flip("#manga-reader-show-progress");
@@ -5324,6 +5373,16 @@ async function main() {
       away(rowOf("#manga-reader-show-marks")),
       false,
       "with its marks row"
+    );
+    assert.strictEqual(
+      away(rowOf(".manga-reader-readout")),
+      false,
+      "…and with the row that winds its clock"
+    );
+    assert.strictEqual(
+      away(control("#manga-reader-idle")),
+      false,
+      "…slider and all"
     );
 
     // In the column the bar is also the room the pages leave for it, so turning it off
@@ -5357,6 +5416,151 @@ async function main() {
     dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
 
     stopReader(box);
+  });
+
+  /**
+   * The bar's clock, wound by the reader.
+   *
+   * How long it stays was a constant — two seconds, which is a good answer and was the only
+   * one there was. It is a slider now, and the two ends of that slider are not lengths of
+   * time but settings of their own: at 0 the bar is there only while the pointer is on it,
+   * which is the one setting under which a *turn* does not bring it out at all (there would
+   * be nobody pointing at it to read it), and at the top it comes out and never goes away.
+   *
+   * The clock is the test's, as it is in the sections about sleeping: the timers the plugin
+   * sets are collected, and what is asserted is what it asked for.
+   */
+  await runSection("the bar's clock is the reader's", async () => {
+    const real = dom.window.setTimeout;
+    const timers = [];
+    dom.window.setTimeout = (fn, ms) => {
+      timers.push({ fn, ms });
+      return real(fn, ms);
+    };
+
+    try {
+      // Eight pages rather than five: this section wakes the bar by turning pages, three
+      // times over, and running out of book in the middle of it is a test that fails for
+      // the wrong reason.
+      const { box } = await startReader({
+        galleryId: "31",
+        on: true,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
+      });
+      const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
+      const bar = box.lightbox.querySelector(".manga-reader-progress");
+      const track = bar.querySelector(".manga-reader-progress-track");
+      const slider = panel.querySelector("#manga-reader-idle");
+      const readout = () =>
+        panel.querySelector(".manga-reader-readout").textContent;
+      const asleep = () => bar.classList.contains("is-idle");
+
+      /** The bar's own clock, told apart from the drag's throttle by its length */
+      const clocks = () => timers.filter((timer) => timer.ms >= 500);
+
+      const slide = (step) => {
+        slider.value = String(step);
+        slider.dispatch("input");
+      };
+
+      // The pages as laid out, since a bar with nothing measured stays out of the way
+      // however much is asked of it.
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+      dom.flush();
+
+      // The row: a slider, and what it is set to said in seconds.
+      assert.ok(slider, "the panel has the slider this section is about");
+      assert.strictEqual(slider.type, "range", "which is a slider");
+      assert.strictEqual(
+        slider.value,
+        String(NR.PROGRESS_IDLE_MS / 500),
+        "which starts on the length the constant was"
+      );
+      assert.strictEqual(readout(), "2 s", "said beside it in seconds");
+
+      // The top of the slider: out, and out it stays. No clock at all — and the assertion
+      // is that none was set, because a clock set to a very long time would pass a test
+      // that only waited.
+      slide(NR.PROGRESS_IDLE_MAX_MS / 500 + 1);
+      assert.strictEqual(
+        savedReaderSettings().progressIdleMs,
+        NR.PROGRESS_NEVER,
+        "the top step is not a length of time: it is the setting that never hides"
+      );
+      assert.strictEqual(readout(), "Never", "which the readout says in words");
+
+      const before = timers.length;
+      dom.click(box.navRight);
+      assert.strictEqual(asleep(), false, "a turn brings the bar out");
+
+      // …and nothing it asked for can put the bar away again, whatever length that clock
+      // was: every callback it set is run, and the bar is still there. Run rather than
+      // counted, because the way this goes wrong is a clock scheduled with the *setting*
+      // as its length — and -1 as a length fires at once. A test that waited out a long
+      // clock instead would pass with the setting not honoured at all.
+      for (const timer of timers.slice(before)) timer.fn();
+      assert.strictEqual(
+        asleep(),
+        false,
+        "and there is nothing to put it away again: 'never' means never, not 'not yet'"
+      );
+
+      // The bottom of it: only the pointer has the bar.
+      slide(0);
+      assert.strictEqual(
+        savedReaderSettings().progressIdleMs,
+        0,
+        "the bottom step is the other setting that is not a length of time"
+      );
+      assert.strictEqual(readout(), "0 s", "which reads as no time at all");
+
+      dom.click(box.navRight);
+      assert.strictEqual(
+        asleep(),
+        true,
+        "a turn does not bring it out — there is nobody pointing at it to read it"
+      );
+      track.dispatch("mousemove", dom.makeEvent("mousemove", {}));
+      assert.strictEqual(asleep(), false, "the pointer reaching it does");
+      track.dispatch("mouseleave", dom.makeEvent("mouseleave", {}));
+      assert.strictEqual(
+        asleep(),
+        true,
+        "and leaving takes it with it, with no waiting at all"
+      );
+
+      // And in between: a length of time, which is what the clock is set to.
+      slide(6);
+      assert.strictEqual(
+        savedReaderSettings().progressIdleMs,
+        3000,
+        "three seconds is three thousand milliseconds"
+      );
+      assert.strictEqual(readout(), "3 s", "which is what the readout says");
+
+      timers.length = 0;
+      dom.click(box.navRight);
+      assert.strictEqual(asleep(), false, "a turn brings it out");
+      const clock = clocks().pop();
+      assert.ok(clock, "and sets a clock to put it away by");
+      assert.strictEqual(clock.ms, 3000, "as long as the reader asked for");
+      clock.fn();
+      assert.strictEqual(asleep(), true, "and it goes when that runs out");
+
+      // Put back: the default, so that the sections after this one have a bar that behaves
+      // as they expect.
+      slide(NR.PROGRESS_IDLE_MS / 500);
+      assert.strictEqual(readout(), "2 s", "which the slider says again");
+
+      stopReader(box);
+    } finally {
+      dom.window.setTimeout = real;
+    }
   });
 
   /**

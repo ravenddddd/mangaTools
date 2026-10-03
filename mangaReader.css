@@ -459,6 +459,20 @@
 }
 
 /*
+ * What a slider in the panel is set to, read off at the far end of its own row.
+ *
+ * In the row rather than after the slider — which is what this is here to say: the slider
+ * keeps the full width of the body, because a number sitting beside it would shorten the
+ * one control in this panel that is dragged rather than pressed. Dimmer than the label it
+ * faces, and in tabular figures, so that the words do not shuffle sideways as the number
+ * under them goes from 2 to 10.
+ */
+.manga-reader-readout {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
  * Bootstrap's switch is drawn as the label's two pseudo-elements, and the label it
  * expects to sit beside them is the words this panel puts on the other side of the
  * row. The empty label still reserves that space — 0.5rem of it — so the row takes

@@ -63,6 +63,16 @@ export interface ProgressState {
   /** How many pages the gallery has, which is what the bar is a fraction of */
   total: number;
   /**
+   * How long the bar stays after the last thing that woke it, in milliseconds — with the
+   * two settings that are not lengths of time in it: PROGRESS_HOLD_MS (only while the
+   * pointer is on it) and PROGRESS_NEVER (until the lightbox closes).
+   *
+   * The reader's own, out of the options panel, and passed rather than read from the
+   * settings here for the reason everything else in this state is: this half draws from
+   * what it is given.
+   */
+  idleMs: number;
+  /**
    * How wide the pages on show are, in pixels — which is how wide the bar is.
    *
    * Measured by the reader, from the pages it drew: the bar belongs to those pages
@@ -95,8 +105,30 @@ export interface ProgressState {
  */
 export const PROGRESS_SCRUB_MS = 120;
 
-/** How long the bar is left alone before it gets out of the way, in milliseconds */
+/**
+ * How long the bar is left alone before it gets out of the way, in milliseconds.
+ *
+ * The **default** rather than the rule: the reader can wind this clock, and the setting is
+ * `progressIdleMs` — see PROGRESS_HOLD_MS and PROGRESS_NEVER for the two values of it that
+ * are not lengths of time.
+ */
 export const PROGRESS_IDLE_MS = 2000;
+
+/**
+ * The two ends of that clock, neither of which is a length of time.
+ *
+ * `PROGRESS_HOLD_MS` is "no clock, and no lingering": the bar is a control that is there
+ * while the pointer is on it and gone when it leaves, which is the one setting under which
+ * a *turn* does not bring it out — there would be nobody pointing at it to read it. Every
+ * other value leaves the turn alone and only decides how long the bar stays afterwards.
+ *
+ * `PROGRESS_NEVER` is the other end: it comes out and it stays out.
+ */
+export const PROGRESS_HOLD_MS = 0;
+export const PROGRESS_NEVER = -1;
+
+/** The longest the reader can ask for, in milliseconds — the slider's top step but one */
+export const PROGRESS_IDLE_MAX_MS = 10000;
 
 /** Where a page sits on the bar, as a fraction — see the note above */
 export function fractionOfPage(page: number, total: number): number {
@@ -307,6 +339,7 @@ export function removeProgress(lightbox: Element): void {
   bubble = null;
   pointer = null;
   pressed = false;
+  onTrack = false;
   labelWidth = 0;
   labelHeight = 0;
   // The width remembered for the pages and the wake that was owed are both the
@@ -632,6 +665,9 @@ function drawNodes(state: ProgressState): void {
  * under a pointer that has not moved and is no longer over it: nothing tells it.
  */
 function onMoveOverBar(event: Event): void {
+  // The pointer is on the line, which is a fact one of the clock's settings is about —
+  // see PROGRESS_HOLD_MS. Set before waking, since waking is what reads it.
+  onTrack = true;
   wake();
 
   // A drag has a bubble of its own, and the pointer crossing a tick on its way is not
@@ -660,7 +696,14 @@ function onMoveOverBar(event: Event): void {
 
 /** The pointer left the line: the bubble goes, unless a drag is holding it */
 function onLeaveTrack(): void {
+  onTrack = false;
   if (!pressed) takeBubbleDown();
+
+  // With no lingering allowed the pointer *is* the bar's visibility: it leaves, and the
+  // bar goes with it. Every other setting has a clock to wait on instead — see wake.
+  if (!pressed && latest?.idleMs === PROGRESS_HOLD_MS) {
+    bar?.classList.add(CLASS_IDLE);
+  }
 }
 
 /**
@@ -711,13 +754,32 @@ function wake(): void {
     return;
   }
 
+  // Whatever clock was running goes, because the reader can move this setting while the
+  // bar is out — and a clock set under the old one would put the bar away under the new.
+  if (idle !== null) {
+    window.clearTimeout(idle);
+    idle = null;
+  }
+
+  const idleMs = latest?.idleMs ?? PROGRESS_IDLE_MS;
+
+  // No lingering, so no clock: the pointer is what has this bar out, and a turn that
+  // called this is a turn that would be showing a bar to nobody. See onLeaveTrack, which
+  // is the other half of it.
+  if (idleMs === PROGRESS_HOLD_MS) {
+    bar.classList.toggle(CLASS_IDLE, !onTrack);
+    return;
+  }
+
   bar.classList.remove(CLASS_IDLE);
-  if (idle !== null) window.clearTimeout(idle);
+
+  // …and the other end: out, and out it stays.
+  if (idleMs === PROGRESS_NEVER) return;
 
   idle = window.setTimeout(() => {
     idle = null;
     bar?.classList.add(CLASS_IDLE);
-  }, PROGRESS_IDLE_MS);
+  }, idleMs);
 }
 
 function stopTimers(): void {
@@ -729,6 +791,16 @@ function stopTimers(): void {
 
 /** Whether a pointer is down on the bar */
 let pressed = false;
+
+/**
+ * Whether the pointer is on the bar's line at all.
+ *
+ * Kept because one of the clock's settings is about exactly that — see PROGRESS_HOLD_MS,
+ * where the pointer is the whole of the bar's visibility. Written in three places, all of
+ * them pointer events on the track: a move over it, a leave, and a press that landed on it
+ * without a move first.
+ */
+let onTrack = false;
 
 /**
  * Where a pointer is along the track, as a fraction of its length.
@@ -758,6 +830,11 @@ function onPress(event: Event): void {
 
   press.preventDefault();
   press.stopPropagation();
+
+  // A press on the line is on it, whether or not a move was seen first: a hand that lands
+  // and drags has not been anywhere else, and the setting with no lingering in it would
+  // otherwise put the bar away under the drag that is using it.
+  onTrack = true;
 
   pressed = true;
   bar?.classList.add(CLASS_SCRUBBING);

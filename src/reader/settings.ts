@@ -15,6 +15,12 @@
  * write nobody asked for, to spare one click in each browser that had chosen something.
  */
 import { NR, type MangaReaderSettings } from "./namespace";
+import {
+  PROGRESS_HOLD_MS,
+  PROGRESS_IDLE_MAX_MS,
+  PROGRESS_IDLE_MS,
+  PROGRESS_NEVER,
+} from "./progress";
 import { NS } from "../languages";
 
 /**
@@ -50,6 +56,7 @@ export const DEFAULT_SETTINGS: MangaReaderSettings = {
   offset: false,
   showProgress: true,
   showChapterMarks: true,
+  progressIdleMs: PROGRESS_IDLE_MS,
 };
 
 /**
@@ -79,6 +86,30 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
       : (DEFAULT_SETTINGS[key] as boolean);
 
   /**
+   * How long the bar stays, in milliseconds — with the two ends of it that are not lengths
+   * of time: PROGRESS_HOLD_MS and PROGRESS_NEVER.
+   *
+   * A number the slider cannot produce is not a setting: a hand-edited configuration reads
+   * as the default, and so does a length past the top of the range, which is clamped rather
+   * than refused (a reader who edited the file by hand meant "as long as possible" and not
+   * "the default"). Only a value that is not a number at all falls back.
+   */
+  const idleMs = (): number => {
+    const value = stored.progressIdleMs;
+
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      return DEFAULT_SETTINGS.progressIdleMs;
+    }
+
+    if (value === PROGRESS_NEVER || value === PROGRESS_HOLD_MS) return value;
+
+    return Math.min(
+      Math.max(Math.round(value), PROGRESS_HOLD_MS),
+      PROGRESS_IDLE_MAX_MS
+    );
+  };
+
+  /**
    * Which of the three ways the pages are laid out.
    *
    * A value of the wrong shape — a hand-edited configuration, a mode some later build
@@ -96,6 +127,7 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
 
   return {
     readingMode: readingMode(),
+    progressIdleMs: idleMs(),
     coverAlone: flag("coverAlone"),
     detectSpreads: flag("detectSpreads"),
     fade: flag("fade"),

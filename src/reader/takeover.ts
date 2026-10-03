@@ -56,7 +56,10 @@ import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
 import { syncFooter } from "./footer";
 import {
+  PROGRESS_HOLD_MS,
+  PROGRESS_IDLE_MAX_MS,
   PROGRESS_IDLE_MS,
+  PROGRESS_NEVER,
   PROGRESS_SCRUB_MS,
   barReserve,
   ensureProgress,
@@ -709,6 +712,7 @@ function progressState(
     // wake it was owed.
     width: scrolling || relaid ? 0 : pictureWidth(screen?.pages.length ?? 0),
     vertical: scrolling,
+    idleMs: settings.progressIdleMs,
     // …and the same fact said to the bar itself, which is where the width it was holding
     // is forgotten. See `lastWidth` in progress.ts.
     relaid,
@@ -1091,6 +1095,11 @@ NR.pageAtFraction = pageAtFraction;
 NR.progressNodes = progressNodes;
 NR.PROGRESS_SCRUB_MS = PROGRESS_SCRUB_MS;
 NR.PROGRESS_IDLE_MS = PROGRESS_IDLE_MS;
+// The three the reader's own slider is on: the default above, the longest it can ask for,
+// and the two ends of it that are not lengths of time.
+NR.PROGRESS_IDLE_MAX_MS = PROGRESS_IDLE_MAX_MS;
+NR.PROGRESS_HOLD_MS = PROGRESS_HOLD_MS;
+NR.PROGRESS_NEVER = PROGRESS_NEVER;
 
 /**
  * Fades a screen in as it arrives.

@@ -64,6 +64,16 @@ export interface MangaReaderSettings {
    */
   showProgress: boolean;
   /**
+   * How long the bar stays after the last thing that woke it, in milliseconds.
+   *
+   * Two of its values are not lengths of time, and are the two ends of the slider that sets
+   * it: 0 is "only while the pointer is on it" — under which a turn does not bring the bar
+   * out at all, since there would be nobody pointing at it — and -1 is "never hide".
+   * Anything between them is how long it lingers. See PROGRESS_HOLD_MS and PROGRESS_NEVER
+   * in progress.ts, which is where the bar reads it.
+   */
+  progressIdleMs: number;
+  /**
    * Whether the bar marks where each chapter begins.
    *
    * The ticks, and nothing else: the chapter menu in the header and the name the drag's
@@ -304,7 +314,18 @@ export interface MangaReaderNamespace {
     locale: string | null
   ): { name: string; at: number; fraction: number }[];
   PROGRESS_SCRUB_MS: number;
+  /**
+   * The bar's clock, published whole rather than only where it is read: the default, the
+   * longest a reader can ask for, and the two settings that are not lengths of time —
+   * `PROGRESS_HOLD_MS` (only while the pointer is on the bar) and `PROGRESS_NEVER` (until
+   * the lightbox closes). See progress.ts. The tests are why: what is written into the
+   * settings when a slider is dragged is one of these, and a literal in a test is a second
+   * place the number lives.
+   */
   PROGRESS_IDLE_MS: number;
+  PROGRESS_IDLE_MAX_MS: number;
+  PROGRESS_HOLD_MS: number;
+  PROGRESS_NEVER: number;
   stepsToAdjacent(
     screens: MangaReaderScreen[],
     pageIndex: number,
