@@ -15,6 +15,7 @@
   "mangaReader.fadeOff": "None",
   "mangaReader.groupProgress": "Progress",
   "mangaReader.groupWheel": "Wheel",
+  "mangaReader.perMode": "Each way of reading keeps its own settings: single page, double page and the column do not share them, and what you change here is the set for the way you are reading now. They are stored on the server with the library, so every browser reads the same.",
   "mangaReader.wheel": "Wheel",
   "mangaReader.wheelShift": "Shift + wheel",
   "mangaReader.wheelCtrl": "Ctrl + wheel",

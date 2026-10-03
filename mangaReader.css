@@ -459,6 +459,81 @@
 }
 
 /*
+ * A group's heading and whatever stands beside it — the words in the label, and this panel's
+ * one "?" after them — on one line.
+ *
+ * The row carries the space under the heading rather than the label, because the label is now
+ * a flex item in it: its own margin-bottom would push the "?" off the baseline instead of
+ * holding the next row away.
+ */
+.manga-reader-heading-line {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 0.6rem;
+}
+
+.manga-reader-heading-line > .manga-reader-group-label {
+  margin-bottom: 0;
+}
+
+/*
+ * The "?" beside a group's heading, and the note it opens.
+ *
+ * The same arrangement as the settings page's own "?" — see mangaTools.css — in this panel's
+ * clothes: a muted glyph the size of the words beside it, and a note that hangs under the
+ * heading and over whatever it covers. Opening is the stylesheet's job and it is *hover*,
+ * plus `:focus-visible` for a keyboard: nothing here is stateful, which matters because this
+ * panel is drawn from the reader's state on every change.
+ */
+.manga-reader-help {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.35rem;
+}
+
+.manga-reader-help-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: rgba(191, 204, 214, 0.6);
+  cursor: help;
+  font: inherit;
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.manga-reader-help-button:hover {
+  color: #f5f8fa;
+}
+
+.manga-reader-help-panel {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 20;
+  width: 15rem;
+  margin-top: 0.35rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 3px;
+  background: #2f3d47;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  color: #f5f8fa;
+  font-size: 0.9rem;
+  /* The heading it hangs under has letter-spacing of its own, which the note does not want:
+     it is prose, and it is a different kind of thing from the word it is explaining. */
+  letter-spacing: normal;
+  line-height: 1.45;
+}
+
+.manga-reader-help:hover .manga-reader-help-panel,
+.manga-reader-help-button:focus-visible + .manga-reader-help-panel {
+  display: block;
+}
+
+/*
  * The wheel's rows: a dropdown at the far edge, the same width in all three so that the
  * three of them line up as a column.
  *

@@ -55,12 +55,7 @@ import { bridged, installBridge, takeOver } from "./bridge";
 import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
 import { syncFooter } from "./footer";
-import {
-  autoWheelAction,
-  wheelDelta,
-  wheelEffect,
-  wheelGesture,
-} from "./wheel";
+import { wheelDelta, wheelEffect, wheelGesture } from "./wheel";
 import {
   PROGRESS_HOLD_MS,
   PROGRESS_IDLE_MAX_MS,
@@ -1859,7 +1854,6 @@ NR.WHEEL_REST_MS = WHEEL_REST_MS;
 // rather than what is stored in the settings.
 NR.wheelGesture = wheelGesture;
 NR.wheelDelta = wheelDelta;
-NR.autoWheelAction = autoWheelAction;
 NR.wheelEffect = wheelEffect;
 
 /** What the wheel has travelled since the last screen it turned */
@@ -1898,10 +1892,15 @@ let wheelRest: number | null = null;
  * is not a place a wheel event can land — so this is the only wheel in the lightbox,
  * and there is nothing to stop from hearing it.
  */
-/** What the reader has this chord bound to */
+/**
+ * What the reader has this chord bound to.
+ *
+ * Out of the set for the mode in hand, which is what `settings` *is*: the three sets are kept
+ * apart in the settings' own storage, and what a reader of them reads is the one that belongs
+ * to the way they are reading. See settings.ts.
+ */
 function actionOf(gesture: MangaReaderWheelGesture): MangaReaderWheelAction {
-  if (gesture === "ctrl") return settings.ctrlWheelAction;
-  return gesture === "shift" ? settings.shiftWheelAction : settings.wheelAction;
+  return settings.wheel[gesture];
 }
 
 function onSpreadWheel(event: Event): void {
@@ -1911,7 +1910,7 @@ function onSpreadWheel(event: Event): void {
   const wheel = event as WheelEvent;
   const scrolling = settings.readingMode === "scroll";
   const gesture = wheelGesture(wheel);
-  const effect = wheelEffect(actionOf(gesture), gesture, scrolling);
+  const effect = wheelEffect(actionOf(gesture), scrolling);
   const delta = wheelDelta(wheel);
 
   // The one binding that is not this plugin's to do: in the column, "scroll" is the

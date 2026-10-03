@@ -893,6 +893,41 @@ module.exports = () => {
     "the slider's row should be spaced as a label rather than as a row: what is under it " +
       "belongs to it, and the panel's ordinary gap is a gap between two settings"
   );
+  // The wheel's rows: a dropdown at the far edge, the same width in all three. Bootstrap's
+  // own `.custom-select` is `width: 100%`, which in a row shaped like this panel's — the words
+  // taking the room there is — would take the room the words need.
+  assert.ok(
+    /\.manga-reader-settings\s+\.manga-reader-select\s*\{[^}]*width:\s*7\.25rem/.test(
+      readerCss
+    ),
+    "a dropdown in this panel needs a width of its own, or it takes the whole row"
+  );
+
+  // The panel's one note, and the two things about it that the test DOM cannot see: that it
+  // opens on *hover* — this panel is drawn from the reader's state on every pass, so a note
+  // opened by a click would be state held somewhere else — and that the heading it hangs off
+  // carries the row's spacing rather than the label's, since the label is a flex item in it
+  // now and its own margin would push the "?" off the heading's line.
+  assert.ok(
+    /\.manga-reader-help:hover\s+\.manga-reader-help-panel[^{]*\{[^}]*display:\s*block/.test(
+      readerCss
+    ),
+    "the note should open when the pointer reaches it"
+  );
+  assert.ok(
+    /\.manga-reader-help-button:focus-visible\s*\+\s*\.manga-reader-help-panel/.test(
+      readerCss
+    ),
+    "…and for a keyboard, where the ring is the only thing saying where they are"
+  );
+  assert.ok(
+    /\.manga-reader-heading-line\s*\{[^}]*margin-bottom/.test(readerCss) &&
+      /\.manga-reader-heading-line\s*>\s*\.manga-reader-group-label\s*\{[^}]*margin-bottom:\s*0/.test(
+        readerCss
+      ),
+    "the heading row should hold the space under it, and the label give up the one it had"
+  );
+
   assert.ok(
     /\.manga-reader-settings\s+\.manga-reader-row-slider\s*\+\s*\.custom-range\s*\{[^}]*margin-top:\s*0/.test(
       readerCss

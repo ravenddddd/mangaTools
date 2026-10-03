@@ -15,6 +15,7 @@
   "mangaReader.fadeOff": "無",
   "mangaReader.groupProgress": "進度",
   "mangaReader.groupWheel": "滾輪",
+  "mangaReader.perMode": "每個閱讀方式各有一套設定：單頁、雙頁、縱向互不影響，現在改的是當前這一套。設定存在伺服器上、跟著庫走，所以每個瀏覽器讀到的一樣。",
   "mangaReader.wheel": "滾輪",
   "mangaReader.wheelShift": "Shift + 滾輪",
   "mangaReader.wheelCtrl": "Ctrl + 滾輪",

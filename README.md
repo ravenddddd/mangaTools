@@ -804,6 +804,14 @@ gallery, open an image, and the lightbox's own options menu — the one behind t
 icon in its header — opens the reader's own panel: **Single page / Double page /
 Scroll** as a row of buttons, then the switches, grouped.
 
+**Everything below the mode chooser is kept per way of reading.** Single page, double page and
+the column each have their own set of these settings — how the pages are paired, how a screen
+arrives, what the progress bar does, what the wheel does — because the same switch does not mean
+the same thing in all three. Switching the way you are reading switches which set the rows are
+showing; the "?" beside the Reading group's heading is where the panel says so. The settings
+themselves are kept with the library rather than in a browser — one JSON string in the plugin's
+own configuration — so every browser and every machine reads the same sets.
+
 **Everything is in that one panel, and it is grouped by what each setting is about:**
 
 | Group | | |
@@ -816,7 +824,7 @@ Scroll** as a row of buttons, then the switches, grouped.
 | **Progress** | **Progress bar** | This plugin's own bar — along the bottom in the two screen modes, down the side of the picture in the column. **On by default**; off, it is not drawn at all rather than hidden |
 | | **Chapter marks** | A tick on the bar where each chapter begins. In every mode, and put away with the bar: a mark on a bar that is not drawn is a setting with nothing to say |
 | | **Hide after** | How long the bar stays once it is out — a slider, in half-seconds up to 10, with the value beside it. Its two ends are not lengths of time: **0** is "only while the pointer is on it", and the top step is **never**, which is also the bar being there from the moment a lightbox opens. Both put away with the bar |
-| **Wheel** | **Wheel / Shift + wheel / Ctrl + wheel** | What each of the wheel's three chords does: **off**, turn a page, zoom, or scroll. Any of them may be bound to the same thing — nothing says a chord is used once. Each row shows what *that* chord does in the mode you are in, which is how the wheel's own default is shown rather than named: see below |
+| **Wheel** | **Wheel / Shift + wheel / Ctrl + wheel** | What each of the wheel's three chords does: **off**, turn a page, zoom, or scroll. **Per way of reading** — the three rows change when the mode does — and any of them may be bound to the same thing, since nothing says a chord is used once. The Reading group's "?" is where that is said to the reader |
 
 The last group is the one that **is in every mode**, because the bar is drawn in all
 three — down the side rather than along the bottom in the column, which is a different
@@ -839,10 +847,15 @@ a bar, and one that is never dismissed is not one to be dismissed before the pic
 read either.
 
 **And the wheel is yours to bind.** Three chords — the wheel, and the same wheel with Shift or
-Ctrl held — each bound to one of three actions or off. The panel offers four answers and not
-the word "default", because the default is the one thing here that depends on the mode, and a
-row that says what the chord *does in front of you* is a truer answer than a name for "whatever
-this mode does":
+Ctrl held — each bound to one of three actions or off, **for each way of reading**: nine
+answers, not three, because the same chord does not mean the same thing in front of a screen
+and in a column. Switch the way you are reading and those three rows become that way of
+reading's own — which is what the "?" beside the Reading group's heading says, and the one
+thing about this panel a reader could not work out from the panel itself. (It says the other
+half too: that these settings are kept with the library on the server rather than in this
+browser, so every browser reads the same.)
+
+The four bindings, and what each of them means where:
 
 | | In a screen (single or double) | In the column |
 |---|---|---|
@@ -851,8 +864,11 @@ this mode does":
 | **Scroll** | up and down a zoomed page — nothing to scroll when it is not zoomed | the browser's own scrolling of the column, handed over rather than done |
 | **Off** | nothing at all — but the chord is still taken, because Ctrl is where a browser puts its own page zoom | nothing at all, including the scrolling |
 
-Untouched, every chord is on what this plugin has always done: the wheel turns a page, Shift
-goes up and down a tall one, Ctrl zooms. **A chord's travel is read from whichever axis the
+Untouched, every chord is on what this plugin has always done *there*: in front of a screen the
+wheel turns a page, Shift goes up and down a tall one and Ctrl zooms; in the column the wheel
+scrolls — scrolling is reading there — and the chord a reader holds down is the one that goes a
+page at a time. There is no "automatic" for the panel to offer, because that would be a name for
+"whatever this mode does" and every mode's answer is now kept as itself. **A chord's travel is read from whichever axis the
 event carries it on**, since several browsers put a Shift+wheel's movement on `deltaX` —
 scrolling sideways being their own meaning for that chord — and a binding the reader chose
 should not care how the browser spells a scroll.

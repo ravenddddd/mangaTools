@@ -24,9 +24,9 @@ import { requirePluginApi } from "../plugin-api";
 import { numbered, stringFor } from "../i18n";
 import { NR } from "./namespace";
 import { PROGRESS_IDLE_MAX_MS, PROGRESS_NEVER } from "./progress";
-import { autoWheelAction } from "./wheel";
+import { WHEEL_ACTIONS, isWheelAction, withWheelAction } from "./wheel";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
-import type { MangaReaderSettings, MangaReaderWheelAction } from "./namespace";
+import type { MangaReaderSettings } from "./namespace";
 import type { LightboxImage } from "./stash-lightbox";
 
 /** This plugin's own header, and the menus inside it */
@@ -103,6 +103,16 @@ const CLASS_READOUT = "manga-reader-readout";
  * buttons would say with three rows of buttons and this says with three lines.
  */
 const CLASS_SELECT = "manga-reader-select";
+/**
+ * The "?" beside a heading, and the note it opens — the same pair the settings page has, in
+ * this panel's clothes. Two classes rather than one because the stylesheet needs the wrapper
+ * to be positioned and the button to be told apart from it.
+ */
+/** A heading and whatever sits beside it, on one line */
+const CLASS_HEADING_LINE = "manga-reader-heading-line";
+const CLASS_HELP = "manga-reader-help";
+const CLASS_HELP_BUTTON = "manga-reader-help-button";
+const CLASS_HELP_PANEL = "manga-reader-help-panel";
 /**
  * The single-page/double-page pair.
  *
@@ -656,6 +666,21 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     // ── How the pages are paired ──────────────────────────────────────────
     const reading = group("mangaReader.groupReading");
 
+    // The one note in this panel, and the one thing a reader cannot work out from the panel
+    // itself: everything below the mode chooser is kept per way of reading, so switching the
+    // mode switches which set those rows are showing. See settings.ts.
+    // …with the note *beside* the heading's words rather than inside them, which is not a
+    // preference: the words are written by `say` on every pass, and writing text into an
+    // element takes its children with it — a "?" inside the heading would be wiped out by the
+    // next pass that said "Reading".
+    const readingTitle = labels["mangaReader.groupReading"];
+    if (readingTitle?.parentNode) {
+      const line = text(CLASS_HEADING_LINE, "div");
+      readingTitle.parentNode.insertBefore(line, readingTitle);
+      line.appendChild(readingTitle);
+      line.appendChild(helpAt("mangaReader.perMode"));
+    }
+
     /**
      * A pair of buttons: one of two, rather than on or off, so not a switch.
      *
@@ -833,6 +858,29 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   }
 
   /**
+   * A "?" and the note it opens.
+   *
+   * Hover, and nothing stateful: this panel is drawn from the reader's own state on every
+   * change, so a note opened by a *click* would be state held somewhere else — and the note
+   * is in the page whether it is shown or not, which is also what the tests can see of it.
+   * The same arrangement the settings page's own "?" uses.
+   */
+  function helpAt(textId: string): HTMLElement {
+    const wrap = text(CLASS_HELP, "span");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = CLASS_HELP_BUTTON;
+
+    const note = text(CLASS_HELP_PANEL);
+    labels[textId] = note;
+
+    wrap.appendChild(button);
+    wrap.appendChild(note);
+    return wrap;
+  }
+
+  /**
    * One chord's dropdown: the four things it can be bound to.
    *
    * The option elements are built once and their words written by the pass below, like
@@ -852,10 +900,17 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     select.addEventListener("change", () => {
       const value = select.value;
       // A dropdown can only offer the four, so this guards against a DOM that is not the one
-      // that was built — and a value that is not one of them is not written at all, rather
-      // than written as "auto": a reader who pressed something did not ask for the default.
-      if (!isWheelAction(value)) return;
-      latest?.handlers.onSetting({ [chord.key]: value });
+      // that was built. The whole table goes with it because that is how the settings are
+      // held — one table per way of reading — and the settings' own write merges a table into
+      // the set for the mode in hand.
+      // `latest` rather than the state this dropdown was built with: the panel is built once
+      // and the reader's settings change under it — a chord bound in another mode, a write
+      // from somewhere else — and a table merged into a stale one would undo those.
+      const wheel = latest?.settings.wheel;
+      if (!isWheelAction(value) || !wheel) return;
+      latest?.handlers.onSetting({
+        wheel: withWheelAction(wheel, chord.gesture, value),
+      });
     });
     return select;
   }
@@ -895,6 +950,17 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   say("mangaReader.showChapterMarks");
   say("mangaReader.progressIdle");
   say("mangaReader.groupWheel");
+  say("mangaReader.perMode");
+
+  // The one attribute in this panel rather than a word: what the "?" is called for a reader
+  // who cannot see it. The name is the note itself, which is what it opens — and it is
+  // written here rather than at the build for the same reason every other word is, which is
+  // that Stash's language can change while the lightbox is open.
+  const helpName = label("mangaReader.perMode");
+  const helpButton = panel.querySelector("." + CLASS_HELP_BUTTON);
+  if (helpButton && helpButton.getAttribute("aria-label") !== helpName) {
+    helpButton.setAttribute("aria-label", helpName);
+  }
   say("mangaReader.wheel");
   say("mangaReader.wheelShift");
   say("mangaReader.wheelCtrl");
@@ -941,11 +1007,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
 
   // The wheel's three dropdowns: the words of their options, and which one is chosen.
   //
-  // Chosen is what the chord *does here*, not what is stored: an untouched install has
-  // "auto", which is not one of the four options and is not a word a reader could have
-  // picked. So the row says the action — turn a page where a screen is being read, scroll
-  // where the pages are a column — which is also the truth about what their wheel is doing.
-  const scrolling = state.settings.readingMode === "scroll";
+  // Chosen out of the set for the mode being read, which is what the three rows of this group
+  // are about — change the way you are reading and these three rows change with it. The note
+  // beside the Reading group is where that is explained to the reader; see drawSettings.
   for (const chord of WHEEL_CHORDS) {
     const select = panel.querySelector(
       "#" + chord.id
@@ -959,9 +1023,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
       if (option.textContent !== words) option.textContent = words;
     });
 
-    const stored = state.settings[chord.key];
-    const chosen =
-      stored === "auto" ? autoWheelAction(chord.gesture, scrolling) : stored;
+    const chosen = state.settings.wheel[chord.gesture];
     if (select.value !== chosen) select.value = chosen;
   }
 
@@ -1013,54 +1075,20 @@ const CTRL_WHEEL_ID = "manga-reader-ctrl-wheel";
 
 /**
  * The wheel's three chords, in the order the panel draws them: the label, the element, and
- * the setting each of them writes.
+ * the gesture each of them is about.
  *
- * The setting is spelled here rather than derived from the element's id, since the two are
- * named for different things — one for the reader ("Shift + wheel"), one for the settings
- * map — and a name assembled out of the other is a name that breaks the first time either
- * changes.
+ * The gesture is spelled here rather than derived from the element's id, since the two are
+ * named for different things — one for the reader ("Shift + wheel"), one for the settings'
+ * own table — and a name assembled out of the other is a name that breaks the first time
+ * either changes.
  */
 const WHEEL_CHORDS = [
-  {
-    id: WHEEL_ID,
-    textId: "mangaReader.wheel",
-    key: "wheelAction",
-    gesture: "plain",
-  },
-  {
-    id: SHIFT_WHEEL_ID,
-    textId: "mangaReader.wheelShift",
-    key: "shiftWheelAction",
-    gesture: "shift",
-  },
-  {
-    id: CTRL_WHEEL_ID,
-    textId: "mangaReader.wheelCtrl",
-    key: "ctrlWheelAction",
-    gesture: "ctrl",
-  },
+  { id: WHEEL_ID, textId: "mangaReader.wheel", gesture: "plain" },
+  { id: SHIFT_WHEEL_ID, textId: "mangaReader.wheelShift", gesture: "shift" },
+  { id: CTRL_WHEEL_ID, textId: "mangaReader.wheelCtrl", gesture: "ctrl" },
 ] as const;
 
-/**
- * What a chord can be bound to, in the order the dropdown lists them.
- *
- * Four, and `auto` is deliberately not one of them: it is what a reader who has never
- * touched this has, and the only value whose meaning depends on the mode. The panel shows
- * the *action* — what the chord does here — rather than the stored word, which for an
- * untouched install is a word the reader has never chosen and cannot choose.
- */
-const WHEEL_ACTIONS = ["off", "turn", "zoom", "scroll"] as const;
-
-/** Whether a value read off a dropdown is one of the four */
-function isWheelAction(value: string): value is MangaReaderWheelAction {
-  return (
-    value === "off" ||
-    value === "turn" ||
-    value === "zoom" ||
-    value === "scroll"
-  );
-}
-
+/** Which of the four bindings each of the dropdowns' options is, by name */
 const WHEEL_WORDS: { [key: string]: string } = {
   off: "mangaReader.wheelOff",
   turn: "mangaReader.wheelTurn",

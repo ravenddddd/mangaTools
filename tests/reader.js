@@ -699,7 +699,27 @@ const chapterRanges = (box) =>
  */
 const savedReaderSettings = () => {
   const written = settingsWrites[settingsWrites.length - 1]?.readerSettings;
-  return written ? JSON.parse(written) : null;
+  // Read the way the plugin reads it rather than with a bare `JSON.parse`: the stored object
+  // is the mode and a set of settings for each way of reading, and what a section means by
+  // "the settings" is the flat one the reader in hand has. See settings.ts.
+  return written ? NR.parseSettings(written) : null;
+};
+
+/**
+ * The settings as the plugin *stores* them: the way of reading, and one set of settings per
+ * way.
+ *
+ * The shape is the plugin's rather than a section's — see settings.ts — so this is the one
+ * place a section says what it is putting in the library, and every set starts from the
+ * plugin's own defaults for that mode rather than from a literal that could drift. A section
+ * that wants a stored object rather than a write through the panel asks for this.
+ */
+const storedSettings = ({ readingMode = "single", profiles = {} } = {}) => {
+  const sets = {};
+  for (const mode of ["single", "double", "scroll"]) {
+    sets[mode] = { ...NR.defaultProfile(mode), ...(profiles[mode] || {}) };
+  }
+  return JSON.stringify({ readingMode, profiles: sets });
 };
 
 /**
@@ -723,11 +743,10 @@ const settingsWith = (over = {}) => ({
   // Read off the bundle rather than written down, so that the default is asserted where it
   // is declared and a change to it is a change here too.
   progressIdleMs: NR.PROGRESS_IDLE_MS,
-  // "auto" for all three: the wheel is the reader's to bind, and a reader who has not bound
-  // it has what this plugin has always done.
-  wheelAction: "auto",
-  shiftWheelAction: "auto",
-  ctrlWheelAction: "auto",
+  // The wheel's three chords as a reader who has never touched them has them — for single
+  // pages, which is the mode these sections are in unless they say otherwise. The column's
+  // own set is the other way round; see wheel.ts.
+  wheel: { plain: "turn", shift: "scroll", ctrl: "zoom" },
   ...over,
 });
 
@@ -1086,105 +1105,169 @@ async function main() {
     assert.deepStrictEqual(
       NR.parseSettings(null),
       defaults,
-      "a browser that has never been asked gets the defaults — the mode off"
-    );
-    assert.deepStrictEqual(
-      NR.parseSettings('{"coverAlone":false}'),
-      { ...defaults, coverAlone: false },
-      "a stored object may be missing a field: the rest are defaults"
-    );
-    assert.deepStrictEqual(
-      NR.parseSettings('{"coverAlone":"yes"}'),
-      defaults,
-      "and a value of the wrong type is not a setting"
-    );
-
-    // How the pages are laid out: one of three, and a value of the wrong shape — a mode
-    // this build has never heard of, or one written by a build that has more — is not a
-    // setting at all. The two shapes this replaced are not read, and have not been
-    // since the settings left the browser: nothing can write them any more.
-    const mode = (raw) => NR.parseSettings(raw).readingMode;
-    assert.strictEqual(
-      mode('{"readingMode":"scroll"}'),
-      "scroll",
-      "each mode reads"
-    );
-    assert.strictEqual(mode('{"readingMode":"double"}'), "double", "as itself");
-    assert.strictEqual(
-      mode('{"readingMode":"sideways"}'),
-      "single",
-      "while a mode this build has never heard of is the default, not a guess"
-    );
-    assert.strictEqual(
-      mode('{"doublePage":true}'),
-      "single",
-      "and the boolean it used to be is nothing now — it was written by a browser, " +
-        "which is not where these settings live"
+      "a library nobody has written to gets the defaults — the mode off"
     );
     assert.deepStrictEqual(
       NR.parseSettings("not json"),
       defaults,
       "nor is something else's value under our key"
     );
+    const legacy = () =>
+      NR.parseSettings(
+        JSON.stringify({
+          readingMode: "double",
+          coverAlone: false,
+          fade: false,
+        })
+      );
 
-    // The fade is a yes or a no, and the length it used to be is not read — see the
-    // note above the mode.
-    const fade = (raw) => NR.parseSettings(raw).fade;
-    assert.strictEqual(fade('{"fade":false}'), false, "a stored no is a no");
+    // **The set is the mode's own.** The whole of what a section writes below is one set per
+    // way of reading, and what is read back is the one for the mode in hand — which is the
+    // whole point of the shape: the same object read in two modes is two different settings.
+    assert.deepStrictEqual(
+      [
+        NR.parseSettings(storedSettings()).wheel,
+        NR.parseSettings(storedSettings({ readingMode: "scroll" })).wheel,
+      ],
+      [
+        { plain: "turn", shift: "scroll", ctrl: "zoom" },
+        { plain: "scroll", shift: "turn", ctrl: "zoom" },
+      ],
+      "the same settings read in two ways of reading are two different sets of them"
+    );
+    assert.deepStrictEqual(
+      NR.parseSettings(
+        storedSettings({ profiles: { double: { coverAlone: false } } })
+      ),
+      defaults,
+      "…and the set that is not the one in hand is not read: this is the single-page one"
+    );
     assert.strictEqual(
-      fade('{"fade":true}'),
-      true,
+      NR.parseSettings(
+        storedSettings({
+          readingMode: "double",
+          profiles: { double: { coverAlone: false } },
+        })
+      ).coverAlone,
+      false,
+      "while the same object read in double page is the set that was written for it"
+    );
+
+    // A field that is absent inside a set, or of the wrong type, falls back to that mode's
+    // default — which is what makes adding one later harmless for a library that already has
+    // a stored object.
+    const at = (profile, mode = "single") =>
+      NR.parseSettings(storedSettings({ profiles: { [mode]: profile } }));
+    assert.strictEqual(
+      at({ coverAlone: false }).coverAlone,
+      false,
+      "a stored no is a no"
+    );
+    assert.strictEqual(
+      at({ fade: false }).fade,
+      false,
       "and a stored yes is a yes"
     );
     assert.strictEqual(
-      fade('{"fade":"yes"}'),
+      at({ fade: false }).coverAlone,
       true,
-      "a value of the wrong type is not a setting, so the default stands"
+      "and a field the stored set does not mention is its default"
     );
     assert.strictEqual(
-      fade('{"fadeMs":0}'),
+      at({ coverAlone: "yes" }).coverAlone,
       true,
-      "and the length the slider used to write is nothing now"
+      "while a value of the wrong type is not a setting at all"
     );
 
-    // The shift is a setting of the browser's now, like the rest of them — it was
-    // remembered per gallery, which is a thing this build does not do.
+    // How the pages are laid out: one of three, and a value of the wrong shape — a mode this
+    // build has never heard of, or one written by a build that has more — is not a setting.
+    const mode = (raw) => NR.parseSettings(raw).readingMode;
     assert.strictEqual(
-      NR.parseSettings('{"offset":true}').offset,
-      true,
-      "the pairing shift is read like any other switch"
+      mode(storedSettings({ readingMode: "scroll" })),
+      "scroll",
+      "each mode reads"
     );
     assert.strictEqual(
-      NR.parseSettings('{"offset":"yes"}').offset,
-      false,
-      "…and a value of the wrong type is not one"
+      mode(storedSettings({ readingMode: "double" })),
+      "double",
+      "as itself"
+    );
+    assert.strictEqual(
+      NR.parseSettings('{"readingMode":"scroll"}').readingMode,
+      "scroll",
+      "…and the mode is at the top of the object, where the shape has always had it"
+    );
+    assert.strictEqual(
+      mode(storedSettings({ readingMode: "sideways" })),
+      "single",
+      "while a mode this build has never heard of is the default, not a guess"
+    );
+
+    // **Nothing flat is read at all.** This is the shape this build wrote until now — the
+    // settings themselves at the top of the object — and a library that has one reads as the
+    // defaults rather than as a mixture of the two. There is no migration: see settings.ts.
+    assert.deepStrictEqual(
+      legacy().readingMode,
+      "double",
+      "the mode is at the top of the object, which is where it has always been"
+    );
+    assert.deepStrictEqual(
+      { ...legacy(), readingMode: "single" },
+      defaults,
+      "…and nothing else of it is read: a settings object an older build wrote — flat, the " +
+        "way this one used to be — is not migrated, so those settings are worth setting once " +
+        "more"
+    );
+
+    // The wheel: three chords, each checked on its own, so that one bad value is not three.
+    const wheel = (bindings, inMode = "single") =>
+      NR.parseSettings(
+        storedSettings({
+          readingMode: inMode,
+          profiles: { [inMode]: { wheel: bindings } },
+        })
+      ).wheel;
+    assert.deepStrictEqual(
+      wheel({ plain: "zoom", shift: "off", ctrl: "turn" }),
+      { plain: "zoom", shift: "off", ctrl: "turn" },
+      "each binding reads as itself"
+    );
+    assert.deepStrictEqual(
+      wheel({ plain: "sideways" }),
+      { plain: "turn", shift: "scroll", ctrl: "zoom" },
+      "…and one that is not one of the four leaves that chord's default standing"
+    );
+    assert.deepStrictEqual(
+      wheel({}, "scroll"),
+      { plain: "scroll", shift: "turn", ctrl: "zoom" },
+      "with the default being the one for the way of reading in hand"
     );
 
     // The bar's clock: a length in milliseconds, with the two values of it that are not
     // lengths at all — the ends of the slider that sets it.
-    const idle = (raw) => NR.parseSettings(raw).progressIdleMs;
+    const idle = (value) => at({ progressIdleMs: value }).progressIdleMs;
     assert.strictEqual(
-      idle('{"progressIdleMs":3000}'),
+      idle(3000),
       3000,
       "a length the reader chose is read back as itself"
     );
     assert.strictEqual(
-      idle(`{"progressIdleMs":${NR.PROGRESS_NEVER}}`),
+      idle(NR.PROGRESS_NEVER),
       NR.PROGRESS_NEVER,
       "…and so is the setting that never hides"
     );
     assert.strictEqual(
-      idle('{"progressIdleMs":0}'),
+      idle(NR.PROGRESS_HOLD_MS),
       NR.PROGRESS_HOLD_MS,
       "…and the one where the pointer is the whole of the bar's visibility"
     );
     assert.strictEqual(
-      idle('{"progressIdleMs":"long"}'),
+      idle("long"),
       NR.PROGRESS_IDLE_MS,
       "while something that is not a number is not a setting, so the default stands"
     );
     assert.strictEqual(
-      idle('{"progressIdleMs":900000}'),
+      idle(900000),
       NR.PROGRESS_IDLE_MAX_MS,
       "and a length past the top of the slider is clamped rather than refused: a hand-" +
         "edited file means 'as long as possible', which is what the top of it is"
@@ -2680,12 +2763,15 @@ async function main() {
           "browser happens to remember"
       );
 
-      NS.readerSettingsRaw = JSON.stringify({
+      // The shape a library has: the way of reading, and a set for each way. Two of the three
+      // sets say something, and which one is read is the mode the object names — which is the
+      // whole of what the shape is for.
+      NS.readerSettingsRaw = storedSettings({
         readingMode: "double",
-        coverAlone: false,
-        detectSpreads: false,
-        fade: false,
-        offset: true,
+        profiles: {
+          double: { coverAlone: false, detectSpreads: false, fade: false },
+          scroll: { offset: true, showProgress: false },
+        },
       });
       assert.deepStrictEqual(
         NR.readSettings(),
@@ -2694,10 +2780,23 @@ async function main() {
           coverAlone: false,
           detectSpreads: false,
           fade: false,
-          offset: true,
         }),
         "and with something in the library, that is what is read — every one of them, " +
           "not only the ones a section happened to set"
+      );
+      assert.strictEqual(
+        NR.parseSettings(
+          storedSettings({
+            readingMode: "scroll",
+            profiles: {
+              double: { coverAlone: false, detectSpreads: false, fade: false },
+              scroll: { offset: true, showProgress: false },
+            },
+          })
+        ).offset,
+        true,
+        "…and the set for the column is read when the column is what is being read: the " +
+          "two sets are kept apart, and neither is the other's fallback"
       );
 
       // Put back: this browser's leftovers, so the sections after this one start from the
@@ -3870,6 +3969,53 @@ async function main() {
       body.querySelectorAll(".manga-reader-divider").length,
       3,
       "with a rule between each pair of them, and none around the outside"
+    );
+
+    // **The one note in this panel**, and the one thing a reader cannot work out from the
+    // panel itself: that every row below the way-of-reading chooser belongs to that way of
+    // reading, and that the settings live on the server rather than in this browser. It hangs
+    // off the Reading group's own heading, and it opens on hover — see the stylesheet — which
+    // is what the settings page's "?" does and for the same reason: nothing about it is state.
+    // Found from the document rather than from the panel this section is holding: the menus
+    // are drawn into the lightbox's own header, and a section that kept a panel element from
+    // before a re-draw would be asking the wrong tree.
+    const help = dom.body.querySelector(".manga-reader-help");
+    assert.ok(help, "the Reading group carries a note");
+    assert.strictEqual(
+      help.parentNode.classList.contains("manga-reader-heading-line"),
+      true,
+      "…on the heading of the group that chooses the way of reading, and not on a row"
+    );
+    assert.strictEqual(
+      help.parentNode.parentNode.querySelector(".manga-reader-group-label")
+        .textContent,
+      "Reading",
+      "…which is the Reading group's own heading"
+    );
+    // And it survives a pass. The words it sits beside are written by every pass — that is
+    // what `say` does — and writing text into an element takes its children with it, which is
+    // exactly how this note came to be built and then wiped out on the very next pass.
+    dom.flush();
+    assert.strictEqual(
+      dom.body.querySelector(".manga-reader-help") === null,
+      false,
+      "…and it is still there after a pass has written the words beside it"
+    );
+    const note = help.querySelector(".manga-reader-help-panel").textContent;
+    assert.strictEqual(
+      note,
+      "Each way of reading keeps its own settings: single page, double page and the " +
+        "column do not share them, and what you change here is the set for the way you " +
+        "are reading now. They are stored on the server with the library, so every " +
+        "browser reads the same.",
+      "…and it says both things: which set these rows are, and where the settings are kept"
+    );
+    assert.strictEqual(
+      help
+        .querySelector(".manga-reader-help-button")
+        .getAttribute("aria-label"),
+      note,
+      "which is also what the button is called for a reader who cannot see it"
     );
 
     // No descriptions: a row is its label and its control, and there is nothing under
@@ -5299,24 +5445,28 @@ async function main() {
       return wheel;
     };
     /**
-     * Every chord back to unbound — the state a reader who has never opened this group has.
+     * The library as a reader who has never bound anything has it: every set back to its own
+     * defaults, the mode in hand's as much as the other two's.
      *
-     * Written through the managing half rather than through the dropdowns, because "auto" is
-     * not one of the four they offer: it is what the *absence* of a choice means, and it is
-     * the one value whose meaning depends on the mode.
+     * Written through the managing half rather than through the dropdowns for the reason the
+     * settings themselves are: a section putting the world back as it found it should say what
+     * it means, and the defaults are the plugin's to spell rather than a section's.
      */
-    const unbind = () =>
+    const unbind = () => {
+      const profiles = {};
+      for (const which of ["single", "double", "scroll"]) {
+        profiles[which] = NR.defaultProfile(which);
+      }
       NS.writeReaderSettings(
         JSON.stringify({
-          ...savedReaderSettings(),
-          wheelAction: "auto",
-          shiftWheelAction: "auto",
-          ctrlWheelAction: "auto",
+          readingMode: NR.parseSettings(NS.readerSettingsRaw).readingMode,
+          profiles,
         })
       );
+    };
 
-    // The three rows, and what they show before anything is bound: what this plugin has
-    // always done, read off the mode the reader is in rather than off the stored word.
+    // The three rows, and what they show before anything is bound: the defaults for the way
+    // of reading in hand, which is what this plugin has always done there.
     for (const [id, chosen] of [
       ["#manga-reader-wheel", "turn"],
       ["#manga-reader-shift-wheel", "scroll"],
@@ -5332,7 +5482,7 @@ async function main() {
       assert.strictEqual(
         select.value,
         chosen,
-        "…and showing what the chord does here, which is not the word that is stored"
+        "…and showing the binding this way of reading has"
       );
     }
 
@@ -5340,7 +5490,7 @@ async function main() {
     // does not like this plugin's wheel would ask for first.
     bind("#manga-reader-wheel", "zoom");
     assert.strictEqual(
-      savedReaderSettings().wheelAction,
+      savedReaderSettings().wheel.plain,
       "zoom",
       "which is written"
     );
@@ -5358,7 +5508,7 @@ async function main() {
     // Back to the action this chord has always had, and the same chord turns again.
     bind("#manga-reader-wheel", "turn");
     assert.strictEqual(
-      savedReaderSettings().wheelAction,
+      savedReaderSettings().wheel.plain,
       "turn",
       "which is written"
     );
@@ -5381,7 +5531,7 @@ async function main() {
     // Shift bound to turning: the chord keeps its modifier and loses its own meaning.
     bind("#manga-reader-shift-wheel", "turn");
     assert.strictEqual(
-      savedReaderSettings().shiftWheelAction,
+      savedReaderSettings().wheel.shift,
       "turn",
       "shift is written"
     );
@@ -5398,7 +5548,7 @@ async function main() {
     // ask for the whole interface to zoom instead.
     bind("#manga-reader-ctrl-wheel", "off");
     assert.strictEqual(
-      savedReaderSettings().ctrlWheelAction,
+      savedReaderSettings().wheel.ctrl,
       "off",
       "off is written"
     );
@@ -5419,9 +5569,9 @@ async function main() {
     }
     assert.deepStrictEqual(
       [
-        savedReaderSettings().wheelAction,
-        savedReaderSettings().shiftWheelAction,
-        savedReaderSettings().ctrlWheelAction,
+        savedReaderSettings().wheel.plain,
+        savedReaderSettings().wheel.shift,
+        savedReaderSettings().wheel.ctrl,
       ],
       ["zoom", "zoom", "zoom"],
       "three chords, one answer, and nothing in the settings says a chord is used once"
@@ -5433,23 +5583,34 @@ async function main() {
     roll(-120);
     assert.notStrictEqual(transform(), flat2, "…and so does the wheel");
 
-    // In the column the same three rows say different things, because the wheel does: the
-    // chord that turns a page where a screen is read scrolls where the pages are a column.
+    // **And the column has a set of its own.** Same panel, same three rows, different
+    // bindings: the wheel scrolls — in a column, scrolling *is* reading — and the chord a
+    // reader holds down is the one that goes a page at a time.
     //
-    // Unbound first — which is not something a *dropdown* can say, since "auto" is
-    // deliberately not one of its four answers — so the settings are written the way the
-    // managing half writes them, which is also how the reader hears about a change made
-    // somewhere other than this panel.
-    unbind();
+    // And what has just been bound belongs to *single pages*: the three chords were all
+    // bound to zooming a moment ago, and the column has not heard about any of it. That is
+    // the whole point of the sets being kept apart — and it is what a reader complained
+    // about when they were not, a wheel that jumped a page at a time in a column because of
+    // a binding they had made in front of a screen.
     dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+    const shown = () => [
+      panel.querySelector("#manga-reader-wheel").value,
+      panel.querySelector("#manga-reader-shift-wheel").value,
+      panel.querySelector("#manga-reader-ctrl-wheel").value,
+    ];
     assert.deepStrictEqual(
-      [
-        panel.querySelector("#manga-reader-wheel").value,
-        panel.querySelector("#manga-reader-shift-wheel").value,
-        panel.querySelector("#manga-reader-ctrl-wheel").value,
-      ],
-      ["scroll", "scroll", "zoom"],
-      "the same three rows, showing what those chords do in this mode"
+      shown(),
+      ["scroll", "turn", "zoom"],
+      "the column has bindings of its own, untouched by the ones just made for single pages"
+    );
+
+    // Unbound through the managing half, which is also how the reader hears about a change
+    // made somewhere other than this panel: every set back to its own defaults.
+    unbind();
+    assert.deepStrictEqual(
+      shown(),
+      ["scroll", "turn", "zoom"],
+      "which is where the column already was"
     );
 
     const column = container();
@@ -5468,20 +5629,31 @@ async function main() {
       "the wheel in the column is the browser's, which is what an untouched install has"
     );
 
-    // Bound to turning, though, it is this plugin's: a page at a time, and the browser is
-    // not left to scroll as well.
-    bind("#manga-reader-wheel", "turn");
+    // A page at a time is what shift is bound to here, and that is this plugin's own turn —
+    // the same one the arrow keys make — so the browser is not left to scroll as well.
     const here = at();
-    const turning = rolled(120);
+    const turning = rolled(120, { shiftKey: true });
     assert.strictEqual(
       turning.defaultPrevented,
       true,
-      "bound to turning, it is taken"
+      "a chord bound to turning is taken rather than handed to the browser"
     );
     assert.notStrictEqual(
       at(),
       here,
       "…and turns a page rather than scrolling freely"
+    );
+
+    // And the same chord bound in the other direction is the other page. The wheel is given
+    // its rest first: what it has travelled is added up and kept, and a roll the other way
+    // that is smaller than the remainder is still travel in the same direction.
+    await new Promise((resolve) => setTimeout(resolve, NR.WHEEL_REST_MS + 40));
+    const back = at();
+    rolled(-120, { shiftKey: true });
+    assert.notStrictEqual(
+      at(),
+      back,
+      "…and the other way round is the page before it"
     );
 
     // And off is off in every mode, which is the promise the word makes: the column does
