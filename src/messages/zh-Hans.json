@@ -71,14 +71,12 @@
 
   "mangaTools.settings.display.heading": "漫画信息的显示",
   "mangaTools.settings.openDetailsBlock.heading": "漫画信息详情默认展开",
-  "mangaTools.settings.openDetailsBlock.description": "画廊简介页里的那一节。收起时，那一行标题就是「这里有一节」的说明。这只决定打开时的默认状态，不决定它能不能打开。",
   "mangaTools.settings.openEditBlock.heading": "漫画信息编辑默认展开",
-  "mangaTools.settings.openEditBlock.description": "画廊编辑表单里的那一块，语言、修正和翻译组在那里设置。这只决定打开时的默认状态，不决定它能不能打开。",
   "mangaTools.settings.hidePerformers.heading": "编辑页隐藏演出者",
-  "mangaTools.settings.hidePerformers.description": "漫画一般没有演出者，所以编辑页不显示这一栏。只是隐藏：画廊已有的演出者仍然留在画廊上，保存时也不会被清掉。批量编辑对话框和简介页不受影响。",
+  "mangaTools.settings.hidePerformers.description": "漫画一般没有演出者，编辑页不显示这一栏以方便编辑。画廊已有的演出者仍然留在画廊上。",
   "mangaTools.settings.showDisabledFields.heading": "显示禁用的插件字段",
   "mangaTools.settings.showDisabledFields.description": "开启时，禁用的字段不再隐藏，详情页和编辑页上由 Stash 原生显示自定义字段。该选项不会修改对应的值。",
-  "mangaTools.settings.showDisabledFields.note": "启用的字段始终由插件接管；这一项只管禁用的那些。",
+  "mangaTools.settings.showDisabledFields.note": "启用的字段始终由插件接管",
 
   "mangaTools.settings.mark.heading": "漫画标记",
   "mangaTools.settings.confirmUnmark.heading": "取消漫画标记时确认",

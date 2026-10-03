@@ -602,11 +602,19 @@ while the switch they belong to is on**:
 |---|---|
 | **Take over Stash's lightbox** | the switch, and — inside its description — a boxed note that the lightbox's own settings are changed on the lightbox |
 | **Take over the Chapters tab** | the switch, and — inside its description — a boxed note on what it commits to: from then on, editing chapters does not touch Stash's own chapter rows |
-| **Custom fields** | the master switch; then one switch per field, with the language's own settings under it; then a heading for the three rows that are not fields |
+| **Custom fields** | the master switch; then one switch per field, with the language's own settings under it; then a heading for the four rows that are not fields — how each of the two Manga info blocks opens, the performers field on the edit page, and whether a disabled field is Stash's to draw |
 | **The manga mark** | three siblings under a heading: unmarking, what unmarking clears, and the mark's icon on covers |
 
 Hiding is not writing. A switch turned off and on again comes back with exactly the
 sub-settings it had, and the same goes for the field values on the galleries.
+
+**The two rows that decide how a block opens decide only that.** Whether the details tab's
+Manga info section and the edit form's block are drawn expanded: a block already on screen keeps
+whatever the reader did to it, and a collapsed one opens on the click that has always opened it.
+Those two rows therefore carry no description — the heading is the whole of what they say, and a
+sentence under each restating it was a line of grey prose under every row. (The one that *was*
+there is this paragraph: a description is where a reader looks for it, and a page of nine
+descriptions is a page nobody reads.)
 
 **A group can also be folded shut, and that is a view rather than a setting.** A row
 that has rows under it carries a chevron, and so does a heading that is not a switch —

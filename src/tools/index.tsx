@@ -3353,10 +3353,18 @@ function MangaToolsSettings() {
           }
         )}
 
-        {/* Three rows that are not fields: they decide how the manga blocks are
-            shown, so they belong to the feature rather than to any one field, and
-            they get a heading instead of a switch to say so — a heading that folds,
-            like the mark's, because it is the same kind of group. */}
+        {/* Four rows that are not fields: they decide how the manga blocks are
+            shown — and, for the last of them, what happens to a field that is off — so
+            they belong to the feature rather than to any one field, and they get a
+            heading instead of a switch to say so: a heading that folds, like the
+            mark's, because it is the same kind of group.
+
+            The first two have no description, which is not an oversight: the heading
+            already says what the switch does ("start expanded", "start expanded"), and
+            a sentence restating it was a line of grey prose under every row. The
+            wording that *was* there — that this decides the state a block opens in and
+            not whether it can be opened — is in the README, where a reader who wants
+            to know it will look. */}
         <SettingsGroup
           id={DISPLAY_GROUP_ID}
           heading={t(intl, "mangaTools.settings.display.heading")}
@@ -3364,10 +3372,6 @@ function MangaToolsSettings() {
           <BooleanSetting
             id="mangaTools-openDetailsBlock"
             heading={t(intl, "mangaTools.settings.openDetailsBlock.heading")}
-            subHeading={t(
-              intl,
-              "mangaTools.settings.openDetailsBlock.description"
-            )}
             checked={NS.openDetailsBlock}
             onChange={writeFlag((next) => {
               NS.openDetailsBlock = next;
@@ -3376,10 +3380,6 @@ function MangaToolsSettings() {
           <BooleanSetting
             id="mangaTools-openEditBlock"
             heading={t(intl, "mangaTools.settings.openEditBlock.heading")}
-            subHeading={t(
-              intl,
-              "mangaTools.settings.openEditBlock.description"
-            )}
             checked={NS.openEditBlock}
             onChange={writeFlag((next) => {
               NS.openEditBlock = next;

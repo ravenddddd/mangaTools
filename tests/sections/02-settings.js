@@ -524,7 +524,7 @@ module.exports = () => {
       settingsEl,
       (n) => n.props?.children === "How the manga info is shown"
     ),
-    "and so are the three display rows"
+    "and so are the rows under it"
   );
 
   // ── The three notes, inside their rows' descriptions ────────────────

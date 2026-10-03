@@ -71,14 +71,12 @@
 
   "mangaTools.settings.display.heading": "漫畫資訊的顯示",
   "mangaTools.settings.openDetailsBlock.heading": "漫畫資訊詳情預設展開",
-  "mangaTools.settings.openDetailsBlock.description": "畫廊簡介頁裡的那一節。收起時，那一行標題就是「這裡有一節」的說明。這只決定打開時的預設狀態，不決定它能不能打開。",
   "mangaTools.settings.openEditBlock.heading": "漫畫資訊編輯預設展開",
-  "mangaTools.settings.openEditBlock.description": "畫廊編輯表單裡的那一塊，語言、修正和翻譯組在那裡設定。這只決定打開時的預設狀態，不決定它能不能打開。",
   "mangaTools.settings.hidePerformers.heading": "編輯頁隱藏演出者",
-  "mangaTools.settings.hidePerformers.description": "漫畫一般沒有演出者，所以編輯頁不顯示這一欄。只是隱藏：畫廊已有的演出者仍然留在畫廊上，儲存時也不會被清掉。批量編輯對話框和簡介頁不受影響。",
+  "mangaTools.settings.hidePerformers.description": "漫畫一般沒有演出者，編輯頁不顯示這一欄以方便編輯。畫廊已有的演出者仍然留在畫廊上。",
   "mangaTools.settings.showDisabledFields.heading": "顯示停用的外掛欄位",
   "mangaTools.settings.showDisabledFields.description": "開啟時，停用的欄位不再隱藏，詳細頁和編輯頁上由 Stash 原生顯示自訂欄位。該選項不會修改對應的值。",
-  "mangaTools.settings.showDisabledFields.note": "啟用的欄位始終由外掛接管；這一項只管停用的那些。",
+  "mangaTools.settings.showDisabledFields.note": "啟用的欄位始終由外掛接管",
 
   "mangaTools.settings.mark.heading": "漫畫標記",
   "mangaTools.settings.confirmUnmark.heading": "取消漫畫標記時確認",

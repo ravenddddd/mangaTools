@@ -71,14 +71,12 @@
 
   "mangaTools.settings.display.heading": "How the manga info is shown",
   "mangaTools.settings.openDetailsBlock.heading": "Start the manga info section expanded",
-  "mangaTools.settings.openDetailsBlock.description": "The Manga info section in a gallery's details tab. Collapsed, its heading is what says the section is there. This decides the state a block opens in, not whether it can be opened.",
   "mangaTools.settings.openEditBlock.heading": "Start the manga info block expanded",
-  "mangaTools.settings.openEditBlock.description": "The Manga info block in a gallery's edit form, where its language, censorship and translation group are set. This decides the state a block opens in, not whether it can be opened.",
   "mangaTools.settings.hidePerformers.heading": "Hide the performers field on the edit page",
-  "mangaTools.settings.hidePerformers.description": "A manga gallery rarely has performers, so its edit page leaves the field out. Only the field is hidden — whatever a gallery already has stays on the gallery and is kept when it is saved. The bulk edit dialog and the details tab are unaffected.",
+  "mangaTools.settings.hidePerformers.description": "A manga gallery rarely has performers, so its edit page leaves the field out to make the form easier to fill in. Whatever a gallery already has stays on the gallery.",
   "mangaTools.settings.showDisabledFields.heading": "Show disabled plugin fields",
   "mangaTools.settings.showDisabledFields.description": "With this on, a disabled field is no longer hidden: Stash draws its own custom-field row for it in the details tab and the edit form. The value itself is not changed.",
-  "mangaTools.settings.showDisabledFields.note": "An enabled field is always this plugin's; this is about the disabled ones.",
+  "mangaTools.settings.showDisabledFields.note": "An enabled field is always this plugin's.",
 
   "mangaTools.settings.mark.heading": "The manga mark",
   "mangaTools.settings.confirmUnmark.heading": "Ask before unmarking",
