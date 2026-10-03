@@ -478,17 +478,27 @@
  *                      the class comes from the component rather than from whether
  *                      a group was drawn.
  *   a group's last row so a group reads as a block, and a group boundary is one
- *                      line rather than two.
+ *                      line rather than two. Two selectors for it, because a group
+ *                      ends in one of two shapes: with a row, or with the wrapper a
+ *                      heading's rows sit in. The fields' group ends with the
+ *                      display group's rows, and the page itself ends with the
+ *                      mark's — so the body is the one that draws the line at both
+ *                      ends of the page today, and the group selector is what covers
+ *                      a group that ends in a row of its own.
  *   a heading          of a group that is not a switch.
  *   the page's last    so the page does not end open.
  *
- * The selector for the last one has to be a direct child of the collapse box, which
- * is `div.collapsible-section` — Stash's own wrapper, and the one our rows really
- * sit in: `div.plugin-settings` is the wrapper Stash's own PluginSettings renders,
- * and this plugin *replaces* that component rather than adding to it.
+ * That last one has to be a direct child of the collapse box, which is
+ * `div.collapsible-section` — Stash's own wrapper, and the one our rows really sit
+ * in: `div.plugin-settings` is the wrapper Stash's own PluginSettings renders, and
+ * this plugin *replaces* that component rather than adding to it. It is the shape
+ * rather than the case as the page is drawn now, where the last child is a heading's
+ * wrapper; it is kept because it is what the line is *for*, and it is the rule that
+ * comes back the moment a page ends in a bare row.
  */
 .setting.manga-tools-setting-head,
 .manga-tools-settings-group > .setting:last-child,
+.manga-tools-settings-body > .setting:last-child,
 .collapsible-section > .setting.manga-tools-setting:last-child,
 .manga-tools-settings-heading {
   border-bottom: 1px solid #000;

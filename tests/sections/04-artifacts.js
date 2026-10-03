@@ -365,8 +365,13 @@ module.exports = () => {
   // Stash draws one under every row that is not its parent's last child, which on
   // a page of nested groups is a line between every pair of rows and another at
   // every group boundary. This plugin's rows carry none of their own, and a line is
-  // drawn only where it means something — the four cases are read here as the four
-  // selectors, because "which of these is missing" is the whole of the check.
+  // drawn only where it means something — the four cases are read here as the five
+  // selectors that draw them, because "which of these is missing" is the whole of
+  // the check. Five and not four: a group's last row is a row in one shape and a
+  // heading's wrapper in the other, and the page is drawn in the second — the
+  // fields' group ends with the display group's rows, and the page ends with the
+  // mark's, so a page with no `.manga-tools-settings-body` rule in it draws neither
+  // of the two lines it is supposed to end with.
   assert.ok(
     /\.setting\.manga-tools-setting,\s*\.setting\.manga-tools-settings\s*\{[^}]*border-bottom:\s*none/.test(
       css
@@ -383,6 +388,11 @@ module.exports = () => {
     [
       "a group's last row",
       /\.manga-tools-settings-group\s*>\s*\.setting:last-child/,
+    ],
+    [
+      "a group's last row when the group ends in a heading's rows — which is how both " +
+        "the fields' group and the page itself end",
+      /\.manga-tools-settings-body\s*>\s*\.setting:last-child/,
     ],
     [
       "the page's last row",

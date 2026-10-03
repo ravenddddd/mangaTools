@@ -640,9 +640,16 @@ not its parent's last child, which across nested groups means a line between eve
 pair of rows *and* another at every group boundary — the page read as a table. This
 plugin's rows carry none of their own; a line is drawn only under a row that is a
 section of the page, under a group's last row, under a heading that is not a switch,
-and under the page's last row. The last of those is a direct child of Stash's
-collapse box rather than of `div.plugin-settings`: that div belongs to Stash's own
-`PluginSettings`, and this plugin *replaces* that component rather than adding to it.
+and under the page's last row. **A group's last row is a row in one shape and a
+wrapper in the other**, and the wrapper is the shape the page has: the fields' group
+ends with the rows under the heading for how the info is shown, and the page itself
+ends with the mark's. So the wrapper's last row is what draws the line at both ends of
+the page as it is drawn today — and without a rule of its own for that shape, neither
+of the two lines the page is meant to end with was drawn at all, silently: a selector
+that matches nothing is a selector nothing reports. The page-last one is a direct
+child of Stash's collapse box rather than of `div.plugin-settings`: that div belongs
+to Stash's own `PluginSettings`, and this plugin *replaces* that component rather than
+adding to it.
 
 **Two rows say a second thing, and it is the second half of their description.**
 "Where the lightbox's own settings live" and "editing chapters does not touch Stash's
