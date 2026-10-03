@@ -807,6 +807,32 @@ module.exports = () => {
     "mangaReader.css should lay the spread over the display: in the flow it takes " +
       "the width of its pages, and squeezes Stash's own arrows against the edges"
   );
+  // And a row in the column is centred *safely*, which the stub's DOM cannot see:
+  // centring an item that overflows is centring half of the overflow outside the
+  // start edge, and that half is not in a scroll box's scrollable area. Measured in
+  // Chrome: a 900px row in a 400px box gives a `scrollWidth` of 650, so the left
+  // 250px of a zoomed page is out of reach of both the scroll and the drag — which
+  // is the one thing the column does that a screen does not, and only after the
+  // first notch of zoom. The pair is read in order: the plain `center` is what a
+  // browser without the keyword keeps, which is the behaviour this replaces.
+  const columnRule = /\.manga-reader-spread\.is-scroll\s*\{([^}]*)\}/.exec(
+    readerCss
+  );
+  // Comments stripped first, as for the help example: the declaration that carries
+  // the fallback is the one with a lint suppression and a reason above it, and a
+  // check that reads prose is a check that passes for the wrong reason.
+  const columnDeclarations = (columnRule?.[1] ?? "").replace(
+    /\/\*[\s\S]*?\*\//g,
+    ""
+  );
+  assert.ok(
+    /align-items:\s*center;\s*align-items:\s*safe center/.test(
+      columnDeclarations
+    ),
+    "a row in the column should be centred safely, and the plain centring kept as " +
+      "the fallback for a browser that does not know `safe`: plain centring alone " +
+      "puts the left edge of a zoomed page outside the box's scroll range"
+  );
 
   // The footer, which stays. It carries the image's own name and the link back to
   // the gallery it came from — Stash's to say, not this plugin's to replace — so a

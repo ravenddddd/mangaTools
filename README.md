@@ -865,7 +865,14 @@ the same thing in all three.
   that are *fitted* to the screen, with slack in both directions, while the fit here is
   the page's own width. So the page itself grows — which is the browser's own model of
   page zoom — because a transform on a scroll box leaves its scroll range where it was
-  and puts the edges of a zoomed page out of reach. Whichever zoom is in hand, the
+  and puts the edges of a zoomed page out of reach. **Which is also why the rows are
+  centred *safely*.** They are centred on the column's cross axis, and centring an item
+  that overflows puts half of that overflow outside the *start* edge — which a scroll box
+  does not count as part of its scroll range: measured in Chrome, a 900px row in a 400px
+  box gives a `scrollWidth` of 650, so the left 250px of a zoomed page is beyond the
+  reach of the scroll and of the drag alike. `align-items: safe center` gives the
+  centring up exactly when a row does not fit, with the plain `center` left above it for
+  a browser that does not know the keyword. Whichever zoom is in hand, the
   header's reset button puts it back, and the reader stays exactly where they were
   reading — the position is scaled by the same factor the pages are, rather than
   snapped to the top of the page they happened to be in.

@@ -97,7 +97,26 @@
 .manga-reader-spread.is-scroll {
   flex-direction: column;
   justify-content: flex-start;
+  /*
+   * Centred — and `safe`, which is a different thing the moment a row is wider than
+   * this box. Centring an item that overflows puts half of that overflow outside the
+   * *start* edge, and the start-side half is not in a scroll box's scrollable area:
+   * measured in Chrome, a 900px row in a 400px box gives a `scrollWidth` of 650 —
+   * the right-hand overflow only — so the left 250px of every page is out of reach
+   * of the scroll and of the drag alike. Nothing shows it at the size the pages fit
+   * at, which is the size the mode opens in: it begins with the first notch of zoom,
+   * which is the one thing this column does that a screen does not.
+   *
+   * `safe center` gives the centring up only when the item does not fit, and falls
+   * back to `start`: the whole page is in the range, and a row that fits is centred
+   * as it was. The plain `center` above it is what a browser that does not know the
+   * keyword keeps — this is what it was, not a second guess.
+   */
   align-items: center;
+  /* biome-ignore lint/suspicious/noDuplicateProperties: the duplicate *is* the
+     point — a browser that does not know `safe` drops the second declaration and
+     keeps the first. See the note above. */
+  align-items: safe center;
   gap: 2px;
   overflow-y: auto;
   /* Both ways, because a zoomed column is wider than the picture area — see the note
