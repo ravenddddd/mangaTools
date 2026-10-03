@@ -670,7 +670,7 @@ module.exports = () => {
     const groupsIn = (el) =>
       countIn(el, (n) => isClass(n, "manga-tools-settings-group"));
     const switchesIn = (el) => countIn(el, (n) => n.type === "Switch");
-    const open = (el) => call("PluginSettings", { pluginID: "mangaTools" });
+    const open = () => call("PluginSettings", { pluginID: "mangaTools" });
 
     const page = open();
     const chevrons = chevronsIn(page);
@@ -691,7 +691,9 @@ module.exports = () => {
     assert.strictEqual(switchesIn(page), 15, "…and fifteen switches");
 
     const before = state.capturedConfigWrite;
-    const click = (c) => c.props.onClick({ stopPropagation: () => {} });
+    const click = (c) => {
+      c.props.onClick({ stopPropagation: () => {} });
+    };
 
     // The language field is the second chevron, and it folds its own three rows —
     // two of them switches, and the multiselect, which is not one.
@@ -773,7 +775,9 @@ module.exports = () => {
     for (let pass = 0; pass < 3; pass++) {
       const shut = chevronsIn(open()).filter((c) => !c.props["aria-expanded"]);
       if (!shut.length) break;
-      shut.forEach((c) => click(c));
+      shut.forEach((c) => {
+        click(c);
+      });
     }
     assert.strictEqual(
       groupsIn(open()),
