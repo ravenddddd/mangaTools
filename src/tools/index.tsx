@@ -307,9 +307,10 @@ let bulkRenders = 0;
 /**
  * The path the plugin was last *told* it is on, by `stash:location`.
  *
- * No longer what the path checks read — see pathNow — but kept as what the reader's
- * half of the world can still answer when the URL cannot, and as the value
- * MangaTools.diag() reports next to the live one.
+ * Nothing decides anything by this any more — see pathNow, which reads the URL. It
+ * is kept because it is the other half of a question worth being able to ask: when
+ * the plugin acts on the wrong page, the first thing to know is whether the URL and
+ * the last announcement agree. MangaTools.diag() reports both.
  */
 let currentPath = window.location.pathname || "";
 
@@ -323,16 +324,20 @@ let currentPath = window.location.pathname || "";
  * the remembered value makes all of it depend on one listener having been
  * registered and every event having arrived; reading the URL makes the worst case
  * "the answer is right but nothing redrew", which a route change fixes on its own
- * because a navigation redraws the page anyway. Where the browser cannot answer
- * (an empty pathname, which is no browser this runs in), the remembered path is
- * the fallback rather than nothing.
+ * because a navigation redraws the page anyway.
  *
- * A Stash whose routes lived after a `#` would answer "/" here, and this would
- * make the plugin do nothing rather than act on the wrong gallery — the safe
- * direction, and one MangaTools.diag() reports as a plain disagreement.
+ * **There is deliberately no fallback to `currentPath`.** One stood here for a day,
+ * for an empty pathname that no browser produces — and it was the one way a stale
+ * remembered path could still be acted on, which is the thing reading live is meant
+ * to end. An answer of "" is not a gallery, which is the safe direction: the plugin
+ * does nothing rather than something to the wrong gallery.
+ *
+ * A Stash whose routes lived after a `#` would answer "/" for the same reason, and
+ * would be inert rather than wrong. MangaTools.diag() reports that as a plain
+ * disagreement between the URL and the last path Stash announced.
  */
 function pathNow(): string {
-  return window.location.pathname || currentPath || "";
+  return window.location.pathname || "";
 }
 
 function emit(): void {
@@ -3863,11 +3868,30 @@ function BulkFieldsRow() {
   // and one extra render is all it takes.
   // As in LanguageRow: before paint, so this pass adds no step of its own.
   React.useLayoutEffect(() => {
-    if (isGalleryContext()) {
-      installBulkLink();
-      if (ensureBulkFieldHost() !== host) {
-        bump((v) => v + 1);
-      }
+    if (!isGalleryContext()) return;
+
+    installBulkLink();
+
+    if (ensureBulkFieldHost() !== host) {
+      bump((v) => v + 1);
+    } else if (!host && bulkDialogUp()) {
+      // **After the commit, and only when there is a dialog to place rows in.**
+      // Both readings have settled by now: the dialog's rows are in the DOM, and
+      // the anchor has either been found or has not. A mount point that cannot be
+      // placed at this point, with the dialog up, is the failure this line exists
+      // for — the one where the dialog is on screen, the rows are not, and nothing
+      // else on the console says why. Two things would make it cry wolf instead:
+      // asking during the render (the studio row is not committed yet on the first
+      // one — the same reason this effect exists at all), and asking without the
+      // dialog being up (`BulkFieldsRow` renders wherever a RatingSystem does, and
+      // most of those pages have no bulk dialog and are not broken).
+      noteOnce(
+        "bulk-no-host",
+        "the bulk edit dialog's mount point could not be placed — " +
+          BULK_ANCHOR +
+          " was not found inside the dialog's own form. MangaTools.diag() " +
+          "reports what it sees."
+      );
     }
   });
 
@@ -3891,34 +3915,26 @@ function BulkFieldsRow() {
   // right moment. MangaTools.diag() reports it.
   bulkRenders += 1;
 
+  // Drawing nothing is silent, and **nothing is said from here**. Both of the ways
+  // this render can come up empty have a better place to be reported from:
+  //
+  //   - "not a gallery route" is the ordinary case, not a failure. The rating row
+  //     this component is mounted from belongs to *a* bulk dialog, and galleries,
+  //     images, scenes and groups all draw that same row — images and scenes down
+  //     to `scene_code` and `photographer`. So `/images` with its dialog open looks
+  //     exactly like a gallery page whose route the plugin got wrong, and a line
+  //     here would cry wolf on every one of them.
+  //   - "the mount point could not be placed" is only answerable *after* the commit:
+  //     the dialog's studio row is not in the DOM yet on this first render, by
+  //     design (see the layout effect above). Reported from here it would fire once
+  //     on every dialog that opens perfectly well. It is reported from the effect,
+  //     which is the first moment the question has a true answer — and where the
+  //     bug it exists for would still be caught, because a mount point that cannot
+  //     be placed cannot be placed then either.
+  //
+  // So this guard is quiet, and the two lines that were here are gone: one cried
+  // wolf, one was said twice (resolveSelect already names a missing react-select).
   if (!isGalleryContext() || !Select || !host) {
-    // The three ways to draw nothing, each said once. The first is the one worth
-    // having: a dialog asking to be filled in, on a page the plugin reads as
-    // somewhere else, is a disagreement between two things that should never
-    // disagree — and it used to produce no output of any kind.
-    if (!isGalleryContext() && bulkAnchor()) {
-      noteOnce(
-        "bulk-not-gallery",
-        'the gallery bulk edit dialog is open, but the plugin reads "' +
-          pathNow() +
-          '" as the current route, so it does not draw its manga rows there. ' +
-          "MangaTools.diag() reports what it sees."
-      );
-    } else if (isGalleryContext() && !Select) {
-      noteOnce(
-        "bulk-no-select",
-        "Stash's react-select is not available, so the manga rows in the bulk " +
-          "edit dialog are not drawn"
-      );
-    } else if (isGalleryContext() && !host) {
-      noteOnce(
-        "bulk-no-host",
-        "the bulk edit dialog's mount point could not be placed — " +
-          BULK_ANCHOR +
-          " was not found inside the dialog's own form"
-      );
-    }
-
     return null;
   }
 
@@ -4645,6 +4661,18 @@ const FIELD_HOST_CLASS = "manga-tools-field-host";
 function bulkAnchor(): Element | null {
   const form = document.querySelector(BULK_DIALOG_MARK)?.closest("form");
   return form ? form.querySelector(BULK_ANCHOR) : null;
+}
+
+/**
+ * Whether a bulk dialog is on the page at all — the rating row is the mark of it.
+ *
+ * The one question the mount point's diagnostic cannot answer by itself: an anchor
+ * that cannot be found means "there is no dialog here" (an ordinary page) as well
+ * as "there is a dialog and I cannot place the rows in it" (a bug). Only the second
+ * is worth a line, and this is what tells them apart.
+ */
+function bulkDialogUp(): boolean {
+  return !!document.querySelector(BULK_DIALOG_MARK);
 }
 
 /** As above, held at module scope so the same node is reused */

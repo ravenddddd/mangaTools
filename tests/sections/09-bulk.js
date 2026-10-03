@@ -539,15 +539,16 @@ module.exports = () => {
     "…and the rows draw from the URL alone, with no event of any kind"
   );
 
-  // The guard says why, once. It is the only symptom this failure has: an empty
-  // slot in a dialog, and a console that used to say nothing at all.
-  const said = loggedWarnings.filter((line) =>
-    /bulk edit dialog is open/.test(line)
-  );
-  assert.strictEqual(said.length, 1, "the route guard reports itself once");
-  assert.ok(
-    /\/scenes\/5/.test(said[0]),
-    "naming the path it read, which is the thing to compare against the URL"
+  // **A route that says otherwise is not worth a line, and this is where that is
+  // pinned.** The rating row this component is mounted from belongs to *a* bulk
+  // dialog, and galleries, images, scenes and groups all draw that same row — so a
+  // page like /images with its own dialog open looks exactly like a gallery page
+  // whose route the plugin got wrong. A line here would cry wolf on every one of
+  // them, and a diagnostic nobody can trust is worse than none.
+  assert.deepStrictEqual(
+    loggedWarnings.filter((line) => /bulk edit dialog|react-select/.test(line)),
+    [],
+    "an off-route render says nothing: this is the ordinary case, not a failure"
   );
 
   // ── 14g. MangaTools.diag(): the readings those guards make ──
@@ -691,6 +692,43 @@ module.exports = () => {
   );
   bulkForm.insertBefore(bulkRatingRow, bulkStudioRow);
   assert.ok(!!bulkRow(), "and back to normal with the dialog whole again");
+
+  // ── 14h. The one way this draws nothing does say so ──
+  //
+  // A limit worth stating: that this line is said from the layout effect rather
+  // than from the render is a fact about when a browser commits, and this world
+  // cannot express it — `useLayoutEffect` here runs the callback where React would
+  // run it after committing, so both placements behave identically below. What is
+  // asserted is the outcome at each end (silence when the dialog is whole, one line
+  // when the anchor is gone); the *placement* rests on the note in the effect.
+  //
+  // Reported as an empty slot in a dialog and a console with nothing on it: the
+  // dialog up, its rating row in place, and the row the mount point anchors on not
+  // found inside its form — which is what a browser did with a `tagName` compared
+  // in lower case (see bulkAnchor and makeEl). This is the case worth a line, and
+  // it is said from the layout effect rather than the render, because on the first
+  // render of a dialog that opens *perfectly well* the studio row is not committed
+  // yet: asked there, the line would fire on every dialog rather than on the broken
+  // ones.
+  const saidBefore = loggedWarnings.length;
+  assert.ok(!!bulkRow(), "precondition: the dialog draws");
+  assert.deepStrictEqual(
+    loggedWarnings.slice(saidBefore),
+    [],
+    "a dialog whose studio row is where it should be says nothing"
+  );
+
+  bulkForm.detach(bulkStudioRow);
+  assert.ok(!bulkRow(), "the anchor gone, the rows go with it");
+  const noHost = loggedWarnings.slice(saidBefore);
+  assert.strictEqual(noHost.length, 1, "…and that one does say why, once");
+  assert.ok(
+    /mount point could not be placed/.test(noHost[0]) &&
+      /\[data-field="studio"\]/.test(noHost[0]),
+    "naming the anchor it looked for and did not find"
+  );
+  bulkForm.insertBefore(bulkStudioRow, bulkPerformerRow);
+  assert.ok(!!bulkRow(), "and the mount point comes back with the row");
 
   documentRoot.detach(scrapeModal);
   console.log(

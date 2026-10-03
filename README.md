@@ -1423,9 +1423,12 @@ goes to — used to be decided by a variable that only the `stash:location` list
 That made all of it depend on one listener being registered and every event arriving, and when
 they did not the plugin spent the rest of the session reading a stale path: rows simply absent,
 nothing on the console. It reads `window.location.pathname` now, which is always the current one
-(the reader half always did); the event is what makes a navigation *redraw*. The degradation is
-deliberate in one direction only — a Stash whose routes lived after a `#` would answer `/`, and
-the plugin would rather do nothing than act on the wrong gallery.
+(the reader half always did); the event is what makes a navigation *redraw*. There is deliberately
+no fallback to the remembered path even when the URL answers with nothing, because a stale path
+acted on is worse than an empty one: the degradation is inert, not wrong. A Stash whose routes
+lived after a `#` would answer `/` for the same reason — do nothing rather than act on the wrong
+gallery. The path Stash last announced is still kept, and reported next to the URL by `diag()`,
+because "the plugin acted on the wrong page" starts with asking whether those two agree.
 
 **When something is missing from the page, ask the plugin.** `MangaTools.diag()` in the browser
 console reports what the tools half makes of where it is: the path it read, the path Stash last
@@ -1433,9 +1436,13 @@ announced, whether that is a gallery context, whether the route listener registe
 bulk dialog's anchor is on the page, and whether the mount point it portals into is still attached
 (`detached` is the one React has dropped out of the document underneath it). Those are *readings*,
 not verdicts, because the failures they exist for have no other symptom: a patch onto a component
-name Stash does not have never runs, and a guard that reads a stale path draws nothing — both by
-construction silent. `noteFired` covers the first (`patch active: <name>`, once per target); the
-guards now name themselves too, once each, on `console.warn`.
+name Stash does not have never runs, and a guard that decides not to draw says nothing — both by
+construction silent. So the plugin says when it declines, and only where that means something:
+`noteFired` logs each patch the first time it runs, and **one** guard does, once — the one where
+the bulk dialog is up and the rows cannot be placed in it. The two that used to sit beside it are
+gone: "this is not a gallery route" is the ordinary case (galleries, images, scenes and groups all
+draw the rating row the rows are mounted from), and a missing react-select is already named where
+it is looked up. A diagnostic that cries wolf is worse than none.
 
 **A stub that answers differently from a browser is worse than no stub at all.** The section
 tests' DOM answered `tagName` in lower case, as written; a browser answers it in upper case. That
