@@ -489,6 +489,114 @@
 }
 
 /*
+ * ── Folding a group ───────────────────────────────────────────────────────────
+ *
+ * The chevron sits in the indent to the left of a heading, not in front of it and
+ * not in the right-hand column. In front of it, a heading with a chevron would
+ * start a glyph further right than a sibling row without one — the field rows are
+ * exactly that pair. The right-hand column is the vertical line every switch on
+ * this page is aligned to. Of the three places it could go, the left gutter is the
+ * only one with nothing in it.
+ *
+ * `top` because the heading is the first line of the row, and the row may be two
+ * lines tall.
+ */
+.manga-tools-settings-heading.manga-tools-foldable,
+.manga-tools-foldable > h3 {
+  cursor: pointer;
+}
+
+.manga-tools-foldable:hover > h3 {
+  color: #48aff0;
+}
+
+.manga-tools-fold {
+  position: absolute;
+  left: -1.05rem;
+  top: 0.2rem;
+  width: 0.7rem;
+  height: 0.9rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* A triangle pointing down while the group is open, right while it is folded */
+.manga-tools-fold > .fa-icon {
+  display: block;
+  margin: 0;
+  width: 0;
+  height: 0;
+  border-left: 0.26rem solid transparent;
+  border-right: 0.26rem solid transparent;
+  border-top: 0.32rem solid rgba(191, 204, 214, 0.75);
+  transition: transform 0.15s;
+}
+
+.manga-tools-fold.is-folded > .fa-icon {
+  transform: rotate(-90deg);
+}
+
+/*
+ * The row the chevron hangs off is positioned, so that the chevron has something
+ * to be positioned *against*: it is drawn outside the text column, in the gutter,
+ * which is only possible if the column is the reference.
+ */
+.setting.manga-tools-setting > .manga-tools-foldable,
+.manga-tools-settings-heading {
+  position: relative;
+}
+
+/* Nothing in a heading that is not the chevron should look clickable. */
+.manga-tools-settings-heading.manga-tools-foldable > .sub-heading {
+  cursor: default;
+}
+
+/*
+ * ── Where the lines between rows go ───────────────────────────────────────────
+ *
+ * Stash draws one under every row that is not the last child of its parent, which
+ * on a page of nested groups means a line between every pair of rows *and* another
+ * at every group boundary — 19 lines for 19 rows, and the eye reads a table
+ * instead of a hierarchy.
+ *
+ * So this plugin's rows carry no line of their own, and a line is drawn only where
+ * it means something: under the row that opens a group, under a group's last row,
+ * under the heading of a group that is not a switch, and under the page's last row
+ * so the page does not end open.
+ */
+.setting.manga-tools-setting,
+.setting.manga-tools-settings {
+  border-bottom: none;
+}
+
+/*
+ * …and a line is put back in the four places it means something:
+ *
+ *   a section row      every row SettingSwitch draws — the lightbox, the chapters
+ *                      tab, and the two that open groups. Two of those have nothing
+ *                      under them and are still sections of the page, which is why
+ *                      the class comes from the component rather than from whether
+ *                      a group was drawn.
+ *   a group's last row so a group reads as a block, and a group boundary is one
+ *                      line rather than two.
+ *   a heading          of a group that is not a switch.
+ *   the page's last    so the page does not end open.
+ *
+ * The selector for the last one has to be a direct child of the collapse box, which
+ * is `div.collapsible-section` — Stash's own wrapper, and the one our rows really
+ * sit in: `div.plugin-settings` is the wrapper Stash's own PluginSettings renders,
+ * and this plugin *replaces* that component rather than adding to it.
+ */
+.setting.manga-tools-setting-head,
+.manga-tools-settings-group > .setting:last-child,
+.collapsible-section > .setting.manga-tools-setting:last-child,
+.manga-tools-settings-heading {
+  border-bottom: 1px solid #000;
+}
+
+/*
  * The "?" beside a heading, and the example it opens.
  *
  * The icon and the panel are two children of one wrapper rather than one inside

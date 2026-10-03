@@ -636,6 +636,158 @@ module.exports = () => {
   NS.manageChapters = true;
   state.currentLocale = localeHere;
 
+  // ── Folding a group shut ───────────────────────────────────────────
+  // The chevron is the reader's own fold, and it is drawn only where there is
+  // something under the row to fold. Folding is not writing: it takes a row's rows
+  // off the page and leaves every setting exactly as it was.
+  //
+  // Which chevron folds what is checked by folding each one and counting what
+  // goes: the fields group, the language group inside it, and the mark's three
+  // rows. Three, and no more — the lightbox and the chapters rows have nothing
+  // under them since their notes moved into their descriptions, so a chevron there
+  // would open nothing.
+  state.currentLocale = "en";
+  {
+    const countIn = (el, make) => {
+      const out = [];
+      find(el, (n) => {
+        if (make(n)) out.push(n);
+        return false;
+      });
+      return out.length;
+    };
+    const isClass = (n, cls) =>
+      typeof n.props?.className === "string" &&
+      n.props.className.split(" ").includes(cls);
+    const chevronsIn = (el) => {
+      const out = [];
+      find(el, (n) => {
+        if (isClass(n, "manga-tools-fold")) out.push(n);
+        return false;
+      });
+      return out;
+    };
+    const groupsIn = (el) =>
+      countIn(el, (n) => isClass(n, "manga-tools-settings-group"));
+    const switchesIn = (el) => countIn(el, (n) => n.type === "Switch");
+    const open = (el) => call("PluginSettings", { pluginID: "mangaTools" });
+
+    const page = open();
+    const chevrons = chevronsIn(page);
+    assert.strictEqual(
+      chevrons.length,
+      3,
+      "one chevron per row that has rows under it, and no row without them"
+    );
+    assert.ok(
+      chevrons.every((c) => c.type === "button"),
+      "…each a button, so a keyboard can fold a group too"
+    );
+    assert.ok(
+      chevrons.every((c) => c.props["aria-expanded"] === true),
+      "…and each saying it is open, which is the only way anything but an eye knows"
+    );
+    assert.strictEqual(groupsIn(page), 2, "two groups to start with");
+    assert.strictEqual(switchesIn(page), 15, "…and fifteen switches");
+
+    const before = state.capturedConfigWrite;
+    const click = (c) => c.props.onClick({ stopPropagation: () => {} });
+
+    // The language field is the second chevron, and it folds its own three rows —
+    // two of them switches, and the multiselect, which is not one.
+    click(chevrons[1]);
+    const languageShut = open();
+    assert.strictEqual(
+      groupsIn(languageShut),
+      1,
+      "the language group folds away"
+    );
+    assert.strictEqual(
+      switchesIn(languageShut),
+      13,
+      "…taking two switches with it"
+    );
+    assert.strictEqual(
+      chevronsIn(languageShut).length,
+      3,
+      "…and its own chevron stays where it is, or there would be no way back"
+    );
+
+    // Put it back, then fold the mark's heading: the one chevron whose row is not
+    // a switch, and which folds three rows rather than a group.
+    click(chevronsIn(languageShut)[1]);
+    assert.strictEqual(groupsIn(open()), 2, "…so unfolding puts it back");
+
+    const third = chevronsIn(open())[2];
+    click(third);
+    const markShut = open();
+    assert.strictEqual(
+      switchesIn(markShut),
+      12,
+      "the mark's three rows fold away"
+    );
+    assert.strictEqual(groupsIn(markShut), 2, "…and no group went with them");
+
+    // Whatever is still open is folded by one chevron that takes everything under
+    // it: this is the fields row, which is the whole point of the exercise.
+    const everythingShut = (() => {
+      const page = open();
+      chevronsIn(page).forEach((c) => {
+        if (c.props["aria-expanded"]) click(c);
+      });
+      return open();
+    })();
+    assert.strictEqual(
+      groupsIn(everythingShut),
+      0,
+      "fold the rest and no group is left"
+    );
+    assert.strictEqual(
+      switchesIn(everythingShut),
+      3,
+      "…and what is left is the three rows that carry no fold: the lightbox, the " +
+        "chapters tab and the master switch"
+    );
+    assert.ok(
+      chevronsIn(everythingShut).every(
+        (c) => c.props["aria-expanded"] === false
+      ),
+      "every chevron says it is shut"
+    );
+
+    // Nothing was written, and no setting moved: a fold is a view.
+    assert.strictEqual(
+      state.capturedConfigWrite,
+      before,
+      "folding must not write anything to Stash"
+    );
+    assert.deepStrictEqual(
+      [NS.fields, NS.fieldLanguage, NS.coverIcon, NS.confirmUnmark],
+      [true, true, true, true],
+      "…nor change a setting"
+    );
+
+    // Unfold everything, so the rest of this file sees the page it expects. In a
+    // loop, because the language row's chevron is inside the fields group: while
+    // that one is shut it is not on the page, so one pass cannot reach it.
+    for (let pass = 0; pass < 3; pass++) {
+      const shut = chevronsIn(open()).filter((c) => !c.props["aria-expanded"]);
+      if (!shut.length) break;
+      shut.forEach((c) => click(c));
+    }
+    assert.strictEqual(
+      groupsIn(open()),
+      2,
+      "unfolding brings the groups back exactly as they were"
+    );
+    assert.strictEqual(
+      switchesIn(open()),
+      15,
+      "…and every row, with its setting untouched"
+    );
+  }
+  state.currentLocale = localeHere;
+
   // ── The "?" and the example it opens ──────────────────────────────
   // The two settings about a cover carry one, and what opens is a card with the
   // part in question ringed rather than another paragraph. What this section can

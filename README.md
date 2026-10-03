@@ -608,6 +608,27 @@ while the switch they belong to is on**:
 Hiding is not writing. A switch turned off and on again comes back with exactly the
 sub-settings it had, and the same goes for the field values on the galleries.
 
+**A group can also be folded shut, and that is a view rather than a setting.** A row
+that has rows under it carries a chevron, and clicking it — or its heading, since the
+two are one click target — takes those rows off the page without touching a single
+value. The chevron is drawn in the indent to the left of the heading: in front of the
+heading it would push that heading a glyph to the right of the sibling rows without
+one, and the right-hand column is the vertical line every switch on this page is
+aligned to, so the left gutter is the only place with room. A row with nothing under
+it has no chevron and never opens nothing — the lightbox and the chapters rows have
+none, since their notes moved into their descriptions. The state is a set of ids
+outside React, for the same reason the settings are: this page is redrawn on every
+switch and the tests' React stub has no working state setter.
+
+**And the lines between rows were tidied.** Stash draws one under every row that is
+not its parent's last child, which across nested groups means a line between every
+pair of rows *and* another at every group boundary — the page read as a table. This
+plugin's rows carry none of their own; a line is drawn only under a row that is a
+section of the page, under a group's last row, under a heading that is not a switch,
+and under the page's last row. The last of those is a direct child of Stash's
+collapse box rather than of `div.plugin-settings`: that div belongs to Stash's own
+`PluginSettings`, and this plugin *replaces* that component rather than adding to it.
+
 **Two rows say a second thing, and it is the second half of their description.**
 "Where the lightbox's own settings live" and "editing chapters does not touch Stash's
 own rows" are each one of the two things the sentence under that switch is saying, so

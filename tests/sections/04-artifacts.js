@@ -229,6 +229,78 @@ module.exports = () => {
       "date and the language on the badge come out heavier and tighter than they " +
       "are on a real card"
   );
+  // ── Folding a group shut ───────────────────────────────────────────
+  // The chevron goes in the gutter to the left of a heading. Three things make
+  // that work and each can fail on its own.
+  const foldRule = /\.manga-tools-fold\s*\{([^}]*)\}/.exec(css);
+  assert.ok(foldRule, "the chevron needs a rule of its own");
+  assert.ok(
+    /position:\s*absolute/.test(foldRule[1]) && /left:\s*-\d/.test(foldRule[1]),
+    "the chevron should be drawn in the gutter, outside its heading"
+  );
+  assert.ok(
+    /\.setting\.manga-tools-setting\s*>\s*\.manga-tools-foldable[^{]*\{[^}]*position:\s*relative/.test(
+      css
+    ) &&
+      /\.manga-tools-settings-heading\s*\{[^}]*position:\s*relative/.test(css),
+    "…which needs the heading's own box to be positioned, on both kinds of row — " +
+      "a chevron with nothing to be positioned against lands somewhere else entirely"
+  );
+  assert.ok(
+    /\.manga-tools-fold\.is-folded\s*>\s*\.fa-icon\s*\{[^}]*transform:\s*rotate\(-90deg\)/.test(
+      css
+    ),
+    "and the triangle should point at what a click does: down while the group is " +
+      "open, right while it is shut"
+  );
+
+  // ── Where the lines between rows go ────────────────────────────────
+  // Stash draws one under every row that is not its parent's last child, which on
+  // a page of nested groups is a line between every pair of rows and another at
+  // every group boundary. This plugin's rows carry none of their own, and a line is
+  // drawn only where it means something — the four cases are read here as the four
+  // selectors, because "which of these is missing" is the whole of the check.
+  assert.ok(
+    /\.setting\.manga-tools-setting,\s*\.setting\.manga-tools-settings\s*\{[^}]*border-bottom:\s*none/.test(
+      css
+    ),
+    "this plugin's rows should carry no line of their own"
+  );
+  const lineRule =
+    /\.setting\.manga-tools-setting-head,[\s\S]*?\n\}\n/.exec(css)?.[0] || "";
+  for (const [what, sel] of [
+    [
+      "the row that is a section of the page",
+      /\.setting\.manga-tools-setting-head/,
+    ],
+    [
+      "a group's last row",
+      /\.manga-tools-settings-group\s*>\s*\.setting:last-child/,
+    ],
+    [
+      "the page's last row",
+      /\.collapsible-section\s*>\s*\.setting\.manga-tools-setting:last-child/,
+    ],
+    ["a heading that is not a switch", /^\.manga-tools-settings-heading/m],
+  ]) {
+    assert.ok(
+      sel.test(lineRule),
+      `a line should be drawn under ${what} — ${String(sel)}`
+    );
+  }
+  assert.ok(
+    /border-bottom:\s*1px solid #000/.test(lineRule),
+    "…and that is the line"
+  );
+  // The page's last row is a direct child of Stash's collapse box, not of
+  // `div.plugin-settings`: that div belongs to Stash's own PluginSettings, and this
+  // plugin replaces that component rather than adding to it. A rule written against
+  // it would silently match nothing.
+  assert.ok(
+    !/\.plugin-settings\s*>\s*\.setting/.test(css),
+    "no rule may be scoped to div.plugin-settings: our page is not inside one"
+  );
+
   // The lightbox's note, inside that row's description. Boxed so it is not read as
   // the next grey sentence of the description — and a flex row, which is the part
   // worth checking here: an icon aligned on the text's baseline sits a little low

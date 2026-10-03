@@ -2879,6 +2879,19 @@ function BooleanSetting(props: {
    * be drawn with nothing to show.
    */
   help?: { text: string; example: HelpExample };
+  /**
+   * Set when this row opens a group the reader can fold — see FoldIcon. Absent
+   * for a row with nothing under it, which is what keeps the chevron off.
+   */
+  fold?: { folded: boolean; onToggle: () => void };
+  /**
+   * Set by SettingSwitch for every row it draws: this one is a section of the page
+   * rather than one of a group's rows, which is what the stylesheet reads to decide
+   * where a line goes (see mangaTools.css). A row that has no rows under it — the
+   * lightbox and the chapters tab, since their notes moved into their descriptions —
+   * is still a section.
+   */
+  head?: boolean;
 }) {
   const Bootstrap = PluginApi.libraries.Bootstrap;
   if (!Bootstrap) {
@@ -2888,25 +2901,45 @@ function BooleanSetting(props: {
     return null;
   }
 
+  // A plain string when nothing hangs off it — see the note on the h3 below.
+  const heading = props.help ? (
+    <>
+      {props.heading}
+      <HelpIcon text={props.help.text} example={props.help.example} />
+    </>
+  ) : (
+    props.heading
+  );
+
   return (
     // `manga-tools-setting` is what the stylesheet needs to undo Stash's
     // `flex-wrap: wrap` on a plugin's rows, which puts a switch with a long
     // sub-heading on a line of its own — see the rule in mangaTools.css.
-    <div className="setting manga-tools-setting">
-      <div>
+    <div
+      className={
+        "setting manga-tools-setting" +
+        (props.head ? " manga-tools-setting-head" : "")
+      }
+    >
+      {/* The heading and its description are one click target while there is a
+          group to fold: the chevron alone is a small thing to hit, and clicking a
+          heading to fold what is under it is what everyone tries. The switch's own
+          column is a separate element, so it does not take part. */}
+      <div
+        className={props.fold ? "manga-tools-foldable" : undefined}
+        onClick={props.fold ? props.fold.onToggle : undefined}
+      >
         {/* The heading is a plain string when nothing hangs off it — a heading that
             is an array with a null in it is a different shape to every other one on
             the page, and to anything reading the text of one. */}
-        <h3>
-          {props.help ? (
-            <>
-              {props.heading}
-              <HelpIcon text={props.help.text} example={props.help.example} />
-            </>
-          ) : (
-            props.heading
-          )}
-        </h3>
+        {/* The chevron is a sibling of the heading rather than inside it, so that
+            an h3 keeps the two shapes the rest of this page reads: the heading on
+            its own, or the heading with a "?" after it. A chevron inside would make
+            a third — an array with an element in front of the text. */}
+        {props.fold ? (
+          <FoldIcon folded={props.fold.folded} onToggle={props.fold.onToggle} />
+        ) : null}
+        <h3>{heading}</h3>
         {props.subHeading ? (
           <div className="sub-heading">{props.subHeading}</div>
         ) : null}
@@ -2925,6 +2958,44 @@ function BooleanSetting(props: {
 }
 
 /**
+ * Which groups the reader has folded shut, by the id of the row that opens them.
+ *
+ * View state, and nothing else: it is not a setting, it never reaches Stash's
+ * configuration, and a page that starts folded would be hiding settings that are
+ * on. It lives out here rather than in React's state for the reason the settings
+ * themselves do — this page is redrawn from `emit()` on every switch, and the
+ * smoke tests' React stub has no working state setter, so anything held inside a
+ * component would be either lost or untestable. `NS.*` is the pattern; this is the
+ * same pattern with a set.
+ */
+const foldedGroups = new Set<string>();
+
+function setGroupFolded(id: string, folded: boolean): void {
+  if (folded) foldedGroups.add(id);
+  else foldedGroups.delete(id);
+  emit();
+}
+
+/** The "⌄/›" a row that opens a group carries, in the gutter before its heading */
+function FoldIcon(props: { folded: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      className={"manga-tools-fold" + (props.folded ? " is-folded" : "")}
+      aria-expanded={!props.folded}
+      onClick={(event) => {
+        // The heading beside it toggles too (clicking a heading to fold what is
+        // under it is the thing everyone tries), so this one stops there.
+        event.stopPropagation();
+        props.onToggle();
+      }}
+    >
+      <span className="fa-icon" />
+    </button>
+  );
+}
+
+/**
  * A switch and the rows that only mean anything under it.
  *
  * The rows are *rendered* only while the switch is on — what a reader has not
@@ -2938,6 +3009,12 @@ function BooleanSetting(props: {
  * That is also why the rows that are *not* one thing's sub-settings — the mark's
  * three, the display rows — are not wrapped: they are siblings, and wrapping them
  * would say they were children.
+ *
+ * The chevron beside the heading is the reader's own fold, and it is only drawn
+ * when there is something under the row to fold — a row whose rows are missing
+ * because the feature is off has no chevron, so there is never a chevron that
+ * opens nothing. Folding is not the switch: the switch says whether the plugin
+ * does the thing, the chevron says whether you are looking at it.
  */
 function SettingSwitch(props: {
   id: string;
@@ -2949,6 +3026,12 @@ function SettingSwitch(props: {
   /** The rows under it, drawn only while `checked` */
   children?: ReactNode;
 }) {
+  const rows = props.checked && props.children ? props.children : null;
+  const folded = foldedGroups.has(props.id);
+  const fold = rows
+    ? { folded, onToggle: () => setGroupFolded(props.id, !folded) }
+    : undefined;
+
   return (
     <>
       <BooleanSetting
@@ -2958,11 +3041,11 @@ function SettingSwitch(props: {
         help={props.help}
         checked={props.checked}
         onChange={props.onChange}
+        head
+        fold={fold}
       />
-      {props.checked && props.children ? (
-        <div className="setting-group manga-tools-settings-group">
-          {props.children}
-        </div>
+      {rows && !folded ? (
+        <div className="setting-group manga-tools-settings-group">{rows}</div>
       ) : null}
     </>
   );
@@ -2975,9 +3058,31 @@ function SettingSwitch(props: {
  * one switch: the mark's behaviour, and how the manga blocks are shown. The rows
  * under it stay siblings — no `.setting-group` — because that is what they are.
  */
-function SettingsHeading(props: { heading: string; subHeading?: string }) {
+function SettingsHeading(props: {
+  heading: string;
+  subHeading?: string;
+  /**
+   * Set when the rows under it are foldable. The heading is not a `.setting` row
+   * and has no switch, so the chevron is the only control it carries — and the
+   * caller is what draws the rows, since they are its siblings and not its
+   * children (see MangaToolsSettings, where folding the mark's rows away is the
+   * same set of ids).
+   */
+  fold?: { folded: boolean; onToggle: () => void };
+}) {
   return (
-    <div className="manga-tools-settings-heading">
+    <div
+      className={
+        "manga-tools-settings-heading" +
+        (props.fold ? " manga-tools-foldable" : "")
+      }
+      onClick={props.fold ? props.fold.onToggle : undefined}
+    >
+      {/* As in BooleanSetting: the chevron is the heading's sibling, not its
+          first child, so that an h3 here is the plain heading and nothing else. */}
+      {props.fold ? (
+        <FoldIcon folded={props.fold.folded} onToggle={props.fold.onToggle} />
+      ) : null}
       <h3>{props.heading}</h3>
       {props.subHeading ? (
         <div className="sub-heading">{props.subHeading}</div>
@@ -2986,11 +3091,15 @@ function SettingsHeading(props: { heading: string; subHeading?: string }) {
   );
 }
 
+/** The id `foldedGroups` holds the mark's fold under — not a setting id */
+const MARK_GROUP_ID = "mangaTools-markGroup";
+
 function MangaToolsSettings() {
   useGlobalVersion();
 
   const intl = PluginApi.libraries.Intl.useIntl();
   const Select = resolveSelect();
+  const markFolded = foldedGroups.has(MARK_GROUP_ID);
 
   /**
    * Writes every setting at once — see `saveSettings`, which is where the map is built
@@ -3242,39 +3351,61 @@ function MangaToolsSettings() {
       {/* ── The mark itself ──────────────────────────────────────────────── */}
       {/* No switch: these three are not one feature, they are three answers about
           the mark, and they are deliberately siblings — the pair that is easy to
-          mistake for a parent and its child especially. */}
-      <SettingsHeading heading={t(intl, "mangaTools.settings.mark.heading")} />
-      <BooleanSetting
-        id="mangaTools-confirmUnmark"
-        heading={t(intl, "mangaTools.settings.confirmUnmark.heading")}
-        subHeading={t(intl, "mangaTools.settings.confirmUnmark.description")}
-        checked={NS.confirmUnmark}
-        onChange={writeFlag((next) => {
-          NS.confirmUnmark = next;
-        })}
-      />
-      <BooleanSetting
-        id="mangaTools-deleteOnUnmark"
-        heading={t(intl, "mangaTools.settings.deleteOnUnmark.heading")}
-        subHeading={t(intl, "mangaTools.settings.deleteOnUnmark.description")}
-        checked={NS.deleteOnUnmark}
-        onChange={writeFlag((next) => {
-          NS.deleteOnUnmark = next;
-        })}
-      />
-      <BooleanSetting
-        id="mangaTools-coverIcon"
-        heading={t(intl, "mangaTools.settings.coverIcon.heading")}
-        subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
-        help={{
-          text: t(intl, "mangaTools.settings.coverIcon.help"),
-          example: "mark",
+          mistake for a parent and its child especially.
+
+          They are the one group whose fold is drawn here rather than inside a
+          SettingSwitch, because there is no switch to own it: the heading is what
+          the reader clicks, and the rows are its siblings. `foldedGroups` holds it
+          under an id of its own, which is not a setting id and never reaches
+          Stash. */}
+      <SettingsHeading
+        heading={t(intl, "mangaTools.settings.mark.heading")}
+        fold={{
+          folded: markFolded,
+          onToggle: () => setGroupFolded(MARK_GROUP_ID, !markFolded),
         }}
-        checked={NS.coverIcon}
-        onChange={writeFlag((next) => {
-          NS.coverIcon = next;
-        })}
       />
+      {markFolded ? null : (
+        <>
+          <BooleanSetting
+            id="mangaTools-confirmUnmark"
+            heading={t(intl, "mangaTools.settings.confirmUnmark.heading")}
+            subHeading={t(
+              intl,
+              "mangaTools.settings.confirmUnmark.description"
+            )}
+            checked={NS.confirmUnmark}
+            onChange={writeFlag((next) => {
+              NS.confirmUnmark = next;
+            })}
+          />
+          <BooleanSetting
+            id="mangaTools-deleteOnUnmark"
+            heading={t(intl, "mangaTools.settings.deleteOnUnmark.heading")}
+            subHeading={t(
+              intl,
+              "mangaTools.settings.deleteOnUnmark.description"
+            )}
+            checked={NS.deleteOnUnmark}
+            onChange={writeFlag((next) => {
+              NS.deleteOnUnmark = next;
+            })}
+          />
+          <BooleanSetting
+            id="mangaTools-coverIcon"
+            heading={t(intl, "mangaTools.settings.coverIcon.heading")}
+            subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
+            help={{
+              text: t(intl, "mangaTools.settings.coverIcon.help"),
+              example: "mark",
+            }}
+            checked={NS.coverIcon}
+            onChange={writeFlag((next) => {
+              NS.coverIcon = next;
+            })}
+          />
+        </>
+      )}
     </>
   );
 }
