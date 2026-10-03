@@ -5481,6 +5481,14 @@ async function main() {
     ]) {
       const select = panel.querySelector(id);
       assert.strictEqual(select.tagName, "SELECT", `${id} is a dropdown`);
+      // **Stash's own classes**, measured off its lightbox select: the field, and the fill.
+      // Not Bootstrap's `.custom-select`, which is a differently drawn control — that is what
+      // "looks like another application's" was.
+      assert.deepStrictEqual(
+        select.className.split(" ").sort(),
+        ["btn-secondary", "form-control", "manga-reader-select"],
+        "…wearing what Stash's own lightbox select wears, so that it is drawn like one"
+      );
       assert.deepStrictEqual(
         [...select.children].map((option) => option.value),
         ["off", "turn", "zoom", "scroll"],

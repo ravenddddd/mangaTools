@@ -562,13 +562,15 @@
 }
 
 /*
- * The wheel's rows: a dropdown at the far edge, the same width in all three so that the
- * three of them line up as a column.
+ * The wheel's rows: a dropdown at the far edge, the same width in all three so that the three
+ * of them line up as a column.
  *
- * Bootstrap's own `.custom-select` is `width: 100%`, which in a row shaped like this one —
- * the words taking the room there is — would take the room the words need and squeeze them
- * to nothing. So it is given its width here instead, and no more than the longest word it
- * can be showing needs.
+ * Only the width is said here. Everything else about it — the fill, the border, the height,
+ * the type, the little white chevron — is Stash's own, because it wears Stash's own classes:
+ * see `selectAt` in chrome.ts, which puts the same `form-control btn-secondary` on it that
+ * Stash's lightbox select wears. Bootstrap's `.form-control` is `width: 100%`, which in a row
+ * shaped like this one — the words taking the room there is — would take the room the words
+ * need; the width is this panel's to say, and no more than the longest word it can show needs.
  */
 .manga-reader-chrome .manga-reader-settings .manga-reader-select {
   flex: 0 0 7.25rem;

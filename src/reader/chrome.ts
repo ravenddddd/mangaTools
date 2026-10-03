@@ -897,7 +897,14 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
    */
   function selectAt(chord: (typeof WHEEL_CHORDS)[number]): HTMLElement {
     const select = document.createElement("select");
-    select.className = "custom-select " + CLASS_SELECT;
+    // **The classes Stash's own lightbox select wears**, measured off it rather than invented:
+    // `.form-control` for the field, and `.btn-secondary` for the fill (its `$secondary`, which
+    // is this panel's own colour — looked at on the page and left alone). Not Bootstrap's
+    // `.custom-select`, which is what this used to wear and what made it look like another
+    // application's control: Stash's is a plain `<select>` whose chevron comes from its own
+    // `select` rule in index.scss, so a select of this panel's gets the same one by being a
+    // select.
+    select.className = "form-control btn-secondary " + CLASS_SELECT;
     select.id = chord.id;
     for (const action of WHEEL_ACTIONS) {
       const option = document.createElement("option");
