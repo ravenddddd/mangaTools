@@ -119,6 +119,7 @@
   "mangaTools.translationGroup.originalOffRestore": "No longer raw — clear the mark and put the translation group back",
   "mangaTools.translationGroup.originalDetail": "raw (no translation group)",
   "mangaTools.translationGroup.originalInline": " (raw)",
+  "mangaTools.translationGroup.originalMixed": "Some of these are raw — click to mark them all",
   "mangaTools.translationGroup.suggestedLanguage": "This group's galleries usually carry this language",
 
   "mangaTools.bulk.remove": "Remove",

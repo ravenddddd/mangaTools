@@ -386,6 +386,28 @@
   margin: 0;
 }
 
+/*
+ * The steak's third state, which only the bulk dialog has.
+ *
+ * On the edit page the button is one gallery's and has two states. In a dialog it
+ * is a selection's, and a selection can be part raw — so the button says so the
+ * way a button can: a dashed border, which is the shape an indeterminate control
+ * wears everywhere else on the web, and the icon dimmed. `aria-pressed="mixed"`
+ * is what carries the same thing to a screen reader; the title carries it in
+ * words.
+ *
+ * Deliberately *not* a separate colour: the two colours the icon is drawn in mean
+ * raw and translated, and a third colour would have to mean something that is
+ * neither. The border is the part of the chrome that is not already saying
+ * something.
+ */
+.manga-tools-original.mixed {
+  border-style: dashed;
+  /* The same dimmed text the stylesheet uses wherever a control is present but
+     not claiming anything — the icon is drawn in `currentColor`. */
+  color: rgba(191, 204, 214, 0.5);
+}
+
 /* ─────────────────────── Settings-page multiselect ─────────────────────── */
 
 /*

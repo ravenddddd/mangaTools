@@ -119,6 +119,7 @@
   "mangaTools.translationGroup.originalOffRestore": "取消生肉標記，並還原原本的翻譯組",
   "mangaTools.translationGroup.originalDetail": "生肉（無翻譯組）",
   "mangaTools.translationGroup.originalInline": "（生肉）",
+  "mangaTools.translationGroup.originalMixed": "部分已標為生肉 —— 點擊全部標上",
   "mangaTools.translationGroup.suggestedLanguage": "該翻譯組的畫廊通常是這種語言",
 
   "mangaTools.bulk.remove": "移除",

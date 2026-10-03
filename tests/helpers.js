@@ -239,7 +239,13 @@ const GALLERY_FIELDS = {
   },
   5: { [MANGA]: "true", "plugin.mangaTools.language": "ZH-HANS" },
   6: { [MANGA]: "true", "plugin.mangaTools.language": "zh-Hans" },
-  7: { [MANGA]: "true", "plugin.mangaTools.censorship": "uncensored" },
+  // Raw, and the only one that is: the bulk dialog's steak has a third state that
+  // needs a selection to disagree with itself, and no other fixture does that.
+  7: {
+    [MANGA]: "true",
+    "plugin.mangaTools.censorship": "uncensored",
+    "plugin.mangaTools.original": "true",
+  },
   // Carries a language and nothing else: not manga, so the plugin must leave it
   // entirely alone — no badge, no card mark, no block on its detail page.
   8: { "plugin.mangaTools.language": "ja" },

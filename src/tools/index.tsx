@@ -3570,7 +3570,28 @@ type BulkValuePending = { kind: "set"; value: string } | { kind: "remove" };
  */
 let bulkLanguage: BulkValuePending | null = null;
 let bulkCensorship: BulkValuePending | null = null;
+let bulkGroup: BulkValuePending | null = null;
 let bulkManga: "mark" | "unmark" | null = null;
+
+/**
+ * The raw mark as this dialog means to write it, or null for "leave it alone".
+ *
+ * Not a `BulkValuePending`: an unset raw is the *absence* of the key, which is how
+ * every other "no" in this plugin is spelled (the mark itself included), so there is
+ * no third state to carry. It is also the one pending whose third state is not a
+ * value but a *combination* — see cycleOriginal, where un-pressing hands the group
+ * back.
+ */
+let bulkOriginal: "raw" | "notRaw" | null = null;
+
+/**
+ * The group name 生肉 took away, so that un-pressing it can put the name back.
+ *
+ * The edit page keeps the same memory per gallery (`originalGroupTaken`); a bulk
+ * dialog cannot, because one Apply covers N galleries — so what is remembered here
+ * is not what any gallery had, it is what this dialog was about to write.
+ */
+let bulkGroupBeforeRaw: string | null = null;
 
 /** Ids currently selected in the gallery list, captured from GalleryList */
 let selectedGalleryIds: string[] = [];
@@ -3642,6 +3663,48 @@ function selectedCensorshipAggregate(): string | null {
   }
 
   return first || null;
+}
+
+/**
+ * The translation group every selected gallery shares, or null when they differ
+ * (or when none of them carries one).
+ *
+ * Compared with `sameTranslationGroup` rather than by string equality, because
+ * these values are typed: two galleries reading `Lily` and `lily` are one group,
+ * and a menu prefilled from one of them is not a disagreement.
+ */
+function selectedGroupAggregate(): string | null {
+  if (!selectedGalleryIds.length) return null;
+
+  const first = NS.translationGroupOf(store?.get(selectedGalleryIds[0]));
+  for (let i = 1; i < selectedGalleryIds.length; i++) {
+    const name = NS.translationGroupOf(store?.get(selectedGalleryIds[i]));
+    if (!NS.sameTranslationGroup(name, first)) return null;
+  }
+
+  return first || null;
+}
+
+/**
+ * Whether every selected gallery is raw, none of them is, or the two are mixed —
+ * the same three states the manga mark has, for the other field that is a claim
+ * about a whole selection rather than a value to type into.
+ *
+ * A gallery with no answer at all reads as "not raw", which is what the field
+ * means when it is absent everywhere else in the plugin.
+ */
+function selectedOriginalAggregate(): "all" | "none" | "mixed" {
+  if (!selectedGalleryIds.length) return "none";
+
+  let anyRaw = false;
+  let anyOther = false;
+  for (let i = 0; i < selectedGalleryIds.length; i++) {
+    if (NS.isOriginal(store?.get(selectedGalleryIds[i]))) anyRaw = true;
+    else anyOther = true;
+    if (anyRaw && anyOther) return "mixed";
+  }
+
+  return anyRaw ? "all" : "none";
 }
 
 /**
@@ -3718,7 +3781,23 @@ function applyPendingFields(operation: MangaToolsApolloOperation): boolean {
   const remove: string[] = [];
 
   if (bulkManga === "unmark") {
-    remove.push(FIELD_NAME, CENSORSHIP_FIELD_NAME, MANGA_FIELD_NAME);
+    // **Every field this plugin owns, and these four are the whole list.** The
+    // dialog's warning already says it takes the language, censorship and
+    // translation group with the mark; raw became the fourth when it got a row
+    // here, and leaving it out would have made the sentence a lie.
+    //
+    // These are the canonical spellings rather than the keys each gallery actually
+    // carries (`NS.fieldsToClear`, which is what the single-gallery unmark uses).
+    // One mutation covers N galleries and names one key list, so it cannot say what
+    // each gallery holds — see the note on deleteOnUnmark in the bulk section of the
+    // README, which is where the two paths' remaining disagreement is written down.
+    remove.push(
+      FIELD_NAME,
+      CENSORSHIP_FIELD_NAME,
+      TRANSLATION_GROUP_FIELD_NAME,
+      ORIGINAL_FIELD_NAME,
+      MANGA_FIELD_NAME
+    );
   } else {
     if (bulkManga === "mark") partial[MANGA_FIELD_NAME] = NS.MANGA_VALUE;
 
@@ -3729,6 +3808,15 @@ function applyPendingFields(operation: MangaToolsApolloOperation): boolean {
       partial[CENSORSHIP_FIELD_NAME] = bulkCensorship.value;
     else if (bulkCensorship?.kind === "remove")
       remove.push(CENSORSHIP_FIELD_NAME);
+
+    if (bulkGroup?.kind === "set")
+      partial[TRANSLATION_GROUP_FIELD_NAME] = bulkGroup.value;
+    else if (bulkGroup?.kind === "remove")
+      remove.push(TRANSLATION_GROUP_FIELD_NAME);
+
+    if (bulkOriginal === "raw")
+      partial[ORIGINAL_FIELD_NAME] = NS.ORIGINAL_VALUE;
+    else if (bulkOriginal === "notRaw") remove.push(ORIGINAL_FIELD_NAME);
   }
 
   if (!Object.keys(partial).length && !remove.length) return false;
@@ -3903,6 +3991,9 @@ function BulkFieldsRow() {
       if (!bulkAnchor()) {
         bulkLanguage = null;
         bulkCensorship = null;
+        bulkGroup = null;
+        bulkOriginal = null;
+        bulkGroupBeforeRaw = null;
         bulkManga = null;
       }
     },
@@ -4060,12 +4151,70 @@ function BulkFieldsRow() {
         ? { value: current.code, label: current.name, flag: current.flag }
         : null;
 
+  // The group this dialog is about to write — the pending one if there is one, the
+  // selection's if they agree, otherwise none. It is what the suggestion below is
+  // read from, and why the suggestion follows what you picked rather than what the
+  // galleries still say.
+  const groupNow =
+    bulkGroup?.kind === "set"
+      ? bulkGroup.value
+      : bulkGroup?.kind === "remove"
+        ? ""
+        : selectedGroupAggregate() || "";
+
+  // The language that group's galleries usually carry, offered the way the edit
+  // page offers it: only when it is a language this field's own menu can show, and
+  // only when it is not already what the row says. Same three conditions as there,
+  // for the same three reasons — see the edit page's `offered`.
+  const usualForGroup = NS.usualLanguagesOf(store)[NS.groupKey(groupNow)];
+  const offered =
+    usualForGroup &&
+    (!NS.enabledLanguages || NS.enabledLanguages.has(usualForGroup.code)) &&
+    (!current || current.code !== usualForGroup.code)
+      ? usualForGroup
+      : null;
+  const offeredInfo = offered ? NS.describe(offered.code, intl.locale) : null;
+
+  // The wand the edit page draws beside its group field, doing the same thing here:
+  // this is a suggestion, and the glyph says so rather than naming a language the
+  // field beside it already names. The chain of spellings is the same one — `Icon`
+  // throws inside a render on an undefined icon, and an empty button is the one
+  // outcome a missing glyph may not have.
+  const wandIcon =
+    Solid.faWandMagicSparkles || Solid.faMagic || Solid.faLanguage || null;
+  const languageChip =
+    offered && offeredInfo ? (
+      <button
+        type="button"
+        className="btn btn-secondary manga-tools-chip"
+        aria-label={offeredInfo.name}
+        title={
+          t(intl, "mangaTools.translationGroup.fill") +
+          " " +
+          offeredInfo.name +
+          " — " +
+          t(intl, "mangaTools.translationGroup.suggestedLanguage") +
+          " (" +
+          offered.count +
+          ")"
+        }
+        onClick={() => {
+          bulkLanguage = { kind: "set", value: offered.code };
+          emit();
+        }}
+      >
+        {wandIcon ? <Icon icon={wandIcon} /> : null}
+      </button>
+    ) : null;
+
   const languageRow = (
     <div className={cls.group} data-field="manga_tools_language">
       <label className={cls.label} htmlFor="manga_tools_language">
         {fieldLabel(intl)}
       </label>
-      <div className={cls.control}>
+      <div
+        className={cls.control + (languageChip ? " manga-tools-chip-row" : "")}
+      >
         <Select
           className="manga-tools-select"
           classNamePrefix="react-select"
@@ -4092,6 +4241,7 @@ function BulkFieldsRow() {
             emit();
           }}
         />
+        {languageChip}
       </div>
     </div>
   );
@@ -4154,9 +4304,228 @@ function BulkFieldsRow() {
     </div>
   );
 
+  // ── The translation group, and the raw mark that is its other answer ──
+  //
+  // The same pair the edit page draws, in the same shape: a select, and the steak
+  // beside it. What differs is that a selection can hold more than one answer, so
+  // each of the two has a third state the edit page's field never has.
+  //
+  // `showOriginal` is asked here as the edit page asks it, because it decides two
+  // things in both places: whether the chip is drawn at all, and whether the row
+  // is a chip row (a select sharing its column with a button) or a plain one.
+  const showOriginal = NS.fieldShowing("original");
+
+  const groupShown =
+    bulkGroup?.kind === "set"
+      ? bulkGroup.value
+      : bulkGroup?.kind === "remove"
+        ? BULK_REMOVE_VALUE
+        : selectedGroupAggregate() || "";
+
+  // Raw is the reason there is no group to enter, so the box says which of the two
+  // emptinesses this is — the edit page's `rawShown`, asked of what this dialog is
+  // about to write rather than of one gallery's value.
+  const rawState: "raw" | "notRaw" | "mixed" =
+    bulkOriginal === "raw"
+      ? "raw"
+      : bulkOriginal === "notRaw"
+        ? "notRaw"
+        : selectedOriginalAggregate() === "all"
+          ? "raw"
+          : selectedOriginalAggregate() === "none"
+            ? "notRaw"
+            : "mixed";
+  const rawShown = showOriginal && rawState === "raw";
+
+  // The cycle, mirroring the mark's: the rest state is one click away in every
+  // case (raw↔not-raw, and for a mix keep→raw→not-raw→keep). Pressing raw takes
+  // the group away, which is what the field *means* — and remembering it is what
+  // makes the press undoable, exactly as the edit page remembers the name it took.
+  const cycleOriginal = () => {
+    if (rawState === "raw") {
+      bulkOriginal = "notRaw";
+      if (bulkGroupBeforeRaw) {
+        bulkGroup = { kind: "set", value: bulkGroupBeforeRaw };
+        bulkGroupBeforeRaw = null;
+      }
+    } else if (rawState === "notRaw") {
+      bulkOriginal = null;
+    } else {
+      bulkGroupBeforeRaw =
+        bulkGroup?.kind === "set"
+          ? bulkGroup.value
+          : (selectedGroupAggregate() ?? null);
+      bulkOriginal = "raw";
+      bulkGroup = { kind: "remove" };
+    }
+    emit();
+  };
+
+  const groupValue = groupShown === BULK_REMOVE_VALUE ? "" : groupShown;
+  const known = knownTranslationGroups();
+  // The create entry, by the edit page's rule: only while the typed text is not a
+  // group this Stash already knows, so the menu never spells one name twice.
+  const namesANewGroup =
+    !!groupValue &&
+    !known.some((name) => NS.sameTranslationGroup(name, groupValue));
+
+  // The grouping the edit page uses, applied to the selection's agreed language:
+  // the groups whose galleries usually carry that language come first, the rest
+  // keep their name order behind them. With no agreed language there is nothing to
+  // sort by, and name order is what is left.
+  const agreedLanguage =
+    bulkLanguage?.kind === "set"
+      ? bulkLanguage.value
+      : bulkLanguage?.kind === "remove"
+        ? ""
+        : selectedLanguageAggregate() || "";
+  const usualLanguages = NS.usualLanguagesOf(store);
+  const usualOf = (name: string) => usualLanguages[NS.groupKey(name)];
+  const matchesAgreed = (name: string) => {
+    const usualHere = usualOf(name);
+    return !!agreedLanguage && !!usualHere && usualHere.code === agreedLanguage;
+  };
+  const ordered = known
+    .filter(matchesAgreed)
+    .concat(known.filter((name) => !matchesAgreed(name)));
+
+  const groupOptions: MangaToolsGroupOption[] = [
+    ...(namesANewGroup
+      ? [
+          {
+            value: groupValue,
+            label: groupValue,
+            createLabel:
+              t(intl, "mangaTools.translationGroup.create") +
+              ' "' +
+              groupValue +
+              '"',
+          },
+        ]
+      : []),
+    ...ordered.map((name): MangaToolsGroupOption => {
+      const usualHere = usualOf(name);
+      const described = usualHere
+        ? NS.describe(usualHere.code, intl.locale)
+        : null;
+      return {
+        value: name,
+        label: name,
+        hint: described ? { flag: described.flag, name: described.name } : null,
+      };
+    }),
+  ];
+
+  // The remove entry is this plugin's four-valued answer rather than the clear
+  // button: clearing means "leave the group alone", and taking it off a gallery is
+  // a different thing that has to be reachable — the two are opposites, exactly as
+  // in the two rows above.
+  const groupRemoveOption: MangaToolsGroupOption = {
+    value: BULK_REMOVE_VALUE,
+    label: t(intl, "mangaTools.bulk.remove"),
+  };
+  // The remove entry is drawn by this row, everything else by the edit page's own
+  // formatter — `meta` is passed straight through, because which context a label is
+  // being drawn in (the menu, or the box holding the chosen value) is what decides
+  // whether the hint is there, and react-select is what knows it.
+  const formatGroupWithRemove = (
+    opt: MangaToolsGroupOption,
+    meta?: { context?: string }
+  ) =>
+    opt.value === BULK_REMOVE_VALUE
+      ? removeLabel
+      : formatGroupOption(opt, meta);
+
+  const steakIcon = <SteakIcon raw={rawState === "raw"} />;
+  const originalChip = (
+    <button
+      type="button"
+      className={
+        "btn btn-secondary manga-tools-chip manga-tools-original" +
+        (rawState === "raw" ? " active" : "") +
+        (rawState === "mixed" ? " mixed" : "")
+      }
+      // A button's third state has a name in ARIA, and `mixed` is it — the same
+      // thing the mark's checkbox says with `indeterminate`.
+      aria-pressed={rawState === "mixed" ? "mixed" : rawState === "raw"}
+      aria-label={t(intl, "mangaTools.translationGroup.original")}
+      title={t(
+        intl,
+        rawState === "raw"
+          ? bulkGroupBeforeRaw
+            ? "mangaTools.translationGroup.originalOffRestore"
+            : "mangaTools.translationGroup.originalOff"
+          : rawState === "mixed"
+            ? "mangaTools.translationGroup.originalMixed"
+            : "mangaTools.translationGroup.originalOn"
+      )}
+      onClick={cycleOriginal}
+    >
+      {steakIcon}
+    </button>
+  );
+
+  const groupRow = (
+    <div className={cls.group} data-field="manga_tools_translation_group">
+      <label className={cls.label} htmlFor="manga_tools_translation_group">
+        {t(intl, "mangaTools.translationGroup.heading")}
+      </label>
+      <div
+        className={cls.control + (showOriginal ? " manga-tools-chip-row" : "")}
+      >
+        <Select
+          className="manga-tools-select manga-tools-group-select"
+          classNamePrefix="react-select"
+          inputId="manga_tools_translation_group"
+          isClearable
+          isDisabled={rawShown}
+          menuPortalTarget={document.body}
+          placeholder={t(
+            intl,
+            rawShown
+              ? "mangaTools.translationGroup.originalDetail"
+              : "mangaTools.translationGroup.placeholder"
+          )}
+          value={
+            groupShown === BULK_REMOVE_VALUE
+              ? groupRemoveOption
+              : groupValue
+                ? { value: groupValue, label: groupValue }
+                : null
+          }
+          options={[...groupOptions, groupRemoveOption]}
+          formatOptionLabel={formatGroupWithRemove}
+          components={{ IndicatorSeparator: () => null }}
+          onInputChange={(text: string, meta: { action?: string }) => {
+            if (meta?.action !== "input-change") return;
+            const typed = text.trim();
+            bulkGroup = typed ? { kind: "set", value: typed } : null;
+            emit();
+          }}
+          onChange={(opt: MangaToolsGroupOption | null) => {
+            if (!opt) {
+              bulkGroup = null;
+            } else if (opt.value === BULK_REMOVE_VALUE) {
+              // **Only the group.** The chip beside this box is how raw is said, and
+              // taking a group off a gallery says nothing about whether it is one.
+              bulkGroup = { kind: "remove" };
+            } else {
+              // A group picked is a gallery that was translated, which is the edit
+              // page's rule: choosing a name is the other answer to "is this raw".
+              bulkGroup = { kind: "set", value: opt.value };
+              if (showOriginal) bulkOriginal = "notRaw";
+            }
+            emit();
+          }}
+        />
+        {showOriginal ? originalChip : null}
+      </div>
+    </div>
+  );
+
   // The gate in order: a warning while the reader is unmarking, the mark itself,
-  // and only then the two fields it guards — each of which is drawn only while its
-  // own switch says so, and neither of which takes the other down with it. The mark
+  // and only then the fields it guards — each of which is drawn only while its
+  // own switch says so, and none of which takes another down with it. The mark
   // is not one of the four fields and is never gated on them: it is what makes a
   // gallery this plugin's at all, and a dialog that could not set it would leave
   // every gallery unmarked.
@@ -4170,6 +4539,7 @@ function BulkFieldsRow() {
       {mangaRow}
       {tri === true && NS.fieldShowing("language") ? languageRow : null}
       {tri === true && NS.fieldShowing("censorship") ? censorshipRow : null}
+      {tri === true && NS.fieldShowing("translationGroup") ? groupRow : null}
     </>,
     host
   );

@@ -170,8 +170,13 @@ module.exports = () => {
   assert.deepStrictEqual(mangaState(), { checked: true, indeterminate: false });
   assert.deepStrictEqual(
     bulkChildren().map((r) => r.props["data-field"]),
-    ["manga_tools_manga", "manga_tools_language", "manga_tools_censorship"],
-    "an all-manga selection shows the mark and both fields, in order"
+    [
+      "manga_tools_manga",
+      "manga_tools_language",
+      "manga_tools_censorship",
+      "manga_tools_translation_group",
+    ],
+    "an all-manga selection shows the mark and every field, in order"
   );
 
   // …and each of the two only while its own switch says so. The mark is not one of
@@ -181,21 +186,43 @@ module.exports = () => {
   NS.fieldCensorship = false;
   assert.deepStrictEqual(
     bulkChildren().map((r) => r.props["data-field"]),
-    ["manga_tools_manga", "manga_tools_language"],
+    [
+      "manga_tools_manga",
+      "manga_tools_language",
+      "manga_tools_translation_group",
+    ],
     "a field turned off takes its row and nothing else"
   );
   NS.fieldCensorship = true;
   NS.fieldLanguage = false;
   assert.deepStrictEqual(
     bulkChildren().map((r) => r.props["data-field"]),
-    ["manga_tools_manga", "manga_tools_censorship"],
-    "…whichever of the two it is"
+    [
+      "manga_tools_manga",
+      "manga_tools_censorship",
+      "manga_tools_translation_group",
+    ],
+    "…whichever of them it is"
   );
   NS.fieldLanguage = true;
+  // The translation group is a field like the other two, and its switch is the
+  // only thing that takes its row away.
+  NS.fieldTranslationGroup = false;
   assert.deepStrictEqual(
     bulkChildren().map((r) => r.props["data-field"]),
     ["manga_tools_manga", "manga_tools_language", "manga_tools_censorship"],
-    "and both are back"
+    "the group's own switch takes the group's row"
+  );
+  NS.fieldTranslationGroup = true;
+  assert.deepStrictEqual(
+    bulkChildren().map((r) => r.props["data-field"]),
+    [
+      "manga_tools_manga",
+      "manga_tools_language",
+      "manga_tools_censorship",
+      "manga_tools_translation_group",
+    ],
+    "and every one of them is back"
   );
   assert.strictEqual(
     selectOf("manga_tools_language").props.value.value,
@@ -257,7 +284,7 @@ module.exports = () => {
 
   mangaBox().props.onChange(); // mark — the safe direction first
   assert.deepStrictEqual(mangaState(), { checked: true, indeterminate: false });
-  assert.strictEqual(bulkChildren().length, 3, "marking reveals the fields");
+  assert.strictEqual(bulkChildren().length, 4, "marking reveals the fields");
 
   mangaBox().props.onChange(); // unmark
   assert.deepStrictEqual(mangaState(), {
@@ -429,6 +456,246 @@ module.exports = () => {
     remove: ["plugin.mangaTools.censorship"],
   });
 
+  // ── The translation group, and the raw mark that is its other answer ──
+  //
+  // The pair the edit page draws — a select and a steak — moved into the dialog,
+  // where each of the two has a third state the edit page's field never has, because
+  // a selection can hold more than one answer.
+  const groupSelect = () => selectOf("manga_tools_translation_group");
+
+  // Matched by whole class names on a `button`, not by substring: the div the two
+  // chips share a column with carries `manga-tools-chip-row`, which *contains*
+  // "manga-tools-chip" — a substring test finds that wrapper first and reads the
+  // wrong node's props.
+  const chipButton = (want, not) =>
+    find(
+      bulkRow().node,
+      (n) =>
+        n.type === "button" &&
+        typeof n.props?.className === "string" &&
+        n.props.className.split(/\s+/).includes(want) &&
+        (!not || !n.props.className.split(/\s+/).includes(not))
+    );
+  const chip = () => chipButton("manga-tools-original");
+
+  // The groups the library holds, by name, with the remove entry last — the same
+  // shape as the two rows above. Two spellings of one name (gallery 4 typed its
+  // group with spaces) are one group, which is the store's rule, not this row's.
+  selectGalleries(["1", "4"]);
+  const groupOptions = groupSelect().props.options;
+  assert.deepStrictEqual(
+    groupOptions.map((o) => o.value),
+    ["Aozora", "Lily Manga", langRemove.value],
+    "the groups the library holds, in name order, with remove last"
+  );
+  assert.strictEqual(
+    groupSelect().props.value.value,
+    "Lily Manga",
+    "the group the selection agrees on prefills"
+  );
+  assert.strictEqual(
+    groupSelect().props.isDisabled,
+    false,
+    "a translated selection leaves the box usable"
+  );
+  // The hint is the same fact the ordering below uses, drawn beside the name.
+  assert.deepStrictEqual(
+    groupOptions.find((o) => o.value === "Lily Manga").hint,
+    { flag: "cn", name: "简体中文" },
+    "and the menu says which language that group's galleries usually are"
+  );
+  assert.strictEqual(
+    groupOptions.find((o) => o.value === "Aozora").hint,
+    null,
+    "a group the store has nothing to say about carries no hint"
+  );
+
+  // …and the ordering the edit page does, done against what a *selection* agrees on
+  // rather than against one gallery: both of these are zh-Hans, and Lily Manga's
+  // galleries usually are, so it comes first. With no agreed language there is
+  // nothing to sort by and the name order above is what is left.
+  selectGalleries(["1", "6"]);
+  assert.deepStrictEqual(
+    groupSelect().props.options.map((o) => o.value),
+    ["Lily Manga", "Aozora", langRemove.value],
+    "the group whose galleries speak the selection's language comes first"
+  );
+
+  // A group the selection disagrees about does not prefill — like the language row.
+  selectGalleries(["1", "3"]);
+  assert.strictEqual(groupSelect().props.value, null);
+
+  // ── The steak ──
+  // Gallery 7 is raw and 1 is not, so this selection is a mix — which is the state
+  // a button cannot show by being pressed or not pressed, and has to say some other
+  // way. `aria-pressed="mixed"` is that way; the title says it in words.
+  selectGalleries(["1", "7"]);
+  assert.strictEqual(
+    chip().props["aria-pressed"],
+    "mixed",
+    "a selection that disagrees about raw says so"
+  );
+  assert.ok(
+    /生肉/.test(chip().props.title),
+    "…in words too, since a button has no indeterminate look of its own"
+  );
+  assert.strictEqual(chip().props.className.includes("mixed"), true);
+
+  // The cycle mirrors the mark's: mix → raw → not raw → mix. Pressing raw takes the
+  // group away, remembering it — which is what makes the next press an undo rather
+  // than a second guess.
+  //
+  // The name is *typed* rather than picked, and that is the point: picking a group
+  // is the other answer to "is this raw" and so moves this control's state on its
+  // own (see the note in groupSelect's onChange), while typing says nothing about
+  // raw. Typing is also how a group the library does not have yet gets set, so this
+  // is the state the steak has to work from.
+  groupSelect().props.onInputChange("Hoshi", { action: "input-change" });
+  assert.strictEqual(
+    chip().props["aria-pressed"],
+    "mixed",
+    "typing a name is not a claim about raw"
+  );
+  chip().props.onClick(); // raw
+  assert.strictEqual(chip().props["aria-pressed"], true);
+  assert.strictEqual(
+    groupSelect().props.isDisabled,
+    true,
+    "raw is why there is no group to enter"
+  );
+  assert.strictEqual(
+    groupSelect().props.placeholder,
+    "生肉（无翻译组）",
+    "…and the box says which of the two emptinesses this is"
+  );
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(r14.forwarded.variables.input.custom_fields, {
+    partial: { "plugin.mangaTools.original": "true" },
+    remove: ["plugin.mangaTools.translationGroup"],
+  });
+
+  chip().props.onClick(); // not raw — and the name comes back
+  assert.strictEqual(chip().props["aria-pressed"], false);
+  assert.strictEqual(groupSelect().props.isDisabled, false);
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(
+    r14.forwarded.variables.input.custom_fields,
+    {
+      partial: { "plugin.mangaTools.translationGroup": "Hoshi" },
+      remove: ["plugin.mangaTools.original"],
+    },
+    "un-pressing raw puts back the name it took, as the edit page does"
+  );
+
+  chip().props.onClick(); // back to the mix
+  assert.strictEqual(chip().props["aria-pressed"], "mixed");
+  assert.deepStrictEqual(
+    runLink(bulkVars()).forwarded.variables.input.custom_fields,
+    { partial: { "plugin.mangaTools.translationGroup": "Hoshi" } },
+    "the rest state takes no view on raw — the name in the box is still going out"
+  );
+
+  // The chip is one of the four fields' controls, so its switch takes it away — and
+  // the row stays either way, which is the point of a field switch rather than a
+  // harder question about the row.
+  NS.fieldOriginal = false;
+  assert.strictEqual(chip(), null, "the raw field off takes the steak with it");
+  assert.ok(groupSelect(), "…and leaves the group row standing");
+  NS.fieldOriginal = true;
+  assert.ok(chip(), "and it is back");
+  selectGalleries(["1"]);
+
+  // ── The suggested language, offered here as the edit page offers it ──
+  //
+  // Gallery 4 carries "  Lily Manga  " and no language, so the group has something
+  // to suggest (Lily Manga's galleries are zh-Hans) and the row has nothing to say
+  // yet. Gallery 1 is the same group *with* that language — nothing to suggest,
+  // because writing what is already there is furniture.
+  const wand = () => chipButton("manga-tools-chip", "manga-tools-original");
+  // From what each selection *says*, with nothing picked in this dialog — which is
+  // the state the two assertions below are about.
+  groupSelect().props.onChange(null);
+  selectOf("manga_tools_language").props.onChange(null);
+
+  selectGalleries(["1"]);
+  assert.strictEqual(
+    wand(),
+    null,
+    "a language the group already agrees with is no suggestion"
+  );
+  selectGalleries(["4"]);
+  assert.ok(wand(), "a group whose galleries are usually zh-Hans suggests it");
+  assert.ok(
+    /简体中文/.test(wand().props.title),
+    "naming the language in the tooltip"
+  );
+  wand().props.onClick();
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(
+    r14.forwarded.variables.input.custom_fields,
+    { partial: { "plugin.mangaTools.language": "zh-Hans" } },
+    "clicking it writes the language, and nothing else — the group in the row is " +
+      "the selection's, not something this dialog picked"
+  );
+
+  // Remove first, while nothing else has been said: it takes the group off and that
+  // is the whole of what it does. The chip beside it is how raw is said, and the two
+  // are different claims.
+  selectGalleries(["1"]);
+  groupSelect().props.onChange(langRemove);
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(r14.forwarded.variables.input.custom_fields, {
+    remove: ["plugin.mangaTools.translationGroup"],
+  });
+
+  // Choosing a group is the edit page's other answer to "is this raw": it writes
+  // the group *and* un-marks raw, because a gallery with a translator is not one.
+  groupSelect().props.onChange({ value: "Aozora", label: "Aozora" });
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(r14.forwarded.variables.input.custom_fields, {
+    partial: { "plugin.mangaTools.translationGroup": "Aozora" },
+    remove: ["plugin.mangaTools.original"],
+  });
+
+  // …and removing the name afterwards does *not* take that claim back: a pick said
+  // "not raw", and taking a name off a gallery is not a statement about whether it
+  // is the original. The two rules compose rather than override — so the payload
+  // carries both, and the chip is how you disagree.
+  groupSelect().props.onChange(langRemove);
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(
+    r14.forwarded.variables.input.custom_fields,
+    {
+      remove: [
+        "plugin.mangaTools.translationGroup",
+        "plugin.mangaTools.original",
+      ],
+    },
+    "a pick's un-raw survives a remove, which is about the group alone"
+  );
+
+  // Clearing every control — which is what the ✕ on each box means — leaves the
+  // dialog writing nothing: the state this section works in from here is the one it
+  // started in, and no pending of the four can leak into somebody else's payload.
+  //
+  // The steak has no ✕, so the way back to "no view" is its own cycle: from the
+  // un-raw state a press is that, which is the rest state the mark's checkbox has
+  // too. Asserted rather than assumed, because which press that is depends on where
+  // the cycle was left.
+  assert.strictEqual(
+    chip().props["aria-pressed"],
+    false,
+    "precondition: the steak is in its un-raw state"
+  );
+  chip().props.onClick();
+  selectOf("manga_tools_language").props.onChange(null);
+  groupSelect().props.onChange(null);
+  assert.strictEqual(
+    runLink(bulkVars()).forwarded.variables.input.custom_fields,
+    undefined,
+    "every control cleared writes nothing at all"
+  );
+
   // Mark: a none selection unified to manga.
   selectGalleries(["8"]);
   mangaBox().props.onChange(); // mark
@@ -470,6 +737,8 @@ module.exports = () => {
     remove: [
       "plugin.mangaTools.language",
       "plugin.mangaTools.censorship",
+      "plugin.mangaTools.translationGroup",
+      "plugin.mangaTools.original",
       "plugin.mangaTools.manga",
     ],
   });
@@ -733,7 +1002,8 @@ module.exports = () => {
   documentRoot.detach(scrapeModal);
   console.log(
     "✓ bulk edit (placement / gate+cycle / prefill / set+remove+mark+unmark / " +
-      "scene isolation / one-shot / route / the scrape dialog's studio row)"
+      "scene isolation / one-shot / route / the scrape dialog's studio row / " +
+      "the translation group and the steak / the suggested language)"
   );
 
   // The badges read the plugin's own store, so a successful write refetches it —

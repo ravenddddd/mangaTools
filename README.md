@@ -39,7 +39,7 @@ Adds a "language" property to galleries.
 | Gallery list / sidebar | A **language section** listing every language, to filter the list — see [Filtering](#filtering) |
 | Gallery edit page | A "language" dropdown **between "studio" and "performers"**, listing "flag + localised name" — no typing codes by hand |
 | Gallery detail page | An extra `<h6>` row **below "photographer", above "details"**, showing "flag + localised name" with the same label and font as the rows around it |
-| Gallery bulk edit | A "language" row **between "studio" and "performers"**, prefilled with the selection's shared language like the studio field, and applied by the dialog's own **Apply** — Cancel discards it like every other field |
+| Gallery bulk edit | Four rows **between "studio" and "performers"** — the mark, the language, censorship and the translation group with its raw button — prefilled with what the selection agrees on like the studio field, and applied by the dialog's own **Apply** — Cancel discards them like every other field |
 
 **Both of those positions rely on DOM plus a React portal, not a plain React
 patch.** Stash leaves no insertion point at either one:
@@ -579,14 +579,29 @@ that it no longer does. Nothing waits on the answer: the menu opens with what is
 in hand and is redrawn when the fetch lands.
 
 
-There is deliberately **no sidebar section and no bulk-edit row** for it. A
-sidebar section would have to be a free-text search rather than the checkbox list
-the other three are, and the bulk row would have to say what "set this group on
-every selected gallery" means when the values differ. Both are additions with
-their own design questions rather than a column in an existing table. It is
-recognised as one of this plugin's fields all the same — see `NS.ownField` — so it
-never shows up as a raw custom-field row in the edit form, and unmarking clears it
-along with the rest.
+There is deliberately **no sidebar section** for it: that would have to be a
+free-text search rather than the checkbox list the other three are, which is an
+addition with its own design questions rather than a column in an existing table.
+It is recognised as one of this plugin's fields all the same — see `NS.ownField` —
+so it never shows up as a raw custom-field row in the edit form, and unmarking
+clears it along with the rest.
+
+**The bulk dialog got a row for it in 0.9.51**, and the row is the edit page's
+field moved into a dialog: the same select (the library's groups, create-entry and
+all, ordered by the group whose galleries speak the selection's language), the same
+steak beside it, and the same suggestion button on the language row above. What a
+dialog adds is a **third state** for the two controls that are claims about a whole
+selection rather than values to type: the steak says `mixed` for a selection that
+disagrees about being raw (a pressed/not-pressed button cannot, which is why
+`aria-pressed="mixed"` and a dashed border are what carry it), and the select
+prefills only when the selection agrees — the rule the two rows above it already
+follow. Two of its rules are worth knowing because they interact: **picking a group
+writes "not raw"** (a gallery with a translator is not the original, as on the edit
+page), while **removing a group writes nothing about raw** — so a remove after a
+pick carries both, and the steak is how you disagree. Pressing raw takes the group
+away and **remembers it**, so pressing again is an undo rather than a second guess;
+the edit page keeps that same memory per gallery, and a dialog keeps it as what it
+was about to write.
 
 ### Settings
 
