@@ -834,6 +834,17 @@ depends on where the column is. What the two share is the place itself — a pag
 that is what lets the header, the counter, the chapter menu and the bar go on meaning
 the same thing in all three.
 
+**The bar's width is a measurement, and it belongs to the lightbox that made it.**
+Measured from the pages on show and kept between two screens of one lightbox — a page
+still on its way does not shrink it, because the reader turned a page rather than
+switched off — and forgotten when that lightbox closes. The next gallery has pages of
+its own size and has said nothing yet, so a bar drawn at the last book's width, or one
+that comes out before its own pages have arrived, is exactly the bar this one is
+asleep for. The wake a turn owes when it arrives before there is anything to measure
+goes with the lightbox too, for the same reason: what is owed is a screen of *that*
+book, and a reader who opens a second gallery in that moment is the one who would have
+seen it paid.
+
 **In the column:**
 
 - **The plain wheel is the browser's**, left entirely alone: no page turns and no

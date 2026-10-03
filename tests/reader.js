@@ -5781,6 +5781,102 @@ async function main() {
   });
 
   /**
+   * A wake the bar owes is paid inside the lightbox that owes it.
+   *
+   * A bar with nothing measured cannot be drawn — a bar a point wide says nothing — so
+   * a turn that arrives before the pages have does not drop the asking: it is *kept*
+   * (the `owed` flag in progress.ts) and answered by the pass the pictures' own `load`
+   * asks for. Both halves are here, because the second is what makes keeping it safe.
+   */
+  await runSection(
+    "a wake that was owed is paid when the pages arrive",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const bar = box.lightbox.querySelector(".manga-reader-progress");
+      const asleep = () => bar.classList.contains("is-idle");
+
+      assert.strictEqual(
+        asleep(),
+        true,
+        "the bar opens asleep, as every lightbox's does"
+      );
+
+      // A turn with nothing measured yet: the bar has something new to say and no width
+      // to say it at, so the asking waits rather than being thrown away — and the bar
+      // stays where it is rather than coming out a point wide.
+      dom.click(box.navRight);
+      assert.strictEqual(
+        asleep(),
+        true,
+        "a turn before the pages have measured leaves it asleep, with the wake owed"
+      );
+
+      // And what the asking was waiting for. Nothing else asks for this pass: a picture
+      // arriving is not a change to the document for the observer to see.
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+      dom.flush();
+      assert.strictEqual(
+        asleep(),
+        false,
+        "and the wake it was owed comes when the pages land"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * …and the debt does not outlive that lightbox.
+   *
+   * What is owed is a *screen* mid-turn: a page the reader asked for and has not been
+   * shown. A lightbox opened afterwards has said nothing at all, which is the one state
+   * this bar is asleep in the first place for — so both what is owed and the width it
+   * would be paid at belong to the lightbox that ran up the debt, and closing one takes
+   * them with it. The window is the first moments of a lightbox, before any page of the
+   * session has been measured; the reader who opens a second gallery in it is the one
+   * who sees the difference.
+   */
+  await runSection(
+    "a wake owed to one lightbox is not spent in the next",
+    async () => {
+      const first = await startReader({ galleryId: "8", on: true });
+      const firstBar = first.box.lightbox.querySelector(
+        ".manga-reader-progress"
+      );
+
+      dom.click(first.box.navRight);
+      assert.strictEqual(
+        firstBar.classList.contains("is-idle"),
+        true,
+        "a turn with nothing measured leaves the first lightbox owing itself a wake"
+      );
+      stopReader(first.box);
+
+      const second = await startReader({ galleryId: "8", on: true });
+      const secondBar = second.box.lightbox.querySelector(
+        ".manga-reader-progress"
+      );
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+      dom.flush();
+
+      assert.strictEqual(
+        secondBar.classList.contains("is-idle"),
+        true,
+        "and the next lightbox keeps its bar asleep: a wake the last one owed is not " +
+          "the new one's to spend, and neither is the width it was owed at"
+      );
+
+      stopReader(second.box);
+    }
+  );
+
+  /**
    * A gallery of one page gets no bar.
    *
    * There is no progress to show through a single picture, and a bar across the foot

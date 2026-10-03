@@ -298,6 +298,15 @@ export function removeProgress(lightbox: Element): void {
   pressed = false;
   labelWidth = 0;
   labelHeight = 0;
+  // The width remembered for the pages and the wake that was owed are both the
+  // *lightbox's* rather than the session's: each is something a screen whose pictures
+  // have not arrived stands on, and the screen before them was in another book — where
+  // the pages may be a different size, and where the reader was looking at something
+  // else. Kept, they are a bar drawn at the last book's width, or a bar that comes out
+  // over a picture nobody has looked at yet — which is the state this bar is asleep in
+  // the first place for.
+  lastWidth = 0;
+  owed = false;
 }
 
 /**
