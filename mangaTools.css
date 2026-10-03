@@ -754,16 +754,20 @@
  * A group heading that is not a switch — "the manga mark", "how the manga info is
  * shown". Deliberately not a `.setting` row: those are a label|control pair, and
  * Stash's `.setting > div:last-child { margin-left: auto; text-align: right }`
- * would push a lone heading to the right edge of the page. The size is a step
- * above a setting's own heading, so a group reads as a level above the rows under
- * it.
+ * would push a lone heading to the right edge of the page.
+ *
+ * Its size is the size of every other heading on this page. It was a step above them
+ * — the idea being that a group should read as a level above the rows under it — but
+ * what says that is the indent and the chevron, and a heading that is a different
+ * size from the heading of the row above it reads as a different *kind* of thing when
+ * it is the same kind: a name for a group of rows. So the number here is Stash's own,
+ * copied from what a row's heading gets on this page rather than chosen.
  *
  * What it does have to do is stand where the rows it belongs to stand. Stash puts
- * them 2.5rem in on this page through
- * `.setting-section .setting-group .collapsible-section .setting` — a selector that
- * matches anything carrying the class and nothing that does not, so a heading with
- * none of the box was left 2.5rem to the left of its own rows. The numbers are
- * Stash's, copied rather than chosen.
+ * them 2.5rem in through `.setting-section .setting-group .collapsible-section
+ * .setting` — a selector that matches anything carrying the class and nothing that
+ * does not, so a heading with none of the box was left 2.5rem to the left of its own
+ * rows.
  */
 .manga-tools-settings-heading {
   margin-left: 2.5rem;
@@ -772,8 +776,11 @@
   padding: 10px 0 0;
 }
 
-.manga-tools-settings-heading > h3 {
-  font-size: 1.05rem;
+/* Descendant and not child: the heading sits inside its own line with the chevron
+   (see .manga-tools-heading-line), so a `> h3` here would describe nothing. */
+.manga-tools-settings-heading h3 {
+  /* An h3 carries Bootstrap's own 1.75rem, so this cannot simply be left out. */
+  font-size: 1rem;
   margin-bottom: 0.25rem;
 }
 

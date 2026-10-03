@@ -121,6 +121,21 @@ module.exports = () => {
     "the rule drawn down a group's left edge should be gone — the indent says the " +
       "same thing without making the page read as a table"
   );
+  // The heading's size is the size of every other heading on this page. It was a step
+  // above — "a group should read as a level above its rows" — but the indent and the
+  // chevron already say that, and a heading that is a different size from the heading
+  // of the row above it reads as a different *kind* of thing. Bootstrap gives an h3
+  // 1.75rem, so this cannot simply be left out.
+  assert.ok(
+    /\.manga-tools-settings-heading h3\s*\{[^}]*font-size:\s*1rem/.test(css),
+    "a heading that is not a switch should be the size of one that is"
+  );
+  assert.ok(
+    !/\.manga-tools-settings-heading\s*>\s*h3/.test(css),
+    "…written as a descendant and not as a child: the heading shares a row with its " +
+      "chevron now, so a child selector would describe nothing at all"
+  );
+
   // A group heading that is not a `.setting` is not covered by the rule that puts
   // the rows 2.5rem in, and sat that far to the left of the rows under it.
   assert.ok(
