@@ -54,6 +54,23 @@ export interface MangaReaderSettings {
    * rather than for one book.
    */
   offset: boolean;
+  /**
+   * Whether the progress bar is drawn at all.
+   *
+   * It is the reader's own furniture rather than Stash's, and this is the switch a
+   * reader who does not want it has. In the column it is also the only place the
+   * reader's position is shown — the browser's own scrollbar is hidden there — which is
+   * why this is off by choice and on by default rather than the other way round.
+   */
+  showProgress: boolean;
+  /**
+   * Whether the bar marks where each chapter begins.
+   *
+   * The ticks, and nothing else: the chapter menu in the header and the name the drag's
+   * bubble says are about the chapters rather than about the bar, and they stay whatever
+   * this says. Hidden with the bar, since there is nothing to draw them on then.
+   */
+  showChapterMarks: boolean;
 }
 
 /** What is being read: the pages, where the reader is, and where its chapters are. */

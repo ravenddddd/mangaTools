@@ -813,6 +813,22 @@ Scroll** as a row of buttons, then the switches, grouped.
 | | **Detect spreads automatically** | A page wider than it is tall is taken for one image spanning two pages. Double page only |
 | | **Shift the pairing by one page** | For pages that are grouped wrongly, or `O`. Double page only |
 | **Animation** | **None / Fade in** | Whether a screen arrives or appears. The two screen modes only; the length is the plugin's — 200 ms |
+| **Progress** | **Progress bar** | This plugin's own bar — along the bottom in the two screen modes, down the side of the picture in the column. **On by default**; off, it is not drawn at all rather than hidden |
+| | **Chapter marks** | A tick on the bar where each chapter begins. In every mode, and put away with the bar: a mark on a bar that is not drawn is a setting with nothing to say |
+
+The last group is the one that **is in every mode**, because the bar is drawn in all
+three — down the side rather than along the bottom in the column, which is a different
+bar in the same place and not a different switch. Turning the bar off **gives the column
+its width back**: the fit leaves the bar's corner free on both sides, that number is a
+*measurement* of the bar, and a bar that is not there measures nothing — so the pages take
+the whole width on the next pass, with no window resized and nothing zoomed.
+
+Turning off the chapter marks stops the **ticks** and nothing else. Whether this half knows
+where the chapters are is a different question, and it goes on knowing: the header's
+chapter menu still lists them, and the bubble a drag shows still names the chapter under
+the pointer. In the column the bar is also the only scroll position there is — the
+browser's own scrollbar is hidden there — which is why this is a switch a reader turns off
+deliberately rather than a default.
 
 The last two of the reading group are **stored settings that had no control until
 now**: the pairing has read `coverAlone` and `detectSpreads` from the browser's
@@ -941,7 +957,7 @@ While the pairing is on, and while you are reading a **gallery**:
 | **Pan** | Press and drag to move the pages — as far as you take them, past the edge of the screen and all, exactly as Stash's own image does; turning the page is what puts them back in the middle. A drag never turns the page, and a click never moves it. Nor does a press held longer than a click: Stash's own other half of the test, so a press you thought better of sends you nowhere |
 | **Shift the pairing** | Its own switch in the options panel — in the reading group, and there while a pairing is — or `O`, for pages that are grouped wrongly. Remembered for the browser, like every other switch in that panel |
 | **The chapter menu** | The header's chapter control opens a list of the chapters, each with the **range of pages it covers** — its own first and last page on screen, so a cover in no chapter is not claimed by the one after it. The chapter being read is marked down its side, and the list has a heading that stays put while the list scrolls under it |
-| **The progress bar** | Its own line between the picture and the footer, as wide as the pages it is measuring — so a spread's bar is wider than a lone page's, and it never lies across the picture: how far through the book you are, with a tick where each chapter begins. A page still on its way does not shrink it — half a pair is not the width of a pair — so the bar holds the width it had until both of the pages are there. Drag it to cross four hundred pages in one gesture — the handle follows your hand exactly, while the pictures follow as fast as they can be fetched — and letting go lands you on the page you were nearest. Hover a tick to see which chapter it is, in the bar's own bubble — at once, rather than after the second a browser's tooltip takes — and click it to jump straight there. It is out of the way to begin with, fades again after a couple of seconds, and the pointer reaching the bar is what brings it back |
+| **The progress bar** | Its own line between the picture and the footer, as wide as the pages it is measuring — so a spread's bar is wider than a lone page's, and it never lies across the picture: how far through the book you are, with a tick where each chapter begins. A page still on its way does not shrink it — half a pair is not the width of a pair — so the bar holds the width it had until both of the pages are there. Drag it to cross four hundred pages in one gesture — the handle follows your hand exactly, while the pictures follow as fast as they can be fetched — and letting go lands you on the page you were nearest. Hover a tick to see which chapter it is, in the bar's own bubble — at once, rather than after the second a browser's tooltip takes — and click it to jump straight there. It is out of the way to begin with, fades again after a couple of seconds, and the pointer reaching the bar is what brings it back — and the whole of it, ticks included, can be switched off in the options panel |
 | **The change of screen** | Fades in rather than snapping — briefly, and never at the cost of a wait. Two buttons in the options panel choose whether, and how long is the plugin's own answer (200 ms): the length was a slider, and what a reader did with it was look for the one that stopped being noticeable. Nothing is animated for a reader who has asked their system for less motion |
 | **Fullscreen** | Stash's own button in Stash's own place. While the lightbox is filling the screen, a click on the space around the pages does nothing at all — the margin of a book is not a way out of it — so leaving fullscreen is the button, or Escape |
 | **Back closes it** | Pressing Back closes the lightbox instead of leaving it over the page you land on. Stash's own does not: its lightbox is in its own state and not in the route, so Back moves the page out from under it |

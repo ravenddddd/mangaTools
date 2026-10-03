@@ -725,6 +725,37 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
         (id) => latest?.handlers.onSetting({ fade: id === FADE_ON_ID })
       )
     );
+
+    parts.progressRule = rule();
+
+    // ── What is drawn over the pages ──────────────────────────────────────
+    // The bar and its ticks: this plugin's own furniture rather than anything about
+    // how the pages are put together, so this group is the one that goes with no
+    // mode — it is in all three, and the bar is a different bar in one of them (down
+    // the side rather than along the bottom) without that being a different switch.
+    //
+    // The ticks are a row of their own under the bar's switch, and they go when the
+    // bar does: a mark on a bar that is not drawn is a setting with nothing to say.
+    const progress = group("mangaReader.groupProgress");
+    parts.progressGroup = progress;
+
+    parts.progressRow = row(
+      PROGRESS_ID,
+      "mangaReader.showProgress",
+      switchAt(PROGRESS_ID, (on) =>
+        latest?.handlers.onSetting({ showProgress: on })
+      )
+    );
+    progress.appendChild(parts.progressRow);
+
+    parts.marksRow = row(
+      MARKS_ID,
+      "mangaReader.showChapterMarks",
+      switchAt(MARKS_ID, (on) =>
+        latest?.handlers.onSetting({ showChapterMarks: on })
+      )
+    );
+    progress.appendChild(parts.marksRow);
   }
 
   /**
@@ -757,6 +788,9 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   say("mangaReader.scrollMode");
   say("mangaReader.fadeOff");
   say("mangaReader.fade");
+  say("mangaReader.groupProgress");
+  say("mangaReader.showProgress");
+  say("mangaReader.showChapterMarks");
 
   // Which half of a pair is the chosen one. `is-on` rather than Stash's `active`,
   // which is a solid blue: see drawChapters.
@@ -774,6 +808,8 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   set(COVER_ID, state.settings.coverAlone);
   set(SPREAD_ID, state.settings.detectSpreads);
   set(OFFSET_ID, state.settings.offset);
+  set(PROGRESS_ID, state.settings.showProgress);
+  set(MARKS_ID, state.settings.showChapterMarks);
 
   say("mangaReader.coverAlone");
   say("mangaReader.detectSpreads");
@@ -795,6 +831,13 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const screening = state.settings.readingMode !== "scroll";
   showWhen(parts.animationGroup, screening);
   showWhen(parts.animationRule, screening);
+
+  // The ticks go with the bar they are marks *on*, and only they do: the chapter menu
+  // in the header and the name the drag's bubble says are about the chapters rather
+  // than about the bar, and a reader who does not want ticks has not asked for either
+  // of those to change. The fifth group is the only one that is in every mode — the
+  // bar is drawn in all three — so nothing here asks what the mode is.
+  showWhen(parts.marksRow, state.settings.showProgress);
 }
 
 const SINGLE_PAGE_ID = "manga-reader-single-page";
@@ -805,6 +848,8 @@ const SPREAD_ID = "manga-reader-detect-spreads";
 const OFFSET_ID = "manga-reader-offset";
 const FADE_OFF_ID = "manga-reader-fade-off";
 const FADE_ON_ID = "manga-reader-fade-on";
+const PROGRESS_ID = "manga-reader-show-progress";
+const MARKS_ID = "manga-reader-show-marks";
 
 function text(className: string, tag = "span"): HTMLElement {
   const node = document.createElement(tag);

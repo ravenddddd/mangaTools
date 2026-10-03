@@ -36,6 +36,11 @@ export const FADE_MS = 200;
  * something the reader never asked for; the other three describe how *spreads* are
  * put together once the mode is on, so they start in the position that suits a
  * manga.
+ *
+ * The two the bar answers are **on**, for the same reason read the other way round:
+ * this plugin's own furniture has always been there, and a switch that arrives with a
+ * new version is not the place to change what a reader already has. Off is what the
+ * reader asks for.
  */
 export const DEFAULT_SETTINGS: MangaReaderSettings = {
   readingMode: "single",
@@ -43,6 +48,8 @@ export const DEFAULT_SETTINGS: MangaReaderSettings = {
   detectSpreads: true,
   fade: true,
   offset: false,
+  showProgress: true,
+  showChapterMarks: true,
 };
 
 /**
@@ -93,6 +100,8 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
     detectSpreads: flag("detectSpreads"),
     fade: flag("fade"),
     offset: flag("offset"),
+    showProgress: flag("showProgress"),
+    showChapterMarks: flag("showChapterMarks"),
   };
 }
 

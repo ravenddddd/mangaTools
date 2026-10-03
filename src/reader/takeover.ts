@@ -627,16 +627,30 @@ function sync(lightbox: Element): void {
   // The same position said as a fraction of the book, and the one gesture that
   // crosses it. See progress.ts. In the third mode the bar is a column too, and it is
   // drawn in the picture area rather than in a row of its own.
+  //
+  // Whether there is a bar at all is the reader's setting, and a switch can be moved
+  // while the lightbox is open — so a bar that is no longer wanted is taken *down*
+  // rather than left where it was. That is also what gives the column its width back:
+  // the room the fit leaves for the bar is measured from the bar, and a removed element
+  // measures nothing. See refitIfReserveChanged, which is what notices.
   const scrolling = settings.readingMode === "scroll";
 
   if (scrolling) {
-    ensureProgress(lightbox, progressState(gallery, at, lightbox));
+    if (settings.showProgress) {
+      ensureProgress(lightbox, progressState(gallery, at, lightbox));
+    } else {
+      removeProgress(lightbox);
+    }
     ensureColumn(lightbox, gallery);
     return;
   }
 
   removeColumn();
-  if (at >= 0) ensureProgress(lightbox, progressState(gallery, at, lightbox));
+  if (at >= 0 && settings.showProgress) {
+    ensureProgress(lightbox, progressState(gallery, at, lightbox));
+  } else {
+    removeProgress(lightbox);
+  }
 
   if (at < 0) return;
 
@@ -678,7 +692,12 @@ function progressState(
     // than a measurement of the pages — see progress.ts.
     width: scrolling ? 0 : pictureWidth(screen?.pages.length ?? 0),
     vertical: scrolling,
-    chapters: gallery.chapters,
+    // The ticks, and only the ticks: "chapter marks" is a setting about the bar, so the
+    // list the bar draws its marks from is the one that is emptied. What the drag's
+    // bubble says comes from `chapterNameAt` below, which reads the chapters whatever
+    // this says — a reader who turned the marks off has not asked the bar to stop
+    // knowing where the chapters are.
+    chapters: settings.showChapterMarks ? gallery.chapters : [],
     chapterNameAt: (page) =>
       chapterAt(gallery.chapters, gallery.pages[page]?.id || "")?.title || "",
     locale: language,

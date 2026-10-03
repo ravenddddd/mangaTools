@@ -702,6 +702,27 @@ const savedReaderSettings = () => {
   return written ? JSON.parse(written) : null;
 };
 
+/**
+ * The whole of the reader's settings, with whatever a section is asking about
+ * overridden.
+ *
+ * They are compared as a whole — a write carries the whole map, because that is what
+ * saving plugin settings is — so every assertion about them wants all of them, and a
+ * literal per assertion is a literal to grow each time one is added: when the two the
+ * progress bar answers arrived, six of them had to. One place that lists them now, and
+ * the default of each is written once.
+ */
+const settingsWith = (over = {}) => ({
+  readingMode: "single",
+  coverAlone: true,
+  detectSpreads: true,
+  fade: true,
+  offset: false,
+  showProgress: true,
+  showChapterMarks: true,
+  ...over,
+});
+
 /** The rows this plugin drew in Stash's container */
 const drawnRows = (container) =>
   [...container.children].map(
@@ -1052,13 +1073,7 @@ async function main() {
   );
 
   await runSection("settings are parsed defensively", () => {
-    const defaults = {
-      readingMode: "single",
-      coverAlone: true,
-      detectSpreads: true,
-      fade: true,
-      offset: false,
-    };
+    const defaults = settingsWith();
 
     assert.deepStrictEqual(
       NR.parseSettings(null),
@@ -2582,13 +2597,7 @@ async function main() {
       );
       assert.deepStrictEqual(
         savedReaderSettings(),
-        {
-          readingMode: "double",
-          coverAlone: true,
-          detectSpreads: true,
-          fade: true,
-          offset: false,
-        },
+        settingsWith({ readingMode: "double" }),
         "and the settings are where they were found — this section flipped two of " +
           "them and put both back, which is where they started"
       );
@@ -2628,13 +2637,7 @@ async function main() {
       NS.readerSettingsRaw = null;
       assert.deepStrictEqual(
         NR.readSettings(),
-        {
-          readingMode: "single",
-          coverAlone: true,
-          detectSpreads: true,
-          fade: true,
-          offset: false,
-        },
+        settingsWith(),
         "a library with nothing in it reads as the defaults, and not as what this " +
           "browser happens to remember"
       );
@@ -2648,15 +2651,15 @@ async function main() {
       });
       assert.deepStrictEqual(
         NR.readSettings(),
-        {
+        settingsWith({
           readingMode: "double",
           coverAlone: false,
           detectSpreads: false,
           fade: false,
           offset: true,
-        },
-        "and with something in the library, that is what is read — every one of the " +
-          "five, not only the ones a section happened to set"
+        }),
+        "and with something in the library, that is what is read — every one of them, " +
+          "not only the ones a section happened to set"
       );
 
       // Put back: this browser's leftovers, so the sections after this one start from the
@@ -2680,13 +2683,7 @@ async function main() {
 
     assert.deepStrictEqual(
       savedReaderSettings(),
-      {
-        readingMode: "double",
-        coverAlone: true,
-        detectSpreads: true,
-        fade: true,
-        offset: false,
-      },
+      settingsWith({ readingMode: "double" }),
       "the pairing writes the setting it changed and leaves the rest alone — the whole " +
         "settings map, the managing half's on it too"
     );
@@ -3798,6 +3795,8 @@ async function main() {
       "#manga-reader-offset",
       "#manga-reader-fade-off",
       "#manga-reader-fade-on",
+      "#manga-reader-show-progress",
+      "#manga-reader-show-marks",
     ]) {
       const control = settings.querySelector(id);
       assert.ok(control, `${id} should be in the panel`);
@@ -3814,22 +3813,22 @@ async function main() {
       );
     }
 
-    // Two groups, each with its own heading: how the pages are paired, and whether a
-    // screen fades in as it arrives. Stash's own panel is one flat list, so this is the
-    // arrangement this plugin chose. The shift used to be a third group of its own,
-    // named for a gallery — it is remembered for the browser now, and belongs with the
-    // other pairing settings.
+    // Three groups, each with its own heading: how the pages are paired, whether a
+    // screen fades in as it arrives, and what is drawn over the pages while they are
+    // read. Stash's own panel is one flat list, so this is the arrangement this plugin
+    // chose. The shift used to be a group of its own, named for a gallery — it is
+    // remembered for the browser now, and belongs with the other pairing settings.
     assert.deepStrictEqual(
       [...body.querySelectorAll(".manga-reader-group")].map(
         (group) => group.querySelector(".manga-reader-group-label").textContent
       ),
-      ["Reading", "Animation"],
-      "in two groups, each named"
+      ["Reading", "Animation", "Progress"],
+      "in three groups, each named"
     );
     assert.strictEqual(
       body.querySelectorAll(".manga-reader-divider").length,
-      1,
-      "with a rule between them, and none around the outside"
+      2,
+      "with a rule between each pair of them, and none around the outside"
     );
 
     // No descriptions: a row is its label and its control, and there is nothing under
@@ -4590,7 +4589,7 @@ async function main() {
         "the pairing's settings are put away, as they are for a single page"
       );
       const groups = [...panel.querySelectorAll(".manga-reader-group")];
-      assert.strictEqual(groups.length, 2, "the panel keeps its two groups");
+      assert.strictEqual(groups.length, 3, "the panel keeps its three groups");
       assert.strictEqual(
         away(groups[1]),
         true,
@@ -4600,6 +4599,14 @@ async function main() {
         away(groups[0]),
         false,
         "while the group holding the selector stays, which is the one that got here"
+      );
+      // And the progress group stays too, which is the point of its being a group of its
+      // own: the bar is drawn in all three modes — down the side of the picture in this
+      // one — so it is the one group nothing here puts away.
+      assert.strictEqual(
+        away(groups[2]),
+        false,
+        "…and neither does the bar's, which is drawn in every mode there is"
       );
 
       // A turn in the column is a page and not a screenful: a screenful is however much
@@ -5190,6 +5197,167 @@ async function main() {
       stopReader(box);
     }
   );
+
+  /**
+   * The bar's own two switches, and what each of them stops.
+   *
+   * The bar is this plugin's furniture rather than Stash's, so a reader who does not want
+   * it is the one reader nothing was offering a say to. Two switches, in a group of their
+   * own in the options menu: the bar, and the marks it draws where each chapter begins —
+   * a question about the bar, which is why they are one group and why the second goes
+   * when the first does.
+   *
+   * What is asserted is not that the setting is *written* but that the drawing stops:
+   * both are drawn by the reader half, on the far side of the panel that switches them,
+   * and a switch that writes a setting nobody reads is a switch that does nothing.
+   */
+  await runSection("the progress bar has switches of its own", async () => {
+    const { box } = await startReader({
+      galleryId: "31",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
+
+    const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
+    const control = (id) => panel.querySelector(id);
+    const flip = (id) => {
+      const box2 = control(id);
+      box2.checked = !box2.checked;
+      box2.dispatch("change");
+    };
+    const bar = () => box.lightbox.querySelector(".manga-reader-progress");
+    const ticks = () =>
+      bar() ? bar().querySelectorAll(".manga-reader-progress-node").length : 0;
+    const away = (node) =>
+      node.getAttribute("data-manga-reader-hidden") !== null;
+    // The row a control sits in, found the way the panel's own pass finds it: the
+    // control is inside the row rather than the row's own element, and what is hidden is
+    // the row.
+    const rowOf = (id) => {
+      let at = control(id);
+      while (at && !at.classList?.contains("manga-reader-row")) {
+        at = at.parentNode;
+      }
+      return at;
+    };
+    const chaptersDrawn = () => chapterMenu(box);
+
+    // Both on, which is what this plugin did before either switch existed: a library
+    // that has never been asked reads as the defaults.
+    assert.strictEqual(
+      control("#manga-reader-show-progress").checked,
+      true,
+      "the bar is drawn by default"
+    );
+    assert.strictEqual(
+      control("#manga-reader-show-marks").checked,
+      true,
+      "…and so are its chapter marks"
+    );
+    assert.ok(bar(), "which is a bar on the page");
+    assert.ok(
+      ticks() > 0,
+      "with a mark on it for every chapter that begins inside the book"
+    );
+    assert.deepStrictEqual(
+      chaptersDrawn(),
+      ["開幕", "中盤"],
+      "and the chapters themselves, which the header's own menu lists"
+    );
+
+    // Marks off: the ticks go, and only the ticks do.
+    flip("#manga-reader-show-marks");
+    assert.strictEqual(ticks(), 0, "the ticks are gone");
+    assert.ok(
+      bar(),
+      "while the bar they were marks on is still there, which is the setting's own " +
+        "question and not this one's"
+    );
+    assert.deepStrictEqual(
+      chaptersDrawn(),
+      ["開幕", "中盤"],
+      "and the chapters are still the book's chapters: what was turned off is where the " +
+        "bar says they begin, not whether this half knows about them"
+    );
+    assert.strictEqual(
+      savedReaderSettings().showChapterMarks,
+      false,
+      "and the setting is with the library, like every other one"
+    );
+
+    // …and on again, which is what makes it a switch rather than a one-way door.
+    flip("#manga-reader-show-marks");
+    assert.ok(ticks() > 0, "and they come back");
+
+    // The bar itself off: there is no bar, and the row that would put marks on one has
+    // nothing to be about — see the panel's own pass, which hides it.
+    flip("#manga-reader-show-progress");
+    // Compared as a boolean rather than against `null`: what a failed assertion prints
+    // is its two values, and a stub element prints its own parent and children — a
+    // cycle, which Node's inspector walks until the heap gives out. The failure then
+    // arrives as a RangeError from printing it, and the assertion's own message is
+    // nowhere in the output. See the same shape in the one-page gallery's section.
+    assert.strictEqual(
+      bar() === null,
+      true,
+      "the bar is taken off the page rather than hidden: an element still in the " +
+        "lightbox is an element still taking pointers"
+    );
+    assert.strictEqual(
+      savedReaderSettings().showProgress,
+      false,
+      "its setting is written the same way"
+    );
+    assert.strictEqual(
+      away(rowOf("#manga-reader-show-marks")),
+      true,
+      "and the marks row goes with it, since a mark on a bar that is not drawn is a " +
+        "setting with nothing to say"
+    );
+
+    // And back, so the sections after this one read a panel in the state they expect.
+    flip("#manga-reader-show-progress");
+    assert.ok(bar(), "and the bar comes back");
+    assert.strictEqual(
+      away(rowOf("#manga-reader-show-marks")),
+      false,
+      "with its marks row"
+    );
+
+    // In the column the bar is also the room the pages leave for it, so turning it off
+    // gives that room back — which is a measurement of the bar, and a bar that is not
+    // there measures nothing. See refitIfReserveChanged: nothing here is a resize or a
+    // zoom, only the pass the switch itself causes.
+    dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+    const container = box.lightbox.querySelector(".manga-reader-spread");
+    const rows = [...container.querySelectorAll(".manga-reader-scroll-page")];
+    const bar2 = box.lightbox.querySelector(".manga-reader-progress");
+    bar2.rect = { left: 874, top: 0, width: 16, height: 600 };
+    container.rect = { left: 0, top: 0, width: 900, height: 1600 };
+    dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+    assert.strictEqual(
+      rows[0].style.width,
+      "828px",
+      "in the column the pages leave the bar its corner, as they always did"
+    );
+
+    flip("#manga-reader-show-progress");
+    assert.strictEqual(
+      rows[0].style.width,
+      "900px",
+      "and a reader who takes the bar away gets the whole width back, with no window " +
+        "resized and nothing zoomed"
+    );
+
+    // Put back: the bar, and the mode — both are the reader's settings, and a section
+    // that left either changed would be deciding for every section after it.
+    flip("#manga-reader-show-progress");
+    dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+
+    stopReader(box);
+  });
 
   await runSection("the progress bar shows the way, and moves it", async () => {
     const { box } = await startReader({
