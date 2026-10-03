@@ -4616,25 +4616,23 @@ async function main() {
         "the lightbox is marked while the column is up"
       );
 
-      // What a *measured* box does, which is the whole of the fit's cap. The smoke DOM
-      // has no layout, so every size above is the fallback; this is the path a browser
-      // takes. The zoom is put back to the fit first, because it is the reader's rather
-      // than the column's and a section before this one left it a notch in — so the
-      // numbers below are the fit's own and nothing else's.
+      // What a *measured* box does, which is the whole of the fit — the smoke DOM has no
+      // layout, so the sizes above are the fallback and a zeroed rect is what it takes
+      // to stay on it. The zoom is put back to the fit first, because it is the
+      // reader's rather than the column's and a section before this one left it a notch
+      // in, so the numbers below are the fit's own and nothing else's.
+      const bar = box.lightbox.querySelector(".manga-reader-progress");
+
+      // Landscape: wider than it is tall, so the height is the fit. The bar's rect is
+      // zeroed for this one, since this is about the cap rather than about the bar.
+      bar.rect = { left: 0, top: 0, width: 0, height: 0 };
+      container.rect = { left: 0, top: 0, width: 1600, height: 900 };
       dom.click(box.lightbox.querySelector(".manga-reader-zoom"));
       assert.strictEqual(
         rows[0].style.width,
-        "100%",
-        "the reset puts the fit back"
-      );
-
-      container.clientWidth = 1600;
-      container.clientHeight = 900;
-      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
-      assert.strictEqual(
-        rows[0].style.width,
         "900px",
-        "landscape: a page is drawn as wide as the window is tall, not as wide as it is"
+        "landscape: a page is drawn as wide as the window is tall, not as wide as it is " +
+          "— and the zoom's own reset puts the fit back on the way"
       );
       assert.strictEqual(
         rows[0].style.maxWidth,
@@ -4642,14 +4640,27 @@ async function main() {
         "…and the page's own pixels only matter under that"
       );
 
-      container.clientWidth = 700;
-      container.clientHeight = 1600;
+      // Portrait: the width is the smaller side, so the page fills it — less the corner
+      // the reader's progress bar stands on. A bar 26px wide from the area's right edge
+      // is 26px less page, which is the whole point of measuring it rather than writing
+      // a number down.
+      bar.rect = { left: 874, top: 0, width: 16, height: 600 };
+      container.rect = { left: 0, top: 0, width: 900, height: 1600 };
       dom.window.dispatchEvent(dom.makeEvent("resize", {}));
       assert.strictEqual(
         rows[0].style.width,
-        "700px",
-        "portrait: the width is the smaller one, so the page fills it — which is the " +
-          "behaviour this keeps"
+        "874px",
+        "portrait: the page fills the width, with the bar's corner left free"
+      );
+
+      // And a bar that is not drawn — the panel's own state, or a gallery with one
+      // page — takes nothing off it.
+      bar.rect = { left: 0, top: 0, width: 0, height: 0 };
+      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+      assert.strictEqual(
+        rows[0].style.width,
+        "900px",
+        "an unmeasured bar costs the pages nothing"
       );
 
       // Put back: the mode is the browser's setting, and a section that left the reader
@@ -4791,6 +4802,17 @@ async function main() {
       NR.columnFitted(undefined, undefined),
       0,
       "…however it is unmeasured, since the smoke tests' DOM has no layout at all"
+    );
+    assert.strictEqual(
+      NR.columnFitted(900, 1600, 26),
+      874,
+      "and the room the progress bar stands on comes off the width"
+    );
+    assert.strictEqual(
+      NR.columnFitted(1600, 900, 26),
+      900,
+      "…only off the width: the bar is down the side, and a page capped by its height " +
+        "is already clear of it"
     );
 
     const { box } = await startReader({ galleryId: "8", on: true });

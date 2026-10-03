@@ -80,14 +80,23 @@ export function columnZoom(): number {
  * the fit is capped at the height, which is the rule the other two modes already
  * follow — a page is never drawn larger than a screenful of it.
  *
+ * `reserved` is the room the progress bar stands on, taken off the width and not off
+ * the height: the bar is down the side, and a page that filled the width would be a
+ * page with its right-hand edge under the bar. Nothing else is reserved — a zoom is
+ * free to run under it.
+ *
  * It is a measurement and not a share of the box, which is why it is a number of pixels
  * rather than a percentage: `min(width, height)` has no percentage form. Zero means the
  * box has not been measured — a container not in the document yet, or the smoke tests'
  * DOM, which has no layout — and the caller fills the box instead, as it always did.
  */
-export function columnFitted(width: number, height: number): number {
+export function columnFitted(
+  width: number,
+  height: number,
+  reserved = 0
+): number {
   if (!(width > 0) || !(height > 0)) return 0;
-  return Math.min(width, height);
+  return Math.max(1, Math.min(width - reserved, height));
 }
 
 /**
@@ -103,10 +112,11 @@ export function zoomedBy(current: number, factor: number): number {
 }
 
 /** Draws the rows at the zoom in hand — the width, and the cap that keeps them sharp */
-export function setColumnZoom(next: number): number {
+export function setColumnZoom(next: number, reserved = 0): number {
   zoom = next;
-  const fitted = column
-    ? columnFitted(column.clientWidth || 0, column.clientHeight || 0)
+  const box = column?.getBoundingClientRect();
+  const fitted = box
+    ? columnFitted(box.width || 0, box.height || 0, reserved)
     : 0;
 
   column?.querySelectorAll("." + CLASS_SCROLL_PAGE).forEach((row) => {

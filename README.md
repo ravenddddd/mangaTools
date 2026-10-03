@@ -837,11 +837,16 @@ the same thing in all three.
   counts; a screenful would be a measurement, and a different answer on every window.
   A click on a page does nothing — there is no page on either side of it — while a
   click on the letterbox still closes the lightbox.
-- **A page is fitted to the smaller of the picture area's width and its height.** So a
-  window taller than it is wide fills — the width is already the smaller one, which is
-  what a portrait reader wants — and a window wider than it is tall is capped at its
-  own height, which is the same rule the other two modes follow: a page is never drawn
-  larger than a screenful of it. Filling the width in landscape instead would draw a
+- **A page is fitted to the smaller of the picture area's width and its height**, less
+  the corner the progress bar stands on. So a window taller than it is wide fills —
+  the width is already the smaller one, which is what a portrait reader wants, and the
+  page stops just short of the bar — and a window wider than it is tall is capped at
+  its own height, which is the same rule the other two modes follow: a page is never
+  drawn larger than a screenful of it. The bar's corner is **measured** rather than
+  written down, so the stylesheet's own numbers stay in the stylesheet, and it comes off
+  the width only: a page capped by its height is already clear of a bar down the side.
+  Nothing else is reserved — a zoom past the fit runs under the bar if the reader asks
+  for it, which is what a zoom is for. Filling the width in landscape instead would draw a
   page three and a half screenfuls tall at a size that never shows a whole screenful of
   anything. It is a measurement and not a share of the box, which is why the rows carry
   a width in pixels; a window that changes size re-fits them (`measureAgain`), and a

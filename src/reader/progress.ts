@@ -311,6 +311,27 @@ function vertical(): boolean {
 }
 
 /**
+ * How much of the picture area's right edge the bar stands on, in pixels.
+ *
+ * Zero unless the bar is the column's — a bar along the bottom takes nothing off a
+ * width — and zero when it has not been drawn or measured yet, which is the answer the
+ * caller acts on by leaving the whole width alone.
+ *
+ * The column's *fit* leaves this space, so a reader opening the column sees the whole
+ * page beside the bar rather than under it. A zoom past the fit is free to run under
+ * it: the reader asked for bigger, and the bar is a thin thing which by then is over
+ * the margin rather than over the page.
+ */
+export function barReserve(area: { left: number; width: number }): number {
+  if (!vertical() || !bar) return 0;
+
+  const box = bar.getBoundingClientRect();
+  if (!box.width) return 0;
+
+  return Math.max(0, area.left + area.width - box.left);
+}
+
+/**
  * How far along the bar something sits: a fraction, in the bar's own direction.
  *
  * The other axis is **cleared** rather than left where it was. The bar is one element

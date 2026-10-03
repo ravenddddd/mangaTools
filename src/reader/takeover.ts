@@ -58,6 +58,7 @@ import { syncFooter } from "./footer";
 import {
   PROGRESS_IDLE_MS,
   PROGRESS_SCRUB_MS,
+  barReserve,
   ensureProgress,
   fractionOfPage,
   pageAtFraction,
@@ -721,7 +722,7 @@ function chromeState(
         // pages fit at", in whichever of the two that is.
         view = fitView();
         if (settings.readingMode === "scroll") {
-          setColumnZoom(1);
+          refitColumn(1);
           scrollTo = Math.max(place, 0);
         }
         applyView();
@@ -910,7 +911,7 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
     // this reader's for as long as they are reading, and coming back to the mode is
     // not asking for the last one. Here rather than above, because this runs on every
     // pass — and a reset on every pass is a zoom that never happens.
-    setColumnZoom(1);
+    refitColumn(1);
   }
 
   // Where the reader is, in the column's own coordinates. On a fresh column that is
@@ -1324,12 +1325,26 @@ function closeLightbox(): void {
  * are fitted to changes what the progress bar measures — and a resize or a
  * fullscreen change is not a change to the document for the observer to see.
  */
+/**
+ * The column's fit, applied — with the room the progress bar stands on left free.
+ *
+ * Every path that re-fits the column comes through here rather than calling
+ * `setColumnZoom` directly, because the fit depends on the bar: it is drawn down the
+ * side of the picture area, and a page fitted to the area's full width has its
+ * right-hand edge under it. The reserve is measured rather than written down, so the
+ * stylesheet's own numbers stay in the stylesheet.
+ */
+function refitColumn(next: number): void {
+  if (!container) return;
+  setColumnZoom(next, barReserve(container.getBoundingClientRect()));
+}
+
 function measureAgain(): void {
   // The column's fit is a measurement of the box rather than a share of it — a page is
   // only ever as wide as one screenful is tall — so a window that changed size has
   // changed it, and the rows are in pixels and would keep the old size without this.
   // The other two modes measure themselves as they draw; this one has nothing to draw.
-  if (settings.readingMode === "scroll") setColumnZoom(columnZoom());
+  if (settings.readingMode === "scroll") refitColumn(columnZoom());
   if (root) sync(root);
 }
 
@@ -1781,7 +1796,7 @@ function onSpreadWheel(event: Event): void {
       ? { top: container.scrollTop || 0, left: container.scrollLeft || 0 }
       : null;
 
-    setColumnZoom(next);
+    refitColumn(next);
 
     // And put back, in proportion. A row's height is its width times its own ratio, so
     // a zoom multiplies *every* height by the same factor: the position that keeps the
