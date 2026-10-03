@@ -5359,6 +5359,118 @@ async function main() {
     stopReader(box);
   });
 
+  /**
+   * A width does not survive a change of layout.
+   *
+   * The bar holds the width of the last screen that measured one, so that a page still on
+   * its way does not shrink it. Right, for a turn: the screen before is the same kind of
+   * thing as the screen now. Not right across a change of layout, where the screen before
+   * is a *different* kind of thing — out of the column, what is in the picture area is the
+   * column's own rows, a page as wide as the picture area — and the bar came out at very
+   * nearly its full length for the moment before the new screen had been measured. Which
+   * is what a reader saw.
+   *
+   * So the pass that re-cuts the pages reports no width and forgets the one it was holding,
+   * and the bar does what it does for the first screen of a gallery: out of the way until
+   * there is something measured to be about, and back out on the wake it was owed.
+   */
+  await runSection(
+    "the bar carries no width across a change of layout",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      const bar = () => box.lightbox.querySelector(".manga-reader-progress");
+      const track = () => bar().querySelector(".manga-reader-progress-track");
+      const asleep = () => bar().classList.contains("is-idle");
+      const width = () => track().style.width || null;
+
+      /** Where the images in the picture area are, which is what the bar measures */
+      const measured = (boxes) =>
+        [...container().querySelectorAll("img")].forEach((image, at) => {
+          image.offsetLeft = boxes[at][0];
+          image.offsetWidth = boxes[at][1];
+        });
+
+      // One page, measured: the bar is as wide as it.
+      measured([[0, 500]]);
+      dom.flush();
+      assert.strictEqual(
+        width(),
+        "500px",
+        "the bar is as wide as the page it is standing for"
+      );
+
+      // Into the column, where a page is as wide as the picture area is and the bar is
+      // measured by nobody — its length is the area's, which the stylesheet says.
+      dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+      const rows = [
+        ...container().querySelectorAll(".manga-reader-scroll-page"),
+      ];
+      rows.forEach((row) => {
+        const image = row.querySelector("img");
+        image.offsetLeft = 0;
+        image.offsetWidth = 900;
+      });
+      dom.flush();
+      assert.strictEqual(
+        width(),
+        null,
+        "and the column's bar holds no width of its own, since nothing measures it"
+      );
+
+      // And out again. What is in the picture area *now* is still the column's rows at
+      // 900px a page: measuring them is measuring the layout that has just been left, and
+      // 900px is nearly the whole picture area — which is where the flash came from.
+      dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
+      assert.strictEqual(
+        width(),
+        null,
+        "so the bar leaves the column holding nothing rather than the column's page width"
+      );
+      assert.strictEqual(
+        asleep(),
+        true,
+        "…and stays out of the way, as it does for the first screen of a gallery, until " +
+          "the screen it is about has been measured"
+      );
+
+      // A page on, so that the screen in front of the reader is a *pair* — the first
+      // screen of this gallery is its cover, on a page of its own, in every mode.
+      press("ArrowRight");
+      assert.strictEqual(
+        width(),
+        null,
+        "a turn holds what it was holding, which is nothing here, since the new screen " +
+          "has not been measured either"
+      );
+
+      // Which is what the pages arriving is, and the wake it was owed comes with them.
+      measured([
+        [0, 500],
+        [520, 500],
+      ]);
+      dom.flush();
+      assert.strictEqual(
+        width(),
+        "1020px",
+        "and then it is as wide as the screen the reader is looking at"
+      );
+      assert.strictEqual(asleep(), false, "which is when it comes back out");
+
+      // And the same across a change of layout that never goes near the column: back to a
+      // single page. What is in the picture area is the pair that has just been left, and
+      // the bar's own inline width is still the pair's — a length left standing is the old
+      // screen's drawn as the new one's, which is the other half of the same mistake.
+      dom.click(box.lightbox.querySelector("#manga-reader-single-page"));
+      assert.strictEqual(
+        width(),
+        null,
+        "a re-cut leaves nothing behind it, inline style and all"
+      );
+
+      stopReader(box);
+    }
+  );
+
   await runSection("the progress bar shows the way, and moves it", async () => {
     const { box } = await startReader({
       galleryId: "31",

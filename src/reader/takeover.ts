@@ -593,10 +593,16 @@ function sync(lightbox: Element): void {
   // The screens are a function of the settings, so a gallery laid out under other ones
   // is laid out again here rather than drawn the old way — including one fetched
   // earlier in the session and opened again after a switch was moved.
+  //
+  // `relaid` is that fact carried down to the bar, which is the one other thing on the
+  // page that is *measured* from the pages — see progressState, where it says that what
+  // is in the picture area belongs to a layout that is no longer the one on show.
+  let relaid = false;
   if (gallery.pairedWith !== pairingKey()) {
     gallery.screens = laidOut(gallery.pages);
     gallery.pairedWith = pairingKey();
     shownAt = -1;
+    relaid = true;
   }
 
   if (place < 0) {
@@ -637,7 +643,7 @@ function sync(lightbox: Element): void {
 
   if (scrolling) {
     if (settings.showProgress) {
-      ensureProgress(lightbox, progressState(gallery, at, lightbox));
+      ensureProgress(lightbox, progressState(gallery, at, lightbox, relaid));
     } else {
       removeProgress(lightbox);
     }
@@ -647,7 +653,7 @@ function sync(lightbox: Element): void {
 
   removeColumn();
   if (at >= 0 && settings.showProgress) {
-    ensureProgress(lightbox, progressState(gallery, at, lightbox));
+    ensureProgress(lightbox, progressState(gallery, at, lightbox, relaid));
   } else {
     removeProgress(lightbox);
   }
@@ -681,7 +687,8 @@ function sync(lightbox: Element): void {
 function progressState(
   gallery: MangaReaderGallery,
   at: number,
-  lightbox: Element
+  lightbox: Element,
+  relaid: boolean
 ): Parameters<typeof ensureProgress>[1] {
   const screen = gallery.screens[at];
   const scrolling = settings.readingMode === "scroll";
@@ -690,8 +697,21 @@ function progressState(
     total: gallery.pages.length,
     // The column's bar is a column too, and its extent is the picture area's rather
     // than a measurement of the pages — see progress.ts.
-    width: scrolling ? 0 : pictureWidth(screen?.pages.length ?? 0),
+    //
+    // And on the pass that re-cut the pages there is no width to report either, because
+    // what is in the picture area is still the *previous* layout's: the old screen's
+    // images, or the column's own rows. `pictureWidth` cannot tell one from the other,
+    // and the number it gives back is not this screen's width in any sense — a column's
+    // page is as wide as the picture area, which is what made the bar flash at very
+    // nearly its full length for a moment on the way out of the column. The bar hears
+    // "no width" and does what it does for the first screen of a gallery: it stays out of
+    // the way until the screen it is about has been measured, and comes out then on the
+    // wake it was owed.
+    width: scrolling || relaid ? 0 : pictureWidth(screen?.pages.length ?? 0),
     vertical: scrolling,
+    // …and the same fact said to the bar itself, which is where the width it was holding
+    // is forgotten. See `lastWidth` in progress.ts.
+    relaid,
     // The ticks, and only the ticks: "chapter marks" is a setting about the bar, so the
     // list the bar draws its marks from is the one that is emptied. What the drag's
     // bubble says comes from `chapterNameAt` below, which reads the chapters whatever

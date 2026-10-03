@@ -861,6 +861,15 @@ goes with the lightbox too, for the same reason: what is owed is a screen of *th
 book, and a reader who opens a second gallery in that moment is the one who would have
 seen it paid.
 
+**It belongs to the layout that made it as well.** A *turn* keeps the width, because the
+screen before is the same kind of thing as the screen now. A change of layout does not: the
+pages are cut again, and what is still in the picture area for that moment is the previous
+layout's — the old screen's images, or the column's rows, where a page is as wide as the
+whole picture area. Measuring those is what made the bar come out at nearly its full length
+for an instant on the way out of the column. So the pass that re-cuts the pages reports no
+width and forgets the one it was holding, and the bar waits — out of the way, as it does for
+a gallery's first screen — until the screen it is actually about has been measured.
+
 **In the column:**
 
 - **The plain wheel is the browser's**, left entirely alone: no page turns and no

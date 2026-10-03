@@ -49,6 +49,17 @@ export interface ProgressState {
    * paint, the same sixteen of aim, the same ticks, the same bubble, the same drag.
    */
   vertical: boolean;
+  /**
+   * Whether the pages were cut again on this pass, so that nothing on screen has been
+   * measured under the layout the bar is about to describe.
+   *
+   * Set by the reader when the pairing changes — a mode switched, a cover taken off a
+   * page of its own — and it means the width below is *not* a measurement of a screen
+   * that is no longer on the page: it is the previous layout's, or the column's rows'.
+   * What the bar does with it is forget what it was holding, rather than hold a number
+   * that describes nothing.
+   */
+  relaid: boolean;
   /** How many pages the gallery has, which is what the bar is a fraction of */
   total: number;
   /**
@@ -500,6 +511,12 @@ function update(state: ProgressState): void {
   // a screen whose pictures are still arriving measures nothing, and the width of the
   // screen before it is the better answer. The column's bar is measured by nobody: its
   // length is the picture area's, which the stylesheet says.
+  //
+  // Forgotten first when the pages were cut again on this pass — the screen before it is
+  // from another layout in every sense, and holding its width is how the bar came out at
+  // very nearly the full length of the picture area for a moment on the way out of the
+  // column, where a page *is* that wide.
+  if (state.relaid) lastWidth = 0;
   if (state.width > 0) lastWidth = state.width;
 
   // And it is written to the track only with no pointer down. The bar's width is half
@@ -514,6 +531,12 @@ function update(state: ProgressState): void {
   } else if (!pressed && lastWidth > 0) {
     const wanted = Math.round(lastWidth) + "px";
     if (track.style.width !== wanted) track.style.width = wanted;
+  } else if (!lastWidth) {
+    // Nothing to hold — the pages on show have not been measured: the first screen of a
+    // gallery, or the pass that re-cut them. The width that was written *before* goes with
+    // it, or the track would keep drawing the old length from its own inline style while
+    // the bar is waiting to be told a new one.
+    if (track.style.width) track.style.width = "";
   }
 
   const settled = fractionOfPage(state.at, state.total);
