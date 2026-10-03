@@ -599,9 +599,19 @@ follow. Two of its rules are worth knowing because they interact: **picking a gr
 writes "not raw"** (a gallery with a translator is not the original, as on the edit
 page), while **removing a group writes nothing about raw** — so a remove after a
 pick carries both, and the steak is how you disagree. Pressing raw takes the group
-away and **remembers it**, so pressing again is an undo rather than a second guess;
-the edit page keeps that same memory per gallery, and a dialog keeps it as what it
-was about to write.
+away and remembers what the box was about to write — **the pending state itself,
+`null` included, not the name** — so pressing again is an undo rather than a second
+guess, and it gives back exactly what it took: a name, a removal the reader had
+asked for, or nothing at all. Restoring "the name" instead would have to invent one
+for a selection with no group of its own. The edit page keeps the same undo per
+gallery, where there is only ever a value to put back.
+
+The steak's cycle is keyed on **what the selection is**, not on what is pending —
+which is not a detail: keyed on the pending value, a selection where nothing is raw
+sat at "not raw", and the first press moved "no view" to "no view", so the button
+did not change and read as broken. Keyed on the aggregate, every press changes what
+is drawn, exactly as the mark's checkbox does. The two are one rule, and the
+checkbox got it right first (see `cycleManga`).
 
 ### Settings
 

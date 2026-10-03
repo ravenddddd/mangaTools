@@ -3585,13 +3585,20 @@ let bulkManga: "mark" | "unmark" | null = null;
 let bulkOriginal: "raw" | "notRaw" | null = null;
 
 /**
- * The group name 生肉 took away, so that un-pressing it can put the name back.
+ * What the group box was about to write when the raw mark took it away.
  *
- * The edit page keeps the same memory per gallery (`originalGroupTaken`); a bulk
- * dialog cannot, because one Apply covers N galleries — so what is remembered here
- * is not what any gallery had, it is what this dialog was about to write.
+ * The edit page keeps the same memory per gallery (`originalGroupTaken`) and puts
+ * the *name* back. A dialog cannot, and the difference is worth the extra state: a
+ * bulk selection may have no group at all, or may have one the reader has already
+ * asked to remove — and in both of those cases "the name" is the wrong thing to
+ * restore. What is restored is the pending itself, `null` included, so un-pressing
+ * gives back exactly what the box was saying: a name, a removal, or nothing.
+ *
+ * Outer `null` means raw took nothing (the note is not there to undo); `pending:
+ * null` means it took "no view", which un-pressing gives back with the box reading
+ * the selection's own group again.
  */
-let bulkGroupBeforeRaw: string | null = null;
+let bulkGroupBeforeRaw: { pending: BulkValuePending | null } | null = null;
 
 /** Ids currently selected in the gallery list, captured from GalleryList */
 let selectedGalleryIds: string[] = [];
@@ -4337,27 +4344,58 @@ function BulkFieldsRow() {
             : "mixed";
   const rawShown = showOriginal && rawState === "raw";
 
-  // The cycle, mirroring the mark's: the rest state is one click away in every
-  // case (raw↔not-raw, and for a mix keep→raw→not-raw→keep). Pressing raw takes
-  // the group away, which is what the field *means* — and remembering it is what
-  // makes the press undoable, exactly as the edit page remembers the name it took.
+  // Whether pressing again would put a group back — which the tooltip says, and it
+  // is a question about *what would come back* rather than about whether raw took
+  // something: a selection with no group of its own has nothing to restore, and
+  // saying it would be a promise the click does not keep.
+  const restoresGroup =
+    !!bulkGroupBeforeRaw &&
+    (bulkGroupBeforeRaw.pending
+      ? bulkGroupBeforeRaw.pending.kind === "set"
+      : !!selectedGroupAggregate());
+
+  // The cycle, and **what it is keyed on is the whole of getting this right**: the
+  // selection's own state, not the pending value's. Keyed on the pending value, a
+  // selection where nothing is raw sat at "not raw", and the first press moved the
+  // pending value to "no view" — which the aggregate then answered identically, so
+  // the button did not change, and read as broken. The mark's checkbox was keyed on
+  // its aggregate from the start and has the property this does now: **every press
+  // changes what is drawn**, whichever state the selection is in.
+  //
+  // So: every gallery raw toggles raw↔not-raw, none raw toggles the other way, and a
+  // mix walks keep → raw → not raw → keep. Pressing raw takes the group away, which
+  // is what the field means — and remembering it is what makes the next press an
+  // undo rather than a second guess, exactly as the edit page remembers the name it
+  // took.
   const cycleOriginal = () => {
-    if (rawState === "raw") {
-      bulkOriginal = "notRaw";
-      if (bulkGroupBeforeRaw) {
-        bulkGroup = { kind: "set", value: bulkGroupBeforeRaw };
-        bulkGroupBeforeRaw = null;
-      }
-    } else if (rawState === "notRaw") {
-      bulkOriginal = null;
-    } else {
-      bulkGroupBeforeRaw =
-        bulkGroup?.kind === "set"
-          ? bulkGroup.value
-          : (selectedGroupAggregate() ?? null);
-      bulkOriginal = "raw";
+    const aggregate = selectedOriginalAggregate();
+    const next: "raw" | "notRaw" | null =
+      aggregate === "all"
+        ? bulkOriginal === "notRaw"
+          ? null
+          : "notRaw"
+        : aggregate === "none"
+          ? bulkOriginal === "raw"
+            ? null
+            : "raw"
+          : bulkOriginal === null
+            ? "raw"
+            : bulkOriginal === "raw"
+              ? "notRaw"
+              : null;
+
+    if (next === "raw") {
+      bulkGroupBeforeRaw = { pending: bulkGroup };
       bulkGroup = { kind: "remove" };
+    } else if (bulkGroupBeforeRaw) {
+      // Whatever raw took comes back exactly as it was — which for a selection with
+      // no group of its own is "nothing pending", not a name this dialog would have
+      // had to invent.
+      bulkGroup = bulkGroupBeforeRaw.pending;
+      bulkGroupBeforeRaw = null;
     }
+
+    bulkOriginal = next;
     emit();
   };
 
@@ -4452,7 +4490,7 @@ function BulkFieldsRow() {
       title={t(
         intl,
         rawState === "raw"
-          ? bulkGroupBeforeRaw
+          ? restoresGroup
             ? "mangaTools.translationGroup.originalOffRestore"
             : "mangaTools.translationGroup.originalOff"
           : rawState === "mixed"

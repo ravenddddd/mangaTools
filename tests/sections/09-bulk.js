@@ -595,6 +595,58 @@ module.exports = () => {
     "the rest state takes no view on raw — the name in the box is still going out"
   );
 
+  // **The case this got wrong.** A selection where nothing is raw — the ordinary
+  // one, and the one every reader starts from — has to toggle on the *first* press.
+  // Keyed on the pending value instead of on the selection, that first press moved
+  // "no view" to "no view" and the button sat there looking broken; every press has
+  // to change what is drawn, which is what keying it on the aggregate buys.
+  selectGalleries(["1"]); // group Lily Manga, no gallery raw
+  groupSelect().props.onChange(null);
+  assert.strictEqual(
+    chip().props["aria-pressed"],
+    false,
+    "precondition: nothing in this selection is raw"
+  );
+  chip().props.onClick();
+  assert.strictEqual(
+    chip().props["aria-pressed"],
+    true,
+    "one press marks it raw, from the state the selection is already in"
+  );
+  assert.deepStrictEqual(
+    runLink(bulkVars()).forwarded.variables.input.custom_fields,
+    {
+      partial: { "plugin.mangaTools.original": "true" },
+      remove: ["plugin.mangaTools.translationGroup"],
+    },
+    "…and raw takes the group with it, the selection's own included"
+  );
+
+  // The undo puts back **exactly** what it took, which for a box that was showing
+  // the selection's own value is "no pending at all" — so the removal above goes
+  // with it rather than being left standing. A selection with no group of its own
+  // is the case that tells the two apart: restoring "the name" would have had to
+  // invent one.
+  chip().props.onClick();
+  assert.strictEqual(
+    chip().props["aria-pressed"],
+    false,
+    "a second press takes raw back, so the pair is one toggle"
+  );
+  assert.strictEqual(
+    runLink(bulkVars()).forwarded.variables.input.custom_fields,
+    undefined,
+    "…and the removal raw made goes with it, so the box says nothing at all again"
+  );
+  selectGalleries(["6"]); // no group of its own
+  chip().props.onClick();
+  chip().props.onClick();
+  assert.strictEqual(
+    runLink(bulkVars()).forwarded.variables.input.custom_fields,
+    undefined,
+    "which is the same answer where there was no group to take"
+  );
+
   // The chip is one of the four fields' controls, so its switch takes it away — and
   // the row stays either way, which is the point of a field switch rather than a
   // harder question about the row.
@@ -678,15 +730,12 @@ module.exports = () => {
   // dialog writing nothing: the state this section works in from here is the one it
   // started in, and no pending of the four can leak into somebody else's payload.
   //
-  // The steak has no ✕, so the way back to "no view" is its own cycle: from the
-  // un-raw state a press is that, which is the rest state the mark's checkbox has
-  // too. Asserted rather than assumed, because which press that is depends on where
-  // the cycle was left.
-  assert.strictEqual(
-    chip().props["aria-pressed"],
-    false,
-    "precondition: the steak is in its un-raw state"
-  );
+  // The steak has no ✕, so "no view" is reached through its own cycle — and how many
+  // presses that takes depends on where it was left, because the cycle is keyed on
+  // what the selection *is* (see cycleOriginal). Here the selection is not raw and a
+  // group pick has already said "not raw", so it is two: raw, then nothing — the
+  // same two the mark's checkbox takes from the same place.
+  chip().props.onClick();
   chip().props.onClick();
   selectOf("manga_tools_language").props.onChange(null);
   groupSelect().props.onChange(null);
