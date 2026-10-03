@@ -352,16 +352,19 @@
 /*
  * The panel's width, said out loud.
  *
- * Bootstrap caps a popover at 276px, but Stash overrides that with `max-width:
- * inherit` — so the cap is whatever the box it is drawn in has, which is nothing. It
- * was invisible while this panel was three `form-group`s of short labels; it is not
- * now that a row is a label and a sentence in a flex line, because a flex line's
- * natural width is the sum of everything in it and the popover would come out as wide
- * as the longest hint. 276px is Bootstrap's own number, which is what this would have
- * been capped at if Stash had not lifted it.
+ * Bootstrap caps a popover at 276px, but Stash overrides that with `max-width: inherit` — so the
+ * cap is whatever the box it is drawn in has, which is nothing. It was invisible while this panel
+ * was three `form-group`s of short labels; it is not now that a row is a label and a sentence in
+ * a flex line, because a flex line's natural width is the sum of everything in it and the popover
+ * would come out as wide as the longest hint.
+ *
+ * 20rem — 280px at this page's 14px root, a shade wider than the 276px Bootstrap would have
+ * capped it at. It is wider than it needs to be for its longest label, and that is the point:
+ * the wheel's rows are a label and a dropdown, and the dropdown is a fixed 7.25rem, so what a
+ * wider panel buys is room for the words beside it rather than for the control.
  */
 .manga-reader-chrome .manga-reader-menu-settings {
-  width: 17.25rem;
+  width: 20rem;
   max-width: calc(100vw - 2rem);
   /*
    * And it scrolls when there is not room for it. How much room there is, is measured and set

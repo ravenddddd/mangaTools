@@ -903,6 +903,16 @@ module.exports = () => {
     "a dropdown in this panel needs a width of its own, or it takes the whole row"
   );
 
+  // The panel's width, which has to be said out loud because Stash lifts Bootstrap's own cap on
+  // a popover (`max-width: inherit`): left to itself, the box is as wide as its contents, which
+  // for a row of flex lines is as wide as the longest sentence in it.
+  assert.ok(
+    /\.manga-reader-chrome\s+\.manga-reader-menu-settings\s*\{[^}]*width:\s*20rem/.test(
+      readerCss
+    ),
+    "the settings panel should have a width of its own: Stash lifts the popover's cap"
+  );
+
   // The panel scrolls when there is not room for it: `fitMenu` measures the room from the
   // panel's own top — where Stash's header put it — and sets a max-height, and this is the
   // other half of that. A cap with nothing to scroll is content cut off, and it is what
