@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.9.45
+version: 0.9.46
 ui:
   javascript:
     - mangaTools.js
@@ -141,7 +141,7 @@ settings:
     type: BOOLEAN
   showDisabledFields:
     displayName: Show disabled plugin fields
-    description: A disabled field is no longer hidden: Stash draws its own custom-field row for it in the details tab and the edit form. The value itself is not changed. The bulk edit dialog and the sidebar are unaffected.
+    description: A disabled field is no longer hidden — Stash draws its own custom-field row for it in the details tab and the edit form. The value itself is not changed. The bulk edit dialog and the sidebar are unaffected.
     type: BOOLEAN
   # The reading half's own settings, as the JSON string they are stored as. They are
   # *not* rendered on the settings page — the plugin's own UI is what draws that page,

@@ -665,6 +665,37 @@ module.exports = () => {
   // them one by one, so a file the manifest lists and the build does not copy is a
   // half that draws wrong with a 404 to explain it. Named here rather than read
   // from the yml, so that dropping one from the manifest fails here too.
+  // **The manifest, for the one mistake that takes the whole plugin down.** A colon in an
+  // unquoted YAML value is a mapping and not prose, and Stash parses this file before anything
+  // else: it refuses the plugin outright, so the settings page, the fields, the lightbox and the
+  // reader all go with it — which is what "the plugin disappeared" was. Nothing else in the suite
+  // reads this file, so a syntax error in it ships silently, and one did.
+  const manifest = fs.readFileSync(path.join(PLUGIN, "mangaTools.yml"), "utf8");
+  const colonInValue = manifest
+    .split("\n")
+    .map((text, at) => ({ text, at: at + 1 }))
+    .filter(({ text }) => {
+      // The first `: ` on the line is the one that separates a key from its value; what is
+      // read here is everything after it. A quoted, literal or block value is YAML's own way
+      // of saying "this is text", and is left alone.
+      const value = /^\s*(?:-\s+)?[\w-]+:\s+(.*)$/.exec(text)?.[1];
+      return Boolean(value) && !/^["'|>]/.test(value) && /: /.test(value);
+    })
+    .map(({ at, text }) => `${at}: ${text.trim()}`);
+  assert.deepStrictEqual(
+    colonInValue,
+    [],
+    "no unquoted value in the manifest may contain ': ' — it is a mapping rather than " +
+      "prose, and Stash refuses the plugin rather than parsing it (quote the value, or say " +
+      "it with a dash)"
+  );
+  assert.ok(
+    /^name:\s*\S/m.test(manifest) &&
+      /^version:\s*\d+\.\d+\.\d+/m.test(manifest),
+    "and the manifest should carry the plugin's name and a version, which are what Stash " +
+      "reads first"
+  );
+
   for (const name of ["mangaTools.css", "mangaReader.css"]) {
     assert.ok(
       fs.existsSync(path.join(PLUGIN, name)),
