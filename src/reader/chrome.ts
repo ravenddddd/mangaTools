@@ -395,6 +395,15 @@ function update(chrome: HTMLElement, state: ChromeState): void {
 const MENU_MARGIN = 8;
 
 /**
+ * The least room a menu is given when the window has almost none to give.
+ *
+ * Not a height the panel is trimmed to — it is as tall as its own content — but a floor under
+ * the answer, so that a window too short for anything at all still leaves a menu with a few
+ * rows and a scrollbar rather than one row.
+ */
+const MENU_MIN_HEIGHT = 180;
+
+/**
  * Whether a menu would hang off the right of the lightbox, and by how much.
  *
  * The style sheet places both menus with an anchor and an edge — the chapter menu
@@ -455,10 +464,29 @@ function fitMenu(panel: HTMLElement): void {
   // the question is what the stylesheet alone would have done with it.
   const had = Number(panel.dataset.shift || 0);
   const shift = fitShift(rect.left - had, rect.width, viewport, MENU_MARGIN);
-  if (shift === had) return;
+  if (shift !== had) {
+    panel.dataset.shift = String(shift);
+    panel.style.transform = shift === 0 ? "" : "translateX(" + shift + "px)";
+  }
 
-  panel.dataset.shift = String(shift);
-  panel.style.transform = shift === 0 ? "" : "translateX(" + shift + "px)";
+  // **And the same question downwards, which is a height rather than a shift.** A menu taller
+  // than the room beneath it has nowhere to be moved to — turning it upwards only trades one
+  // cut-off edge for the other — so it is given the room that is left and a scrollbar of its
+  // own, which is what Stash's own menu does (a flat `max-height: 300px` on its dropdown).
+  //
+  // Measured from the panel's *own top* rather than written down, because how far down it
+  // starts is Stash's header's business and not this stylesheet's. The settings panel is the
+  // one this is for: it is the one that grows with what it holds — the pairing's rows appear
+  // with the pairing, and the wheel's and the bar's are below them — where the chapter menu is
+  // a list that scrolls inside itself and needs no help.
+  if (!panel.classList.contains(CLASS_SETTINGS)) return;
+
+  const height = window.innerHeight;
+  if (typeof rect.top !== "number" || !height) return;
+
+  const room = Math.max(MENU_MIN_HEIGHT, height - rect.top - MENU_MARGIN);
+  const wanted = Math.round(room) + "px";
+  if (panel.style.maxHeight !== wanted) panel.style.maxHeight = wanted;
 }
 
 /**

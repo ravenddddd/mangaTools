@@ -812,6 +812,14 @@ showing; the "?" beside the Reading group's heading is where the panel says so. 
 themselves are kept with the library rather than in a browser — one JSON string in the plugin's
 own configuration — so every browser and every machine reads the same sets.
 
+**And the panel scrolls when it has to.** It is as tall as what it holds — the pairing's rows
+appear with the pairing, and the bar's and the wheel's are below them — so in a window without
+the room for all of it, it is given the room that is left and a scrollbar of its own, which is
+what Stash's own lightbox menu does (a flat 300px on its dropdown). How much room is left is
+*measured* from the panel's own top, because where that is is Stash's header's business. The
+chapter menu is left alone: its list scrolls inside itself, and a cap of that kind on it would
+be a second scrollbar around the first.
+
 **Everything is in that one panel, and it is grouped by what each setting is about:**
 
 | Group | | |

@@ -363,6 +363,14 @@
 .manga-reader-chrome .manga-reader-menu-settings {
   width: 17.25rem;
   max-width: calc(100vw - 2rem);
+  /*
+   * And it scrolls when there is not room for it. How much room there is, is measured and set
+   * by `fitMenu` — a max-height from the panel's own top, since where it starts is Stash's
+   * header's business — and this is the other half of that: a cap with nothing to scroll is
+   * content cut off. Its own scrollbar rather than the window's, which is what Stash's own
+   * lightbox menu does.
+   */
+  overflow-y: auto;
 }
 
 .manga-reader-chrome .manga-reader-settings .popover-body {

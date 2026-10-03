@@ -4187,6 +4187,79 @@ async function main() {
         "…leaving it exactly where it already was, because there was nothing to fix"
       );
 
+      // **And downwards, which is a height rather than a shift.** A panel taller than the room
+      // beneath it has nowhere to be moved to, so it is given the room that is left and a
+      // scrollbar of its own — the same thing Stash's own menu does, at a flat 300px. The two
+      // numbers here are a real pair, measured on a laptop: a 710px panel whose top is 46px
+      // down a 698px window, which is 58px of it below the screen.
+      let capped = 0;
+      let maxHeight = "";
+      Object.defineProperty(panel.style, "maxHeight", {
+        configurable: true,
+        get: () => maxHeight,
+        set: (value) => {
+          capped++;
+          maxHeight = value;
+        },
+      });
+      dom.window.innerHeight = 698;
+      panel.getBoundingClientRect = () => ({
+        left: 0,
+        top: 46,
+        width: 348,
+        height: 710,
+      });
+
+      // A pass rather than a click: the menu is open and stays open — and a pass is what a
+      // window that changed size asks for.
+      dom.flush();
+      assert.strictEqual(
+        panel.style.maxHeight,
+        "644px",
+        "a panel with more under it than the window has room for is given that room: " +
+          "698 − 46 − the margin"
+      );
+
+      // The same pass again on the same window: nothing written, and nothing to write. A cap
+      // written per pass would be a change per pass, and the observer hears its own writes.
+      capped = 0;
+      dom.flush();
+      assert.strictEqual(capped, 0, "…and the next pass writes nothing at all");
+
+      // A window with almost no room still leaves a menu a few rows and a scrollbar, rather
+      // than one row: the floor under the answer.
+      dom.window.innerHeight = 100;
+      dom.flush();
+      assert.strictEqual(
+        panel.style.maxHeight,
+        "180px",
+        "and a window too short for anything leaves the floor"
+      );
+
+      // And the chapter menu is left alone, which is the other half of that answer: it is a
+      // list that scrolls inside itself, and a cap of this kind on it would be a second
+      // scrollbar around the first.
+      const chapters = chrome.querySelector(".manga-reader-menu-chapters");
+      chapters.getBoundingClientRect = () => ({
+        left: 0,
+        top: 46,
+        width: 348,
+        height: 710,
+      });
+      dom.window.innerHeight = 698;
+      dom.click(
+        [...chrome.querySelectorAll(".manga-reader-menu-button")].find(
+          (button) => button.dataset.opens === "chapters"
+        )
+      );
+      dom.flush();
+      assert.strictEqual(
+        chapters.style.maxHeight,
+        undefined,
+        "the chapter menu is not capped: its own list is what scrolls"
+      );
+
+      dom.window.innerHeight = 0;
       stopReader(box);
     }
   );

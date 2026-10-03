@@ -903,6 +903,18 @@ module.exports = () => {
     "a dropdown in this panel needs a width of its own, or it takes the whole row"
   );
 
+  // The panel scrolls when there is not room for it: `fitMenu` measures the room from the
+  // panel's own top — where Stash's header put it — and sets a max-height, and this is the
+  // other half of that. A cap with nothing to scroll is content cut off, and it is what
+  // Stash's own lightbox menu does with its own scrollbar.
+  assert.ok(
+    /\.manga-reader-chrome\s+\.manga-reader-menu-settings\s*\{[^}]*overflow-y:\s*auto/.test(
+      readerCss
+    ),
+    "the settings panel should scroll: it is the one that grows with what it holds, and a " +
+      "window is not always tall enough for it"
+  );
+
   // The panel's one note, and the two things about it that the test DOM cannot see: that it
   // opens on *hover* — this panel is drawn from the reader's state on every pass, so a note
   // opened by a click would be state held somewhere else — and that the heading it hangs off
