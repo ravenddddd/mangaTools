@@ -205,6 +205,13 @@ export function pageAtTop(
  * wider than its own pixels: a page drawn wider than it was is a page made blurry, and
  * a row whose height is not known until its picture lands is the whole column jumping
  * down by one page every time one arrives.
+ *
+ * The *width* is not this function's business, and deliberately: a row is built without
+ * one, and the caller fits the column — see ensureColumn, which is where the fit's two
+ * numbers (the zoom, and the room the bar stands on) both live. This used to end by
+ * fitting the rows at the zoom the last gallery happened to leave behind and with no
+ * reserve at all, and be fitted again by the caller a line later: every row of the book
+ * written twice, once of them wrong.
  */
 export function buildColumn(
   into: HTMLElement,
@@ -239,8 +246,6 @@ export function buildColumn(
     row.appendChild(image);
     into.appendChild(row);
   });
-
-  setColumnZoom(zoom);
 }
 
 /** How far down a page's row begins, or null when the column has no such row */

@@ -912,6 +912,13 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
     // not asking for the last one. Here rather than above, because this runs on every
     // pass — and a reset on every pass is a zoom that never happens.
     refitColumn(1);
+  } else {
+    // The column is already built and already fitted — but fitted *with* something, and
+    // the bar may have arrived since: it is drawn in this pass, by ensureProgress, and a
+    // pass that could not draw it left the fit at the full width. See
+    // refitIfReserveChanged, which is also where the same comparison serves a window that
+    // changed size between two passes.
+    refitIfReserveChanged();
   }
 
   // Where the reader is, in the column's own coordinates. On a fresh column that is
@@ -1334,6 +1341,14 @@ function closeLightbox(): void {
  * right-hand edge under it. The reserve is measured rather than written down, so the
  * stylesheet's own numbers stay in the stylesheet.
  */
+/**
+ * The reserve the column was last fitted with, or null before it has been fitted at all.
+ *
+ * Kept so that a fit can be *re*-done when the number it was made from has changed — see
+ * refitIfReserveChanged, which is the only reader of it.
+ */
+let fittedWith: number | null = null;
+
 function refitColumn(next: number): void {
   if (!container) return;
 
@@ -1341,7 +1356,29 @@ function refitColumn(next: number): void {
   // so the middle of a page stays the middle of the picture area and the bar gets the
   // same space on either hand. Nothing is padded or shifted — a page moved across to
   // make room is a page the reader has to find again.
-  setColumnZoom(next, barReserve(container.getBoundingClientRect()));
+  const reserve = barReserve(container.getBoundingClientRect());
+  fittedWith = reserve;
+  setColumnZoom(next, reserve);
+}
+
+/**
+ * Re-fits the column if the room the bar stands on is not the room it was fitted with.
+ *
+ * The reserve is a measurement of the bar, and the bar is drawn by a *different* function
+ * in the same pass (ensureProgress, a few lines above ensureColumn in sync). So the first
+ * pass of a lightbox can fit the column before the bar is there to be measured — a pass
+ * that found no footer to put it in, or a gallery whose pages are still being read — and
+ * a column fitted at the full width is a page with its edge under the bar, which is the
+ * one thing the reserve exists to prevent. A resize re-fits it and a zoom re-fits it, but
+ * a bar *arriving* is neither, so the comparison is made here instead: the answer is the
+ * same number every pass once the bar is up, and a fit that changes nothing writes
+ * nothing.
+ */
+function refitIfReserveChanged(): void {
+  if (!container) return;
+  if (barReserve(container.getBoundingClientRect()) !== fittedWith) {
+    refitColumn(columnZoom());
+  }
 }
 
 function measureAgain(): void {

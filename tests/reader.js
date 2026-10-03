@@ -4726,6 +4726,26 @@ async function main() {
         "an unmeasured bar costs the pages nothing"
       );
 
+      // And a bar that arrives *after* the column was fitted is its own case, because the
+      // fit is a measurement of it: the first pass of a lightbox can fit the column before
+      // there is a bar in the picture area at all — one whose footer has not rendered, a
+      // gallery whose pages are still being read — and that fit is the full width, with
+      // the page's edge under a bar that was supposed to have room reserved for it.
+      // Nothing here re-fits anything: no resize, no zoom, no reset, only the pass the
+      // bar's own drawing comes with.
+      bar.rect = { left: 874, top: 0, width: 16, height: 600 };
+      dom.flush();
+      assert.strictEqual(
+        rows[0].style.width,
+        "828px",
+        "a bar measured after the column was fitted takes its room off it on a pass"
+      );
+
+      // Back to the unmeasured bar, so that the fit counted just below has a change to
+      // make.
+      bar.rect = { left: 0, top: 0, width: 0, height: 0 };
+      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+
       // And a fit that would change nothing writes nothing. Not readable off the DOM —
       // a width written twice reads the same both times — so the rows' own style objects
       // are counted: the plugin writes through `style.width`, and every one of those

@@ -873,9 +873,13 @@ seen it paid.
   for it, which is what a zoom is for. Filling the width in landscape instead would draw a
   page three and a half screenfuls tall at a size that never shows a whole screenful of
   anything. It is a measurement and not a share of the box, which is why the rows carry
-  a width in pixels; a window that changes size re-fits them (`measureAgain`), and a
-  box that has not been measured — a DOM with no layout behind it — falls back to
-  filling.
+  a width in pixels; a window that changes size re-fits them (`measureAgain`), **and so
+  does a bar that turns up after the fit was made** — the reserve is measured off the
+  bar's own rectangle, and the bar is drawn by a different function in the same pass, so
+  the first pass of a lightbox can fit the column before there is anything to measure.
+  That comparison is made on every pass of the column, and it is one number against
+  another: a fit that changes nothing writes nothing. A box that has not been measured —
+  a DOM with no layout behind it — falls back to filling.
 - **A zoomed column is wider than the picture area, and the drag is how a reader
   moves around in it.** A drag *scrolls* the box — the same movement the wheel makes,
   on the same box, so the two cannot disagree about where the reader is. The zoom
