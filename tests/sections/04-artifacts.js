@@ -257,6 +257,28 @@ module.exports = () => {
     /overflow:\s*hidden/.test(exampleCardRule[1]),
     "the frame should be what the spotlight is clipped by"
   );
+  // The example is drawn at 80% of the card it is a picture of — and by `zoom` rather
+  // than by a transform: a transform draws the same thing in a box that keeps its full
+  // size, and this is a panel whose size *is* its content, so the popover would sit in
+  // an invisible box a fifth wider than what it shows, hover area and all. Measured on
+  // the real markup: the frame comes out 210px wide against 264, the card inside 192
+  // against 240, and its cover square at 192×192.
+  // Comments stripped first: this rule's own comment names `transform: scale()` while
+  // explaining why it is not used, and a check that reads prose is a check that passes
+  // for the wrong reason.
+  const exampleDeclarations = exampleCardRule[1].replace(
+    /\/\*[\s\S]*?\*\//g,
+    ""
+  );
+  assert.ok(
+    /zoom:\s*0\.8/.test(exampleDeclarations),
+    "the example should be drawn at 80%"
+  );
+  assert.ok(
+    !/transform:\s*scale\(/.test(exampleDeclarations),
+    "…and by zooming, not by scaling: a transform would leave the box it is drawn in " +
+      "at full size"
+  );
   assert.ok(
     /\.manga-tools-help-card\s+\.gallery-card\.card\s*\{[^}]*overflow:\s*visible/.test(
       css

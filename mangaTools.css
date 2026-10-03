@@ -589,6 +589,15 @@
   font-weight: normal;
   line-height: 1.5;
   /*
+   * The example at 80% — the card, its type, and the frame around it together. `zoom`
+   * and not `transform: scale()`: a transform draws the same thing in a box that stays
+   * its full size, and this is a panel whose size *is* its content, so the popover
+   * would sit in an invisible box a fifth wider than what it shows. (The name is a
+   * coincidence: `zoom-1` on the card inside is Stash's own class for a cover height,
+   * nothing to do with this property.)
+   */
+  zoom: 0.8;
+  /*
    * The spotlight's clipping box, done here rather than by Stash's card.
    * `.gallery-card.card` is `overflow: hidden`, which is what keeps a 9999px
    * shadow from painting the page — but the mark sits at the card's own bottom
