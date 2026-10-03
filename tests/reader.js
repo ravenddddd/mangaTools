@@ -5552,12 +5552,50 @@ async function main() {
       clock.fn();
       assert.strictEqual(asleep(), true, "and it goes when that runs out");
 
-      // Put back: the default, so that the sections after this one have a bar that behaves
-      // as they expect.
-      slide(NR.PROGRESS_IDLE_MS / 500);
-      assert.strictEqual(readout(), "2 s", "which the slider says again");
-
+      // And a lightbox opened with that setting has the bar from the start. Not because a
+      // bar that comes out on its own is wanted — a lightbox that has just opened has said
+      // nothing yet — but because a reader who asked for a bar that never goes away asked
+      // for a bar, and one that is never dismissed is not one to be dismissed before the
+      // picture can be read either.
+      slide(NR.PROGRESS_IDLE_MAX_MS / 500 + 1);
       stopReader(box);
+
+      const again = await startReader({ galleryId: "8", on: true });
+      const againBar = again.box.lightbox.querySelector(
+        ".manga-reader-progress"
+      );
+      [...container().querySelectorAll("img")].forEach((image, at) => {
+        image.offsetLeft = at * 520;
+        image.offsetWidth = 500;
+      });
+      dom.flush();
+      assert.strictEqual(
+        againBar.classList.contains("is-idle"),
+        false,
+        "and a lightbox opened with it has the bar as soon as its pages are measured, " +
+          "with nothing turned and no pointer near it"
+      );
+
+      // Put back through *this* lightbox's own slider — the one the section has been
+      // dragging belongs to the lightbox it stopped — so that the sections after this one
+      // find a bar that behaves as they expect.
+      const againSlider =
+        again.box.lightbox.querySelector("#manga-reader-idle");
+      againSlider.value = String(NR.PROGRESS_IDLE_MS / 500);
+      againSlider.dispatch("input");
+      assert.strictEqual(
+        again.box.lightbox.querySelector(".manga-reader-readout").textContent,
+        "2 s",
+        "which the slider says again"
+      );
+      assert.strictEqual(
+        savedReaderSettings().progressIdleMs,
+        NR.PROGRESS_IDLE_MS,
+        "the default is written back, so the sections after this one find a bar that " +
+          "behaves as they expect"
+      );
+
+      stopReader(again.box);
     } finally {
       dom.window.setTimeout = real;
     }

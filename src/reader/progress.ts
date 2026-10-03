@@ -122,7 +122,9 @@ export const PROGRESS_IDLE_MS = 2000;
  * a *turn* does not bring it out — there would be nobody pointing at it to read it. Every
  * other value leaves the turn alone and only decides how long the bar stays afterwards.
  *
- * `PROGRESS_NEVER` is the other end: it comes out and it stays out.
+ * `PROGRESS_NEVER` is the other end, and it is the one setting that also decides what
+ * happens *before* anything: the bar is up from the moment a lightbox's pages have been
+ * measured, without waiting for a turn or a pointer — see the wake in `update`.
  */
 export const PROGRESS_HOLD_MS = 0;
 export const PROGRESS_NEVER = -1;
@@ -612,11 +614,20 @@ function update(state: ProgressState): void {
   }
 
   // A bar with something new to say comes back: the reader who turned a page is
-  // looking at the pages, and the bar is how they see where that was. Not on the
-  // first pass, though — a lightbox that has just opened has said nothing yet, and a
-  // bar that appears with it is a bar that has to be dismissed before it can be read.
-  // A wake that was owed, now that there is a width to draw the bar at.
-  if (owed && (state.vertical || state.width > 0)) {
+  // looking at the pages, and the bar is how they see where that was.
+  //
+  // Two things ask for it that are not a turn, and both are asked here because this is
+  // where there is a width to draw the bar at. One is the wake that was owed — an asking
+  // that arrived when there was nothing to draw it with. The other is the setting with no
+  // clock in it: a reader who has said the bar never goes away has said they want a bar,
+  // so it is up from the first pass rather than waiting for something to happen. That is
+  // the one setting under which "a lightbox that has just opened has said nothing yet"
+  // does not apply: a bar that is never dismissed is not one to be dismissed before the
+  // picture can be read either.
+  if (
+    (owed || state.idleMs === PROGRESS_NEVER) &&
+    (state.vertical || state.width > 0)
+  ) {
     owed = false;
     wake();
   }

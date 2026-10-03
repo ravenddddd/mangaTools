@@ -815,7 +815,7 @@ Scroll** as a row of buttons, then the switches, grouped.
 | **Animation** | **None / Fade in** | Whether a screen arrives or appears. The two screen modes only; the length is the plugin's — 200 ms |
 | **Progress** | **Progress bar** | This plugin's own bar — along the bottom in the two screen modes, down the side of the picture in the column. **On by default**; off, it is not drawn at all rather than hidden |
 | | **Chapter marks** | A tick on the bar where each chapter begins. In every mode, and put away with the bar: a mark on a bar that is not drawn is a setting with nothing to say |
-| | **Hide after** | How long the bar stays once it is out — a slider, in half-seconds up to 10, with the value beside it. Its two ends are not lengths of time: **0** is "only while the pointer is on it", and the top step is **never**. Both put away with the bar |
+| | **Hide after** | How long the bar stays once it is out — a slider, in half-seconds up to 10, with the value beside it. Its two ends are not lengths of time: **0** is "only while the pointer is on it", and the top step is **never**, which is also the bar being there from the moment a lightbox opens. Both put away with the bar |
 
 The last group is the one that **is in every mode**, because the bar is drawn in all
 three — down the side rather than along the bottom in the column, which is a different
@@ -831,8 +831,11 @@ closes. At **0** the pointer *is* the bar's visibility: it is there while the po
 it and gone when the pointer leaves, which makes a turn the one thing that does not bring it
 out, since there would be nobody pointing at it to read it. Everything between the two is a
 length of time. The default is still the two seconds, and a lightbox that has just opened
-still says nothing: this decides how long the bar stays, not whether it comes out on its
-own.
+still says nothing — except with the slider at its top, where the bar is simply there from
+the moment its pages are measured. That is the one setting under which the bar is not
+something that *happens*: a reader who has asked for a bar that never goes away has asked for
+a bar, and one that is never dismissed is not one to be dismissed before the picture can be
+read either.
 
 Turning off the chapter marks stops the **ticks** and nothing else. Whether this half knows
 where the chapters are is a different question, and it goes on knowing: the header's
