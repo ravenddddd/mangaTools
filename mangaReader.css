@@ -513,10 +513,24 @@
   color: #f5f8fa;
 }
 
-/* Stash's own index.scss sets an unscoped `.fa-icon { margin: 0 0.4rem }`, and this wrapper
-   already spaces the glyph — the same note the settings page's rule carries. */
-.manga-reader-help-button .fa-icon {
+/*
+ * What the glyph is actually sized by.
+ *
+ * Two of Stash's own rules reach in here. The unscoped `.fa-icon { margin: 0 0.4rem }` of its
+ * index.scss — the same note the settings page's rule carries — and, in a lightbox,
+ * `.Lightbox-header .fa-icon { width: 1.5rem; height: 1.5rem }`: the size of the *header's*
+ * buttons, which this "?" is not. That one has the same specificity as a single-class rule of
+ * this panel's, so `font-size: 0.85em` beside it did nothing at all and the glyph came out at
+ * a header button's size — which is what "0.85 没生效" was.
+ *
+ * So the size is said here, in `em` of the button's own 0.85em: the glyph scales with the word
+ * it stands beside, which is what every other icon in this plugin does. The wrapper is in the
+ * selector to outrank Stash's rule rather than to describe anything.
+ */
+.manga-reader-help .manga-reader-help-button .fa-icon {
   margin: 0;
+  width: 1em;
+  height: 1em;
 }
 
 .manga-reader-help-panel {

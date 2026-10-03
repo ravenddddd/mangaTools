@@ -927,6 +927,21 @@ module.exports = () => {
     );
   }
 
+  // And the glyph's own size, said here because Stash says it too: in a lightbox its
+  // `.Lightbox-header .fa-icon { width: 1.5rem; height: 1.5rem }` — a header button's size —
+  // has the specificity of a single-class rule and reached the "?" as well, so the 0.85em
+  // beside it did nothing. The selector is three deep to outrank that, which is the whole
+  // reason the wrapper is named in it.
+  assert.ok(
+    /\.manga-reader-help\s+\.manga-reader-help-button\s+\.fa-icon\s*\{[^}]*width:\s*1em/.test(
+      readerCss
+    ) &&
+      /\.manga-reader-help\s+\.manga-reader-help-button\s+\.fa-icon\s*\{[^}]*height:\s*1em/.test(
+        readerCss
+      ),
+    "the note's glyph needs a size of its own, or a lightbox's header-icon rule sizes it"
+  );
+
   assert.ok(
     /\.manga-reader-help:hover\s+\.manga-reader-help-panel[^{]*\{[^}]*display:\s*block/.test(
       readerCss
