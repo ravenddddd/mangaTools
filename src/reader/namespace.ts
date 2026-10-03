@@ -37,6 +37,34 @@ export interface MangaReaderOrder {
  */
 export type MangaReaderReadingMode = "single" | "double" | "scroll";
 
+/**
+ * What one of the wheel's three chords is bound to.
+ *
+ * `auto` is what a reader who has never touched it has, and is deliberately **not** one of
+ * the choices the panel offers: it is the only value whose meaning depends on the mode (a
+ * wheel turns a page where a screen is being read, and scrolls where the pages are a
+ * column), and a name for "whatever this mode does" is a worse answer than the panel simply
+ * showing what the chord does here. See wheel.ts for that mapping, which the panel asks for
+ * when it draws.
+ */
+export type MangaReaderWheelAction =
+  | "auto"
+  | "off"
+  | "turn"
+  | "zoom"
+  | "scroll";
+
+/** Which of the wheel's three chords an event is: the wheel, and it with shift or ctrl */
+export type MangaReaderWheelGesture = "plain" | "shift" | "ctrl";
+
+/** What a chord does once the mode and the reader's setting have both been asked */
+export type MangaReaderWheelEffect =
+  | "turn"
+  | "zoom"
+  | "pan"
+  | "scroll"
+  | "none";
+
 export interface MangaReaderSettings {
   /** Which of the three ways the pages are laid out. See MangaReaderReadingMode */
   readingMode: MangaReaderReadingMode;
@@ -73,6 +101,17 @@ export interface MangaReaderSettings {
    * in progress.ts, which is where the bar reads it.
    */
   progressIdleMs: number;
+  /**
+   * What the wheel itself is bound to, and the same for the two chords.
+   *
+   * Three settings rather than one, because they are three chords a reader can use
+   * independently — and three that may perfectly well be bound to the same thing: nothing
+   * here says a chord is used once. See MangaReaderWheelAction for the values and wheel.ts
+   * for what each of them means in each mode.
+   */
+  wheelAction: MangaReaderWheelAction;
+  shiftWheelAction: MangaReaderWheelAction;
+  ctrlWheelAction: MangaReaderWheelAction;
   /**
    * Whether the bar marks where each chapter begins.
    *
@@ -313,6 +352,27 @@ export interface MangaReaderNamespace {
     total: number,
     locale: string | null
   ): { name: string; at: number; fraction: number }[];
+  /**
+   * The wheel's two bits of arithmetic — which chord an event is, how far it travelled, and
+   * what that chord is bound to — here for the reason the rest of the pure helpers are: the
+   * tests' DOM has no wheel of its own to roll, so a section that wants to ask what a chord
+   * does asks this rather than driving a browser.
+   */
+  wheelGesture(wheel: {
+    shiftKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+  }): MangaReaderWheelGesture;
+  wheelDelta(wheel: { deltaX: number; deltaY: number }): number;
+  autoWheelAction(
+    gesture: MangaReaderWheelGesture,
+    scrolling: boolean
+  ): MangaReaderWheelAction;
+  wheelEffect(
+    action: MangaReaderWheelAction,
+    gesture: MangaReaderWheelGesture,
+    scrolling: boolean
+  ): MangaReaderWheelEffect;
   PROGRESS_SCRUB_MS: number;
   /**
    * The bar's clock, published whole rather than only where it is read: the default, the

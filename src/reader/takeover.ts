@@ -56,6 +56,12 @@ import { ensureChrome, forgetOpenMenu, removeChrome } from "./chrome";
 import { syncChaptersTab } from "./chapters-tab";
 import { syncFooter } from "./footer";
 import {
+  autoWheelAction,
+  wheelDelta,
+  wheelEffect,
+  wheelGesture,
+} from "./wheel";
+import {
   PROGRESS_HOLD_MS,
   PROGRESS_IDLE_MAX_MS,
   PROGRESS_IDLE_MS,
@@ -76,7 +82,12 @@ import {
   placeChapters,
 } from "./chapters";
 import { NR, type MangaReaderOrder } from "./namespace";
-import type { MangaReaderGallery, MangaReaderSettings } from "./namespace";
+import type {
+  MangaReaderGallery,
+  MangaReaderSettings,
+  MangaReaderWheelAction,
+  MangaReaderWheelGesture,
+} from "./namespace";
 import { FADE_MS, readSettings, writeSettings } from "./settings";
 import {
   CLASS_SCROLL,
@@ -1843,6 +1854,13 @@ export const WHEEL_REST_MS = 250;
 // would read them in their own dead zone.
 NR.WHEEL_TURN = WHEEL_TURN;
 NR.WHEEL_REST_MS = WHEEL_REST_MS;
+// The wheel's own arithmetic, published for the readers of it that are not this file: the
+// tests, which have no wheel to roll, and the panel, which shows what each chord is bound to
+// rather than what is stored in the settings.
+NR.wheelGesture = wheelGesture;
+NR.wheelDelta = wheelDelta;
+NR.autoWheelAction = autoWheelAction;
+NR.wheelEffect = wheelEffect;
 
 /** What the wheel has travelled since the last screen it turned */
 let wheelRun = 0;
@@ -1852,12 +1870,19 @@ let wheelRest: number | null = null;
 /**
  * The wheel: a page — or, with **ctrl** held, closer and further away.
  *
- * Not Stash's arrangement, and deliberately. Its `scrollMode` default is Zoom, so
- * its wheel zooms and its shifted wheel scrolls; here the wheel turns a page, which
- * is what a hand on a wheel in front of a book means, and **ctrl+wheel** is what
- * zooms — which is also where a browser puts its own zoom, so the chord is taken
- * rather than passed on. Shift keeps Stash's own meaning for it: up and down the
- * page, for looking at a tall one without turning away from it.
+ * The three chords and what they do are **the reader's to set** — three choices in the
+ * options panel, one per chord, each of them one of three actions or off. What is left here
+ * is the doing: which chord an event is, what that chord is bound to, and what that binding
+ * *means* in the mode the reader is in, which is the one part of it that is not a matter of
+ * taste. All three of those questions are asked of wheel.ts, which is where the answers are
+ * written down and tested on their own.
+ *
+ * Untouched, this is not Stash's arrangement, and deliberately. Its `scrollMode` default is
+ * Zoom, so its wheel zooms and its shifted wheel scrolls; here the wheel turns a page, which
+ * is what a hand on a wheel in front of a book means, and **ctrl+wheel** is what zooms —
+ * which is also where a browser puts its own zoom, so the chord is taken rather than passed
+ * on. Shift keeps Stash's own meaning for it: up and down the page, for looking at a tall
+ * one without turning away from it.
  *
  * A wheel is not one event per notch. What it has travelled is added up and a screen
  * is turned per WHEEL_TURN of it, with the remainder kept — a slow drift adds up to
@@ -1873,28 +1898,41 @@ let wheelRest: number | null = null;
  * is not a place a wheel event can land — so this is the only wheel in the lightbox,
  * and there is nothing to stop from hearing it.
  */
+/** What the reader has this chord bound to */
+function actionOf(gesture: MangaReaderWheelGesture): MangaReaderWheelAction {
+  if (gesture === "ctrl") return settings.ctrlWheelAction;
+  return gesture === "shift" ? settings.shiftWheelAction : settings.wheelAction;
+}
+
 function onSpreadWheel(event: Event): void {
   const lightbox = root;
   if (!lightbox || !container) return;
 
   const wheel = event as WheelEvent;
+  const scrolling = settings.readingMode === "scroll";
+  const gesture = wheelGesture(wheel);
+  const effect = wheelEffect(actionOf(gesture), gesture, scrolling);
+  const delta = wheelDelta(wheel);
 
-  // In the column the wheel is the browser's: scrolling *is* reading there, so the
-  // plain wheel is left entirely alone. **Ctrl is not** — it is the chord the other
-  // two modes zoom with, and it does the same thing to the pages here, one notch a
-  // step.
-  //
-  // What it does not share is the machinery. There the zoom is a transform over pages
-  // *fitted* to the screen, with slack in both directions to zoom into; here the page
-  // is already as wide as the picture area, so what zooms is the page itself — a
-  // transform on a scroll box would leave the scroll range where it was and put the
-  // edges of a zoomed page out of reach. See the note on `zoom` in scroll.ts.
-  if (settings.readingMode === "scroll") {
-    if (!wheel.ctrlKey && !wheel.metaKey) return;
+  // The one binding that is not this plugin's to do: in the column, "scroll" is the
+  // browser's own, and is handed over by *not* taking the event — its smooth scrolling is
+  // better than anything written here would be.
+  if (effect === "scroll") return;
 
-    wheel.preventDefault();
+  // Everything below has taken the event. Ctrl is why it has to be taken even when the
+  // chord has been turned off: that is where a browser puts its own page zoom, and a reader
+  // who has unbound it did not ask to zoom the whole interface instead.
+  wheel.preventDefault();
+  if (effect === "none") return;
+
+  if (effect === "zoom" && scrolling) {
+    // Not the machinery the other two modes use, and it cannot be. There the zoom is a
+    // transform over pages *fitted* to the screen, with slack in both directions to zoom
+    // into; here the page is already as wide as the picture area, so what zooms is the page
+    // itself — a transform on a scroll box would leave the scroll range where it was and put
+    // the edges of a zoomed page out of reach. See the note on `zoom` in scroll.ts.
     const was = columnZoom();
-    const next = zoomedBy(was, wheel.deltaY < 0 ? VIEW_STEP : 1 / VIEW_STEP);
+    const next = zoomedBy(was, delta < 0 ? VIEW_STEP : 1 / VIEW_STEP);
     if (next === was) return;
 
     // Where the reader is *in the column*, read before the pages change size — a read
@@ -1920,25 +1958,21 @@ function onSpreadWheel(event: Event): void {
     return;
   }
 
-  // Taken whatever is done with it: ctrl+wheel is the browser's own page zoom, and
-  // without this a reader zooming into a page would zoom the whole interface.
-  wheel.preventDefault();
-
-  if (wheel.ctrlKey || wheel.metaKey) {
-    view = zoomed(view, wheel.deltaY < 0 ? VIEW_STEP : 1 / VIEW_STEP);
+  if (effect === "zoom") {
+    view = zoomed(view, delta < 0 ? VIEW_STEP : 1 / VIEW_STEP);
     applyView();
     redrawChrome();
     return;
   }
 
-  if (wheel.shiftKey) {
-    view = panned(view, 0, wheel.deltaY < 0 ? -VIEW_PAN_STEP : VIEW_PAN_STEP);
+  if (effect === "pan") {
+    view = panned(view, 0, delta < 0 ? -VIEW_PAN_STEP : VIEW_PAN_STEP);
     applyView();
     redrawChrome();
     return;
   }
 
-  wheelRun += wheel.deltaY;
+  wheelRun += delta;
 
   if (wheelRest !== null) window.clearTimeout(wheelRest);
   wheelRest = window.setTimeout(() => {

@@ -459,6 +459,20 @@
 }
 
 /*
+ * The wheel's rows: a dropdown at the far edge, the same width in all three so that the
+ * three of them line up as a column.
+ *
+ * Bootstrap's own `.custom-select` is `width: 100%`, which in a row shaped like this one —
+ * the words taking the room there is — would take the room the words need and squeeze them
+ * to nothing. So it is given its width here instead, and no more than the longest word it
+ * can be showing needs.
+ */
+.manga-reader-chrome .manga-reader-settings .manga-reader-select {
+  flex: 0 0 7.25rem;
+  width: 7.25rem;
+}
+
+/*
  * The one row with its control underneath it, and the seam that comes with that.
  *
  * Two margins meet here and they were never meant to add up: the row's own — the panel

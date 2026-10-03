@@ -816,6 +816,7 @@ Scroll** as a row of buttons, then the switches, grouped.
 | **Progress** | **Progress bar** | This plugin's own bar — along the bottom in the two screen modes, down the side of the picture in the column. **On by default**; off, it is not drawn at all rather than hidden |
 | | **Chapter marks** | A tick on the bar where each chapter begins. In every mode, and put away with the bar: a mark on a bar that is not drawn is a setting with nothing to say |
 | | **Hide after** | How long the bar stays once it is out — a slider, in half-seconds up to 10, with the value beside it. Its two ends are not lengths of time: **0** is "only while the pointer is on it", and the top step is **never**, which is also the bar being there from the moment a lightbox opens. Both put away with the bar |
+| **Wheel** | **Wheel / Shift + wheel / Ctrl + wheel** | What each of the wheel's three chords does: **off**, turn a page, zoom, or scroll. Any of them may be bound to the same thing — nothing says a chord is used once. Each row shows what *that* chord does in the mode you are in, which is how the wheel's own default is shown rather than named: see below |
 
 The last group is the one that **is in every mode**, because the bar is drawn in all
 three — down the side rather than along the bottom in the column, which is a different
@@ -836,6 +837,25 @@ the moment its pages are measured. That is the one setting under which the bar i
 something that *happens*: a reader who has asked for a bar that never goes away has asked for
 a bar, and one that is never dismissed is not one to be dismissed before the picture can be
 read either.
+
+**And the wheel is yours to bind.** Three chords — the wheel, and the same wheel with Shift or
+Ctrl held — each bound to one of three actions or off. The panel offers four answers and not
+the word "default", because the default is the one thing here that depends on the mode, and a
+row that says what the chord *does in front of you* is a truer answer than a name for "whatever
+this mode does":
+
+| | In a screen (single or double) | In the column |
+|---|---|---|
+| **Turn a page** | one screen per `WHEEL_TURN` of travel | scroll to the next page's row, as the arrow keys do |
+| **Zoom** | the screen, about its middle | the column, keeping the reader on the line they were on |
+| **Scroll** | up and down a zoomed page — nothing to scroll when it is not zoomed | the browser's own scrolling of the column, handed over rather than done |
+| **Off** | nothing at all — but the chord is still taken, because Ctrl is where a browser puts its own page zoom | nothing at all, including the scrolling |
+
+Untouched, every chord is on what this plugin has always done: the wheel turns a page, Shift
+goes up and down a tall one, Ctrl zooms. **A chord's travel is read from whichever axis the
+event carries it on**, since several browsers put a Shift+wheel's movement on `deltaX` —
+scrolling sideways being their own meaning for that chord — and a binding the reader chose
+should not care how the browser spells a scroll.
 
 Turning off the chapter marks stops the **ticks** and nothing else. Whether this half knows
 where the chapters are is a different question, and it goes on knowing: the header's
@@ -980,7 +1000,7 @@ While the pairing is on, and while you are reading a **gallery**:
 | **The cover** | Stands alone. A cover is not the left half of anything |
 | **Arrows, chevrons and the wheel** | Left and right move a *screen*, not a page — so a pair advances together. The keyboard arrows, Stash's own chevrons and the mouse wheel all go through the same turn: the wheel is added up rather than counted by event, so a trackpad's flick is one screen rather than twenty |
 | **Clicks** | Clicking a page turns it, right half forward and left half back, exactly as Stash's own image click does. Clicking the space around the pages still closes the lightbox |
-| **Zoom** | `Ctrl` + the wheel: away from you to zoom in, towards you to zoom out, `Shift` + the wheel to scroll up and down instead. **Not Stash's own arrangement** — its wheel zooms and its `Shift`+wheel scrolls, by its `scrollMode` default — but a browser puts its own page zoom on `Ctrl`+wheel, so that chord is taken rather than passed on. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
+| **Zoom** | `Ctrl` + the wheel by default, and **any chord can be bound to it** in the options panel — as can turning and scrolling. Away from you to zoom in, towards you to zoom out. **Not Stash's own arrangement** — its wheel zooms and its `Shift`+wheel scrolls, by its `scrollMode` default — but a browser puts its own page zoom on `Ctrl`+wheel, so that chord is taken rather than passed on. A whole screen zooms at once, so a pair zooms together, and the zoom is cut off at the edge of the picture area rather than scaled over the header — which is what Stash's own slides do, by containment rather than by a clip. The header offers a reset while there is a zoom to put back |
 | **Pan** | Press and drag to move the pages — as far as you take them, past the edge of the screen and all, exactly as Stash's own image does; turning the page is what puts them back in the middle. A drag never turns the page, and a click never moves it. Nor does a press held longer than a click: Stash's own other half of the test, so a press you thought better of sends you nowhere |
 | **Shift the pairing** | Its own switch in the options panel — in the reading group, and there while a pairing is — or `O`, for pages that are grouped wrongly. Remembered for the browser, like every other switch in that panel |
 | **The chapter menu** | The header's chapter control opens a list of the chapters, each with the **range of pages it covers** — its own first and last page on screen, so a cover in no chapter is not claimed by the one after it. The chapter being read is marked down its side, and the list has a heading that stays put while the list scrolls under it |

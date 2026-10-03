@@ -723,6 +723,11 @@ const settingsWith = (over = {}) => ({
   // Read off the bundle rather than written down, so that the default is asserted where it
   // is declared and a change to it is a change here too.
   progressIdleMs: NR.PROGRESS_IDLE_MS,
+  // "auto" for all three: the wheel is the reader's to bind, and a reader who has not bound
+  // it has what this plugin has always done.
+  wheelAction: "auto",
+  shiftWheelAction: "auto",
+  ctrlWheelAction: "auto",
   ...over,
 });
 
@@ -3830,6 +3835,9 @@ async function main() {
       "#manga-reader-fade-on",
       "#manga-reader-show-progress",
       "#manga-reader-show-marks",
+      "#manga-reader-wheel",
+      "#manga-reader-shift-wheel",
+      "#manga-reader-ctrl-wheel",
     ]) {
       const control = settings.querySelector(id);
       assert.ok(control, `${id} should be in the panel`);
@@ -3846,21 +3854,21 @@ async function main() {
       );
     }
 
-    // Three groups, each with its own heading: how the pages are paired, whether a
-    // screen fades in as it arrives, and what is drawn over the pages while they are
-    // read. Stash's own panel is one flat list, so this is the arrangement this plugin
-    // chose. The shift used to be a group of its own, named for a gallery — it is
-    // remembered for the browser now, and belongs with the other pairing settings.
+    // Four groups, each with its own heading: how the pages are paired, whether a screen
+    // fades in as it arrives, what is drawn over the pages while they are read, and what the
+    // wheel does. Stash's own panel is one flat list, so this is the arrangement this plugin
+    // chose. The shift used to be a group of its own, named for a gallery — it is remembered
+    // for the browser now, and belongs with the other pairing settings.
     assert.deepStrictEqual(
       [...body.querySelectorAll(".manga-reader-group")].map(
         (group) => group.querySelector(".manga-reader-group-label").textContent
       ),
-      ["Reading", "Animation", "Progress"],
-      "in three groups, each named"
+      ["Reading", "Animation", "Progress", "Wheel"],
+      "in four groups, each named"
     );
     assert.strictEqual(
       body.querySelectorAll(".manga-reader-divider").length,
-      2,
+      3,
       "with a rule between each pair of them, and none around the outside"
     );
 
@@ -4628,7 +4636,7 @@ async function main() {
         "the pairing's settings are put away, as they are for a single page"
       );
       const groups = [...panel.querySelectorAll(".manga-reader-group")];
-      assert.strictEqual(groups.length, 3, "the panel keeps its three groups");
+      assert.strictEqual(groups.length, 4, "the panel keeps its four groups");
       assert.strictEqual(
         away(groups[1]),
         true,
@@ -4646,6 +4654,12 @@ async function main() {
         away(groups[2]),
         false,
         "…and neither does the bar's, which is drawn in every mode there is"
+      );
+      assert.strictEqual(
+        away(groups[3]),
+        false,
+        "…nor the wheel's, which is about a gesture rather than about a screen — and " +
+          "whose rows say different things in this mode, since the wheel does"
       );
 
       // A turn in the column is a page and not a screenful: a screenful is however much
@@ -5236,6 +5250,267 @@ async function main() {
       stopReader(box);
     }
   );
+
+  /**
+   * The wheel's three chords, and what a reader may bind them to.
+   *
+   * Three dropdowns in the options panel, one per chord, each offering the same four
+   * answers: off, turn a page, zoom, scroll — and *any* of them may be bound to the same
+   * thing, because a reader who wants one gesture everywhere is not making a mistake. What
+   * a binding means depends on the mode, which is why the panel shows the action rather
+   * than the word it has stored: an untouched install has "auto", which is not one of the
+   * four and is not a word a reader could have picked.
+   */
+  await runSection("the wheel is the reader's to bind", async () => {
+    // Eight pages, and one page a screen on purpose: this section turns pages four times,
+    // and how many screens there are is a *setting* — a reader left pairing two pages at a
+    // time by the section before this one has half as many, and a turn that runs out of book
+    // is a failure that says nothing about the wheel.
+    const { box } = await startReader({
+      galleryId: "31",
+      on: true,
+      total: 8,
+      search: "?sortby=title&perPage=500",
+      ids: CHAPTERS_VIEW.map(String),
+    });
+    const startedIn = savedReaderSettings()?.readingMode || "single";
+    dom.click(box.lightbox.querySelector("#manga-reader-single-page"));
+
+    const panel = box.lightbox.querySelector(".manga-reader-menu-settings");
+    const spread = container();
+    const counter = () =>
+      box.lightbox.querySelector(".manga-reader-counter").textContent;
+    const transform = () => spread.style.transform || "";
+
+    // Outlast the wheel's own clock before rolling anything. What the wheel has travelled is
+    // added up across events and forgotten once it has been still for WHEEL_REST_MS — a
+    // section's own rolls are fine, but the *remainder* an earlier section left behind is
+    // not, and a turn that comes up a few pixels short is a turn that does not happen.
+    await new Promise((resolve) => setTimeout(resolve, NR.WHEEL_REST_MS + 40));
+
+    const bind = (id, action) => {
+      const select = panel.querySelector(id);
+      select.value = action;
+      select.dispatch("change");
+    };
+    const roll = (deltaY, keys = {}) => {
+      const wheel = dom.makeEvent("wheel", { deltaY, ...keys });
+      spread.dispatch("wheel", wheel);
+      return wheel;
+    };
+    /**
+     * Every chord back to unbound — the state a reader who has never opened this group has.
+     *
+     * Written through the managing half rather than through the dropdowns, because "auto" is
+     * not one of the four they offer: it is what the *absence* of a choice means, and it is
+     * the one value whose meaning depends on the mode.
+     */
+    const unbind = () =>
+      NS.writeReaderSettings(
+        JSON.stringify({
+          ...savedReaderSettings(),
+          wheelAction: "auto",
+          shiftWheelAction: "auto",
+          ctrlWheelAction: "auto",
+        })
+      );
+
+    // The three rows, and what they show before anything is bound: what this plugin has
+    // always done, read off the mode the reader is in rather than off the stored word.
+    for (const [id, chosen] of [
+      ["#manga-reader-wheel", "turn"],
+      ["#manga-reader-shift-wheel", "scroll"],
+      ["#manga-reader-ctrl-wheel", "zoom"],
+    ]) {
+      const select = panel.querySelector(id);
+      assert.strictEqual(select.tagName, "SELECT", `${id} is a dropdown`);
+      assert.deepStrictEqual(
+        [...select.children].map((option) => option.value),
+        ["off", "turn", "zoom", "scroll"],
+        "…offering the same four, in the same order"
+      );
+      assert.strictEqual(
+        select.value,
+        chosen,
+        "…and showing what the chord does here, which is not the word that is stored"
+      );
+    }
+
+    // The wheel zooming, which is Stash's own arrangement and the one thing a reader who
+    // does not like this plugin's wheel would ask for first.
+    bind("#manga-reader-wheel", "zoom");
+    assert.strictEqual(
+      savedReaderSettings().wheelAction,
+      "zoom",
+      "which is written"
+    );
+    const wasAt = counter();
+    const unzoomed = transform();
+    const zoomed = roll(-120);
+    assert.strictEqual(zoomed.defaultPrevented, true, "the wheel is taken");
+    assert.notStrictEqual(
+      transform(),
+      unzoomed,
+      "and a wheel bound to zooming moves the view rather than turning the page"
+    );
+    assert.strictEqual(counter(), wasAt, "…without turning away from the page");
+
+    // Back to the action this chord has always had, and the same chord turns again.
+    bind("#manga-reader-wheel", "turn");
+    assert.strictEqual(
+      savedReaderSettings().wheelAction,
+      "turn",
+      "which is written"
+    );
+    // Rolled the *other* way on purpose: the screen before the first one is not a screen,
+    // and a wheel rolled up on the first page of a book has nothing to turn to.
+    roll(120);
+    assert.notStrictEqual(counter(), wasAt, "and the wheel turns a page again");
+
+    // …whichever axis the event carries its travel on. Some browsers put a wheel's movement
+    // on `deltaX` when shift is held — scrolling sideways is their own meaning for that
+    // chord — and a chord the reader has bound should not care how the browser spells it.
+    const sideways = counter();
+    roll(0, { deltaX: 120 });
+    assert.notStrictEqual(
+      counter(),
+      sideways,
+      "a wheel whose travel is on deltaX turns a page too"
+    );
+
+    // Shift bound to turning: the chord keeps its modifier and loses its own meaning.
+    bind("#manga-reader-shift-wheel", "turn");
+    assert.strictEqual(
+      savedReaderSettings().shiftWheelAction,
+      "turn",
+      "shift is written"
+    );
+    const before = counter();
+    roll(120, { shiftKey: true });
+    assert.notStrictEqual(
+      counter(),
+      before,
+      "and shift+wheel turns a page too"
+    );
+
+    // Ctrl bound to off: the chord does nothing at all — and is *still* taken, because that
+    // is where a browser puts its own page zoom, and a reader who unbound the chord did not
+    // ask for the whole interface to zoom instead.
+    bind("#manga-reader-ctrl-wheel", "off");
+    assert.strictEqual(
+      savedReaderSettings().ctrlWheelAction,
+      "off",
+      "off is written"
+    );
+    const still = { at: counter(), view: transform() };
+    const dead = roll(-120, { ctrlKey: true });
+    assert.strictEqual(dead.defaultPrevented, true, "the chord is still taken");
+    assert.strictEqual(counter(), still.at, "and does nothing: no turn");
+    assert.strictEqual(transform(), still.view, "…and no zoom either");
+
+    // And all three bound to the same thing, which the panel allows because it is a
+    // perfectly reasonable thing to want: every gesture zooms.
+    for (const id of [
+      "#manga-reader-wheel",
+      "#manga-reader-shift-wheel",
+      "#manga-reader-ctrl-wheel",
+    ]) {
+      bind(id, "zoom");
+    }
+    assert.deepStrictEqual(
+      [
+        savedReaderSettings().wheelAction,
+        savedReaderSettings().shiftWheelAction,
+        savedReaderSettings().ctrlWheelAction,
+      ],
+      ["zoom", "zoom", "zoom"],
+      "three chords, one answer, and nothing in the settings says a chord is used once"
+    );
+    const flat = transform();
+    roll(120, { shiftKey: true });
+    assert.notStrictEqual(transform(), flat, "…so shift+wheel zooms");
+    const flat2 = transform();
+    roll(-120);
+    assert.notStrictEqual(transform(), flat2, "…and so does the wheel");
+
+    // In the column the same three rows say different things, because the wheel does: the
+    // chord that turns a page where a screen is read scrolls where the pages are a column.
+    //
+    // Unbound first — which is not something a *dropdown* can say, since "auto" is
+    // deliberately not one of its four answers — so the settings are written the way the
+    // managing half writes them, which is also how the reader hears about a change made
+    // somewhere other than this panel.
+    unbind();
+    dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+    assert.deepStrictEqual(
+      [
+        panel.querySelector("#manga-reader-wheel").value,
+        panel.querySelector("#manga-reader-shift-wheel").value,
+        panel.querySelector("#manga-reader-ctrl-wheel").value,
+      ],
+      ["scroll", "scroll", "zoom"],
+      "the same three rows, showing what those chords do in this mode"
+    );
+
+    const column = container();
+    const at = () =>
+      box.lightbox.querySelector(".manga-reader-counter").textContent;
+    const rolled = (deltaY, keys = {}) => {
+      const wheel = dom.makeEvent("wheel", { deltaY, ...keys });
+      column.dispatch("wheel", wheel);
+      return wheel;
+    };
+
+    // The browser's own, untouched: the column scrolls, and this plugin stays out of it.
+    assert.strictEqual(
+      rolled(120).defaultPrevented,
+      false,
+      "the wheel in the column is the browser's, which is what an untouched install has"
+    );
+
+    // Bound to turning, though, it is this plugin's: a page at a time, and the browser is
+    // not left to scroll as well.
+    bind("#manga-reader-wheel", "turn");
+    const here = at();
+    const turning = rolled(120);
+    assert.strictEqual(
+      turning.defaultPrevented,
+      true,
+      "bound to turning, it is taken"
+    );
+    assert.notStrictEqual(
+      at(),
+      here,
+      "…and turns a page rather than scrolling freely"
+    );
+
+    // And off is off in every mode, which is the promise the word makes: the column does
+    // not scroll either.
+    bind("#manga-reader-wheel", "off");
+    column.scrollTop = 0;
+    const off = rolled(120);
+    assert.strictEqual(
+      off.defaultPrevented,
+      true,
+      "off is taken rather than handed over"
+    );
+    assert.strictEqual(column.scrollTop, 0, "…and nothing scrolls");
+
+    // Put back: the three chords, and the mode the section *found* — a reader who came in
+    // pairing two pages at a time is still pairing them.
+    unbind();
+    dom.click(
+      box.lightbox.querySelector(
+        startedIn === "scroll"
+          ? "#manga-reader-scroll"
+          : startedIn === "double"
+            ? "#manga-reader-double-page"
+            : "#manga-reader-single-page"
+      )
+    );
+
+    stopReader(box);
+  });
 
   /**
    * The bar's own two switches, and what each of them stops.

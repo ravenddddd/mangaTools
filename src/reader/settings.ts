@@ -14,7 +14,11 @@
  * Doing more than that — carrying each browser's old value up, once — is a branch and a
  * write nobody asked for, to spare one click in each browser that had chosen something.
  */
-import { NR, type MangaReaderSettings } from "./namespace";
+import {
+  NR,
+  type MangaReaderSettings,
+  type MangaReaderWheelAction,
+} from "./namespace";
 import {
   PROGRESS_HOLD_MS,
   PROGRESS_IDLE_MAX_MS,
@@ -57,6 +61,12 @@ export const DEFAULT_SETTINGS: MangaReaderSettings = {
   showProgress: true,
   showChapterMarks: true,
   progressIdleMs: PROGRESS_IDLE_MS,
+  // "auto" is not one of the choices the panel offers — it is what a reader who has never
+  // touched the wheel has, and it is the only value that means something different in each
+  // mode. See wheel.ts.
+  wheelAction: "auto",
+  shiftWheelAction: "auto",
+  ctrlWheelAction: "auto",
 };
 
 /**
@@ -84,6 +94,27 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
     typeof stored[key] === "boolean"
       ? (stored[key] as boolean)
       : (DEFAULT_SETTINGS[key] as boolean);
+
+  /**
+   * What one of the wheel's chords is bound to.
+   *
+   * A value the panel cannot produce is not a setting — a hand-edited configuration, or a
+   * name some later build knows and this one does not — and the default stands. "auto" *is*
+   * one of the values, and the one every install starts on.
+   */
+  const wheelAction = (
+    key: "wheelAction" | "shiftWheelAction" | "ctrlWheelAction"
+  ): MangaReaderWheelAction => {
+    const value = stored[key];
+
+    return value === "off" ||
+      value === "turn" ||
+      value === "zoom" ||
+      value === "scroll" ||
+      value === "auto"
+      ? value
+      : "auto";
+  };
 
   /**
    * How long the bar stays, in milliseconds — with the two ends of it that are not lengths
@@ -128,6 +159,9 @@ export function parseSettings(raw: string | null): MangaReaderSettings {
   return {
     readingMode: readingMode(),
     progressIdleMs: idleMs(),
+    wheelAction: wheelAction("wheelAction"),
+    shiftWheelAction: wheelAction("shiftWheelAction"),
+    ctrlWheelAction: wheelAction("ctrlWheelAction"),
     coverAlone: flag("coverAlone"),
     detectSpreads: flag("detectSpreads"),
     fade: flag("fade"),

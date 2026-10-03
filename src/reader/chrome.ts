@@ -24,8 +24,9 @@ import { requirePluginApi } from "../plugin-api";
 import { numbered, stringFor } from "../i18n";
 import { NR } from "./namespace";
 import { PROGRESS_IDLE_MAX_MS, PROGRESS_NEVER } from "./progress";
+import { autoWheelAction } from "./wheel";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
-import type { MangaReaderSettings } from "./namespace";
+import type { MangaReaderSettings, MangaReaderWheelAction } from "./namespace";
 import type { LightboxImage } from "./stash-lightbox";
 
 /** This plugin's own header, and the menus inside it */
@@ -94,6 +95,14 @@ const CLASS_ROW_SLIDER = "manga-reader-row-slider";
  * that slider became a pair of buttons.
  */
 const CLASS_READOUT = "manga-reader-readout";
+/**
+ * The one dropdown in this panel: what a chord of the wheel is bound to.
+ *
+ * A `select` rather than another row of segments because of what it holds — three chords
+ * that may perfectly well be bound to the same thing, in any combination, which a row of
+ * buttons would say with three rows of buttons and this says with three lines.
+ */
+const CLASS_SELECT = "manga-reader-select";
 /**
  * The single-page/double-page pair.
  *
@@ -805,6 +814,50 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     });
     parts.idleSlider = idle;
     progress.appendChild(idle);
+
+    parts.wheelRule = rule();
+
+    // ── The wheel ─────────────────────────────────────────────────────────
+    // Three chords, each bound to one of three actions or turned off — and any of them may
+    // be bound to the same thing, which is what a reader who wants one gesture everywhere
+    // would do. The panel shows what each chord does *in this mode*: what an untouched
+    // install has stored is "auto", whose meaning is different in each of the three ways of
+    // reading, so the row says the action rather than the word. See wheel.ts.
+    const wheelGroup = group("mangaReader.groupWheel");
+    parts.wheelGroup = wheelGroup;
+
+    for (const chord of WHEEL_CHORDS) {
+      parts[chord.id] = row(chord.id, chord.textId, selectAt(chord));
+      wheelGroup.appendChild(parts[chord.id]);
+    }
+  }
+
+  /**
+   * One chord's dropdown: the four things it can be bound to.
+   *
+   * The option elements are built once and their words written by the pass below, like
+   * every other label in this panel: one message is one element here, and these are the
+   * same four words in each of the three dropdowns, so they are not filed away under a
+   * message id the way a row's own label is.
+   */
+  function selectAt(chord: (typeof WHEEL_CHORDS)[number]): HTMLElement {
+    const select = document.createElement("select");
+    select.className = "custom-select " + CLASS_SELECT;
+    select.id = chord.id;
+    for (const action of WHEEL_ACTIONS) {
+      const option = document.createElement("option");
+      option.value = action;
+      select.appendChild(option);
+    }
+    select.addEventListener("change", () => {
+      const value = select.value;
+      // A dropdown can only offer the four, so this guards against a DOM that is not the one
+      // that was built — and a value that is not one of them is not written at all, rather
+      // than written as "auto": a reader who pressed something did not ask for the default.
+      if (!isWheelAction(value)) return;
+      latest?.handlers.onSetting({ [chord.key]: value });
+    });
+    return select;
   }
 
   /**
@@ -841,6 +894,10 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   say("mangaReader.showProgress");
   say("mangaReader.showChapterMarks");
   say("mangaReader.progressIdle");
+  say("mangaReader.groupWheel");
+  say("mangaReader.wheel");
+  say("mangaReader.wheelShift");
+  say("mangaReader.wheelCtrl");
 
   // Which half of a pair is the chosen one. `is-on` rather than Stash's `active`,
   // which is a solid blue: see drawChapters.
@@ -881,6 +938,32 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
   const screening = state.settings.readingMode !== "scroll";
   showWhen(parts.animationGroup, screening);
   showWhen(parts.animationRule, screening);
+
+  // The wheel's three dropdowns: the words of their options, and which one is chosen.
+  //
+  // Chosen is what the chord *does here*, not what is stored: an untouched install has
+  // "auto", which is not one of the four options and is not a word a reader could have
+  // picked. So the row says the action — turn a page where a screen is being read, scroll
+  // where the pages are a column — which is also the truth about what their wheel is doing.
+  const scrolling = state.settings.readingMode === "scroll";
+  for (const chord of WHEEL_CHORDS) {
+    const select = panel.querySelector(
+      "#" + chord.id
+    ) as HTMLSelectElement | null;
+    if (!select) continue;
+
+    WHEEL_ACTIONS.forEach((action, at) => {
+      const option = select.children?.[at] as HTMLElement | undefined;
+      if (!option) return;
+      const words = label(WHEEL_WORDS[action]);
+      if (option.textContent !== words) option.textContent = words;
+    });
+
+    const stored = state.settings[chord.key];
+    const chosen =
+      stored === "auto" ? autoWheelAction(chord.gesture, scrolling) : stored;
+    if (select.value !== chosen) select.value = chosen;
+  }
 
   // The ticks go with the bar they are marks *on*, and only they do: the chapter menu
   // in the header and the name the drag's bubble says are about the chapters rather
@@ -924,6 +1007,66 @@ const FADE_ON_ID = "manga-reader-fade-on";
 const PROGRESS_ID = "manga-reader-show-progress";
 const MARKS_ID = "manga-reader-show-marks";
 const IDLE_ID = "manga-reader-idle";
+const WHEEL_ID = "manga-reader-wheel";
+const SHIFT_WHEEL_ID = "manga-reader-shift-wheel";
+const CTRL_WHEEL_ID = "manga-reader-ctrl-wheel";
+
+/**
+ * The wheel's three chords, in the order the panel draws them: the label, the element, and
+ * the setting each of them writes.
+ *
+ * The setting is spelled here rather than derived from the element's id, since the two are
+ * named for different things — one for the reader ("Shift + wheel"), one for the settings
+ * map — and a name assembled out of the other is a name that breaks the first time either
+ * changes.
+ */
+const WHEEL_CHORDS = [
+  {
+    id: WHEEL_ID,
+    textId: "mangaReader.wheel",
+    key: "wheelAction",
+    gesture: "plain",
+  },
+  {
+    id: SHIFT_WHEEL_ID,
+    textId: "mangaReader.wheelShift",
+    key: "shiftWheelAction",
+    gesture: "shift",
+  },
+  {
+    id: CTRL_WHEEL_ID,
+    textId: "mangaReader.wheelCtrl",
+    key: "ctrlWheelAction",
+    gesture: "ctrl",
+  },
+] as const;
+
+/**
+ * What a chord can be bound to, in the order the dropdown lists them.
+ *
+ * Four, and `auto` is deliberately not one of them: it is what a reader who has never
+ * touched this has, and the only value whose meaning depends on the mode. The panel shows
+ * the *action* — what the chord does here — rather than the stored word, which for an
+ * untouched install is a word the reader has never chosen and cannot choose.
+ */
+const WHEEL_ACTIONS = ["off", "turn", "zoom", "scroll"] as const;
+
+/** Whether a value read off a dropdown is one of the four */
+function isWheelAction(value: string): value is MangaReaderWheelAction {
+  return (
+    value === "off" ||
+    value === "turn" ||
+    value === "zoom" ||
+    value === "scroll"
+  );
+}
+
+const WHEEL_WORDS: { [key: string]: string } = {
+  off: "mangaReader.wheelOff",
+  turn: "mangaReader.wheelTurn",
+  zoom: "mangaReader.wheelZoom",
+  scroll: "mangaReader.wheelScroll",
+};
 
 /**
  * The slider's own scale, and the two ends of it that are not lengths of time.
