@@ -4641,16 +4641,18 @@ async function main() {
       );
 
       // Portrait: the width is the smaller side, so the page fills it — less the corner
-      // the reader's progress bar stands on. A bar 26px wide from the area's right edge
-      // is 26px less page, which is the whole point of measuring it rather than writing
-      // a number down.
+      // the reader's progress bar stands on. A bar whose near edge is 26px from the
+      // area's right (its 10px of air plus its 16px of track) takes 26px plus the same
+      // 10px mirrored on its far side: 36px of page, so that the reader sees the same
+      // gap either side of the line. Which is the whole point of measuring it rather
+      // than writing a number down — the 10px is the stylesheet's, read back.
       bar.rect = { left: 874, top: 0, width: 16, height: 600 };
       container.rect = { left: 0, top: 0, width: 900, height: 1600 };
       dom.window.dispatchEvent(dom.makeEvent("resize", {}));
       assert.strictEqual(
         rows[0].style.width,
-        "874px",
-        "portrait: the page fills the width, with the bar's corner left free"
+        "864px",
+        "portrait: the page fills the width, less the bar and the air either side of it"
       );
       // And the box the pages are *centred* in is narrowed by the same amount. Sizing
       // the page alone was not enough: centred in the full width, it gave half the
@@ -4658,7 +4660,7 @@ async function main() {
       // the bug this assertion is the guard for.
       assert.strictEqual(
         container.style.paddingRight,
-        "26px",
+        "36px",
         "…and the centring box narrowed by it, or half of it is given back to each side"
       );
 

@@ -318,9 +318,10 @@ function vertical(): boolean {
  * caller acts on by leaving the whole width alone.
  *
  * The column's *fit* leaves this space, so a reader opening the column sees the whole
- * page beside the bar rather than under it. A zoom past the fit is free to run under
- * it: the reader asked for bigger, and the bar is a thin thing which by then is over
- * the margin rather than over the page.
+ * page beside the bar rather than under it — and with the same gap on the bar's far side
+ * as on its near one. A zoom past the fit is free to run under it: the reader asked for
+ * bigger, and the bar is a thin thing which by then is over the margin rather than over
+ * the page.
  */
 export function barReserve(area: { left: number; width: number }): number {
   if (!vertical() || !bar) return 0;
@@ -328,7 +329,14 @@ export function barReserve(area: { left: number; width: number }): number {
   const box = bar.getBoundingClientRect();
   if (!box.width) return 0;
 
-  return Math.max(0, area.left + area.width - box.left);
+  // The bar's own air on the side it is pinned to, mirrored on the other side of it: a
+  // reader sees the same gap either side of the line rather than the page touching it on
+  // one. Measured from the same rectangle, so the stylesheet's `right: 10px` stays the
+  // stylesheet's — this is that number, read back rather than repeated.
+  const right = area.left + area.width;
+  const air = right - (box.left + box.width);
+
+  return Math.max(0, right - box.left + air);
 }
 
 /**
