@@ -246,6 +246,23 @@ function noteFired(target: string): void {
   console.info("[mangaTools] patch active: " + target);
 }
 
+/**
+ * Records the first time a *condition* worth reporting is met, and says so once.
+ *
+ * The same discipline as `noteFired`, for the other half of the same problem: a
+ * patch that never runs leaves no trace, and neither does a guard that decides not
+ * to draw something. Both are silent by construction — that is what a guard is —
+ * so the one place that can tell the difference is the plugin itself, at the
+ * moment it decides. Once per key per page, because these run on every render.
+ */
+const notedOnce: { [key: string]: boolean } = {};
+
+function noteOnce(key: string, message: string): void {
+  if (notedOnce[key]) return;
+  notedOnce[key] = true;
+  console.warn("[mangaTools] " + message);
+}
+
 // ───────────────────────────── State ─────────────────────────────
 
 /**
@@ -281,11 +298,42 @@ let inFlight: Promise<unknown> | null = null;
 let started = false;
 let lastLoggedSize = -1;
 
+/** Whether the `stash:location` listener got registered — see start(), and diag */
+let locationListener = false;
+
+/** How many times the bulk rows have rendered — see diag */
+let bulkRenders = 0;
+
 /**
- * Current path. CustomFieldsInput is shared by every entity type, so this is
- * how we tell a gallery page apart from the rest.
+ * The path the plugin was last *told* it is on, by `stash:location`.
+ *
+ * No longer what the path checks read — see pathNow — but kept as what the reader's
+ * half of the world can still answer when the URL cannot, and as the value
+ * MangaTools.diag() reports next to the live one.
  */
 let currentPath = window.location.pathname || "";
+
+/**
+ * The path to act on: the browser's, which is always the current one.
+ *
+ * **This is read live rather than taken from the remembered `currentPath`**, and
+ * that is the difference between the plugin knowing where it is and merely having
+ * been told once. Everything path-gated in this half — the bulk dialog's rows, the
+ * edit page's block, every write's gallery id — hangs off this answer. Trusting
+ * the remembered value makes all of it depend on one listener having been
+ * registered and every event having arrived; reading the URL makes the worst case
+ * "the answer is right but nothing redrew", which a route change fixes on its own
+ * because a navigation redraws the page anyway. Where the browser cannot answer
+ * (an empty pathname, which is no browser this runs in), the remembered path is
+ * the fallback rather than nothing.
+ *
+ * A Stash whose routes lived after a `#` would answer "/" here, and this would
+ * make the plugin do nothing rather than act on the wrong gallery — the safe
+ * direction, and one MangaTools.diag() reports as a plain disagreement.
+ */
+function pathNow(): string {
+  return window.location.pathname || currentPath || "";
+}
 
 function emit(): void {
   listeners.forEach((fn) => {
@@ -326,7 +374,7 @@ function useGlobalVersion(): number {
  * dialog opens over the gallery list at /galleries.
  */
 function isGalleryContext(): boolean {
-  return currentPath.indexOf("/galleries") === 0;
+  return pathNow().indexOf("/galleries") === 0;
 }
 
 /**
@@ -338,7 +386,7 @@ function isGalleryContext(): boolean {
  * needs to know the plugin is on a gallery page at all.
  */
 function currentGalleryId(): string {
-  const m = /^\/galleries\/(\d+)(?:\/|$)/.exec(currentPath);
+  const m = /^\/galleries\/(\d+)(?:\/|$)/.exec(pathNow());
   return m ? m[1] : "";
 }
 
@@ -779,16 +827,12 @@ function start(): void {
     );
   }
 
-  refresh();
-  refreshSettings();
-
-  // Saving an edit does not change the route, so a slow poll acts as a
-  // backstop. The query only pulls id + custom_fields, so it is small.
-  window.setInterval(() => {
-    if (document.visibilityState === "visible") refresh();
-  }, REFRESH_MS);
-
+  // **The route listener goes on first**, before anything that can fail. It is what
+  // a navigation is noticed by — every path-gated thing in this half redraws off
+  // it — and it used to be the last statement here, behind two network calls. The
+  // one failure that costs the most was therefore the one most easily reached.
   if (PluginApi.Event?.addEventListener) {
+    locationListener = true;
     PluginApi.Event.addEventListener("stash:location", (e) => {
       const ev = e as LocationEvent;
       const loc = ev?.detail?.data?.location;
@@ -798,7 +842,26 @@ function start(): void {
       // Tell subscribers to recompute isGalleryContext()
       emit();
     });
+  } else {
+    // Loud, because it is silent otherwise: with no event the plugin still reads
+    // the right path (see pathNow), but it only *notices* a change when something
+    // else redraws — so the symptom is a row that appears a page late or not at
+    // all, which is exactly the symptom this guard used to hide.
+    console.error(
+      "[mangaTools] Stash has no stash:location event, so the plugin will not " +
+        "hear about navigation on its own; rows it gates on the route may only " +
+        "appear once something else redraws. MangaTools.diag() reports this."
+    );
   }
+
+  refresh();
+  refreshSettings();
+
+  // Saving an edit does not change the route, so a slow poll acts as a
+  // backstop. The query only pulls id + custom_fields, so it is small.
+  window.setInterval(() => {
+    if (document.visibilityState === "visible") refresh();
+  }, REFRESH_MS);
 }
 
 /**
@@ -3822,7 +3885,42 @@ function BulkFieldsRow() {
     []
   );
 
-  if (!isGalleryContext() || !Select || !host) return null;
+  // Counted, not logged: whether this component ever ran is what tells a bug in
+  // the dialog apart from a bug in whatever mounts it, and a count is the only
+  // form of that answer which does not depend on watching the console at the
+  // right moment. MangaTools.diag() reports it.
+  bulkRenders += 1;
+
+  if (!isGalleryContext() || !Select || !host) {
+    // The three ways to draw nothing, each said once. The first is the one worth
+    // having: a dialog asking to be filled in, on a page the plugin reads as
+    // somewhere else, is a disagreement between two things that should never
+    // disagree — and it used to produce no output of any kind.
+    if (!isGalleryContext() && bulkAnchor()) {
+      noteOnce(
+        "bulk-not-gallery",
+        'the gallery bulk edit dialog is open, but the plugin reads "' +
+          pathNow() +
+          '" as the current route, so it does not draw its manga rows there. ' +
+          "MangaTools.diag() reports what it sees."
+      );
+    } else if (isGalleryContext() && !Select) {
+      noteOnce(
+        "bulk-no-select",
+        "Stash's react-select is not available, so the manga rows in the bulk " +
+          "edit dialog are not drawn"
+      );
+    } else if (isGalleryContext() && !host) {
+      noteOnce(
+        "bulk-no-host",
+        "the bulk edit dialog's mount point could not be placed — " +
+          BULK_ANCHOR +
+          " was not found inside the dialog's own form"
+      );
+    }
+
+    return null;
+  }
 
   const cls = readNativeFieldClasses(bulkAnchor()) || {
     group: "row",
@@ -4613,6 +4711,49 @@ function ensureFieldHost(): HTMLElement | null {
 function ensureBulkFieldHost(): HTMLElement | null {
   return ensureHostAfter(bulkAnchor(), "bulk");
 }
+
+/**
+ * What this half makes of the page it is on, for a console.
+ *
+ * `MangaTools.diag()` — nothing in the plugin reads it. It exists because this
+ * file keeps meeting the same shape of failure: a row that should be on the page
+ * is not, and the console says nothing at all, because the two things that decide
+ * it — a patch onto a component name Stash may not have, and a guard reading a
+ * route the plugin may never have learned — are both silent by construction.
+ * `noteFired` covers the first. This covers the rest, by reporting the inputs
+ * those guards read rather than the conclusion they reached:
+ *
+ *   url / path          the browser's path, the path checks' answer, and the last
+ *                       one Stash announced. A disagreement here is the whole of
+ *                       one entire class of bug (see pathNow)
+ *   locationListener    whether the plugin hears about navigation at all
+ *   bulkRenders         whether the bulk rows ever ran — 0 with a dialog open means
+ *                       the RatingSystem patch did not fire, not that a guard said no
+ *   bulkAnchor / hosts  where the rows would go, and whether that mount point is
+ *                       actually on the page ("detached" is a node React has
+ *                       dropped out of the document while the plugin still portals
+ *                       into it)
+ */
+NS.diag = () => ({
+  url: window.location.pathname || "",
+  path: pathNow(),
+  rememberedPath: currentPath,
+  galleryContext: isGalleryContext(),
+  galleryId: currentGalleryId(),
+  started,
+  locationListener,
+  eventApi: !!PluginApi.Event?.addEventListener,
+  bulkRenders,
+  bulkAnchor: !!bulkAnchor(),
+  hosts: Object.keys(fieldHosts).map((key): [string, string] => [
+    key,
+    fieldHosts[key]
+      ? fieldHosts[key]?.parentNode
+        ? "attached"
+        : "detached"
+      : "none",
+  ]),
+});
 
 /**
  * Localised text for the "language" label.

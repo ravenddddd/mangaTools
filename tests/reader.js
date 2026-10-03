@@ -8242,6 +8242,45 @@ async function main() {
     }
   );
 
+  await runSection(
+    "a Stash with no location event is reported, not silently survived",
+    async () => {
+      const window = dom.window;
+      const eventApi = window.PluginApi.Event;
+      const errorsAt = loggedErrors.length;
+
+      // A plugin API with no event target. The path checks read the URL (see
+      // pathNow), so the tools half still knows where it is — what it loses is
+      // *noticing* a navigation on its own, which is the shape of half-working
+      // that has to be said out loud: the symptom otherwise is a row that appears
+      // a page late or not at all, and a console with nothing in it.
+      delete window.PluginApi.Event;
+      delete require.cache[require.resolve(BUNDLE)];
+      require(BUNDLE);
+      // Read before the API is put back: `eventApi` is a live reading of Stash's
+      // API, `locationListener` is what this load actually managed to do.
+      const diag = window.MangaTools.diag();
+      window.PluginApi.Event = eventApi;
+
+      assert.ok(
+        errorsSince(errorsAt).some((line) =>
+          /no stash:location event/.test(line)
+        ),
+        "a plugin that cannot hear about navigation says so"
+      );
+      assert.strictEqual(
+        diag.eventApi,
+        false,
+        "and diag() reports it, for the case where nobody was watching the console"
+      );
+      assert.strictEqual(
+        diag.locationListener,
+        false,
+        "…along with whether the listener got onto it"
+      );
+    }
+  );
+
   /**
    * The test world's own rules, which every other section in this file reads through.
    *

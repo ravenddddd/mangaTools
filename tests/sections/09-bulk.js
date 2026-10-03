@@ -12,6 +12,7 @@ const {
   find,
   globalListeners,
   loggedErrors,
+  loggedWarnings,
   makeEl,
   mutationWrites,
   patchedBefore,
@@ -503,6 +504,107 @@ module.exports = () => {
     "clearing must not write anything"
   );
   assert.strictEqual(r14.completed, null);
+
+  // ── 14f. Where the route comes from: the URL, not a remembered value ──
+  //
+  // Reported: the bulk rows gone, on a gallery page, with nothing on the console.
+  // The plugin used to take its path from the last `stash:location` it had been
+  // handed, so a navigation it never heard about — the listener never registered,
+  // an event that never arrived — left every path-gated row reading a stale answer
+  // for the rest of the session. It reads the URL now, which is the thing that is
+  // actually current; the event only says *when* to redraw.
+  //
+  // Both directions are asserted, because each one alone passes on the wrong
+  // implementation: a remembered path that says "gallery" while the URL says
+  // otherwise must not draw the rows, and a remembered path that says otherwise
+  // while the URL says "gallery" must.
+  global.window.location.pathname = "/scenes/5";
+  globalListeners["stash:location"]({
+    detail: { data: { location: { pathname: "/galleries" } } },
+  });
+  // The event settled the remembered path on /galleries — and, as in a browser,
+  // moved the URL with it. Now the URL moves on alone.
+  global.window.location.pathname = "/scenes/5";
+  // Asserted as a boolean, here and below: a portal compared against null makes
+  // Node print the whole fixture DOM as the failure message, which is enough text
+  // to exhaust the heap instead of reporting anything.
+  assert.ok(
+    !bulkRow(),
+    "the URL decides, even with a remembered path that says gallery"
+  );
+
+  global.window.location.pathname = "/galleries";
+  assert.ok(
+    !!bulkRow(),
+    "…and the rows draw from the URL alone, with no event of any kind"
+  );
+
+  // The guard says why, once. It is the only symptom this failure has: an empty
+  // slot in a dialog, and a console that used to say nothing at all.
+  const said = loggedWarnings.filter((line) =>
+    /bulk edit dialog is open/.test(line)
+  );
+  assert.strictEqual(said.length, 1, "the route guard reports itself once");
+  assert.ok(
+    /\/scenes\/5/.test(said[0]),
+    "naming the path it read, which is the thing to compare against the URL"
+  );
+
+  // ── 14g. MangaTools.diag(): the readings those guards make ──
+  //
+  // Asserted because it is what a future "nothing drew and nothing was said" gets
+  // debugged with, and a diagnostic that lies is worse than none. Every field is a
+  // reading rather than a conclusion — the two paths are reported apart so that a
+  // disagreement is visible instead of resolved.
+  const diag = NS.diag();
+  assert.strictEqual(diag.url, "/galleries", "diag reports the URL's path");
+  assert.strictEqual(
+    diag.path,
+    "/galleries",
+    "…and the path the guards answer with"
+  );
+  assert.strictEqual(
+    diag.rememberedPath,
+    "/galleries",
+    "…and the last announced one"
+  );
+  assert.strictEqual(diag.galleryContext, true);
+  assert.strictEqual(
+    diag.bulkAnchor,
+    true,
+    "the dialog's anchor is on the page"
+  );
+  assert.strictEqual(diag.started, true);
+  assert.strictEqual(diag.eventApi, true);
+  assert.strictEqual(
+    diag.locationListener,
+    true,
+    "and the route listener is on"
+  );
+  assert.ok(diag.bulkRenders > 0, "the rows have rendered");
+  assert.deepStrictEqual(
+    diag.hosts.find(([key]) => key === "bulk"),
+    ["bulk", "attached"],
+    "and their mount point is on the page, not a node React has dropped"
+  );
+
+  global.window.location.pathname = "/scenes/5";
+  const offRoute = NS.diag();
+  assert.strictEqual(offRoute.url, "/scenes/5");
+  // Asserted *while the two disagree*, which is the only time this says anything:
+  // with the event and the URL agreeing, a diag reporting either one passes.
+  assert.strictEqual(
+    offRoute.path,
+    "/scenes/5",
+    "the path the guards answer with is the URL's, not the remembered one"
+  );
+  assert.strictEqual(
+    offRoute.rememberedPath,
+    "/galleries",
+    "the two paths are reported side by side, so a disagreement can be read off"
+  );
+  assert.strictEqual(offRoute.galleryContext, false);
+  global.window.location.pathname = "/galleries";
 
   // The route is checked by the injection itself, not only by the rows being
   // mounted: a value left pending must not be written once the route has moved on.

@@ -1417,6 +1417,26 @@ places: the build asks whether it can be read at all; the suite asks whether it 
 expects. That is what the one runtime-shaped dependency in this repository is for — `js-yaml` is
 a devDependency, and nothing it does reaches the bundle.
 
+**The route comes from the address bar, not from the last event Stash sent.** Every path-gated
+thing in the tools half — the bulk dialog's rows, the edit page's block, the gallery id a write
+goes to — used to be decided by a variable that only the `stash:location` listener ever wrote.
+That made all of it depend on one listener being registered and every event arriving, and when
+they did not the plugin spent the rest of the session reading a stale path: rows simply absent,
+nothing on the console. It reads `window.location.pathname` now, which is always the current one
+(the reader half always did); the event is what makes a navigation *redraw*. The degradation is
+deliberate in one direction only — a Stash whose routes lived after a `#` would answer `/`, and
+the plugin would rather do nothing than act on the wrong gallery.
+
+**When something is missing from the page, ask the plugin.** `MangaTools.diag()` in the browser
+console reports what the tools half makes of where it is: the path it read, the path Stash last
+announced, whether that is a gallery context, whether the route listener registered, whether the
+bulk dialog's anchor is on the page, and whether the mount point it portals into is still attached
+(`detached` is the one React has dropped out of the document underneath it). Those are *readings*,
+not verdicts, because the failures they exist for have no other symptom: a patch onto a component
+name Stash does not have never runs, and a guard that reads a stale path draws nothing — both by
+construction silent. `noteFired` covers the first (`patch active: <name>`, once per target); the
+guards now name themselves too, once each, on `console.warn`.
+
 `tests/` is not packaged — the zip holds only what the entry point bundles plus
 the `.yml`, `.css` and `.md` copied in beside it, so the spec never reaches a
 user's plugins folder.

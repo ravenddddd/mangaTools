@@ -724,6 +724,16 @@ const PluginApi = {
 
       if (!globalListeners[name]) {
         globalListeners[name] = (event) => {
+          // **The address bar moves with the event**, because in a browser it has
+          // already moved by the time Stash dispatches: `stash:location` reports a
+          // navigation, it does not cause one. The tools half reads the current path
+          // from the URL (the reader half always has), so a test that fired the
+          // event without moving the URL would be modelling a navigation that never
+          // happened — and would pass on a plugin that was reading a stale path.
+          const moved = event?.detail?.data?.location;
+          if (name === "stash:location" && moved?.pathname) {
+            global.window.location.pathname = moved.pathname;
+          }
           for (const fn of eventListeners[name]) fn(event);
         };
       }
@@ -909,6 +919,21 @@ const realConsoleError = console.error;
 console.error = (...args) => {
   loggedErrors.push(args.map((a) => String(a)).join(" "));
   realConsoleError.apply(console, args);
+};
+
+/**
+ * The same, for `console.warn` — where the plugin reports a case "worth knowing
+ * about rather than a bug": a guard that decided not to draw something, and why.
+ *
+ * Those lines are the only symptom that class of failure has, which is precisely
+ * why they are worth asserting: a diagnostic nothing checks is a diagnostic that
+ * quietly stops being printed.
+ */
+const loggedWarnings = [];
+const realConsoleWarn = console.warn;
+console.warn = (...args) => {
+  loggedWarnings.push(args.map((a) => String(a)).join(" "));
+  realConsoleWarn.apply(console, args);
 };
 
 const BUNDLE = require.resolve(path.join(PLUGIN, "mangaTools.js"));
@@ -1161,6 +1186,7 @@ module.exports = {
   hasText,
   historyReplaces,
   loggedErrors,
+  loggedWarnings,
   makeEl,
   makeFilterModel,
   mangaConditionsOf,

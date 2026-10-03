@@ -103,6 +103,37 @@ export type MangaToolsFieldName =
   | "translationGroup"
   | "original";
 
+/**
+ * What MangaTools.diag() answers: the inputs the route and mount guards read.
+ *
+ * Every field is a *reading*, not a conclusion about whether something is wrong —
+ * a path that disagrees with the URL, a listener that never registered, a mount
+ * point React has dropped out of the document. See diag in tools/index.tsx for
+ * what each one means and which failure it names.
+ */
+export interface MangaToolsDiagnostics {
+  /** The browser's own path — the address bar Stash's routes live in */
+  url: string;
+  /** The path the plugin's guards answer with (pathNow) */
+  path: string;
+  /** What `stash:location` last announced, which may be older than url */
+  rememberedPath: string;
+  galleryContext: boolean;
+  galleryId: string;
+  /** Whether the tools half's start() has run */
+  started: boolean;
+  /** Whether it managed to subscribe to `stash:location` */
+  locationListener: boolean;
+  /** Whether Stash offers that event at all */
+  eventApi: boolean;
+  /** How many times the bulk dialog's rows have rendered */
+  bulkRenders: number;
+  /** Whether the bulk dialog's anchor — the row they mount beside — is on the page */
+  bulkAnchor: boolean;
+  /** Per mount point: "attached", "detached" (React dropped the node), or "none" */
+  hosts: [string, string][];
+}
+
 export interface MangaToolsNamespace {
   LANGUAGES: { [code: string]: MangaToolsLanguage };
   FALLBACK_LOCALE: string;
@@ -343,6 +374,13 @@ export interface MangaToolsNamespace {
    */
   showDisabledFields: boolean;
   parseFlag(raw: unknown, fallback: boolean): boolean;
+
+  /**
+   * What the tools half makes of the page it is on. For a console, not for code:
+   * `MangaTools.diag()` in the browser, when something this plugin draws is
+   * missing from the page and the console says nothing about why.
+   */
+  diag(): MangaToolsDiagnostics;
 
   /**
    * The language part of Stash's filter model, as the sidebar section sees it.
