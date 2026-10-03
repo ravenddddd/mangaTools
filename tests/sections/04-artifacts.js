@@ -229,6 +229,27 @@ module.exports = () => {
       "date and the language on the badge come out heavier and tighter than they " +
       "are on a real card"
   );
+  // ── The switch column ──────────────────────────────────────────────
+  // Every switch on this page is on one vertical line, and the group indent is what
+  // could break that: a `margin-left` moves a group's box right without narrowing
+  // it, so with Bootstrap's `box-sizing: border-box` the rows inside it end a few
+  // pixels further right than the rows outside — 6px a level, measured — and the
+  // switches step outwards as the page nests. The indent is therefore padding, which
+  // narrows the box instead, and the right edge stays where the level above had it.
+  const groupIndentRule = /\.manga-tools-settings-group\s*\{([^}]*)\}/.exec(
+    css
+  );
+  assert.ok(groupIndentRule, "the group needs a rule of its own");
+  assert.ok(
+    /padding-left:\s*\d/.test(groupIndentRule[1]),
+    "a group should indent with padding"
+  );
+  assert.ok(
+    !/margin-left/.test(groupIndentRule[1]),
+    "…and never with a margin, or every switch inside it steps outwards from the " +
+      "ones above: the box would move right without getting narrower"
+  );
+
   // ── Folding a group shut ───────────────────────────────────────────
   // The chevron goes in the gutter to the left of a heading. Three things make
   // that work and each can fail on its own.

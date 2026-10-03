@@ -620,6 +620,12 @@ none, since their notes moved into their descriptions. The state is a set of ids
 outside React, for the same reason the settings are: this page is redrawn on every
 switch and the tests' React stub has no working state setter.
 
+**The switch column is one vertical line**, and the group indent has to respect it:
+an indent is always padding and never a margin. A `margin-left` moves a group's box
+right without narrowing it, so with Bootstrap's `box-sizing: border-box` the rows
+inside end a few pixels further right than the rows outside — six pixels a level,
+measured — and the switches step outwards as the page nests.
+
 **And the lines between rows were tidied.** Stash draws one under every row that is
 not its parent's last child, which across nested groups means a line between every
 pair of rows *and* another at every group boundary — the page read as a table. This

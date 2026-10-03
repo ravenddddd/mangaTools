@@ -433,10 +433,16 @@
  * stylesheet might not be applying; it read as a table cell rather than as nesting,
  * and the rows already have 2.5rem of Stash's indent behind them (see the heading
  * rule below) for the extra step to be visible against.
+ *
+ * The indent is all padding, and that is load-bearing rather than a preference: a
+ * `margin-left` shifts the group's box right without narrowing it, so with
+ * Bootstrap's `box-sizing: border-box` the rows inside it end a little further right
+ * than the rows outside — 6px a level, and every switch on the page is supposed to
+ * be on one vertical line. Padding narrows the box instead, so the right edge stays
+ * where the level above had it.
  */
 .manga-tools-settings-group {
-  margin-left: 0.35rem;
-  padding-left: 0.9rem;
+  padding-left: 1.25rem;
 }
 
 /*
