@@ -560,9 +560,19 @@
 }
 
 /*
- * Asleep: out of sight, and taking no pointers. An invisible strip across the bottom
- * of the picture that still caught clicks would be sixteen pixels of the page that
- * no longer turn it.
+ * Asleep: out of sight — and still taking pointers, which is the half this note used to
+ * get wrong. The pointer reaching the bar is one of the two things that wakes it, so a
+ * bar with `pointer-events: none` while it is asleep would be a bar nothing can bring
+ * back with a hand. The strip therefore answers whether or not it is drawn.
+ *
+ * What that costs is nothing where the bar sits in the flow: its own row between the
+ * picture and the footer, over nothing anybody else wants. In the column it is an
+ * overlay instead, but the fit leaves its room free on both sides (see `columnFitted` in
+ * scroll.ts), so at the size the mode opens at the strip lies over the margin beside the
+ * page. Past that fit — a zoom the reader asked for — the pages do run under it, and a
+ * press out there scrubs the book rather than panning the column: the bar being a
+ * control rather than a decoration, and a control that answered only where its four
+ * pixels of paint are would be one nobody could grab.
  */
 .manga-reader-progress.is-idle {
   opacity: 0;

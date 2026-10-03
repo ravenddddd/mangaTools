@@ -880,6 +880,24 @@ module.exports = () => {
       "from pages that have not been laid out on the first pass"
   );
 
+  // Asleep is out of sight and nothing else. The pointer reaching the bar is one of the
+  // two things that wakes it — a turn is the other — so `pointer-events: none` here
+  // would be a bar nothing can bring back with a hand. What the invisible strip costs in
+  // the column is written down where the rule is: its room is reserved by the fit, and
+  // past that fit it is the bar's four pixels of paint being grabbable.
+  const idleRule = /\.manga-reader-progress\.is-idle\s*\{([^}]*)\}/.exec(
+    readerCss
+  );
+  assert.ok(
+    idleRule,
+    "the bar needs a rule for the state it spends most of its time in"
+  );
+  assert.ok(
+    /opacity:\s*0/.test(idleRule[1]) && !/pointer-events/.test(idleRule[1]),
+    "asleep should be out of sight only: a bar that takes no pointers cannot be woken " +
+      "by the pointer that has reached it, which is the wake a reader uses most"
+  );
+
   // A chapter's tick is a block of white on the line, drawn inside a box the height of
   // the track: what is seen is inside the bar, and what answers to the pointer is a
   // target the size of the one the line itself offers.
