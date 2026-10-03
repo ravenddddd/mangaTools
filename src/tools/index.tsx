@@ -64,7 +64,7 @@ import {
   publishSidebarFilter,
 } from "./sidebar-filter";
 import type { ReactNode } from "react";
-import type { MangaToolsFieldName, MangaToolsFilterModel } from "../plugin-api";
+import type { MangaToolsFilterModel } from "../plugin-api";
 import type {
   MangaToolsApolloClient,
   MangaToolsApolloOperation,
