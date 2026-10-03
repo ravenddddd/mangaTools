@@ -38,7 +38,7 @@
 
   "mangaTools.settings.manageChapters.heading": "Take over the Chapters tab",
   "mangaTools.settings.manageChapters.description": "Creating and editing chapters is this plugin's job, and writing them stores this plugin's own chapter field. Stash's existing chapters are brought over quietly, and are never modified.",
-  "mangaTools.settings.manageChapters.warning": "From here on, editing chapters does not touch Stash's own chapter rows.",
+  "mangaTools.settings.manageChapters.note": "From here on, editing chapters does not touch Stash's own chapter rows.",
 
   "mangaTools.settings.fields.heading": "Custom fields",
   "mangaTools.settings.fields.description": "The plugin's fields are written as custom fields, so none of Stash's own data is touched. Turning one off does not clear the values already on your galleries.",

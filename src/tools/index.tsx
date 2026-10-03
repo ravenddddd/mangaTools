@@ -3068,19 +3068,28 @@ function MangaToolsSettings() {
       />
 
       {/* ── The chapters tab ─────────────────────────────────────────────── */}
+      {/* No children, and a boxed note inside the description — the same shape as
+          the lightbox above, because it is the same kind of sentence: what this
+          row is about, said in one more line. What it used to be was a row of its
+          own under the switch, with `role="alert"` on it, which is a role for a
+          message that appears in response to something rather than for a sentence
+          that is always part of the row. */}
       <SettingSwitch
         id="mangaTools-manageChapters"
         heading={t(intl, "mangaTools.settings.manageChapters.heading")}
-        subHeading={t(intl, "mangaTools.settings.manageChapters.description")}
+        subHeading={
+          <>
+            {t(intl, "mangaTools.settings.manageChapters.description")}
+            <SettingsNote>
+              {t(intl, "mangaTools.settings.manageChapters.note")}
+            </SettingsNote>
+          </>
+        }
         checked={NS.manageChapters}
         onChange={writeFlag((next) => {
           NS.manageChapters = next;
         })}
-      >
-        <div className="manga-tools-settings-warning" role="alert">
-          {t(intl, "mangaTools.settings.manageChapters.warning")}
-        </div>
-      </SettingSwitch>
+      />
 
       {/* ── The four fields, and how what they hold is shown ─────────────── */}
       <SettingSwitch

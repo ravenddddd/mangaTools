@@ -526,12 +526,18 @@ module.exports = () => {
     "and so are the three display rows"
   );
 
-  // ── The lightbox's note, inside its description ────────────────────
-  // "The lightbox's own settings are adjusted on the lightbox page" used to be a
-  // row of its own under the switch, in the same grey as the description — a line
-  // of grey prose under a longer line of grey prose. It is now the second half of
-  // that row's description, and it stays there with the switch off, because the
-  // description is always drawn and this is part of what it says.
+  // ── The two notes, inside their rows' descriptions ─────────────────
+  // "The lightbox's own settings are adjusted on the lightbox page" and "editing
+  // chapters does not touch Stash's own rows" were each a row of their own under
+  // their switch, in the same grey as the description — a line of grey prose under
+  // a longer line of grey prose, which is a line nobody reads. Each is now the
+  // second half of its own row's description, boxed; and each stays there with its
+  // switch off, because a description is always drawn and this is part of what it
+  // says.
+  const NOTE_ROWS = [
+    ["the lightbox", "readerTakeover"],
+    ["the chapters tab", "manageChapters"],
+  ];
   const stringsIn = (el) => {
     const out = [];
     find(el, (n) => {
@@ -557,66 +563,77 @@ module.exports = () => {
   };
 
   const localeHere = state.currentLocale;
-  const noteOf = (locale) => {
+  const pageIn = (locale) => {
     state.currentLocale = locale;
-    const el = call("PluginSettings", { pluginID: "mangaTools" });
-    const notes = withClass(el, "manga-tools-settings-note");
-    assert.strictEqual(notes.length, 1, `${locale}: there should be one note`);
-    return { note: notes[0], page: el };
+    return call("PluginSettings", { pluginID: "mangaTools" });
   };
 
-  {
-    const { note, page } = noteOf("zh-Hans");
-    const cat = NS.catalogs()["zh-Hans"];
-    // Inside a description, and it is the lightbox's: the description that carries
-    // the note is the one that carries the lightbox's own sentence as well.
-    const descriptions = withClass(page, "sub-heading").filter((d) =>
-      stringsIn(d).includes(cat["mangaTools.settings.readerTakeover.note"])
-    );
+  // Each row's note is found by its own catalogue words, so that a note drawn with
+  // another row's sentence — or in another row's column — is what the checks below
+  // are looking at rather than the count being right by accident.
+  const notesIn = (page, locale) => {
+    const cat = NS.catalogs()[locale];
+    const notes = withClass(page, "manga-tools-settings-note");
     assert.strictEqual(
-      descriptions.length,
-      1,
-      "the note should sit inside exactly one description block"
+      notes.length,
+      NOTE_ROWS.length,
+      `${locale}: each row that says a second thing should have one note, and ` +
+        "nothing else on the page should"
     );
-    assert.ok(
-      stringsIn(descriptions[0]).includes(
-        cat["mangaTools.settings.readerTakeover.description"]
-      ),
-      "…and that block should be the lightbox's own description, not another row's"
-    );
-    assert.ok(
-      stringsIn(note).includes(cat["mangaTools.settings.readerTakeover.note"]),
-      "the note's words should come from the catalogue"
-    );
-    assert.strictEqual(
-      find(note, (n) => n.type === "Icon").props.icon,
-      "faInfoCircle",
-      "the note should carry the info icon, which is what makes it read as a remark"
-    );
+    return NOTE_ROWS.map(([name, key]) => {
+      const words = cat[`mangaTools.settings.${key}.note`];
+      const mine = notes.filter((n) => stringsIn(n).includes(words));
+      assert.strictEqual(
+        mine.length,
+        1,
+        `${locale}: ${name}'s note should carry ${key}.note's own words`
+      );
+      return { name, key, note: mine[0], page, cat };
+    });
+  };
+
+  for (const locale of ["zh-Hans", "en"]) {
+    for (const { name, key, note, page, cat } of notesIn(
+      pageIn(locale),
+      locale
+    )) {
+      const descriptions = withClass(page, "sub-heading").filter((d) =>
+        stringsIn(d).includes(cat[`mangaTools.settings.${key}.note`])
+      );
+      assert.strictEqual(
+        descriptions.length,
+        1,
+        `${locale}: ${name}'s note should sit inside exactly one description block`
+      );
+      assert.ok(
+        stringsIn(descriptions[0]).includes(
+          cat[`mangaTools.settings.${key}.description`]
+        ),
+        `${locale}: …and that block should be ${name}'s own description, not ` +
+          "another row's"
+      );
+      assert.strictEqual(
+        find(note, (n) => n.type === "Icon").props.icon,
+        "faInfoCircle",
+        `${locale}: the note should carry the info icon, which is what makes it ` +
+          "read as a remark rather than as the description's next clause"
+      );
+    }
   }
 
-  // A locale's own words, checked the same way, so a hardcoded line would show.
-  {
-    const { note } = noteOf("en");
-    assert.ok(
-      stringsIn(note).includes(
-        NS.catalogs().en["mangaTools.settings.readerTakeover.note"]
-      ),
-      "en: the note's words should come from the catalogue too"
-    );
-  }
-
-  // …and it does not go away with the switch: it is the description, not a
-  // sub-setting that appears under one.
+  // …and neither goes away with its switch: they are the descriptions, not
+  // sub-settings that appear under one.
   NS.readerTakeover = false;
-  const off = call("PluginSettings", { pluginID: "mangaTools" });
+  NS.manageChapters = false;
+  const bothOff = call("PluginSettings", { pluginID: "mangaTools" });
   assert.strictEqual(
-    withClass(off, "manga-tools-settings-note").length,
-    1,
-    "the note belongs to the description, so turning the feature off leaves it " +
-      "where it is — the row still says where the lightbox's settings live"
+    withClass(bothOff, "manga-tools-settings-note").length,
+    NOTE_ROWS.length,
+    "both notes belong to their descriptions, so turning the features off leaves " +
+      "them where they are"
   );
   NS.readerTakeover = true;
+  NS.manageChapters = true;
   state.currentLocale = localeHere;
 
   // ── The "?" and the example it opens ──────────────────────────────

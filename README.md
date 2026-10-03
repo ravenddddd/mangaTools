@@ -601,22 +601,22 @@ while the switch they belong to is on**:
 | Group | Holds |
 |---|---|
 | **Take over Stash's lightbox** | the switch, and — inside its description — a boxed note that the lightbox's own settings are changed on the lightbox |
-| **Take over the Chapters tab** | the switch, and — while it is on — what it commits to: from then on, editing chapters does not touch Stash's own chapter rows |
+| **Take over the Chapters tab** | the switch, and — inside its description — a boxed note on what it commits to: from then on, editing chapters does not touch Stash's own chapter rows |
 | **Custom fields** | the master switch; then one switch per field, with the language's own settings under it; then a heading for the three rows that are not fields |
 | **The manga mark** | three siblings under a heading: unmarking, what unmarking clears, and the mark's icon on covers |
 
 Hiding is not writing. A switch turned off and on again comes back with exactly the
 sub-settings it had, and the same goes for the field values on the galleries.
 
-**The lightbox's note is the second half of that row's description.** "Where the
-lightbox's own settings live" is one of the two things the sentence under that switch
-is saying, so it belongs in it rather than in a row of its own — and it is boxed and
-tinted, because a line of grey prose under a longer line of grey prose is a line
-nobody reads. Its icon and its words are a flex row centred against each other rather
-than an icon set on the text's baseline, which sits a little low at some sizes and is
-the kind of misalignment that reads as "something is off" without being nameable. It
-stays where it is when the switch is off: the description is always drawn, and this is
-part of what it says.
+**Two rows say a second thing, and it is the second half of their description.**
+"Where the lightbox's own settings live" and "editing chapters does not touch Stash's
+own rows" are each one of the two things the sentence under that switch is saying, so
+each belongs in it rather than in a row of its own — and each is boxed and tinted,
+because a line of grey prose under a longer line of grey prose is a line nobody reads.
+The icon and the words are a flex row centred against each other rather than an icon
+set on the text's baseline, which sits a little low at some sizes and is the kind of
+misalignment that reads as "something is off" without being nameable. Neither goes
+away with its switch: a description is always drawn, and this is part of what it says.
 
 **The four fields.** Language, censorship, translation group and raw, each with its own
 switch under the master. Turned off, a field leaves every surface it appears on — the

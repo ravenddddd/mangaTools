@@ -677,16 +677,6 @@
 }
 
 /*
- * One line that sits where a sub-setting would and is not a setting: what turning
- * the chapters switch on commits to. Muted and unboxed, so it does not read as
- * something to click.
- */
-.manga-tools-settings-warning {
-  font-size: 0.85rem;
-  padding: 0.25rem 0 0.5rem;
-}
-
-/*
  * The lightbox's note, inside that row's description: boxed and tinted so it is
  * read as a remark rather than as the description's next sentence — which is what
  * it was, in the same grey, and nobody read it.

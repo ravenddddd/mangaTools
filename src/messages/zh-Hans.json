@@ -38,7 +38,7 @@
 
   "mangaTools.settings.manageChapters.heading": "接管 Stash 的章节系统",
   "mangaTools.settings.manageChapters.description": "标签页的创建和编辑由插件接管，写入插件自己的章节字段。已存在的 Stash 原生章节会被静默导入，但不会被修改。",
-  "mangaTools.settings.manageChapters.warning": "开启后，对章节的任何编辑都不会修改 Stash 的原生章节。",
+  "mangaTools.settings.manageChapters.note": "开启后，对章节的任何编辑都不会修改 Stash 的原生章节。",
 
   "mangaTools.settings.fields.heading": "自定义字段",
   "mangaTools.settings.fields.description": "插件的字段通过写入 custom fields 添加，不影响原生数据；关掉任何一个，都不会清除画廊上已有的值。",
