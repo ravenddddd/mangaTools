@@ -42,7 +42,6 @@
 
   "mangaTools.settings.fields.heading": "自訂欄位",
   "mangaTools.settings.fields.description": "外掛的欄位透過寫入 custom fields 加入，不影響原生資料；關掉任何一個，都不會清除畫廊上已有的值。",
-  "mangaTools.settings.field.description": "關閉後，這個欄位從它出現的每一處消失：封面徽章、詳細行、編輯行、批量編輯和篩選器。畫廊上已有的值會保留。",
 
   "mangaTools.settings.enabledLanguages.heading": "啟用的語言",
   "mangaTools.settings.enabledLanguages.description": "只有這些語言會出現在編輯頁的下拉選單裡。顯示方式（封面徽章和詳細頁那一行）不受影響。留空表示顯示全部語言。",

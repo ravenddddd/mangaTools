@@ -3024,10 +3024,9 @@ function MangaToolsSettings() {
 
   if (!Select) return null;
 
-  // One description for four switches. What turning a field off does is the same
-  // thing whichever field it is, and four copies of one sentence would read as four
-  // different promises.
-  const fieldDescription = t(intl, "mangaTools.settings.field.description");
+  // No description on a field's own switch: heading and switch is the whole of
+  // what it has to say, and what turning one off does — including that the values
+  // stay on the galleries — is said once, on the master switch above.
   const field = (
     id: string,
     heading: string,
@@ -3037,7 +3036,6 @@ function MangaToolsSettings() {
     <BooleanSetting
       id={id}
       heading={heading}
-      subHeading={fieldDescription}
       checked={showing()}
       onChange={writeFlag(set)}
     />
@@ -3104,7 +3102,6 @@ function MangaToolsSettings() {
         <SettingSwitch
           id="mangaTools-fieldLanguage"
           heading={fieldLabel(intl)}
-          subHeading={fieldDescription}
           checked={NS.fieldLanguage}
           onChange={writeFlag((next) => {
             NS.fieldLanguage = next;
