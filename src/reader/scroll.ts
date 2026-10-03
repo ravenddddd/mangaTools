@@ -71,6 +71,26 @@ export function columnZoom(): number {
 }
 
 /**
+ * How wide a page is fitted in the column, given the picture area.
+ *
+ * The area's width — or its height, whichever is smaller. Filling the width is right
+ * on a window that is taller than it is wide, and too much on one that is not: a page
+ * as wide as a 1600×900 window is a page three and a half screenfuls tall, read by
+ * scrolling through it at a size that never shows a whole screenful of anything. So
+ * the fit is capped at the height, which is the rule the other two modes already
+ * follow — a page is never drawn larger than a screenful of it.
+ *
+ * It is a measurement and not a share of the box, which is why it is a number of pixels
+ * rather than a percentage: `min(width, height)` has no percentage form. Zero means the
+ * box has not been measured — a container not in the document yet, or the smoke tests'
+ * DOM, which has no layout — and the caller fills the box instead, as it always did.
+ */
+export function columnFitted(width: number, height: number): number {
+  if (!(width > 0) || !(height > 0)) return 0;
+  return Math.min(width, height);
+}
+
+/**
  * The zoom one notch further in or out, clamped to the same range the screen modes
  * use — the same numbers, because it is the same gesture and a reader who is used to
  * one should not find the other stopping somewhere else.
@@ -85,11 +105,26 @@ export function zoomedBy(current: number, factor: number): number {
 /** Draws the rows at the zoom in hand — the width, and the cap that keeps them sharp */
 export function setColumnZoom(next: number): number {
   zoom = next;
+  const fitted = column
+    ? columnFitted(column.clientWidth || 0, column.clientHeight || 0)
+    : 0;
+
   column?.querySelectorAll("." + CLASS_SCROLL_PAGE).forEach((row) => {
     const node = row as HTMLElement;
-    // The width is the zoom; the cap is the page's own pixels times it, so a page is
-    // never drawn wider than it was — the same rule as at 1:1, scaled.
+    // The page's own pixels: the zoom is a multiple of them, and the page is never
+    // drawn wider than it was — the same rule as at 1:1, scaled.
     const natural = Number(node.dataset.width || 0);
+
+    if (fitted > 0) {
+      node.style.width = zoom * fitted + "px";
+      node.style.maxWidth =
+        zoom * (natural > 0 ? Math.min(natural, fitted) : fitted) + "px";
+      return;
+    }
+
+    // Nothing measured yet — a box that is not in the document, or a DOM with no
+    // layout behind it. The page fills the box, as it did before there was a fit to
+    // take it off, and the first measurement replaces this.
     node.style.width = zoom * 100 + "%";
     if (natural > 0) node.style.maxWidth = zoom * natural + "px";
   });
@@ -188,3 +223,4 @@ export function rowOffset(into: HTMLElement, index: number): number | null {
 // window — see the note on MangaReaderNamespace in plugin-api.ts.
 NR.pageAtTop = pageAtTop;
 NR.zoomedBy = zoomedBy;
+NR.columnFitted = columnFitted;

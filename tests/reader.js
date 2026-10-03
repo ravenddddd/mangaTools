@@ -4616,6 +4616,42 @@ async function main() {
         "the lightbox is marked while the column is up"
       );
 
+      // What a *measured* box does, which is the whole of the fit's cap. The smoke DOM
+      // has no layout, so every size above is the fallback; this is the path a browser
+      // takes. The zoom is put back to the fit first, because it is the reader's rather
+      // than the column's and a section before this one left it a notch in — so the
+      // numbers below are the fit's own and nothing else's.
+      dom.click(box.lightbox.querySelector(".manga-reader-zoom"));
+      assert.strictEqual(
+        rows[0].style.width,
+        "100%",
+        "the reset puts the fit back"
+      );
+
+      container.clientWidth = 1600;
+      container.clientHeight = 900;
+      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+      assert.strictEqual(
+        rows[0].style.width,
+        "900px",
+        "landscape: a page is drawn as wide as the window is tall, not as wide as it is"
+      );
+      assert.strictEqual(
+        rows[0].style.maxWidth,
+        "900px",
+        "…and the page's own pixels only matter under that"
+      );
+
+      container.clientWidth = 700;
+      container.clientHeight = 1600;
+      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+      assert.strictEqual(
+        rows[0].style.width,
+        "700px",
+        "portrait: the width is the smaller one, so the page fills it — which is the " +
+          "behaviour this keeps"
+      );
+
       // Put back: the mode is the browser's setting, and a section that left the reader
       // in the column would be choosing it for every section after this one.
       dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
@@ -4726,6 +4762,35 @@ async function main() {
       NR.zoomedBy(NR.VIEW_MIN_ZOOM, 1 / 1.1),
       NR.VIEW_MIN_ZOOM,
       "…and at the bottom"
+    );
+
+    // What a page is fitted to, which is where "too big in landscape" was: the wider of
+    // the two is not the answer, the *smaller* is.
+    assert.strictEqual(
+      NR.columnFitted(1600, 900),
+      900,
+      "a window wider than it is tall fits a page to its height, so a page is never " +
+        "drawn three screenfuls tall"
+    );
+    assert.strictEqual(
+      NR.columnFitted(900, 1600),
+      900,
+      "a window taller than it is wide fills: the width is already the smaller one"
+    );
+    assert.strictEqual(
+      NR.columnFitted(900, 900),
+      900,
+      "and a square is the same either way"
+    );
+    assert.strictEqual(
+      NR.columnFitted(0, 900),
+      0,
+      "an unmeasured box is answered as zero, which is the caller's cue to fill it"
+    );
+    assert.strictEqual(
+      NR.columnFitted(undefined, undefined),
+      0,
+      "…however it is unmeasured, since the smoke tests' DOM has no layout at all"
     );
 
     const { box } = await startReader({ galleryId: "8", on: true });

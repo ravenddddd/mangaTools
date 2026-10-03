@@ -323,6 +323,12 @@ export interface MangaReaderNamespace {
    */
   zoomedBy(current: number, factor: number): number;
   /**
+   * How wide a page is fitted in the column, given the picture area — its width or its
+   * height, whichever is smaller. See scroll.ts. Here for the same reason as the two
+   * above: the tests' DOM has no layout, so the fit has to be callable on numbers.
+   */
+  columnFitted(width: number, height: number): number;
+  /**
    * How far a menu has to move sideways to be inside the window — see chrome.ts.
    *
    * Here rather than reached through the DOM for the same reason as the bar's

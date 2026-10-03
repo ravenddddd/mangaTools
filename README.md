@@ -837,17 +837,27 @@ the same thing in all three.
   counts; a screenful would be a measurement, and a different answer on every window.
   A click on a page does nothing — there is no page on either side of it — while a
   click on the letterbox still closes the lightbox.
+- **A page is fitted to the smaller of the picture area's width and its height.** So a
+  window taller than it is wide fills — the width is already the smaller one, which is
+  what a portrait reader wants — and a window wider than it is tall is capped at its
+  own height, which is the same rule the other two modes follow: a page is never drawn
+  larger than a screenful of it. Filling the width in landscape instead would draw a
+  page three and a half screenfuls tall at a size that never shows a whole screenful of
+  anything. It is a measurement and not a share of the box, which is why the rows carry
+  a width in pixels; a window that changes size re-fits them (`measureAgain`), and a
+  box that has not been measured — a DOM with no layout behind it — falls back to
+  filling.
 - **A zoomed column is wider than the picture area, and the drag is how a reader
   moves around in it.** A drag *scrolls* the box — the same movement the wheel makes,
   on the same box, so the two cannot disagree about where the reader is. The zoom
   cannot be a transform here, the way it is in the two screen modes: those zoom pages
-  that are *fitted* to the screen, with slack in both directions, while a page in this
-  mode is already as wide as the area. So the page itself grows — which is the
-  browser's own model of page zoom — because a transform on a scroll box leaves its
-  scroll range where it was and puts the edges of a zoomed page out of reach. Whichever
-  zoom is in hand, the header's reset button puts it back, and the reader stays exactly
-  where they were reading — the position is scaled by the same factor the pages are,
-  rather than snapped to the top of the page they happened to be in.
+  that are *fitted* to the screen, with slack in both directions, while the fit here is
+  the page's own width. So the page itself grows — which is the browser's own model of
+  page zoom — because a transform on a scroll box leaves its scroll range where it was
+  and puts the edges of a zoomed page out of reach. Whichever zoom is in hand, the
+  header's reset button puts it back, and the reader stays exactly where they were
+  reading — the position is scaled by the same factor the pages are, rather than
+  snapped to the top of the page they happened to be in.
 - **Every row's height is reserved before its picture arrives**, from the size the
   gallery answer carries: a column of images that are not there yet has no height at
   all, and each one landing would push the rest down — which for a reader halfway

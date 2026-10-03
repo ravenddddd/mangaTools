@@ -880,10 +880,10 @@ let scrollTo: number | null = null;
  * inside it and how it behaves: a row per page, in reading order, scrolled by the
  * browser rather than turned a screen at a time.
  *
- * The transform goes: the zoom is a transform on this container and a scroll box
+ * The transform goes: the zoom here is a transform on this container and a scroll box
  * cannot be transformed (`clientX` stops meaning what it meant, and the scrolled
- * content moves with it). There is nothing to zoom in this mode anyway — a page is
- * already as wide as the picture area.
+ * content moves with it). What zooms instead is the pages' own width — see setColumnZoom
+ * in scroll.ts, where the fit and its cap live.
  */
 function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
   ensureContainer(lightbox);
@@ -1325,6 +1325,11 @@ function closeLightbox(): void {
  * fullscreen change is not a change to the document for the observer to see.
  */
 function measureAgain(): void {
+  // The column's fit is a measurement of the box rather than a share of it — a page is
+  // only ever as wide as one screenful is tall — so a window that changed size has
+  // changed it, and the rows are in pixels and would keep the old size without this.
+  // The other two modes measure themselves as they draw; this one has nothing to draw.
+  if (settings.readingMode === "scroll") setColumnZoom(columnZoom());
   if (root) sync(root);
 }
 
