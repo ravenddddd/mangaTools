@@ -773,7 +773,12 @@
   margin-left: 2.5rem;
   margin-right: 1.5rem;
   margin-top: 0.6rem;
-  padding: 10px 0 0;
+  /*
+   * 10px above and below, which is the padding a row of settings has on this page —
+   * so a heading sits between the lines around it the way a row does. It had none
+   * below, and the line under it touched the text.
+   */
+  padding: 10px 0;
 }
 
 /* Descendant and not child: the heading sits inside its own line with the chevron
@@ -781,7 +786,9 @@
 .manga-tools-settings-heading h3 {
   /* An h3 carries Bootstrap's own 1.75rem, so this cannot simply be left out. */
   font-size: 1rem;
-  margin-bottom: 0.25rem;
+  /* No margin of its own: the padding above is the whole of the space, and a margin
+     on top of it would make the gap under a heading 14px where a row has 10. */
+  margin-bottom: 0;
 }
 
 /*

@@ -136,6 +136,19 @@ module.exports = () => {
       "chevron now, so a child selector would describe nothing at all"
   );
 
+  // The heading has the same 10px above and below it that a row has as its padding —
+  // it had none below, and the line under it touched the text. The space is all
+  // padding: a margin on the h3 would add to it and leave the heading with 14px where
+  // a row has 10.
+  assert.ok(
+    /\.manga-tools-settings-heading\s*\{[^}]*padding:\s*10px 0;/.test(css),
+    "a heading that is not a switch should have a row's padding above and below it"
+  );
+  assert.ok(
+    /\.manga-tools-settings-heading h3\s*\{[^}]*margin-bottom:\s*0/.test(css),
+    "…and no margin of its own, which would add to that space"
+  );
+
   // A group heading that is not a `.setting` is not covered by the rule that puts
   // the rows 2.5rem in, and sat that far to the left of the rows under it.
   assert.ok(
