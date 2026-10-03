@@ -115,6 +115,22 @@ export function zoomedBy(current: number, factor: number): number {
   return Math.min(Math.max(current * factor, VIEW_MIN_ZOOM), VIEW_MAX_ZOOM);
 }
 
+/**
+ * One property of one row, written only when it is not already what it should be.
+ *
+ * A write is a change even when the value is the same, and this half is written that way
+ * everywhere else — see setAlong and setAlongLength in progress.ts, which compare before
+ * they set. Here there is more to it than tidiness: the rows are every page of the
+ * gallery, and a fit is redone on every resize event of a drag.
+ */
+function setStyle(
+  node: HTMLElement,
+  name: "width" | "maxWidth",
+  value: string
+): void {
+  if (node.style[name] !== value) node.style[name] = value;
+}
+
 /** Draws the rows at the zoom in hand — the width, and the cap that keeps them sharp */
 export function setColumnZoom(next: number, reserved = 0): number {
   zoom = next;
@@ -130,17 +146,20 @@ export function setColumnZoom(next: number, reserved = 0): number {
     const natural = Number(node.dataset.width || 0);
 
     if (fitted > 0) {
-      node.style.width = zoom * fitted + "px";
-      node.style.maxWidth =
-        zoom * (natural > 0 ? Math.min(natural, fitted) : fitted) + "px";
+      setStyle(node, "width", zoom * fitted + "px");
+      setStyle(
+        node,
+        "maxWidth",
+        zoom * (natural > 0 ? Math.min(natural, fitted) : fitted) + "px"
+      );
       return;
     }
 
     // Nothing measured yet — a box that is not in the document, or a DOM with no
     // layout behind it. The page fills the box, as it did before there was a fit to
     // take it off, and the first measurement replaces this.
-    node.style.width = zoom * 100 + "%";
-    if (natural > 0) node.style.maxWidth = zoom * natural + "px";
+    setStyle(node, "width", zoom * 100 + "%");
+    if (natural > 0) setStyle(node, "maxWidth", zoom * natural + "px");
   });
 
   return zoom;

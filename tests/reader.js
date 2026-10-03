@@ -4726,6 +4726,47 @@ async function main() {
         "an unmeasured bar costs the pages nothing"
       );
 
+      // And a fit that would change nothing writes nothing. Not readable off the DOM —
+      // a width written twice reads the same both times — so the rows' own style objects
+      // are counted: the plugin writes through `style.width`, and every one of those
+      // lands in these accessors. The pair of assertions is the point of it, since a
+      // count that never moved would pass this whichever way the code was written.
+      let writes = 0;
+      const kept = rows.map((row) => {
+        const values = { width: row.style.width, maxWidth: row.style.maxWidth };
+        for (const name of ["width", "maxWidth"]) {
+          Object.defineProperty(row.style, name, {
+            configurable: true,
+            get: () => values[name],
+            set: (next) => {
+              writes += 1;
+              values[name] = next;
+            },
+          });
+        }
+        return values;
+      });
+
+      // The fit the resize above took off, put back on: the bar is measured again, so
+      // there is a change to make.
+      bar.rect = { left: 874, top: 0, width: 16, height: 600 };
+      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+      assert.ok(writes > 0, "a fit that changes the width writes it");
+      assert.strictEqual(
+        kept[0].width,
+        "828px",
+        "…and it is the same fit as before, seen through the counted styles"
+      );
+
+      writes = 0;
+      dom.window.dispatchEvent(dom.makeEvent("resize", {}));
+      assert.strictEqual(
+        writes,
+        0,
+        "while a fit that changes nothing writes nothing: the rows are every page of " +
+          "the gallery, and a resize drag re-fits them on every event of it"
+      );
+
       // Put back: the mode is the browser's setting, and a section that left the reader
       // in the column would be choosing it for every section after this one.
       dom.click(box.lightbox.querySelector("#manga-reader-double-page"));
