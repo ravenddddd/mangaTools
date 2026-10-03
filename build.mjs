@@ -19,6 +19,7 @@
 import { buildSync } from "esbuild";
 import fs from "node:fs";
 import path from "node:path";
+import { load } from "js-yaml";
 
 const ROOT = import.meta.dirname;
 const SRC = path.join(ROOT, "src");
@@ -26,6 +27,8 @@ const DIST = path.join(ROOT, "dist");
 
 /** The plugin's ID: its entry point's name, and the name of the bundle */
 const ID = "mangaTools";
+/** The manifest, named once: it is copied, and it is parsed before it is */
+const MANIFEST = "mangaTools.yml";
 
 /**
  * Copied as they are: a file the manifest names, or the README.
@@ -35,12 +38,7 @@ const ID = "mangaTools";
  * concatenated: neither is large, both name their own classes, and a browser
  * caching the one that did not change is worth more than one file.
  */
-const FILES = [
-  "mangaTools.yml",
-  "mangaTools.css",
-  "mangaReader.css",
-  "README.md",
-];
+const FILES = [MANIFEST, "mangaTools.css", "mangaReader.css", "README.md"];
 
 /** Copied whole: the directory the manifest maps at `ui.assets` */
 const DIRECTORIES = ["assets"];
@@ -74,6 +72,26 @@ buildSync({
   // and the target rather than restating either here.
   tsconfig: path.join(ROOT, "tsconfig.json"),
 });
+
+// **The manifest, before it is copied anywhere.**
+//
+// It is the first thing Stash reads and the one file here whose syntax it refuses outright: a
+// plugin whose manifest does not parse does not load at all, and all it takes is one unquoted
+// colon — "…is no longer hidden: Stash draws…" — for the settings page, the fields, the
+// lightbox and the reader to disappear together. That happened once, and the check is here
+// rather than in the tests because it is *syntax*: there is nothing to test about a file that
+// cannot be read, and everything that would read it runs against this build's output.
+//
+// The structural contract — which keys a setting has, what its type may be — is asserted in
+// tests/sections/04-artifacts.js, against the copy this makes. Two questions, two places: this
+// one is "can it be parsed at all", and that one is "does it say what Stash expects".
+const manifestPath = path.join(ROOT, MANIFEST);
+try {
+  load(fs.readFileSync(manifestPath, "utf8"));
+} catch (e) {
+  console.error(`${MANIFEST} is not valid YAML: ${e.message}`);
+  process.exit(1);
+}
 
 for (const file of FILES) {
   fs.copyFileSync(path.join(ROOT, file), path.join(DIST, file));

@@ -17,6 +17,9 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
+      js-yaml:
+        specifier: ^5.4.2
+        version: 5.4.2
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -362,12 +365,19 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  argparse@2.0.1:
+    resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
+
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
   esbuild@0.28.2:
     resolution: {integrity: sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==}
     engines: {node: '>=18'}
+    hasBin: true
+
+  js-yaml@5.4.2:
+    resolution: {integrity: sha512-m+aqu+LwO1O6sIopafj8HUVl5aawITwZQe/yHpMCKjaWBaA/d07B/QdMb3529REftiU+RMMHL3Vlsw3hON7vWg==}
     hasBin: true
 
   typescript@7.0.2:
@@ -557,6 +567,8 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
+  argparse@2.0.1: {}
+
   csstype@3.2.3: {}
 
   esbuild@0.28.2:
@@ -587,6 +599,10 @@ snapshots:
       '@esbuild/win32-arm64': 0.28.2
       '@esbuild/win32-ia32': 0.28.2
       '@esbuild/win32-x64': 0.28.2
+
+  js-yaml@5.4.2:
+    dependencies:
+      argparse: 2.0.1
 
   typescript@7.0.2:
     optionalDependencies:

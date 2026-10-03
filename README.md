@@ -1405,6 +1405,18 @@ so it is a gate rather than a rewrite: lint rules, then a format check that only
 fails if something drifted. One rule is deliberately not Stash's — `noVar`,
 because a hoisted `var` has already cost this codebase a confusing bug.
 
+**The manifest is parsed before it is copied, and asserted after.** `mangaTools.yml` is the first
+file Stash reads and the one whose syntax it refuses outright: an unquoted colon, a tab where an
+indent belongs, a quote left open — any of them means the plugin does not load, and the settings
+page, the fields, the lightbox and the reader go with it. That is not a hypothetical: it shipped
+once, and the plugin disappeared from a running Stash. So `build.mjs` parses the file with
+`js-yaml` before copying it, and `tests/sections/04-artifacts.js` parses the copy for what it has
+to *say* — a name, a three-part version, a `displayName`/`description`/legal `type` for every
+setting, and a file behind every entry `ui.javascript` and `ui.css` names. Two questions, two
+places: the build asks whether it can be read at all; the suite asks whether it says what Stash
+expects. That is what the one runtime-shaped dependency in this repository is for — `js-yaml` is
+a devDependency, and nothing it does reaches the bundle.
+
 `tests/` is not packaged — the zip holds only what the entry point bundles plus
 the `.yml`, `.css` and `.md` copied in beside it, so the spec never reaches a
 user's plugins folder.

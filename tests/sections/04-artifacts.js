@@ -5,6 +5,7 @@
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const { load } = require("js-yaml");
 const { PLUGIN } = require("../helpers.js");
 
 module.exports = () => {
@@ -665,36 +666,66 @@ module.exports = () => {
   // them one by one, so a file the manifest lists and the build does not copy is a
   // half that draws wrong with a 404 to explain it. Named here rather than read
   // from the yml, so that dropping one from the manifest fails here too.
-  // **The manifest, for the one mistake that takes the whole plugin down.** A colon in an
-  // unquoted YAML value is a mapping and not prose, and Stash parses this file before anything
-  // else: it refuses the plugin outright, so the settings page, the fields, the lightbox and the
-  // reader all go with it — which is what "the plugin disappeared" was. Nothing else in the suite
-  // reads this file, so a syntax error in it ships silently, and one did.
-  const manifest = fs.readFileSync(path.join(PLUGIN, "mangaTools.yml"), "utf8");
-  const colonInValue = manifest
-    .split("\n")
-    .map((text, at) => ({ text, at: at + 1 }))
-    .filter(({ text }) => {
-      // The first `: ` on the line is the one that separates a key from its value; what is
-      // read here is everything after it. A quoted, literal or block value is YAML's own way
-      // of saying "this is text", and is left alone.
-      const value = /^\s*(?:-\s+)?[\w-]+:\s+(.*)$/.exec(text)?.[1];
-      return Boolean(value) && !/^["'|>]/.test(value) && /: /.test(value);
-    })
-    .map(({ at, text }) => `${at}: ${text.trim()}`);
-  assert.deepStrictEqual(
-    colonInValue,
-    [],
-    "no unquoted value in the manifest may contain ': ' — it is a mapping rather than " +
-      "prose, and Stash refuses the plugin rather than parsing it (quote the value, or say " +
-      "it with a dash)"
+  // **The manifest, and the contract it has with Stash.** Parsed rather than pattern-matched:
+  // a colon in an unquoted value, a tab where an indent belongs, a quote left open — all of them
+  // are syntax errors, and any of them means Stash refuses the plugin outright, so the settings
+  // page, the fields, the lightbox and the reader disappear together. That happened once, with a
+  // description written "…is no longer hidden: Stash draws…".
+  //
+  // The *build* checks the same file parses, before it copies it — see build.mjs — because a file
+  // that cannot be read is not something to write tests about. What is asserted here is the other
+  // half: what the parsed manifest has to *say*, which is the part Stash will accept or reject
+  // rather than choke on, and the part this suite is the only reader of.
+  const manifest = load(
+    fs.readFileSync(path.join(PLUGIN, "mangaTools.yml"), "utf8")
   );
   assert.ok(
-    /^name:\s*\S/m.test(manifest) &&
-      /^version:\s*\d+\.\d+\.\d+/m.test(manifest),
-    "and the manifest should carry the plugin's name and a version, which are what Stash " +
-      "reads first"
+    typeof manifest.name === "string" && manifest.name.trim(),
+    "the manifest should name the plugin, which is what Stash shows"
   );
+  assert.ok(
+    /^\d+\.\d+\.\d+$/.test(manifest.version),
+    "and carry a plain three-part version: the publishing repository appends the commit to it, " +
+      "and Stash compares the two to decide whether an update is available"
+  );
+
+  // Every setting, as Stash's own settings page would render it: a name and a description, and
+  // one of the three input types it can draw. A fourth type is not a setting Stash silently
+  // ignores — it is a manifest it will not read.
+  const settings = manifest.settings || {};
+  const TYPES = ["BOOLEAN", "NUMBER", "STRING"];
+  const badSettings = Object.entries(settings)
+    .filter(
+      ([, setting]) =>
+        typeof setting?.displayName !== "string" ||
+        typeof setting?.description !== "string" ||
+        !TYPES.includes(setting?.type)
+    )
+    .map(([key, setting]) => `${key}: ${JSON.stringify(setting)}`);
+  assert.deepStrictEqual(
+    badSettings,
+    [],
+    `every setting needs a displayName, a description and a type from ${TYPES.join("/")}`
+  );
+
+  // And the files it lists are the files the build put there — the same rule the artwork rule
+  // above is: a manifest naming a file the build does not copy is a plugin that draws wrong with
+  // a 404 to explain it.
+  for (const [what, names] of [
+    ["ui.javascript", manifest.ui?.javascript],
+    ["ui.css", manifest.ui?.css],
+  ]) {
+    assert.ok(
+      Array.isArray(names) && names.length > 0,
+      `${what} should list the files it names, and name at least one`
+    );
+    for (const name of names) {
+      assert.ok(
+        fs.existsSync(path.join(PLUGIN, name)),
+        `dist/ should carry ${name}, which ${what} names`
+      );
+    }
+  }
 
   for (const name of ["mangaTools.css", "mangaReader.css"]) {
     assert.ok(
