@@ -1648,11 +1648,29 @@ function turnBy(lightbox: Element, direction: 1 | -1): boolean {
  * whole measurement. A partial measurement is no measurement, so this answers zero
  * and the bar holds the width it had, exactly as it does for a screen that has
  * measured nothing at all. See `lastWidth` in progress.ts.
+ *
+ * **And it measures the pages of a *screen*, not whatever the container happens to be
+ * holding.** A container on its way from one layout to another still holds the last
+ * one's: the column's rows, each of them a page as wide as the whole picture area, for
+ * as long as it takes the new screen's images to arrive. Those are not pages on show in
+ * any sense — a column's row is not a page of a screen, and its width is the *fit*
+ * rather than the page's own — and measuring them is what made the bar come out at very
+ * nearly the full length of the picture area, together with pages that were themselves
+ * still the column's, for a few frames after a reader left the column.
+ *
+ * The class is what tells them apart, and it is the class a *page of a screen* wears:
+ * the boxes `draw` builds, one per page, which a column's rows never are.
  */
 function pictureWidth(pages: number): number {
   if (!container || pages <= 0) return 0;
 
-  const images = Array.from(container.querySelectorAll("img")) as HTMLElement[];
+  // Two queries rather than one descendant selector, because the tests' DOM answers a
+  // selector of one class and a selector of one tag, and nothing with a space in it —
+  // and because this is what it means: the boxes a screen is made of, and the picture in
+  // each. A column's row is not one of these boxes.
+  const images = Array.from(
+    container.querySelectorAll("." + CLASS_PAGE)
+  ).flatMap((box) => Array.from(box.querySelectorAll("img")) as HTMLElement[]);
   if (!images.length) return 0;
 
   for (const image of images) {

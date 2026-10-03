@@ -879,7 +879,11 @@ layout's — the old screen's images, or the column's rows, where a page is as w
 whole picture area. Measuring those is what made the bar come out at nearly its full length
 for an instant on the way out of the column. So the pass that re-cuts the pages reports no
 width and forgets the one it was holding, and the bar waits — out of the way, as it does for
-a gallery's first screen — until the screen it is actually about has been measured.
+a gallery's first screen — until the screen it is actually about has been measured. **What
+it measures is the pages of a screen**, too, and not whatever the container happens to be
+holding: for the few frames a new screen's images take to arrive, the picture area is still
+full of the layout before it — the column's own rows — and a row measured as a page is the
+same mistake from the other end.
 
 **In the column:**
 

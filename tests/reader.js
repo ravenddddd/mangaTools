@@ -5660,6 +5660,32 @@ async function main() {
       );
       assert.strictEqual(asleep(), false, "which is when it comes back out");
 
+      // What the container holds on the way from one layout to another is the other
+      // layout's, and in a browser that lasts as long as the new screen's images take to
+      // arrive — several frames. A column's row measured as though it were a page of the
+      // screen is a page as wide as the whole picture area, which is what made the bar
+      // (and the pages that were still the column's) so large for that moment. Built here
+      // by hand, since this DOM draws a screen the moment it is asked to and a browser
+      // does not.
+      const stale = dom.makeElement("div");
+      stale.className = "manga-reader-scroll-page";
+      const staleImage = dom.makeElement("img");
+      staleImage.offsetLeft = 0;
+      // Wider than the pair it is standing in for on purpose: what is being asserted is
+      // that it is not measured at all, and a row that happened to measure the same as
+      // the screen would pass whether it was measured or not.
+      staleImage.offsetWidth = 1800;
+      stale.appendChild(staleImage);
+      container().appendChild(stale);
+      dom.flush();
+      assert.strictEqual(
+        width(),
+        "1020px",
+        "a column's row left in the picture area is not a page on show and does not " +
+          "widen the bar — the pages of the screen are what it is as wide as"
+      );
+      stale.remove();
+
       // And the same across a change of layout that never goes near the column: back to a
       // single page. What is in the picture area is the pair that has just been left, and
       // the bar's own inline width is still the pair's — a length left standing is the old
