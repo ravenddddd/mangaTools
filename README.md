@@ -845,6 +845,10 @@ the same thing in all three.
   drawn larger than a screenful of it. The bar's corner is **measured** rather than
   written down, so the stylesheet's own numbers stay in the stylesheet, and it comes off
   the width only: a page capped by its height is already clear of a bar down the side.
+  It comes off **twice**, and the second half is not redundant: the pages are centred in
+  the box, so the box is narrowed by the same amount — take it off the fit alone and a
+  page of the right size is centred in the full width, giving half the reserve back to
+  each side and sitting half of itself back under the bar.
   Nothing else is reserved — a zoom past the fit runs under the bar if the reader asks
   for it, which is what a zoom is for. Filling the width in landscape instead would draw a
   page three and a half screenfuls tall at a size that never shows a whole screenful of

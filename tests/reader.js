@@ -4652,6 +4652,15 @@ async function main() {
         "874px",
         "portrait: the page fills the width, with the bar's corner left free"
       );
+      // And the box the pages are *centred* in is narrowed by the same amount. Sizing
+      // the page alone was not enough: centred in the full width, it gave half the
+      // reserve back to each side and sat 13px of the bar's 26 back under it — which is
+      // the bug this assertion is the guard for.
+      assert.strictEqual(
+        container.style.paddingRight,
+        "26px",
+        "…and the centring box narrowed by it, or half of it is given back to each side"
+      );
 
       // And a bar that is not drawn — the panel's own state, or a gallery with one
       // page — takes nothing off it.
@@ -4661,6 +4670,11 @@ async function main() {
         rows[0].style.width,
         "900px",
         "an unmeasured bar costs the pages nothing"
+      );
+      assert.strictEqual(
+        container.style.paddingRight,
+        "",
+        "…and takes no padding with it, so a bar drawn later is not paid for twice"
       );
 
       // Put back: the mode is the browser's setting, and a section that left the reader
