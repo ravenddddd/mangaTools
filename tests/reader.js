@@ -4004,10 +4004,8 @@ async function main() {
     const note = help.querySelector(".manga-reader-help-panel").textContent;
     assert.strictEqual(
       note,
-      "Each way of reading keeps its own settings: single page, double page and the " +
-        "column do not share them, and what you change here is the set for the way you " +
-        "are reading now. They are stored on the server with the library, so every " +
-        "browser reads the same.",
+      "The settings are stored on the server. Each way of reading has a set of its own, " +
+        "and they do not affect one another.",
       "…and it says both things: which set these rows are, and where the settings are kept"
     );
     const helpButton = help.querySelector(".manga-reader-help-button");

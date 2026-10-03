@@ -463,8 +463,8 @@
  * one "?" after them — on one line.
  *
  * The row carries the space under the heading rather than the label, because the label is now
- * a flex item in it: its own margin-bottom would push the "?" off the baseline instead of
- * holding the next row away.
+ * a flex item in it: its own margin-bottom would push the "?" off the heading's line instead
+ * of holding the next row away.
  */
 .manga-reader-heading-line {
   display: flex;
@@ -477,29 +477,35 @@
 }
 
 /*
- * The "?" beside a group's heading, and the note it opens.
+ * The "?" beside a heading, and the note it opens.
  *
- * The same arrangement as the settings page's own "?" — see mangaTools.css — in this panel's
- * clothes: a muted glyph the size of the words beside it, and a note that hangs under the
- * heading and over whatever it covers. Opening is the stylesheet's job and it is *hover*,
- * plus `:focus-visible` for a keyboard: nothing here is stateful, which matters because this
- * panel is drawn from the reader's state on every change.
+ * The settings page has one of these already — see `.manga-tools-help` in mangaTools.css, and
+ * this is the same thing in this panel's clothes: the same glyph, at the same size and colour,
+ * with the same cursor, because a reader who has met the one should recognise the other. What
+ * is not the same is where the note opens: that one has a page's width to open sideways into,
+ * and this one lives in a popover 17rem wide, so the note hangs *below* its heading — and takes
+ * the card's own fill and border rather than inventing a second look for the same thing.
+ *
+ * Opening is the stylesheet's job, and it is hover plus `:focus-visible` for a keyboard:
+ * nothing here is stateful, which matters because this panel is drawn from the reader's state
+ * on every change.
  */
 .manga-reader-help {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
   vertical-align: middle;
-  margin-left: 0.35rem;
+  margin-left: 0.4rem;
 }
 
 .manga-reader-help-button {
+  display: inline-flex;
+  align-items: center;
   padding: 0;
   border: 0;
   background: none;
-  color: rgba(191, 204, 214, 0.6);
+  color: rgba(191, 204, 214, 0.5);
   cursor: help;
-  font: inherit;
-  font-size: 0.9em;
+  font-size: 0.85em;
   line-height: 1;
 }
 
@@ -518,20 +524,22 @@
   position: absolute;
   left: 0;
   top: 100%;
-  z-index: 20;
+  z-index: 30;
   width: 15rem;
-  margin-top: 0.35rem;
-  padding: 0.5rem 0.6rem;
-  border: 1px solid rgba(0, 0, 0, 0.35);
+  margin-top: 0.4rem;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.6);
   border-radius: 3px;
-  background: #2f3d47;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  background: #202b33;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
   color: #f5f8fa;
-  font-size: 0.9rem;
-  /* The heading it hangs under has letter-spacing of its own, which the note does not want:
-     it is prose, and it is a different kind of thing from the word it is explaining. */
+  /* The heading it hangs under is letter-spaced, and the note is prose: put back what a
+     heading's own type would otherwise hand down. */
+  font-size: 0.95rem;
+  font-weight: normal;
   letter-spacing: normal;
-  line-height: 1.45;
+  line-height: 1.5;
+  white-space: normal;
 }
 
 .manga-reader-help:hover .manga-reader-help-panel,

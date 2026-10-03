@@ -908,6 +908,25 @@ module.exports = () => {
   // opened by a click would be state held somewhere else — and that the heading it hangs off
   // carries the row's spacing rather than the label's, since the label is a flex item in it
   // now and its own margin would push the "?" off the heading's line.
+  // The two "?"s are one thing in two places — this panel's and the settings page's — and a
+  // reader who has met the one should recognise the other. So the parts that make the glyph are
+  // read off both stylesheets and compared, rather than written down twice here where only one
+  // of them could be wrong.
+  const helpGlyph = (sheet, name) => {
+    const rule = new RegExp("\\." + name + "\\s*\\{([^}]*)\\}").exec(sheet);
+    return rule ? rule[1] : "";
+  };
+  const toolsGlyph = helpGlyph(css, "manga-tools-help-button");
+  const readerGlyph = helpGlyph(readerCss, "manga-reader-help-button");
+  for (const property of ["color", "cursor", "font-size", "line-height"]) {
+    const of = (body) => new RegExp(property + ":\\s*([^;]+);").exec(body)?.[1];
+    assert.strictEqual(
+      of(readerGlyph),
+      of(toolsGlyph),
+      `the panel's "?" should be the settings page's in ${property}, or they are two things`
+    );
+  }
+
   assert.ok(
     /\.manga-reader-help:hover\s+\.manga-reader-help-panel[^{]*\{[^}]*display:\s*block/.test(
       readerCss
