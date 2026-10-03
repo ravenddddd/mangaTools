@@ -26,13 +26,6 @@ export interface MangaReaderOrder {
   direction: "ASC" | "DESC";
 }
 
-/** Where the lightbox's strip of thumbnails starts, and which one is current */
-export interface MangaReaderStrip {
-  start: number;
-  count: number;
-  selected: number;
-}
-
 /** Just the settings the reader keeps. See settings.ts. */
 /**
  * How the pages are laid out to be read.
@@ -136,15 +129,6 @@ export interface MangaReaderNamespace {
    * a busy lightbox and one whose markup has changed under this plugin.
    */
   lightboxIsLoading(lightbox: Element): boolean;
-  /**
-   * The thumbnails the lightbox is holding, and which of them is current.
-   *
-   * Read for the one thing a jump needs: clicking one is Stash's own
-   * `selectIndex`. Stash renders the strip only when `showNavigation` is set, which
-   * neither of the gallery lightboxes sets — so this is here for the lightboxes
-   * that do, and for the day one of them changes.
-   */
-  readStrip(lightbox: Element): MangaReaderStrip | null;
   isWideSpreadPage(page: MangaReaderPage): boolean;
   /**
    * How long a screen may be held back waiting for its images, in milliseconds.
@@ -324,10 +308,12 @@ export interface MangaReaderNamespace {
   zoomedBy(current: number, factor: number): number;
   /**
    * How wide a page is fitted in the column, given the picture area — its width or its
-   * height, whichever is smaller. See scroll.ts. Here for the same reason as the two
-   * above: the tests' DOM has no layout, so the fit has to be callable on numbers.
+   * height, whichever is smaller — with the room the progress bar stands on taken off
+   * the width *twice*, once for each side, because the pages are centred. See
+   * scroll.ts. Here for the same reason as the two above: the tests' DOM has no
+   * layout, so the fit has to be callable on numbers.
    */
-  columnFitted(width: number, height: number): number;
+  columnFitted(width: number, height: number, reserved?: number): number;
   /**
    * How far a menu has to move sideways to be inside the window — see chrome.ts.
    *
