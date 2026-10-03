@@ -4010,12 +4010,21 @@ async function main() {
         "browser reads the same.",
       "…and it says both things: which set these rows are, and where the settings are kept"
     );
+    const helpButton = help.querySelector(".manga-reader-help-button");
     assert.strictEqual(
-      help
-        .querySelector(".manga-reader-help-button")
-        .getAttribute("aria-label"),
+      helpButton.getAttribute("aria-label"),
       note,
       "which is also what the button is called for a reader who cannot see it"
+    );
+    // And it *says* something. A wrapper, a note, and nothing in the button between them is a
+    // note no reader can open — which is what this was, and why the "?" could not be found on
+    // the page. The glyph is Stash's own icon where the plugin API can draw one; this DOM
+    // cannot, so what is read here is the character that stands in for it, the same fallback
+    // the settings page's "?" has.
+    assert.strictEqual(
+      helpButton.textContent,
+      "?",
+      "…and the button wears a glyph, or there is nothing to hover"
     );
 
     // No descriptions: a row is its label and its control, and there is nothing under

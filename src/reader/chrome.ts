@@ -871,6 +871,13 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     const button = document.createElement("button");
     button.type = "button";
     button.className = CLASS_HELP_BUTTON;
+    // The glyph, and the same two ways of drawing it the settings page's "?" has: Stash's own
+    // icon where the plugin API can draw one, and the character itself where it cannot — which
+    // is also what a reader sees for the instant before React has drawn. Drawn once rather
+    // than per pass, since a button is built once and an icon is not a word that changes with
+    // the language.
+    button.textContent = "?";
+    setIcon(button, "faQuestionCircle");
 
     const note = text(CLASS_HELP_PANEL);
     labels[textId] = note;

@@ -507,6 +507,12 @@
   color: #f5f8fa;
 }
 
+/* Stash's own index.scss sets an unscoped `.fa-icon { margin: 0 0.4rem }`, and this wrapper
+   already spaces the glyph — the same note the settings page's rule carries. */
+.manga-reader-help-button .fa-icon {
+  margin: 0;
+}
+
 .manga-reader-help-panel {
   display: none;
   position: absolute;
