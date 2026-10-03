@@ -80,10 +80,11 @@ export function columnZoom(): number {
  * the fit is capped at the height, which is the rule the other two modes already
  * follow — a page is never drawn larger than a screenful of it.
  *
- * `reserved` is the room the progress bar stands on, taken off the width and not off
- * the height: the bar is down the side, and a page that filled the width would be a
- * page with its right-hand edge under the bar. Nothing else is reserved — a zoom is
- * free to run under it.
+ * `reserved` is the room the progress bar stands on, taken off **each side** of the
+ * width and not off the height: the bar is down one side, and the pages are centred, so
+ * both sides give it up or the page ends up off the middle. (The width is the only side
+ * either way: a page capped by its height is already clear of a bar down the side.)
+ * Nothing else is reserved — a zoom is free to run under it.
  *
  * It is a measurement and not a share of the box, which is why it is a number of pixels
  * rather than a percentage: `min(width, height)` has no percentage form. Zero means the
@@ -96,7 +97,10 @@ export function columnFitted(
   reserved = 0
 ): number {
   if (!(width > 0) || !(height > 0)) return 0;
-  return Math.max(1, Math.min(width - reserved, height));
+  // Twice the reserve, because the pages are centred: a reserve taken off one side only
+  // would be a page pushed off the middle, which is the wrong shape of answer — the
+  // reader asked for the page to keep out of the bar's way, not to move across.
+  return Math.max(1, Math.min(width - 2 * reserved, height));
 }
 
 /**

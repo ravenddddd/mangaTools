@@ -847,11 +847,10 @@ the same thing in all three.
   the width only: a page capped by its height is already clear of a bar down the side.
   The gap the bar leaves on the side it is pinned to is mirrored on its far side, so a
   reader sees the same air either side of the line rather than the page touching it on
-  one — and that number is measured from the same rectangle too. It comes off **twice**,
-  and the second half is not redundant: the pages are centred in
-  the box, so the box is narrowed by the same amount — take it off the fit alone and a
-  page of the right size is centred in the full width, giving half the reserve back to
-  each side and sitting half of itself back under the bar.
+  one — and that number is measured from the same rectangle too. The whole of it comes
+  off **both** sides of the page: the pages are centred in the picture area, so a reserve
+  taken off one side only would be a page of the right size in the wrong place, sitting
+  half of itself back under the bar. Smaller, not moved.
   Nothing else is reserved — a zoom past the fit runs under the bar if the reader asks
   for it, which is what a zoom is for. Filling the width in landscape instead would draw a
   page three and a half screenfuls tall at a size that never shows a whole screenful of

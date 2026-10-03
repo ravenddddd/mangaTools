@@ -1337,16 +1337,11 @@ function closeLightbox(): void {
 function refitColumn(next: number): void {
   if (!container) return;
 
-  const reserve = barReserve(container.getBoundingClientRect());
-
-  // The pages are centred in the box, so the bar's room has to come off *that* box as
-  // well as off the fit. Taking it off the fit alone is a page that is the right size
-  // and in the wrong place: centred in the full width, it gives half the reserve back to
-  // each side and sits 13px of a 26px reserve back under the bar — which is what it did.
-  // The padding is the half that places the page; the fit is the half that sizes it.
-  container.style.paddingRight = reserve > 0 ? `${reserve}px` : "";
-
-  setColumnZoom(next, reserve);
+  // The pages stay centred: the fit takes the bar's room off *both* sides of the width,
+  // so the middle of a page stays the middle of the picture area and the bar gets the
+  // same space on either hand. Nothing is padded or shifted — a page moved across to
+  // make room is a page the reader has to find again.
+  setColumnZoom(next, barReserve(container.getBoundingClientRect()));
 }
 
 function measureAgain(): void {

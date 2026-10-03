@@ -4641,27 +4641,24 @@ async function main() {
       );
 
       // Portrait: the width is the smaller side, so the page fills it — less the corner
-      // the reader's progress bar stands on. A bar whose near edge is 26px from the
-      // area's right (its 10px of air plus its 16px of track) takes 26px plus the same
-      // 10px mirrored on its far side: 36px of page, so that the reader sees the same
-      // gap either side of the line. Which is the whole point of measuring it rather
-      // than writing a number down — the 10px is the stylesheet's, read back.
+      // the reader's progress bar stands on, off *each* side, because the pages are
+      // centred. A bar whose near edge is 26px from the area's right (its 10px of air
+      // plus its 16px of track) and whose far side mirrors that 10px is 36px: 900 − 72.
+      // Which is the whole point of measuring it rather than writing a number down — the
+      // 10px is the stylesheet's, read back.
       bar.rect = { left: 874, top: 0, width: 16, height: 600 };
       container.rect = { left: 0, top: 0, width: 900, height: 1600 };
       dom.window.dispatchEvent(dom.makeEvent("resize", {}));
       assert.strictEqual(
         rows[0].style.width,
-        "864px",
-        "portrait: the page fills the width, less the bar and the air either side of it"
+        "828px",
+        "portrait: the page fills the width, less the bar's corner on both sides"
       );
-      // And the box the pages are *centred* in is narrowed by the same amount. Sizing
-      // the page alone was not enough: centred in the full width, it gave half the
-      // reserve back to each side and sat 13px of the bar's 26 back under it — which is
-      // the bug this assertion is the guard for.
       assert.strictEqual(
         container.style.paddingRight,
-        "36px",
-        "…and the centring box narrowed by it, or half of it is given back to each side"
+        undefined,
+        "…by making the page smaller, not by moving it: the pages stay centred, so " +
+          "nothing is padded and the reader finds the middle where it was"
       );
 
       // And a bar that is not drawn — the panel's own state, or a gallery with one
@@ -4672,11 +4669,6 @@ async function main() {
         rows[0].style.width,
         "900px",
         "an unmeasured bar costs the pages nothing"
-      );
-      assert.strictEqual(
-        container.style.paddingRight,
-        "",
-        "…and takes no padding with it, so a bar drawn later is not paid for twice"
       );
 
       // Put back: the mode is the browser's setting, and a section that left the reader
@@ -4821,8 +4813,9 @@ async function main() {
     );
     assert.strictEqual(
       NR.columnFitted(900, 1600, 26),
-      874,
-      "and the room the progress bar stands on comes off the width"
+      848,
+      "and the room the progress bar stands on comes off the width — twice, because " +
+        "the pages are centred and each side gives it up"
     );
     assert.strictEqual(
       NR.columnFitted(1600, 900, 26),
