@@ -80,11 +80,9 @@
 
   "mangaTools.settings.mark.heading": "漫画标记",
   "mangaTools.settings.confirmUnmark.heading": "取消漫画标记时确认",
-  "mangaTools.settings.confirmUnmark.description": "取消标记之前先问一次。",
   "mangaTools.settings.deleteOnUnmark.heading": "取消漫画标记时清除插件字段",
-  "mangaTools.settings.deleteOnUnmark.description": "开启时，取消标记会连同语言、修正、翻译组和生肉的值一起清除。关闭时这些值留在画廊上——只是不再显示，重新标记就会回来。",
+  "mangaTools.settings.deleteOnUnmark.description": "开启时，取消标记会连同插件自定义字段一起清除。关闭后，取消标记时这些值会保留在画廊上。",
   "mangaTools.settings.coverIcon.heading": "在封面信息栏显示漫画图标",
-  "mangaTools.settings.coverIcon.description": "封面信息栏末尾的那个图标——就是悬停时出现、带图片数和标签数的那一行。关掉后封面不带标记，画廊依然由插件管理。",
   "mangaTools.settings.coverIcon.help": "和语言徽章不是一回事：它说的是「这本归插件管理」，而这不是一个会在封面上去扫的值。",
 
   "mangaTools.settings.help.cover": "封面",

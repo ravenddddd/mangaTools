@@ -80,11 +80,9 @@
 
   "mangaTools.settings.mark.heading": "The manga mark",
   "mangaTools.settings.confirmUnmark.heading": "Ask before unmarking",
-  "mangaTools.settings.confirmUnmark.description": "A gallery stops being manga only after a confirmation.",
   "mangaTools.settings.deleteOnUnmark.heading": "Remove this plugin's fields when unmarking",
-  "mangaTools.settings.deleteOnUnmark.description": "On, unmarking a gallery takes its language, censorship, translation group and raw values off with the mark. Off, the values stay on the gallery — hidden, and back if it is marked again.",
+  "mangaTools.settings.deleteOnUnmark.description": "On, unmarking clears the plugin's custom fields with it. Off, the values are kept on the gallery.",
   "mangaTools.settings.coverIcon.heading": "Show the manga icon on gallery covers",
-  "mangaTools.settings.coverIcon.description": "The icon at the end of a cover's info row — the row that appears on hover, with the image count and the tag count. Turned off, the cover carries no mark, and the gallery is still managed.",
   "mangaTools.settings.coverIcon.help": "Not the same thing as the language badge: this one says the gallery is one the plugin manages, which is not a value anyone scans a cover for.",
 
   "mangaTools.settings.help.cover": "Cover",

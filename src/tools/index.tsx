@@ -3427,7 +3427,13 @@ function MangaToolsSettings() {
 
           They are the one group whose fold is not drawn inside a SettingSwitch,
           because there is no switch to own it: see SettingsGroup, which owns the
-          fold for this heading and for the display heading alike. */}
+          fold for this heading and for the display heading alike.
+
+          Two of the three have no description: "ask before unmarking" and "the mark on
+          a cover" are the whole of what their headings say, and the sentences that
+          were under them said it again at length. Only the one that does something
+          with the gallery's own values keeps a sentence — what it clears, and what it
+          keeps. */}
       <SettingsGroup
         id={MARK_GROUP_ID}
         heading={t(intl, "mangaTools.settings.mark.heading")}
@@ -3435,7 +3441,6 @@ function MangaToolsSettings() {
         <BooleanSetting
           id="mangaTools-confirmUnmark"
           heading={t(intl, "mangaTools.settings.confirmUnmark.heading")}
-          subHeading={t(intl, "mangaTools.settings.confirmUnmark.description")}
           checked={NS.confirmUnmark}
           onChange={writeFlag((next) => {
             NS.confirmUnmark = next;
@@ -3453,7 +3458,6 @@ function MangaToolsSettings() {
         <BooleanSetting
           id="mangaTools-coverIcon"
           heading={t(intl, "mangaTools.settings.coverIcon.heading")}
-          subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
           help={{
             text: t(intl, "mangaTools.settings.coverIcon.help"),
             example: "mark",

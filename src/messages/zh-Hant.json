@@ -80,11 +80,9 @@
 
   "mangaTools.settings.mark.heading": "漫畫標記",
   "mangaTools.settings.confirmUnmark.heading": "取消漫畫標記時確認",
-  "mangaTools.settings.confirmUnmark.description": "取消標記之前先問一次。",
   "mangaTools.settings.deleteOnUnmark.heading": "取消漫畫標記時清除外掛欄位",
-  "mangaTools.settings.deleteOnUnmark.description": "開啟時，取消標記會連同語言、修正、翻譯組和生肉的值一起清除。關閉時這些值留在畫廊上——只是不再顯示，重新標記就會回來。",
+  "mangaTools.settings.deleteOnUnmark.description": "開啟時，取消標記會連同外掛自訂欄位一起清除。關閉後，取消標記時這些值會保留在畫廊上。",
   "mangaTools.settings.coverIcon.heading": "在封面資訊欄顯示漫畫圖示",
-  "mangaTools.settings.coverIcon.description": "封面資訊欄末尾的那個圖示——就是懸停時出現、帶圖片數和標籤數的那一行。關掉後封面不帶標記，畫廊依然由外掛管理。",
   "mangaTools.settings.coverIcon.help": "和語言徽章不是一回事：它說的是「這本歸外掛管理」，而這不是一個會在封面上去掃的值。",
 
   "mangaTools.settings.help.cover": "封面",
