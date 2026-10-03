@@ -225,7 +225,10 @@ module.exports = () => {
   galleryPanel.appendChild(makeEl("h6")); // stand in for another row React adds
   assert.strictEqual(
     galleryPanel.lastElementChild.tagName,
-    "h6",
+    // Upper case because that is what a browser answers and what the stub now
+    // answers too — see makeEl. Spelled out rather than compared loosely, so a
+    // stub that went back to lower case would be caught right here.
+    "H6",
     "precondition: the mount point was displaced"
   );
   detail({ "plugin.mangaTools.language": "ja" });

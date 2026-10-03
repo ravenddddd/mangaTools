@@ -370,9 +370,53 @@ function galleryToolbarDom() {
   return { toolbarEl, toolbarGroup, organizedSpan, organizedButton, menuSpan };
 }
 
+/**
+ * One selector shape, parsed once and returned as a predicate — or null when the
+ * selector is not a shape this stub understands (the shapes are listed on
+ * querySelector below).
+ *
+ * Shared by `querySelector` and `closest`, because "does this element match" is
+ * one question however it is reached, and two copies of it is how the two would
+ * come to disagree. Tag names are compared in upper case, which is what a
+ * browser's `tagName` is.
+ */
+function selectorShape(sel) {
+  const mAttr = /^\.([\w-]+)(?:\[data-field="([^"]+)"\])?$/.exec(sel);
+  const mData = /^\[data-([\w-]+)="([^"]+)"\]$/.exec(sel);
+  const mTagData = /^([a-z]+)\[data-([\w-]+)="([^"]+)"\]$/.exec(sel);
+  const mTag = /^([a-z]+)$/.exec(sel);
+
+  if (mData) return (c) => c.dataset[datasetKey(mData[1])] === mData[2];
+  if (mTagData) {
+    return (c) =>
+      c.tagName === mTagData[1].toUpperCase() &&
+      c.dataset[datasetKey(mTagData[2])] === mTagData[3];
+  }
+  if (mAttr) {
+    return (c) =>
+      (c.className || "").split(/\s+/).includes(mAttr[1]) &&
+      (mAttr[2] === undefined || c.dataset.field === mAttr[2]);
+  }
+  if (mTag) return (c) => c.tagName === mTag[1].toUpperCase();
+
+  return null;
+}
+
+/**
+ * **`tagName` is upper case, because that is what a browser answers.**
+ *
+ * This stub used to keep the tag as it was written — `makeEl("form").tagName`
+ * was `"form"` — and a browser answers `"FORM"`. That one difference hid a real
+ * bug for as long as it existed: the bulk dialog's anchor was looked for by
+ * walking parents comparing `tagName === "form"`, which can never be true in a
+ * browser, so the rows were never placed and nothing said why. Every assertion
+ * about them passed, because the stub was kinder than the thing it stood in for.
+ * `tests/dom.js` had it right all along; the two stubs now agree, and with the
+ * browser rather than with each other.
+ */
 function makeEl(tag) {
   const el = {
-    tagName: tag,
+    tagName: String(tag).toUpperCase(),
     className: "",
     dataset: {},
     children: [],
@@ -504,35 +548,30 @@ function makeEl(tag) {
         return outer ? outer.querySelector("." + mDesc[2]) : null;
       }
 
-      const mAttr = /^\.([\w-]+)(?:\[data-field="([^"]+)"\])?$/.exec(sel);
-      const mData = /^\[data-([\w-]+)="([^"]+)"\]$/.exec(sel);
-      const mTagData = /^([a-z]+)\[data-([\w-]+)="([^"]+)"\]$/.exec(sel);
-      const mTag = /^([a-z]+)$/.exec(sel);
-      if (!mAttr && !mData && !mTagData && !mTag) return null;
-
-      const matches = (c) => {
-        if (mData) {
-          return c.dataset[datasetKey(mData[1])] === mData[2];
-        }
-        if (mTagData) {
-          return (
-            c.tagName === mTagData[1] &&
-            c.dataset[datasetKey(mTagData[2])] === mTagData[3]
-          );
-        }
-        if (mAttr) {
-          return (
-            (c.className || "").split(/\s+/).includes(mAttr[1]) &&
-            (mAttr[2] === undefined || c.dataset.field === mAttr[2])
-          );
-        }
-        return c.tagName === mTag[1];
-      };
+      const matches = selectorShape(sel);
+      if (!matches) return null;
 
       for (const c of el.children) {
         if (matches(c)) return c;
         const deep = c.querySelector ? c.querySelector(sel) : null;
         if (deep) return deep;
+      }
+      return null;
+    },
+    // A browser's `closest`, and here for the same reason it exists there: walking
+    // up from an element asking what encloses it is a question about ancestors,
+    // and spelling it out by hand is how the bulk dialog's anchor was looked for
+    // with a comparison no browser could ever satisfy (see makeEl). It is also the
+    // one DOM API this stub adds on demand rather than up front — the plugin uses
+    // it because a browser has it.
+    closest(sel) {
+      const matches = selectorShape(sel);
+      if (!matches) return null;
+
+      let node = el;
+      while (node) {
+        if (matches(node)) return node;
+        node = node.parentNode;
       }
       return null;
     },

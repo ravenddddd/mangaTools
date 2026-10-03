@@ -4633,19 +4633,18 @@ const FIELD_HOST_CLASS = "manga-tools-field-host";
  * the rating row every bulk dialog has (see BULK_DIALOG_MARK); a dialog without one
  * has no form to search, so its rows are never in scope at all.
  *
- * Walked by hand rather than with `closest`, which would be one more method the
- * tests' DOM would have to implement for one lookup.
+ * **`closest` rather than a hand-walked parent chain, and that is the whole of what
+ * went wrong here.** The walk compared `tagName === "form"`, which no browser ever
+ * answers: `tagName` is upper case there ("FORM"). It is lower case only in the
+ * stub this was tested against, so the lookup succeeded in the tests and returned
+ * null in every real browser — the rows were never placed, and nothing said why.
+ * The comment that stood here said `closest` was avoided so the tests' DOM would
+ * not have to implement one more method: the stub's convenience decided the
+ * production code, and the stub was the thing that was wrong.
  */
 function bulkAnchor(): Element | null {
-  let el: Node | null = document.querySelector(BULK_DIALOG_MARK);
-  while (el) {
-    const element = el as Element;
-    if (element.tagName === "form") {
-      return element.querySelector(BULK_ANCHOR);
-    }
-    el = el.parentNode;
-  }
-  return null;
+  const form = document.querySelector(BULK_DIALOG_MARK)?.closest("form");
+  return form ? form.querySelector(BULK_ANCHOR) : null;
 }
 
 /** As above, held at module scope so the same node is reused */

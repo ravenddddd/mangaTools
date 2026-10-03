@@ -1437,6 +1437,17 @@ name Stash does not have never runs, and a guard that reads a stale path draws n
 construction silent. `noteFired` covers the first (`patch active: <name>`, once per target); the
 guards now name themselves too, once each, on `console.warn`.
 
+**A stub that answers differently from a browser is worse than no stub at all.** The section
+tests' DOM answered `tagName` in lower case, as written; a browser answers it in upper case. That
+one difference hid a real bug for as long as it existed: the bulk dialog's anchor was looked for by
+walking parents comparing `tagName === "form"`, which can never be true in a browser, so the rows
+were never placed and nothing said why — while every assertion about them passed, because the stub
+was kinder than the thing it stood in for. `tests/dom.js` had it right all along and the two stubs
+disagreeing is how it went unnoticed, so they now agree with each other and with the browser, and
+the lower-case expectation they had propagated is spelled out in the assertion that catches it.
+The general rule this is the worked example of: when a stub has to choose, it chooses what the
+browser does, even when that makes the test harder to write.
+
 `tests/` is not packaged — the zip holds only what the entry point bundles plus
 the `.yml`, `.css` and `.md` copied in beside it, so the spec never reaches a
 user's plugins folder.
