@@ -678,6 +678,10 @@ const PluginApi = {
       // other two names in its fallback chain are deliberately absent here, so a
       // test can take this one away and drive the rest of the chain.
       faWandMagicSparkles: "faWandMagicSparkles",
+      // The settings note's icon. Present so that a test can assert the note drew
+      // one; the note is drawn without it when a Stash has no such glyph, which is
+      // the other half of the same assertion.
+      faInfoCircle: "faInfoCircle",
     },
     FontAwesomeRegular: { faTimesCircle: "faTimesCircle(regular)" },
     // Captured so a test can assert the URL the filter pushes.

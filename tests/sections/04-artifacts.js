@@ -229,6 +229,34 @@ module.exports = () => {
       "date and the language on the badge come out heavier and tighter than they " +
       "are on a real card"
   );
+  // The lightbox's note, inside that row's description. Boxed so it is not read as
+  // the next grey sentence of the description — and a flex row, which is the part
+  // worth checking here: an icon aligned on the text's baseline sits a little low
+  // and reads as "something is off" without being nameable, so the two are centred
+  // against each other instead. It hugs its words rather than filling the column,
+  // and stays inside it when the words wrap.
+  const noteRule = /\.manga-tools-settings-note\s*\{([^}]*)\}/.exec(css);
+  assert.ok(noteRule, "the settings note needs a rule of its own");
+  assert.ok(
+    /display:\s*flex/.test(noteRule[1]) &&
+      /align-items:\s*center/.test(noteRule[1]) &&
+      /gap:/.test(noteRule[1]),
+    "the note's icon and its words should be a flex row centred against each " +
+      "other, not an icon on a baseline — that is the alignment that looks wrong " +
+      "and cannot be named"
+  );
+  assert.ok(
+    /width:\s*fit-content/.test(noteRule[1]) &&
+      /max-width:\s*100%/.test(noteRule[1]),
+    "…and the box should hug its words without being able to leave the column it " +
+      "sits in"
+  );
+  assert.ok(
+    /\.manga-tools-settings-note\s+\.fa-icon\s*\{[^}]*margin:\s*0/.test(css),
+    "the flex gap is what spaces the icon from the words, so Stash's unscoped " +
+      "`.fa-icon { margin: 0 0.4rem }` has to be undone"
+  );
+
   // The performers field is hidden by CSS rather than by not rendering the row —
   // Stash's form keeps the value, so nothing can clear it. That makes this rule
   // the whole of the feature, and its sibling combinator the load-bearing part of

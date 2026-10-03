@@ -526,6 +526,99 @@ module.exports = () => {
     "and so are the three display rows"
   );
 
+  // ── The lightbox's note, inside its description ────────────────────
+  // "The lightbox's own settings are adjusted on the lightbox page" used to be a
+  // row of its own under the switch, in the same grey as the description — a line
+  // of grey prose under a longer line of grey prose. It is now the second half of
+  // that row's description, and it stays there with the switch off, because the
+  // description is always drawn and this is part of what it says.
+  const stringsIn = (el) => {
+    const out = [];
+    find(el, (n) => {
+      if (n.type === undefined && typeof n.props?.children === "string") {
+        out.push(n.props.children);
+      }
+      return false;
+    });
+    return out;
+  };
+  const withClass = (el, cls) => {
+    const out = [];
+    find(el, (n) => {
+      if (
+        typeof n.props?.className === "string" &&
+        n.props.className.split(" ").includes(cls)
+      ) {
+        out.push(n);
+      }
+      return false;
+    });
+    return out;
+  };
+
+  const localeHere = state.currentLocale;
+  const noteOf = (locale) => {
+    state.currentLocale = locale;
+    const el = call("PluginSettings", { pluginID: "mangaTools" });
+    const notes = withClass(el, "manga-tools-settings-note");
+    assert.strictEqual(notes.length, 1, `${locale}: there should be one note`);
+    return { note: notes[0], page: el };
+  };
+
+  {
+    const { note, page } = noteOf("zh-Hans");
+    const cat = NS.catalogs()["zh-Hans"];
+    // Inside a description, and it is the lightbox's: the description that carries
+    // the note is the one that carries the lightbox's own sentence as well.
+    const descriptions = withClass(page, "sub-heading").filter((d) =>
+      stringsIn(d).includes(cat["mangaTools.settings.readerTakeover.note"])
+    );
+    assert.strictEqual(
+      descriptions.length,
+      1,
+      "the note should sit inside exactly one description block"
+    );
+    assert.ok(
+      stringsIn(descriptions[0]).includes(
+        cat["mangaTools.settings.readerTakeover.description"]
+      ),
+      "…and that block should be the lightbox's own description, not another row's"
+    );
+    assert.ok(
+      stringsIn(note).includes(cat["mangaTools.settings.readerTakeover.note"]),
+      "the note's words should come from the catalogue"
+    );
+    assert.strictEqual(
+      find(note, (n) => n.type === "Icon").props.icon,
+      "faInfoCircle",
+      "the note should carry the info icon, which is what makes it read as a remark"
+    );
+  }
+
+  // A locale's own words, checked the same way, so a hardcoded line would show.
+  {
+    const { note } = noteOf("en");
+    assert.ok(
+      stringsIn(note).includes(
+        NS.catalogs().en["mangaTools.settings.readerTakeover.note"]
+      ),
+      "en: the note's words should come from the catalogue too"
+    );
+  }
+
+  // …and it does not go away with the switch: it is the description, not a
+  // sub-setting that appears under one.
+  NS.readerTakeover = false;
+  const off = call("PluginSettings", { pluginID: "mangaTools" });
+  assert.strictEqual(
+    withClass(off, "manga-tools-settings-note").length,
+    1,
+    "the note belongs to the description, so turning the feature off leaves it " +
+      "where it is — the row still says where the lightbox's settings live"
+  );
+  NS.readerTakeover = true;
+  state.currentLocale = localeHere;
+
   // ── The "?" and the example it opens ──────────────────────────────
   // The two settings about a cover carry one, and what opens is a card with the
   // part in question ringed rather than another paragraph. What this section can

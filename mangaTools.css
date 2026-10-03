@@ -677,19 +677,46 @@
 }
 
 /*
- * Two lines that sit where a sub-setting would, and are not settings: the
- * lightbox's note about where its own settings live, and what turning the
- * chapters switch on commits to. Muted and unboxed, so neither reads as
+ * One line that sits where a sub-setting would and is not a setting: what turning
+ * the chapters switch on commits to. Muted and unboxed, so it does not read as
  * something to click.
  */
-.manga-tools-settings-note,
 .manga-tools-settings-warning {
   font-size: 0.85rem;
   padding: 0.25rem 0 0.5rem;
 }
 
+/*
+ * The lightbox's note, inside that row's description: boxed and tinted so it is
+ * read as a remark rather than as the description's next sentence — which is what
+ * it was, in the same grey, and nobody read it.
+ *
+ * A flex row with the icon centred against the text, rather than an icon aligned
+ * on the text's baseline: a small circle set on the baseline sits a little low, no
+ * single `vertical-align` value fixes it at every font size, and it is the kind of
+ * misalignment that reads as "something is off" without being nameable. The box
+ * hugs its words (`fit-content`) so it does not stretch the column, and the text
+ * still wraps inside it.
+ */
 .manga-tools-settings-note {
-  color: rgba(191, 204, 214, 0.5);
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(19, 124, 189, 0.16);
+  border: 1px solid rgba(72, 175, 240, 0.35);
+  border-radius: 3px;
+  color: #f5f8fa;
+}
+
+.manga-tools-settings-note .fa-icon {
+  /* Stash's unscoped `.fa-icon { margin: 0 0.4rem }` again, and here the flex
+     `gap` is what spaces the icon from the words. */
+  margin: 0;
+  color: #48aff0;
 }
 
 .manga-tools-settings-control {

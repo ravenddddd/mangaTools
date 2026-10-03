@@ -2637,6 +2637,33 @@ function MangaFieldBlock(props: {
  * (Settings/Inputs.tsx): a `.setting` row with the heading on the left and the
  * switch pushed to the right by Stash's own CSS.
  */
+/**
+ * A remark inside a setting's description — the one place this page says "not
+ * here": the lightbox's own settings are changed on the lightbox.
+ *
+ * It is part of the description rather than a row of its own, because it is one
+ * of the two things that sentence is saying, and it is boxed and tinted rather
+ * than written in the same grey, because a line of grey prose under a longer line
+ * of grey prose is a line nobody reads. The tint is the plugin's own; Stash's
+ * settings page has no callout of its own to copy.
+ *
+ * The icon is decorative, so when the library has no glyph for it the box is drawn
+ * without one rather than with a stand-in letter — unlike the "?" that opens a help
+ * panel, where the glyph *is* the affordance.
+ */
+function SettingsNote(props: { children: ReactNode }) {
+  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
+  const Icon = PluginApi.components.Icon;
+  const icon = Solid.faInfoCircle || null;
+
+  return (
+    <span className="manga-tools-settings-note">
+      {icon ? <Icon icon={icon} /> : null}
+      <span>{props.children}</span>
+    </span>
+  );
+}
+
 /** Which part of the example card a setting's help panel is about */
 type HelpExample = "badge" | "mark";
 
@@ -2842,7 +2869,8 @@ function HelpIcon(props: { text: string; example: HelpExample }) {
 function BooleanSetting(props: {
   id: string;
   heading: string;
-  subHeading?: string;
+  /** The description — a string, or a string with a note set off inside it */
+  subHeading?: ReactNode;
   checked: boolean;
   onChange: (next: boolean) => void;
   /**
@@ -2914,7 +2942,7 @@ function BooleanSetting(props: {
 function SettingSwitch(props: {
   id: string;
   heading: string;
-  subHeading?: string;
+  subHeading?: ReactNode;
   help?: { text: string; example: HelpExample };
   checked: boolean;
   onChange: (next: boolean) => void;
@@ -3018,22 +3046,26 @@ function MangaToolsSettings() {
   return (
     <>
       {/* ── The lightbox ─────────────────────────────────────────────────── */}
+      {/* No children: where the lightbox's own settings live is not a sub-setting
+          and not a row of its own — it is the second half of this row's
+          description, set off as a note. See the lightbox's own note string, which
+          says "not here" and would otherwise have been a line of grey prose. */}
       <SettingSwitch
         id="mangaTools-readerTakeover"
         heading={t(intl, "mangaTools.settings.readerTakeover.heading")}
-        subHeading={t(intl, "mangaTools.settings.readerTakeover.description")}
+        subHeading={
+          <>
+            {t(intl, "mangaTools.settings.readerTakeover.description")}
+            <SettingsNote>
+              {t(intl, "mangaTools.settings.readerTakeover.note")}
+            </SettingsNote>
+          </>
+        }
         checked={NS.readerTakeover}
         onChange={writeFlag((next) => {
           NS.readerTakeover = next;
         })}
-      >
-        {/* Where the lightbox's own settings are is the one thing about it this
-            page cannot say with a switch: they are on the lightbox, and this page
-            deliberately does not carry a second copy of them. */}
-        <div className="manga-tools-settings-note">
-          {t(intl, "mangaTools.settings.readerTakeover.note")}
-        </div>
-      </SettingSwitch>
+      />
 
       {/* ── The chapters tab ─────────────────────────────────────────────── */}
       <SettingSwitch
