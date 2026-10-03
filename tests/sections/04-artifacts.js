@@ -880,6 +880,27 @@ module.exports = () => {
       "from pages that have not been laid out on the first pass"
   );
 
+  // The one row in the panel whose control is *under* it rather than beside it: the words,
+  // the number, and then the line itself. Two margins meet at that seam — the row's own,
+  // which the panel gives every row it spaces out, and the range input's — and adding up
+  // they read as a gap between two settings rather than between a label and its control.
+  // The selector is doubled because that is load-bearing: one class and one pseudo-class
+  // is what the row rule above has, and this has to come after it and win.
+  assert.ok(
+    /\.manga-reader-row\.manga-reader-row-slider\s*\{[^}]*margin-bottom:\s*0\.25rem/.test(
+      readerCss
+    ),
+    "the slider's row should be spaced as a label rather than as a row: what is under it " +
+      "belongs to it, and the panel's ordinary gap is a gap between two settings"
+  );
+  assert.ok(
+    /\.manga-reader-settings\s+\.manga-reader-row-slider\s*\+\s*\.custom-range\s*\{[^}]*margin-top:\s*0/.test(
+      readerCss
+    ),
+    "…and the slider's own margin should not come on top of that: the pair is spaced in " +
+      "one place, or the seam is the sum of two"
+  );
+
   // Asleep is out of sight and nothing else. The pointer reaching the bar is one of the
   // two things that wakes it — a turn is the other — so `pointer-events: none` here
   // would be a bar nothing can bring back with a hand. What the invisible strip costs in

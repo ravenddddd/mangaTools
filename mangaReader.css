@@ -459,6 +459,28 @@
 }
 
 /*
+ * The one row with its control underneath it, and the seam that comes with that.
+ *
+ * Two margins meet here and they were never meant to add up: the row's own — the panel
+ * spaces its rows out by 0.75rem — and the range input's, and together they read as a gap
+ * between two settings rather than between a label and the line it labels. So the pair is
+ * spaced here and nowhere else: a quarter of a rem under the words, the row giving up the
+ * margin it would have carried, and the slider's own margin replaced by the one that puts
+ * the usual gap under *it*.
+ *
+ * The row's class is doubled in the selector so that this beats
+ * `.manga-reader-row:not(:last-child)` above, which is one class and one pseudo-class.
+ */
+.manga-reader-row.manga-reader-row-slider {
+  margin-bottom: 0.25rem;
+}
+
+.manga-reader-settings .manga-reader-row-slider + .custom-range {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+/*
  * What a slider in the panel is set to, read off at the far end of its own row.
  *
  * In the row rather than after the slider — which is what this is here to say: the slider

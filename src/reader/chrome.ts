@@ -80,6 +80,12 @@ const CLASS_DIVIDER = "manga-reader-divider";
 const CLASS_ROW = "manga-reader-row";
 const CLASS_ROW_LABEL = "manga-reader-row-label";
 /**
+ * The one row in this panel whose control is *under* it rather than beside it: the words
+ * and the number, and then the line itself. Its own class because its spacing is its own —
+ * see the stylesheet, where the two margins that meet at that seam are settled.
+ */
+const CLASS_ROW_SLIDER = "manga-reader-row-slider";
+/**
  * What a slider is currently set to, read off at the far end of its row.
  *
  * In the label's row rather than after the slider, so that the slider keeps the full width
@@ -772,7 +778,7 @@ function drawSettings(panel: HTMLElement, state: ChromeState): void {
     // wants — and its two ends are not lengths of time but settings of their own: gone the
     // moment the pointer leaves it, and never gone at all. See the readout below for which
     // of them the reader is on, in seconds rather than in the half-steps the slider counts.
-    parts.idleRow = text(CLASS_ROW, "div");
+    parts.idleRow = text(CLASS_ROW + " " + CLASS_ROW_SLIDER, "div");
     const idleLabel = document.createElement("label");
     idleLabel.className = CLASS_ROW_LABEL;
     idleLabel.htmlFor = IDLE_ID;
