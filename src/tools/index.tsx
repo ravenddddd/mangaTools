@@ -2932,14 +2932,22 @@ function BooleanSetting(props: {
         {/* The heading is a plain string when nothing hangs off it — a heading that
             is an array with a null in it is a different shape to every other one on
             the page, and to anything reading the text of one. */}
-        {/* The chevron is a sibling of the heading rather than inside it, so that
-            an h3 keeps the two shapes the rest of this page reads: the heading on
-            its own, or the heading with a "?" after it. A chevron inside would make
-            a third — an array with an element in front of the text. */}
+        {/* The chevron and the heading share a row of their own, and that row is what
+            the chevron is positioned against — so it is centred on the heading's
+            line and not on the box around it, which also holds the description. It is
+            not inside the h3: that would make the heading an array with an element in
+            front of the text, and a third shape for anything reading one. */}
         {props.fold ? (
-          <FoldIcon folded={props.fold.folded} onToggle={props.fold.onToggle} />
-        ) : null}
-        <h3>{heading}</h3>
+          <div className="manga-tools-heading-line">
+            <FoldIcon
+              folded={props.fold.folded}
+              onToggle={props.fold.onToggle}
+            />
+            <h3>{heading}</h3>
+          </div>
+        ) : (
+          <h3>{heading}</h3>
+        )}
         {props.subHeading ? (
           <div className="sub-heading">{props.subHeading}</div>
         ) : null}
@@ -3052,22 +3060,48 @@ function SettingSwitch(props: {
 }
 
 /**
- * A heading that groups the rows under it without being a setting itself.
+ * A heading that groups the rows under it without being a setting itself: the mark's
+ * behaviour, and how the manga blocks are shown. Its rows are not one thing's
+ * sub-settings — they are siblings, and there is no switch to own them — so the
+ * heading is all there is to click, and the chevron is the only control it carries.
  *
- * The two places it is used are the two where the rows belong together but not to
- * one switch: the mark's behaviour, and how the manga blocks are shown. The rows
- * under it stay siblings — no `.setting-group` — because that is what they are.
+ * The rows go in a plain wrapper rather than in Stash's `.setting-group`, and that
+ * matters twice over. `.setting-group > .setting:not(:first-child)` would indent the
+ * second row on and leave the first one out; and the wrapper is where the indent
+ * comes from instead, as padding, so that these rows sit one level in from their
+ * heading — like a group's rows do — and end at the same right edge as everything
+ * else (see `.manga-tools-settings-body` in the stylesheet).
  */
+function SettingsGroup(props: {
+  /** Which fold this is, in `foldedGroups` — not a setting id */
+  id: string;
+  heading: string;
+  subHeading?: string;
+  children?: ReactNode;
+}) {
+  const folded = foldedGroups.has(props.id);
+
+  return (
+    <>
+      <SettingsHeading
+        heading={props.heading}
+        subHeading={props.subHeading}
+        fold={{
+          folded,
+          onToggle: () => setGroupFolded(props.id, !folded),
+        }}
+      />
+      {folded ? null : (
+        <div className="manga-tools-settings-body">{props.children}</div>
+      )}
+    </>
+  );
+}
+
 function SettingsHeading(props: {
   heading: string;
   subHeading?: string;
-  /**
-   * Set when the rows under it are foldable. The heading is not a `.setting` row
-   * and has no switch, so the chevron is the only control it carries — and the
-   * caller is what draws the rows, since they are its siblings and not its
-   * children (see MangaToolsSettings, where folding the mark's rows away is the
-   * same set of ids).
-   */
+  /** Set when the heading opens a group — see SettingsGroup, which is what uses it */
   fold?: { folded: boolean; onToggle: () => void };
 }) {
   return (
@@ -3078,12 +3112,16 @@ function SettingsHeading(props: {
       }
       onClick={props.fold ? props.fold.onToggle : undefined}
     >
-      {/* As in BooleanSetting: the chevron is the heading's sibling, not its
-          first child, so that an h3 here is the plain heading and nothing else. */}
+      {/* As in BooleanSetting: the chevron shares a row with the heading, and it is
+          that row it is positioned against. */}
       {props.fold ? (
-        <FoldIcon folded={props.fold.folded} onToggle={props.fold.onToggle} />
-      ) : null}
-      <h3>{props.heading}</h3>
+        <div className="manga-tools-heading-line">
+          <FoldIcon folded={props.fold.folded} onToggle={props.fold.onToggle} />
+          <h3>{props.heading}</h3>
+        </div>
+      ) : (
+        <h3>{props.heading}</h3>
+      )}
       {props.subHeading ? (
         <div className="sub-heading">{props.subHeading}</div>
       ) : null}
@@ -3091,15 +3129,15 @@ function SettingsHeading(props: {
   );
 }
 
-/** The id `foldedGroups` holds the mark's fold under — not a setting id */
+/** The ids `foldedGroups` holds the two headings' folds under — not setting ids */
 const MARK_GROUP_ID = "mangaTools-markGroup";
+const DISPLAY_GROUP_ID = "mangaTools-displayGroup";
 
 function MangaToolsSettings() {
   useGlobalVersion();
 
   const intl = PluginApi.libraries.Intl.useIntl();
   const Select = resolveSelect();
-  const markFolded = foldedGroups.has(MARK_GROUP_ID);
 
   /**
    * Writes every setting at once — see `saveSettings`, which is where the map is built
@@ -3312,40 +3350,49 @@ function MangaToolsSettings() {
 
         {/* Three rows that are not fields: they decide how the manga blocks are
             shown, so they belong to the feature rather than to any one field, and
-            they get a heading instead of a switch to say so. */}
-        <SettingsHeading
+            they get a heading instead of a switch to say so — a heading that folds,
+            like the mark's, because it is the same kind of group. */}
+        <SettingsGroup
+          id={DISPLAY_GROUP_ID}
           heading={t(intl, "mangaTools.settings.display.heading")}
-        />
-        <BooleanSetting
-          id="mangaTools-openDetailsBlock"
-          heading={t(intl, "mangaTools.settings.openDetailsBlock.heading")}
-          subHeading={t(
-            intl,
-            "mangaTools.settings.openDetailsBlock.description"
-          )}
-          checked={NS.openDetailsBlock}
-          onChange={writeFlag((next) => {
-            NS.openDetailsBlock = next;
-          })}
-        />
-        <BooleanSetting
-          id="mangaTools-openEditBlock"
-          heading={t(intl, "mangaTools.settings.openEditBlock.heading")}
-          subHeading={t(intl, "mangaTools.settings.openEditBlock.description")}
-          checked={NS.openEditBlock}
-          onChange={writeFlag((next) => {
-            NS.openEditBlock = next;
-          })}
-        />
-        <BooleanSetting
-          id="mangaTools-hidePerformers"
-          heading={t(intl, "mangaTools.settings.hidePerformers.heading")}
-          subHeading={t(intl, "mangaTools.settings.hidePerformers.description")}
-          checked={NS.hidePerformers}
-          onChange={writeFlag((next) => {
-            NS.hidePerformers = next;
-          })}
-        />
+        >
+          <BooleanSetting
+            id="mangaTools-openDetailsBlock"
+            heading={t(intl, "mangaTools.settings.openDetailsBlock.heading")}
+            subHeading={t(
+              intl,
+              "mangaTools.settings.openDetailsBlock.description"
+            )}
+            checked={NS.openDetailsBlock}
+            onChange={writeFlag((next) => {
+              NS.openDetailsBlock = next;
+            })}
+          />
+          <BooleanSetting
+            id="mangaTools-openEditBlock"
+            heading={t(intl, "mangaTools.settings.openEditBlock.heading")}
+            subHeading={t(
+              intl,
+              "mangaTools.settings.openEditBlock.description"
+            )}
+            checked={NS.openEditBlock}
+            onChange={writeFlag((next) => {
+              NS.openEditBlock = next;
+            })}
+          />
+          <BooleanSetting
+            id="mangaTools-hidePerformers"
+            heading={t(intl, "mangaTools.settings.hidePerformers.heading")}
+            subHeading={t(
+              intl,
+              "mangaTools.settings.hidePerformers.description"
+            )}
+            checked={NS.hidePerformers}
+            onChange={writeFlag((next) => {
+              NS.hidePerformers = next;
+            })}
+          />
+        </SettingsGroup>
       </SettingSwitch>
 
       {/* ── The mark itself ──────────────────────────────────────────────── */}
@@ -3353,59 +3400,45 @@ function MangaToolsSettings() {
           the mark, and they are deliberately siblings — the pair that is easy to
           mistake for a parent and its child especially.
 
-          They are the one group whose fold is drawn here rather than inside a
-          SettingSwitch, because there is no switch to own it: the heading is what
-          the reader clicks, and the rows are its siblings. `foldedGroups` holds it
-          under an id of its own, which is not a setting id and never reaches
-          Stash. */}
-      <SettingsHeading
+          They are the one group whose fold is not drawn inside a SettingSwitch,
+          because there is no switch to own it: see SettingsGroup, which owns the
+          fold for this heading and for the display heading alike. */}
+      <SettingsGroup
+        id={MARK_GROUP_ID}
         heading={t(intl, "mangaTools.settings.mark.heading")}
-        fold={{
-          folded: markFolded,
-          onToggle: () => setGroupFolded(MARK_GROUP_ID, !markFolded),
-        }}
-      />
-      {markFolded ? null : (
-        <>
-          <BooleanSetting
-            id="mangaTools-confirmUnmark"
-            heading={t(intl, "mangaTools.settings.confirmUnmark.heading")}
-            subHeading={t(
-              intl,
-              "mangaTools.settings.confirmUnmark.description"
-            )}
-            checked={NS.confirmUnmark}
-            onChange={writeFlag((next) => {
-              NS.confirmUnmark = next;
-            })}
-          />
-          <BooleanSetting
-            id="mangaTools-deleteOnUnmark"
-            heading={t(intl, "mangaTools.settings.deleteOnUnmark.heading")}
-            subHeading={t(
-              intl,
-              "mangaTools.settings.deleteOnUnmark.description"
-            )}
-            checked={NS.deleteOnUnmark}
-            onChange={writeFlag((next) => {
-              NS.deleteOnUnmark = next;
-            })}
-          />
-          <BooleanSetting
-            id="mangaTools-coverIcon"
-            heading={t(intl, "mangaTools.settings.coverIcon.heading")}
-            subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
-            help={{
-              text: t(intl, "mangaTools.settings.coverIcon.help"),
-              example: "mark",
-            }}
-            checked={NS.coverIcon}
-            onChange={writeFlag((next) => {
-              NS.coverIcon = next;
-            })}
-          />
-        </>
-      )}
+      >
+        <BooleanSetting
+          id="mangaTools-confirmUnmark"
+          heading={t(intl, "mangaTools.settings.confirmUnmark.heading")}
+          subHeading={t(intl, "mangaTools.settings.confirmUnmark.description")}
+          checked={NS.confirmUnmark}
+          onChange={writeFlag((next) => {
+            NS.confirmUnmark = next;
+          })}
+        />
+        <BooleanSetting
+          id="mangaTools-deleteOnUnmark"
+          heading={t(intl, "mangaTools.settings.deleteOnUnmark.heading")}
+          subHeading={t(intl, "mangaTools.settings.deleteOnUnmark.description")}
+          checked={NS.deleteOnUnmark}
+          onChange={writeFlag((next) => {
+            NS.deleteOnUnmark = next;
+          })}
+        />
+        <BooleanSetting
+          id="mangaTools-coverIcon"
+          heading={t(intl, "mangaTools.settings.coverIcon.heading")}
+          subHeading={t(intl, "mangaTools.settings.coverIcon.description")}
+          help={{
+            text: t(intl, "mangaTools.settings.coverIcon.help"),
+            example: "mark",
+          }}
+          checked={NS.coverIcon}
+          onChange={writeFlag((next) => {
+            NS.coverIcon = next;
+          })}
+        />
+      </SettingsGroup>
     </>
   );
 }

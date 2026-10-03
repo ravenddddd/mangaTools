@@ -96,13 +96,28 @@ module.exports = () => {
     "a settings row must be allowed to keep its switch beside its text: Stash's " +
       "flex-wrap: wrap puts it on a line of its own, and the DOM stub cannot see it"
   );
+  /**
+   * The body of the rule whose selector *starts a line* with `selector`. Searching
+   * the whole stylesheet for the class name is not the same thing: this file's
+   * comments name these classes too, and the first match then belongs to whichever
+   * rule happened to follow the prose.
+   */
+  const ruleBodyOf = (selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // The selector starts a line, and is followed by a comma, a space, or the brace
+    // that opens the rule — a rule's last selector keeps its brace on the same line.
+    const at = css.search(new RegExp("^" + escaped + "(,|[ \\t]+[{]|$)", "m"));
+    if (at < 0) return "";
+    return /\{([^}]*)\}/.exec(css.slice(at))?.[1] ?? "";
+  };
+
   // The group's own indent is all that is left of the nesting signal, and the line
   // that used to run down its left edge is gone rather than merely unused: a border
   // left in the file would come back the moment the indent changed.
-  const groupRule = /\.manga-tools-settings-group\s*\{([^}]*)\}/.exec(css);
+  const groupRule = ruleBodyOf(".manga-tools-settings-group");
   assert.ok(groupRule, "the settings group should still carry its own indent");
   assert.ok(
-    !/border/.test(groupRule[1]),
+    !/border/.test(groupRule),
     "the rule drawn down a group's left edge should be gone — the indent says the " +
       "same thing without making the page read as a table"
   );
@@ -236,18 +251,23 @@ module.exports = () => {
   // pixels further right than the rows outside — 6px a level, measured — and the
   // switches step outwards as the page nests. The indent is therefore padding, which
   // narrows the box instead, and the right edge stays where the level above had it.
-  const groupIndentRule = /\.manga-tools-settings-group\s*\{([^}]*)\}/.exec(
-    css
-  );
+  const groupIndentRule = ruleBodyOf(".manga-tools-settings-group");
   assert.ok(groupIndentRule, "the group needs a rule of its own");
   assert.ok(
-    /padding-left:\s*\d/.test(groupIndentRule[1]),
+    /padding-left:\s*\d/.test(groupIndentRule),
     "a group should indent with padding"
   );
   assert.ok(
-    !/margin-left/.test(groupIndentRule[1]),
+    !/margin-left/.test(groupIndentRule),
     "…and never with a margin, or every switch inside it steps outwards from the " +
       "ones above: the box would move right without getting narrower"
+  );
+  // …and the rows under a heading that is not a switch indent by the same amount,
+  // which is what puts them one level in from their heading, like a group's rows.
+  assert.ok(
+    /padding-left:\s*1\.25rem/.test(ruleBodyOf(".manga-tools-settings-body")),
+    "the rows under a heading that is not a switch should sit one level in from " +
+      "it, by the same amount a group's rows do"
   );
 
   // ── Folding a group shut ───────────────────────────────────────────
@@ -259,13 +279,29 @@ module.exports = () => {
     /position:\s*absolute/.test(foldRule[1]) && /left:\s*-\d/.test(foldRule[1]),
     "the chevron should be drawn in the gutter, outside its heading"
   );
+  // The line the chevron is measured from is the heading's own row — the chevron and
+  // the h3 together, and nothing else. Not the h3 itself: the chevron is the h3's
+  // sibling, so an h3 can never be its reference, however it is positioned.
   assert.ok(
-    /\.setting\.manga-tools-setting\s*>\s*\.manga-tools-foldable[^{]*\{[^}]*position:\s*relative/.test(
+    /\.manga-tools-heading-line\s*\{[^}]*position:\s*relative/.test(css),
+    "…which needs that row to be positioned — a chevron with nothing to be " +
+      "positioned against lands somewhere else entirely"
+  );
+  assert.ok(
+    /\.manga-tools-settings-heading\s*>\s*h3\s*\{[^}]*position:\s*relative/.test(
       css
-    ) &&
-      /\.manga-tools-settings-heading\s*\{[^}]*position:\s*relative/.test(css),
-    "…which needs the heading's own box to be positioned, on both kinds of row — " +
-      "a chevron with nothing to be positioned against lands somewhere else entirely"
+    ) === false,
+    "…and it is not the h3 that is positioned: the chevron is outside it"
+  );
+  // …and centred on that line rather than hung off the box around it. The box is
+  // what it used to be measured from, and a heading that is not a switch has padding
+  // above its text: the chevron came out a few pixels high, which is a thing eyes
+  // notice and cannot name.
+  assert.ok(
+    /top:\s*50%/.test(foldRule[1]) &&
+      /transform:\s*translateY\(-50%\)/.test(foldRule[1]),
+    "the chevron should be centred on the heading's line, so that its size and the " +
+      "box's padding stop mattering"
   );
   assert.ok(
     /\.manga-tools-fold\.is-folded\s*>\s*\.fa-icon\s*\{[^}]*transform:\s*rotate\(-90deg\)/.test(

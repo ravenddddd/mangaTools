@@ -641,11 +641,12 @@ module.exports = () => {
   // something under the row to fold. Folding is not writing: it takes a row's rows
   // off the page and leaves every setting exactly as it was.
   //
-  // Which chevron folds what is checked by folding each one and counting what
-  // goes: the fields group, the language group inside it, and the mark's three
-  // rows. Three, and no more — the lightbox and the chapters rows have nothing
+  // Which chevron folds what is checked by folding each one and counting the
+  // switches that go, in the order the page draws them: the fields group, the
+  // language field inside it, the display heading inside it, and the mark's
+  // heading. Four, and no more — the lightbox and the chapters rows have nothing
   // under them since their notes moved into their descriptions, so a chevron there
-  // would open nothing.
+  // would open nothing (and a fifth would shift every count below).
   state.currentLocale = "en";
   {
     const countIn = (el, make) => {
@@ -671,12 +672,15 @@ module.exports = () => {
       countIn(el, (n) => isClass(n, "manga-tools-settings-group"));
     const switchesIn = (el) => countIn(el, (n) => n.type === "Switch");
     const open = () => call("PluginSettings", { pluginID: "mangaTools" });
+    const click = (c) => {
+      c.props.onClick({ stopPropagation: () => {} });
+    };
 
     const page = open();
     const chevrons = chevronsIn(page);
     assert.strictEqual(
       chevrons.length,
-      3,
+      4,
       "one chevron per row that has rows under it, and no row without them"
     );
     assert.ok(
@@ -691,71 +695,41 @@ module.exports = () => {
     assert.strictEqual(switchesIn(page), 15, "…and fifteen switches");
 
     const before = state.capturedConfigWrite;
-    const click = (c) => {
-      c.props.onClick({ stopPropagation: () => {} });
+
+    // Fold one group, count what is left, and open it again. Unfolding happens in
+    // a loop because a folded group takes the chevrons inside it off the page with
+    // it — the display heading and the language field are both in the fields group.
+    const shutEverything = () => {
+      for (let pass = 0; pass < 5; pass++) {
+        const shut = chevronsIn(open()).filter(
+          (c) => !c.props["aria-expanded"]
+        );
+        if (!shut.length) break;
+        shut.forEach((c) => {
+          click(c);
+        });
+      }
     };
 
-    // The language field is the second chevron, and it folds its own three rows —
-    // two of them switches, and the multiselect, which is not one.
-    click(chevrons[1]);
-    const languageShut = open();
-    assert.strictEqual(
-      groupsIn(languageShut),
-      1,
-      "the language group folds away"
-    );
-    assert.strictEqual(
-      switchesIn(languageShut),
-      13,
-      "…taking two switches with it"
-    );
-    assert.strictEqual(
-      chevronsIn(languageShut).length,
-      3,
-      "…and its own chevron stays where it is, or there would be no way back"
-    );
-
-    // Put it back, then fold the mark's heading: the one chevron whose row is not
-    // a switch, and which folds three rows rather than a group.
-    click(chevronsIn(languageShut)[1]);
-    assert.strictEqual(groupsIn(open()), 2, "…so unfolding puts it back");
-
-    const third = chevronsIn(open())[2];
-    click(third);
-    const markShut = open();
-    assert.strictEqual(
-      switchesIn(markShut),
-      12,
-      "the mark's three rows fold away"
-    );
-    assert.strictEqual(groupsIn(markShut), 2, "…and no group went with them");
-
-    // Whatever is still open is folded by one chevron that takes everything under
-    // it: this is the fields row, which is the whole point of the exercise.
-    const everythingShut = (() => {
-      const page = open();
-      chevronsIn(page).forEach((c) => {
-        if (c.props["aria-expanded"]) click(c);
-      });
-      return open();
-    })();
-    assert.strictEqual(
-      groupsIn(everythingShut),
-      0,
-      "fold the rest and no group is left"
-    );
-    assert.strictEqual(
-      switchesIn(everythingShut),
-      3,
-      "…and what is left is the three rows that carry no fold: the lightbox, the " +
-        "chapters tab and the master switch"
-    );
-    assert.ok(
-      chevronsIn(everythingShut).every(
-        (c) => c.props["aria-expanded"] === false
-      ),
-      "every chevron says it is shut"
-    );
+    for (const [what, index, left] of [
+      ["the language field, which folds two switches", 1, 13],
+      ["the display heading, which folds three rows", 2, 12],
+      ["the mark's heading, which folds three rows and no group", 3, 12],
+      ["the fields group, which folds all nine under it", 0, 6],
+    ]) {
+      click(chevronsIn(open())[index]);
+      assert.strictEqual(
+        switchesIn(open()),
+        left,
+        `${what} — folding it should leave ${left} on the page`
+      );
+      shutEverything();
+      assert.strictEqual(
+        switchesIn(open()),
+        15,
+        `…and opening it again should bring them all back (${what})`
+      );
+    }
 
     // Nothing was written, and no setting moved: a fold is a view.
     assert.strictEqual(
@@ -764,30 +738,18 @@ module.exports = () => {
       "folding must not write anything to Stash"
     );
     assert.deepStrictEqual(
-      [NS.fields, NS.fieldLanguage, NS.coverIcon, NS.confirmUnmark],
-      [true, true, true, true],
+      [NS.fields, NS.fieldLanguage, NS.openDetailsBlock, NS.coverIcon],
+      [true, true, false, true],
       "…nor change a setting"
     );
-
-    // Unfold everything, so the rest of this file sees the page it expects. In a
-    // loop, because the language row's chevron is inside the fields group: while
-    // that one is shut it is not on the page, so one pass cannot reach it.
-    for (let pass = 0; pass < 3; pass++) {
-      const shut = chevronsIn(open()).filter((c) => !c.props["aria-expanded"]);
-      if (!shut.length) break;
-      shut.forEach((c) => {
-        click(c);
-      });
-    }
     assert.strictEqual(
       groupsIn(open()),
       2,
-      "unfolding brings the groups back exactly as they were"
+      "and both groups are where they were"
     );
-    assert.strictEqual(
-      switchesIn(open()),
-      15,
-      "…and every row, with its setting untouched"
+    assert.ok(
+      chevronsIn(open()).every((c) => c.props["aria-expanded"] === true),
+      "with every chevron saying it is open"
     );
   }
   state.currentLocale = localeHere;

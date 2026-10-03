@@ -609,16 +609,25 @@ Hiding is not writing. A switch turned off and on again comes back with exactly 
 sub-settings it had, and the same goes for the field values on the galleries.
 
 **A group can also be folded shut, and that is a view rather than a setting.** A row
-that has rows under it carries a chevron, and clicking it — or its heading, since the
-two are one click target — takes those rows off the page without touching a single
-value. The chevron is drawn in the indent to the left of the heading: in front of the
-heading it would push that heading a glyph to the right of the sibling rows without
-one, and the right-hand column is the vertical line every switch on this page is
-aligned to, so the left gutter is the only place with room. A row with nothing under
-it has no chevron and never opens nothing — the lightbox and the chapters rows have
-none, since their notes moved into their descriptions. The state is a set of ids
-outside React, for the same reason the settings are: this page is redrawn on every
-switch and the tests' React stub has no working state setter.
+that has rows under it carries a chevron, and so does a heading that is not a switch —
+the mark's, and how the manga info is shown. Clicking the chevron, or the heading it
+shares a row with, takes those rows off the page without touching a single value. The
+chevron is drawn in the indent to the left of the heading: in front of the heading it
+would push that heading a glyph to the right of the sibling rows without one, and the
+right-hand column is the vertical line every switch on this page is aligned to, so the
+left gutter is the only place with room. It is centred on the heading's *line* rather
+than on the box around it — a row's box also holds its description, and a heading that
+is not a switch sits in a box with padding above it, so a chevron measured from the box
+comes out a few pixels high. A row with nothing under it has no chevron and never opens
+nothing — the lightbox and the chapters rows have none, since their notes moved into
+their descriptions. The state is a set of ids outside React, for the same reason the
+settings are: this page is redrawn on every switch and the tests' React stub has no
+working state setter.
+
+**The rows under a heading that is not a switch sit one level in from it**, in a plain
+wrapper — not in Stash's `.setting-group`, whose `> .setting:not(:first-child)` would
+indent the second row on and leave the first one out. The wrapper indents by padding,
+for the reason below, so those rows end at the same right edge as everything else.
 
 **The switch column is one vertical line**, and the group indent has to respect it:
 an indent is always padding and never a margin. A `margin-left` moves a group's box

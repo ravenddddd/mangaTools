@@ -441,7 +441,13 @@
  * be on one vertical line. Padding narrows the box instead, so the right edge stays
  * where the level above had it.
  */
-.manga-tools-settings-group {
+/*
+ * Two things are a group: the rows under a switch, and the rows under a heading
+ * that is not a switch. They indent by the same amount, and by padding rather than
+ * by a margin — see the note above.
+ */
+.manga-tools-settings-group,
+.manga-tools-settings-body {
   padding-left: 1.25rem;
 }
 
@@ -796,7 +802,8 @@
 .manga-tools-fold {
   position: absolute;
   left: -1.05rem;
-  top: 0.2rem;
+  top: 50%;
+  transform: translateY(-50%);
   width: 0.7rem;
   height: 0.9rem;
   padding: 0;
@@ -822,12 +829,14 @@
 }
 
 /*
- * The row the chevron hangs off is positioned, so that the chevron has something
- * to be positioned *against*: it is drawn outside the text column, in the gutter,
- * which is only possible if the column is the reference.
+ * The chevron is measured from the heading's own line and centred on it. Not from
+ * the box around the heading: a row's box also holds its description, and a heading
+ * that is not a switch sits in a box with padding above it — a chevron hung off
+ * *that* came out a few pixels high, which is what "the mark's chevron is not
+ * centred" was. The line is a row of its own, so the heading's size and its box's
+ * padding stop mattering.
  */
-.setting.manga-tools-setting > .manga-tools-foldable,
-.manga-tools-settings-heading {
+.manga-tools-heading-line {
   position: relative;
 }
 
