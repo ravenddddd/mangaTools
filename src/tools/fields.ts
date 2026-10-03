@@ -347,6 +347,25 @@ NS.anyFieldShowing = (): boolean =>
   NS.fieldShowing("translationGroup") ||
   NS.fieldShowing("original");
 
+/**
+ * The bare name of one of this plugin's fields, from the key it is stored under.
+ *
+ * The bridge between the two spellings of the same five fields, and here rather than at the
+ * call site because it is the same list: `ownField` below answers with the key, and
+ * `fieldShowing` above answers for the names. The chapters field is the one of ours with no
+ * name — it is never drawn, so nothing ever asks for it by one — and "" is the answer for it
+ * as much as for a key that is not ours at all.
+ */
+NS.fieldNameOf = (key: unknown): MangaToolsFieldName | "" => {
+  const k = NS.ownField(key);
+  if (k === NS.FIELD_NAME) return "language";
+  if (k === NS.CENSORSHIP_FIELD_NAME) return "censorship";
+  if (k === NS.TRANSLATION_GROUP_FIELD_NAME) return "translationGroup";
+  if (k === NS.ORIGINAL_FIELD_NAME) return "original";
+
+  return "";
+};
+
 NS.ownField = (key: unknown): string => {
   const k = String(key ?? "")
     .trim()

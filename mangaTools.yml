@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.9.41
+version: 0.9.42
 ui:
   javascript:
     - mangaTools.js
@@ -69,6 +69,7 @@ ui:
 #   openDetailsBlock  the state the details tab's block opens in
 #   openEditBlock     the state the edit form's block opens in
 #   hidePerformers    leave the performers field out of a manga gallery's edit page
+#   showDisabledFields  a disabled field is drawn by Stash rather than hidden
 #
 # Everything is absent until the user changes something, and an absent value reads as
 # the default — and every default is what the plugin did before the setting existed,
@@ -137,6 +138,10 @@ settings:
   hidePerformers:
     displayName: Hide the performers field on the edit page
     description: A manga gallery rarely has performers, so its edit page leaves the field out. Only the field is hidden — whatever a gallery already has stays on the gallery and is kept when it is saved. The bulk edit dialog and the details tab are unaffected.
+    type: BOOLEAN
+  showDisabledFields:
+    displayName: Show disabled plugin fields
+    description: A disabled field is no longer hidden: Stash draws its own custom-field row for it in the details tab and the edit form. The value itself is not changed. The bulk edit dialog and the sidebar are unaffected.
     type: BOOLEAN
   # The reading half's own settings, as the JSON string they are stored as. They are
   # *not* rendered on the settings page — the plugin's own UI is what draws that page,

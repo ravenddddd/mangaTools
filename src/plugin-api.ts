@@ -248,6 +248,15 @@ export interface MangaToolsNamespace {
    * them, so nothing that draws one should have to remember it.
    */
   fieldShowing(field: MangaToolsFieldName): boolean;
+  /**
+   * The bare name of one of this plugin's fields, from the key it is stored under — or "" for
+   * a key that is not one, and for the chapters key, which is recognised and has no name.
+   *
+   * The bridge between the two ways this plugin names a field: `ownField` answers with the
+   * *key*, because what asks it has a key in hand, and `fieldShowing` answers for the *names*,
+   * which is what the surfaces that draw a field call it by. See both in fields.ts.
+   */
+  fieldNameOf(key: unknown): MangaToolsFieldName | "";
 
   /**
    * Whether any of the four is drawn.
@@ -322,6 +331,17 @@ export interface MangaToolsNamespace {
    * alone, so saving a gallery that has performers keeps them.
    */
   hidePerformers: boolean;
+  /**
+   * Whether a field that is switched off is left to Stash rather than hidden.
+   *
+   * A disabled field is not drawn by this plugin, and what this decides is whether its row on
+   * Stash's own pages is *taken over* as well: taken over, the key is lifted out of the custom
+   * fields Stash is handed and the value is nowhere to be seen; left alone, Stash draws its own
+   * row for it — labelled with the field's name rather than this plugin's wording, which is a
+   * worse-looking row than this plugin's and an invisible one without it. The value is never
+   * touched either way.
+   */
+  showDisabledFields: boolean;
   parseFlag(raw: unknown, fallback: boolean): boolean;
 
   /**

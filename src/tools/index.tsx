@@ -64,7 +64,7 @@ import {
   publishSidebarFilter,
 } from "./sidebar-filter";
 import type { ReactNode } from "react";
-import type { MangaToolsFilterModel } from "../plugin-api";
+import type { MangaToolsFieldName, MangaToolsFilterModel } from "../plugin-api";
 import type {
   MangaToolsApolloClient,
   MangaToolsApolloOperation,
@@ -683,6 +683,10 @@ function refreshSettings(): void {
       NS.hidePerformers = NS.parseFlag(
         pluginCfg ? pluginCfg.hidePerformers : null,
         HIDE_PERFORMERS_BY_DEFAULT
+      );
+      NS.showDisabledFields = NS.parseFlag(
+        pluginCfg ? pluginCfg.showDisabledFields : null,
+        SHOW_DISABLED_FIELDS_BY_DEFAULT
       );
       // The reading half's own settings, kept as the string they arrived as. Null
       // rather than "" for a library that has none: absent is a state the reader reads
@@ -1463,6 +1467,7 @@ function settingsInput(): { [key: string]: unknown } {
     openDetailsBlock: NS.openDetailsBlock,
     openEditBlock: NS.openEditBlock,
     hidePerformers: NS.hidePerformers,
+    showDisabledFields: NS.showDisabledFields,
     // Absent reads as a library that has never been written to, which is what puts the
     // browser's own remembered value back in force — see readSettings in the reader.
     readerSettings: NS.readerSettingsRaw ?? "",
@@ -3392,6 +3397,26 @@ function MangaToolsSettings() {
               NS.hidePerformers = next;
             })}
           />
+          {/* The one row here whose subject is a field that is *off* — see
+              showDisabledFields in plugin-api.ts, and the two patches where it decides
+              whether a key is lifted out of Stash's own rows. Its note is the second
+              half of that: this is about the disabled ones and nothing else. */}
+          <BooleanSetting
+            id="mangaTools-showDisabledFields"
+            heading={t(intl, "mangaTools.settings.showDisabledFields.heading")}
+            subHeading={
+              <>
+                {t(intl, "mangaTools.settings.showDisabledFields.description")}
+                <SettingsNote>
+                  {t(intl, "mangaTools.settings.showDisabledFields.note")}
+                </SettingsNote>
+              </>
+            }
+            checked={NS.showDisabledFields}
+            onChange={writeFlag((next) => {
+              NS.showDisabledFields = next;
+            })}
+          />
         </SettingsGroup>
       </SettingSwitch>
 
@@ -4121,6 +4146,15 @@ const EDIT_OPEN_BY_DEFAULT = true;
 const HIDE_PERFORMERS_BY_DEFAULT = true;
 
 NS.openDetailsBlock = DETAILS_OPEN_BY_DEFAULT;
+
+/**
+ * Whether a field that is switched off is drawn by Stash instead of being hidden.
+ *
+ * **Off by default**, which is what this plugin has always done: a switch that arrives with a
+ * new version is not the place to change what a reader already has. See the note on the row
+ * itself, and `showDisabledFields` in plugin-api.ts for what it decides.
+ */
+const SHOW_DISABLED_FIELDS_BY_DEFAULT = false;
 NS.openEditBlock = EDIT_OPEN_BY_DEFAULT;
 NS.hidePerformers = HIDE_PERFORMERS_BY_DEFAULT;
 
@@ -4392,14 +4426,44 @@ registerPatch("instead", "CustomFieldsInput", (...args: unknown[]) => {
 //    `plugin.mangaTools.censorship` row appearing in the form, and it went
 //    unnoticed that it only ever checked for the language one until the other two
 //    fields existed.
+/**
+ * Whether this plugin takes over the row Stash would draw for one of its own keys.
+ *
+ * The two patches below are the two halves of one answer, which is why this is one function
+ * rather than a condition written twice: the edit form *swallows* each of this plugin's rows,
+ * and the details page *lifts* each of its keys out of the custom fields it hands to Stash.
+ * Both of them are ways of taking the row over, and both have to give it up together or the
+ * page says two different things about the same field.
+ *
+ * Taken over for every key this plugin recognises — unless the reader has asked for disabled
+ * fields to be left to Stash (`showDisabledFields` in plugin-api.ts), in which case the row is
+ * given back for a field that is off. A field that is *on* is always this plugin's: it draws a
+ * nicer row than Stash's, whose label is the field's name.
+ *
+ * And the chapters key is never given back, whatever the reader has asked for: its value is
+ * JSON, and the row Stash would draw for it is a blob in the edit form. See ownField in
+ * fields.ts, where that key is recognised for exactly this reason — so that it cannot be left
+ * behind in Stash's own rows.
+ */
+function takesOverFieldRow(key: unknown): boolean {
+  if (!NS.ownField(key)) return false;
+
+  // The chapters key is the one of ours with no name — see fieldNameOf — and it is never given
+  // back: its value is JSON, and the row Stash would draw for it is a blob in the edit form.
+  const name = NS.fieldNameOf(key);
+  if (!name) return true;
+
+  return !NS.showDisabledFields || NS.fieldShowing(name);
+}
+
 registerPatch("instead", "CustomFieldInput", (...args: unknown[]) => {
   const props = args[0] as { field?: string; isNew?: boolean };
   const Original = originalFrom(args);
   noteFired("CustomFieldInput");
 
-  const isOwnRow = NS.isOwnField(props.field);
-
-  if (!props.isNew && isOwnRow) {
+  // `isNew` passes through whatever this says: that is the "new field" row, and the reader may
+  // be in the middle of typing a name that will turn out to be one of ours.
+  if (!props.isNew && takesOverFieldRow(props.field)) {
     return null;
   }
 
@@ -4599,7 +4663,9 @@ registerPatch("instead", "CustomFields", (...args: unknown[]) => {
   let lifted = false;
 
   Object.keys(values).forEach((k) => {
-    if (!NS.isOwnField(k)) return;
+    // A key that is *not* taken over stays in `rest`, and Stash draws its own row for it —
+    // with the value untouched, which is the whole of what "given back" means here.
+    if (!takesOverFieldRow(k)) return;
     lifted = true;
     delete rest[k];
   });

@@ -55,6 +55,61 @@ module.exports = () => {
     original,
     "reading the original as args[last] must survive the 2-argument call form"
   );
+  // **And a disabled field's row is given back**, when the reader has asked for that: this
+  // plugin draws nothing for a field that is off, so the row Stash would draw is the only one
+  // there is — a row with the value in it rather than no row at all.
+  NS.showDisabledFields = true;
+  NS.fieldLanguage = false;
+  assert.strictEqual(
+    call("CustomFieldInput", {
+      field: "plugin.mangaTools.language",
+      value: "zh-Hans",
+    }).type,
+    original,
+    "a disabled field's row goes to Stash when disabled fields are Stash's"
+  );
+  assert.strictEqual(
+    call("CustomFieldInput", {
+      field: NS.CHAPTER_FIELD_NAME,
+      value: "{}",
+    }),
+    null,
+    "…but the chapters field's never does, whatever the switch says: its value is JSON, " +
+      "and a raw row for it is a blob in the edit form"
+  );
+  // **A field that is on is taken over whatever the switch says** — which is the whole of what
+  // this switch is not about, and the sentence the row's note makes.
+  NS.fieldLanguage = true;
+  assert.strictEqual(
+    call("CustomFieldInput", {
+      field: "plugin.mangaTools.language",
+      value: "zh-Hans",
+    }),
+    null,
+    "an enabled field is taken over even with disabled fields given back"
+  );
+
+  // And the chapters key is never given back, whatever the switch says *and* whatever the four
+  // field switches say: there is no field switch for it, so the only safe answer is that it is
+  // always this plugin's.
+  NS.fieldOriginal = false;
+  assert.strictEqual(
+    call("CustomFieldInput", { field: NS.CHAPTER_FIELD_NAME, value: "{}" }),
+    null,
+    "…and the chapters row is taken over with every switch on the page off"
+  );
+  NS.fieldOriginal = true;
+
+  NS.showDisabledFields = false;
+  assert.strictEqual(
+    call("CustomFieldInput", {
+      field: "plugin.mangaTools.language",
+      value: "zh-Hans",
+    }),
+    null,
+    "and with the switch off it is taken over again, as it always was"
+  );
+
   console.log("✓ CustomFieldInput isolation (including the 2-argument form)");
 
   // ── 9. CustomFields detail page: lift our fields out, portal the panel into .gallery-details ──
@@ -72,6 +127,43 @@ module.exports = () => {
   // The panel already holds a few rows rendered by Stash
   const stockH6 = makeEl("h6");
   galleryPanel.appendChild(stockH6);
+
+  // **The same answer on the details page**, which is the other half of one question: what is
+  // lifted out of the custom fields handed to Stash is what this plugin takes over.
+  NS.showDisabledFields = true;
+  NS.fieldLanguage = false;
+  const givenBack = detail({
+    "plugin.mangaTools.language": "zh-Hant",
+    "plugin.mangaTools.chapters": '{"v":1}',
+    author: "x",
+  });
+  assert.deepStrictEqual(
+    givenBack.rest,
+    { "plugin.mangaTools.language": "zh-Hant", author: "x" },
+    "a disabled field's key is left for Stash to draw, and the chapters one is not"
+  );
+
+  // …and one that is on is lifted out as it always was, switch or no switch.
+  NS.fieldLanguage = true;
+  assert.deepStrictEqual(
+    detail({ "plugin.mangaTools.language": "zh-Hant", author: "x" }).rest,
+    { author: "x" },
+    "an enabled field's key is still lifted out, which is what stops Stash drawing a " +
+      "second row for the same value"
+  );
+
+  // And the chapters key stays lifted even with every field switch off — see fieldNameOf,
+  // which is the one place that knows a key with no name.
+  NS.fieldLanguage = false;
+  NS.fieldOriginal = false;
+  assert.deepStrictEqual(
+    detail({ "plugin.mangaTools.chapters": '{"v":1}', author: "x" }).rest,
+    { author: "x" },
+    "the chapters key is never handed to Stash, with the fields off or on"
+  );
+  NS.fieldLanguage = true;
+  NS.fieldOriginal = true;
+  NS.showDisabledFields = false;
 
   let r9 = detail({ "plugin.mangaTools.language": "zh-Hant", author: "x" });
   assert.deepStrictEqual(

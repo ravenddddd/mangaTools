@@ -361,6 +361,7 @@ module.exports = () => {
       "mangaTools-openDetailsBlock",
       "mangaTools-openEditBlock",
       "mangaTools-hidePerformers",
+      "mangaTools-showDisabledFields",
       "mangaTools-confirmUnmark",
       "mangaTools-deleteOnUnmark",
       "mangaTools-coverIcon",
@@ -526,17 +527,20 @@ module.exports = () => {
     "and so are the three display rows"
   );
 
-  // ── The two notes, inside their rows' descriptions ─────────────────
+  // ── The three notes, inside their rows' descriptions ────────────────
   // "The lightbox's own settings are adjusted on the lightbox page" and "editing
   // chapters does not touch Stash's own rows" were each a row of their own under
   // their switch, in the same grey as the description — a line of grey prose under
   // a longer line of grey prose, which is a line nobody reads. Each is now the
   // second half of its own row's description, boxed; and each stays there with its
   // switch off, because a description is always drawn and this is part of what it
-  // says.
+  // says. The third is the same shape for the same reason: what the row is about is
+  // the fields that are *off*, and the description says what happens rather than
+  // which fields it is about.
   const NOTE_ROWS = [
     ["the lightbox", "readerTakeover"],
     ["the chapters tab", "manageChapters"],
+    ["the disabled fields", "showDisabledFields"],
   ];
   const stringsIn = (el) => {
     const out = [];
@@ -621,19 +625,21 @@ module.exports = () => {
     }
   }
 
-  // …and neither goes away with its switch: they are the descriptions, not
+  // …and none of them goes away with its switch: they are the descriptions, not
   // sub-settings that appear under one.
   NS.readerTakeover = false;
   NS.manageChapters = false;
-  const bothOff = call("PluginSettings", { pluginID: "mangaTools" });
+  NS.showDisabledFields = false;
+  const allOff = call("PluginSettings", { pluginID: "mangaTools" });
   assert.strictEqual(
-    withClass(bothOff, "manga-tools-settings-note").length,
+    withClass(allOff, "manga-tools-settings-note").length,
     NOTE_ROWS.length,
-    "both notes belong to their descriptions, so turning the features off leaves " +
-      "them where they are"
+    "a note belongs to its description, so turning the switch off leaves it where " +
+      "it is"
   );
   NS.readerTakeover = true;
   NS.manageChapters = true;
+  NS.showDisabledFields = false;
   state.currentLocale = localeHere;
 
   // ── Folding a group shut ───────────────────────────────────────────
@@ -692,7 +698,7 @@ module.exports = () => {
       "…and each saying it is open, which is the only way anything but an eye knows"
     );
     assert.strictEqual(groupsIn(page), 2, "two groups to start with");
-    assert.strictEqual(switchesIn(page), 15, "…and fifteen switches");
+    assert.strictEqual(switchesIn(page), 16, "…and sixteen switches");
 
     const before = state.capturedConfigWrite;
 
@@ -712,10 +718,10 @@ module.exports = () => {
     };
 
     for (const [what, index, left] of [
-      ["the language field, which folds two switches", 1, 13],
-      ["the display heading, which folds three rows", 2, 12],
-      ["the mark's heading, which folds three rows and no group", 3, 12],
-      ["the fields group, which folds all nine under it", 0, 6],
+      ["the language field, which folds two switches", 1, 14],
+      ["the display heading, which folds four rows", 2, 12],
+      ["the mark's heading, which folds three rows and no group", 3, 13],
+      ["the fields group, which folds all ten under it", 0, 6],
     ]) {
       click(chevronsIn(open())[index]);
       assert.strictEqual(
@@ -726,7 +732,7 @@ module.exports = () => {
       shutEverything();
       assert.strictEqual(
         switchesIn(open()),
-        15,
+        16,
         `…and opening it again should bring them all back (${what})`
       );
     }
@@ -1024,6 +1030,7 @@ module.exports = () => {
         openDetailsBlock: false,
         openEditBlock: true,
         hidePerformers: true,
+        showDisabledFields: false,
         // The reading half's own settings are part of this map too, and empty here
         // because nothing has been written to the library — see the reader's
         // readSettings, where absent is what puts the browser's value back in force.
@@ -1089,6 +1096,7 @@ module.exports = () => {
       openDetailsBlock: false,
       openEditBlock: true,
       hidePerformers: true,
+      showDisabledFields: false,
       // The reading half's own settings ride along, as the string the library holds
       // them as. Empty here because this library has never been written to — see
       // readSettings in the reader, where an absent value is what puts the browser's

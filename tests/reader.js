@@ -2843,6 +2843,7 @@ async function main() {
         "readerSettings",
         "readerTakeover",
         "showCoverBadge",
+        "showDisabledFields",
         "showFlags",
       ],
       "…and it is the whole map: saving the reader's settings cannot take the " +

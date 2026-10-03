@@ -669,6 +669,16 @@ cleared. What it does *not* change is which keys the plugin recognises. `NS.ownF
 goes on answering for a field nobody is showing, or a gallery's own JSON would come
 back as somebody else's custom field in Stash's edit form.
 
+**Unless the reader asks for Stash's own rows back.** "Show disabled plugin fields", at the
+bottom of that group, is about the two surfaces where Stash has a row of its own to offer: with
+it on, a field that is off is no longer *taken over* — its row in the details tab and the edit
+form is drawn by Stash, labelled with the field's name rather than this plugin's wording, and the
+value is untouched. Which is a worse-looking row and an invisible one without it. A field that is
+*on* is always this plugin's, whatever the switch says, and the chapters key is never given back
+at all: its value is JSON, and the row Stash would draw for it is a blob in the edit form. The
+bulk dialog and the sidebar have no native row to fall back to, so they are unaffected — a
+disabled field does not appear there either way.
+
 **Raw is drawn differently depending on its neighbours.** It answers the same question
 the translation group does, which is why — with the group also on — the mark is a chip
 on the group's row rather than a row of its own. With the group turned off, raw is just
