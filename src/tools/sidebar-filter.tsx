@@ -1,16 +1,31 @@
 /**
  * Manga Tools — the gallery list's filter sections, in the sidebar.
  *
- * Three sections — language, censorship and manga — drawn as pinned sidebar
- * filters like Stash's own studio section. They share the read/write logic in
- * filter-model.ts and the rows in filter-ui.ts; what they also share, and what
- * lives here, is the section shell: a collapsible heading, the chosen values
- * shown above the fold, and the candidate list below it.
+ * Five sections — the mark, the language, the censorship, the translation group
+ * and the raw field — drawn as pinned sidebar filters like Stash's own studio
+ * section. They share the read/write logic in filter-model.ts and the rows in
+ * filter-ui.ts; what they also share, and what lives here, is the section shell: a
+ * collapsible heading, the chosen values shown above the fold, and the candidate
+ * list below it.
  *
- * The three sections used to write that shell out three times. Once the manga
- * section arrived there were three callers of the same boilerplate, so it is
- * one `SidebarSection` component plus one `useSidebarSection` hook for the
- * open/closed state that goes with it.
+ * **Two shapes, not five sections.** Every one of the five is a valued field —
+ * (Any)/(None), include, exclude, a list to search — or a presence: two values,
+ * one of which may be chosen. `useValuedSection` and `usePresenceSection` are
+ * those two shapes, `VALUED_SECTIONS` and `PRESENCE_SECTIONS` are what differs
+ * between the fields, and the five exported components below are what the entry
+ * file mounts by name.
+ *
+ * Both are **hooks that are called rather than components that are rendered**:
+ * they read the section's open state and repair its tag row, so they have to be
+ * hooks, and being called keeps the element tree flat, which is what the section
+ * tests navigate. See the note on languageChip in fields-ui.tsx for the same rule
+ * where no hook is involved.
+ *
+ * The three valued sections were one section written three times until they
+ * became this. Three of the differences between them were *behaviour* rather than
+ * shape, and are kept as flags on the table rather than tidied away — a refactor
+ * that also changes what a click does is two things at once. Each flag says what
+ * it is and why it looks like an oversight.
  */
 import { NS } from "../languages";
 import { t } from "../i18n";
@@ -34,6 +49,7 @@ import {
   readOriginalFilter,
   toggleExcluded,
   toggleIncluded,
+  translationGroupHeading,
   withModifier,
   withoutModifier,
 } from "./filter-model";
@@ -406,23 +422,94 @@ function censorshipOptions(intl: MangaToolsIntl): MangaToolsOption[] {
 }
 
 /**
- * The gallery list's language filter, one of the sections Stash's sidebar
- * renders through its own patch container.
+ * A section for one of the three valued fields: language, censorship, group.
  *
- * Reads the current selection from the filter model it is handed — published by
- * the entry file from `FilteredGalleryList`'s output, since the container is
- * handed nothing but children — and reports changes by rewriting the URL, which
- * is the route in (see applyLanguage).
+ * They are the same section — (Any)/(None), an include list, an exclude list, a
+ * search over the candidates, and the same four click handlers — because they are
+ * the same kind of question: which of a list of values. What differs is data; see
+ * VALUED_SECTIONS below.
  *
- * It also repairs the two things about the filter that belong to Stash and that
- * this plugin has to make say what they mean: the criterion's identity and its
- * tag. Both are in a layout effect below.
+ * A **custom hook that is called, not a component that is rendered**, for the two
+ * reasons usePresenceSection gives: it reads the section's open state and repairs
+ * the tag row, so it must be a hook; and being called rather than rendered keeps
+ * the element tree flat, which is what the section tests navigate.
+ *
+ * Two things are always set up and only sometimes drawn, which is the rule hooks
+ * live by: the search box's state and its ref exist for every field, because a
+ * hook cannot be called conditionally, and only the fields whose values are worth
+ * searching draw the box. With no box the ref is null, so the focus that follows
+ * every change is a no-op rather than a special case.
  */
-export function SidebarLanguageFilter(props: {
+type ValuedSectionProps = {
   filter: MangaToolsFilterModel;
-}) {
-  const { intl, history, open, toggleOpen } =
-    useSidebarSection(SECTION_STATE_KEY);
+  /** The field filtered on — see the table in filter-model.ts */
+  fieldKey: string;
+  stateKey: string;
+  heading: (intl: MangaToolsIntl) => string;
+  /** The word for the Bootstrap-missing message: "language", "censorship", … */
+  what: string;
+  read: (filter: MangaToolsFilterModel) => MangaToolsLanguageSelection;
+  apply: (
+    filter: MangaToolsFilterModel,
+    history: MangaToolsHistory,
+    selection: MangaToolsLanguageSelection
+  ) => void;
+  relabel: (labels: string[]) => void;
+  options: (
+    intl: MangaToolsIntl,
+    selection: MangaToolsLanguageSelection
+  ) => MangaToolsOption[];
+  /** A chess icon where a flag would go, for the field whose values are not languages */
+  leading?: (option: MangaToolsOption) => ReactElement | null;
+  /** Whether the candidates are searchable — true where the list is long enough to type at */
+  search?: boolean;
+  /** A repair to the criterion Stash owns, which only the language field needs */
+  adopt?: (filter: MangaToolsFilterModel) => void;
+  /**
+   * Whether the candidate list steps aside while (Any) or (None) is set.
+   *
+   * The language and censorship sections do, and the translation group's does not
+   * — a difference that predates this being one function. It is kept rather than
+   * tidied because a refactor that also changes behaviour is two things at once,
+   * but it is worth a look: picking a group name while (Any) is set silently
+   * clears the modifier, where the other two do not offer the choice at all.
+   */
+  hideCandidatesWhileModifier?: boolean;
+  /**
+   * Whether a *candidate* row carries nothing before its label.
+   *
+   * The translation group's does not, and that is the third of the differences
+   * these three sections had while they were three functions. What makes it
+   * invisible either way is that a group option carries no flag to draw — the row
+   * says nothing rather than saying null — but the group's list is answering
+   * "which group", and the flag a group *could* carry is its galleries' usual
+   * language, which is a suggestion about a different field. Kept as it was, for
+   * the reason the two below are; see them.
+   */
+  plainCandidates?: boolean;
+  /**
+   * Whether picking a candidate empties the search box.
+   *
+   * Same story as the flag above, and the same suggestion: the language section
+   * does and the group section does not, which looks like an oversight rather
+   * than a decision — emptying the box is what makes a second value typeable
+   * straight away, and a group name is no different.
+   */
+  clearQueryOnPick?: boolean;
+};
+
+/** What a row draws before its label: a flag, or the field's own leading mark */
+function decoration(
+  field: ValuedSectionProps,
+  option: MangaToolsOption
+): { leading?: ReactElement | null; flag?: string | null } {
+  return field.leading
+    ? { leading: field.leading(option) }
+    : { flag: flagOf(option) };
+}
+
+function useValuedSection(props: ValuedSectionProps) {
+  const { intl, history, open, toggleOpen } = useSidebarSection(props.stateKey);
 
   const queryState = React.useState("");
   const query = queryState[0];
@@ -431,22 +518,22 @@ export function SidebarLanguageFilter(props: {
   /** The search box, so focus can be put back into it after a change */
   const searchRef = React.useRef<HTMLInputElement | null>(null);
 
-  const selection = readLanguageFilter(props.filter);
+  const selection = props.read(props.filter);
 
   // This field's tags, re-worded as this plugin words them. Its own conditions
-  // rather than the criterion as a whole: the three fields share one criterion,
-  // so a filter with a censorship in it too is the same criterion with another
+  // rather than the criterion as a whole: the fields share one criterion, so a
+  // filter with a censorship in it too is the same criterion with another
   // condition on it, and the two tags are worded independently.
-  const tagLabelsFor = fieldTagLabels(intl, props.filter, NS.FIELD_NAME);
+  const tagLabelsFor = fieldTagLabels(intl, props.filter, props.fieldKey);
 
-  // Both of the repairs to the filter Stash owns live here, in the one surface
+  // Both of the repairs to the filter Stash owns happen here, in the one surface
   // that is mounted for as long as the list is: the criterion is handed over to
   // Stash's controls (see adoptLanguageCriterion) and its tag is re-worded (see
-  // relabelTags). Every change to the filter decodes into fresh criterion
-  // objects, so both are repeated on each commit.
+  // relabelTags). Every change to the filter decodes into fresh criterion objects,
+  // so both are repeated on each commit.
   React.useLayoutEffect(() => {
-    adoptLanguageCriterion(props.filter);
-    if (tagLabelsFor) relabelTags(tagLabelsFor);
+    if (props.adopt) props.adopt(props.filter);
+    if (tagLabelsFor) props.relabel(tagLabelsFor);
   });
 
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
@@ -454,11 +541,11 @@ export function SidebarLanguageFilter(props: {
   const Bootstrap = PluginApi.libraries.Bootstrap;
 
   function update(next: MangaToolsLanguageSelection) {
-    applyLanguage(props.filter, history, next);
+    props.apply(props.filter, history, next);
 
     // Every change funnels through here, which is this component's equivalent of
     // Stash's selectHook and unselectHook both ending in setInputFocus(): the
-    // cursor stays in the box so a second language can be typed straight away.
+    // cursor stays in the box so a second value can be typed straight away.
     if (!isTouchDevice() && searchRef.current) {
       searchRef.current.focus();
     }
@@ -467,18 +554,18 @@ export function SidebarLanguageFilter(props: {
   // Thin wrappers around the shared operations, which are what actually define
   // what a click means — the dialog's card uses the same ones, so the two
   // surfaces cannot drift apart.
-  function toggleInclude(code: string) {
-    update(toggleIncluded(selection, code));
+  function toggleInclude(value: string) {
+    update(toggleIncluded(selection, value));
   }
 
-  function toggleExclude(code: string) {
-    update(toggleExcluded(selection, code));
+  function toggleExclude(value: string) {
+    update(toggleExcluded(selection, value));
   }
 
-  // Two actions, not one, exactly as Stash has them: picking a modifier entry
-  // sets it (its onSelect), and clicking the same entry once it sits in the
-  // chosen list takes it back to the default (its onUnselect — which sets the
-  // modifier back rather than toggling, so it cannot be reached from here).
+  // Two actions, not one, exactly as Stash has them: picking a modifier entry sets
+  // it (its onSelect), and clicking the same entry once it sits in the chosen list
+  // takes it back to the default (its onUnselect — which sets the modifier back
+  // rather than toggling, so it cannot be reached from here).
   function setModifier(modifier: "any" | "none") {
     update(withModifier(selection, modifier));
   }
@@ -487,37 +574,47 @@ export function SidebarLanguageFilter(props: {
     update(withoutModifier(selection));
   }
 
-  // The same "enabled languages" setting that limits the edit dropdown limits
-  // what can be filtered on, so the two never disagree about which languages
-  // this library uses. A value already in use stays visible even if it has since
-  // been disabled, since otherwise the list would be filtered by something
-  // invisible.
-  const options = visibleOptions(intl, selection);
-  const selectable = selectableOptions(selection, options);
+  /** A row's own click: take the value in, and get out of the reader's way */
+  function pick(value: string) {
+    toggleInclude(value);
+    if (props.clearQueryOnPick) setQuery("");
+  }
 
-  const chosen = selectable.filter(
+  function unpick(value: string) {
+    toggleExclude(value);
+    if (props.clearQueryOnPick) setQuery("");
+  }
+
+  const options = props.options(intl, selection);
+  const chosen = options.filter(
     (o) => selection.included.indexOf(o.value) !== -1
   );
-  const excludedChosen = selectable.filter(
+  const excludedChosen = options.filter(
     (o) => selection.excluded.indexOf(o.value) !== -1
   );
-  const candidates = selectable.filter(
+  // Nothing is selectable while (Any) or (None) is set — there is no particular
+  // value to pick in those states — and `hideCandidatesWhileModifier` is what says
+  // whether this field follows that. See it for the one that does not.
+  const offered = props.hideCandidatesWhileModifier
+    ? selectableOptions(selection, options)
+    : options;
+  const candidates = offered.filter(
     (o) =>
       selection.included.indexOf(o.value) === -1 &&
       selection.excluded.indexOf(o.value) === -1 &&
       matchesQuery(o, query)
   );
 
-  // (Any) and (None) are the two states a language field can be in before any
-  // particular language is chosen, so Stash offers them only while nothing is
-  // chosen — confirmed against a real section, where choosing two studios and
-  // excluding a third left just the one hierarchical entry and neither of
-  // these. Once one is picked it shows above, in the chosen list.
+  // (Any) and (None) are the two states a valued field can be in before any
+  // particular value is chosen, so Stash offers them only while nothing is chosen
+  // — confirmed against a real section, where choosing two studios and excluding a
+  // third left just the one hierarchical entry and neither of these. Once one is
+  // picked it shows above, in the chosen list.
   const showModifiers = isEmptySelection(selection);
 
-  // The section above the fold-away list: whatever is being asked for, in the
-  // same "selected-object" shape as a chosen studio. The modifier entries are
-  // shown in parentheses, exactly as Stash labels its own.
+  // The section above the fold-away list: whatever is being asked for, in the same
+  // "selected-object" shape as a chosen studio. The modifier entries are shown in
+  // parentheses, exactly as Stash labels its own.
   const chosenItems: ReactElement[] = [];
   if (selection.modifier) {
     chosenItems.push(
@@ -545,6 +642,7 @@ export function SidebarLanguageFilter(props: {
         variant="sidebar"
         key={"in-" + o.value}
         label={o.label}
+        {...decoration(props, o)}
         state="included"
         onClick={() => {
           toggleInclude(o.value);
@@ -558,6 +656,7 @@ export function SidebarLanguageFilter(props: {
       variant="sidebar"
       key={"ex-" + o.value}
       label={o.label}
+      {...decoration(props, o)}
       state="excluded"
       onClick={() => {
         toggleExclude(o.value);
@@ -567,51 +666,52 @@ export function SidebarLanguageFilter(props: {
 
   return (
     <SidebarSection
-      heading={fieldLabel(intl)}
+      heading={props.heading(intl)}
       open={open}
       onToggle={toggleOpen}
       chosenItems={chosenItems}
       excludedItems={excludedItems}
-      what="language"
+      what={props.what}
     >
-      {/* Stash searches its candidates server-side and debounces the input;
-          these fourteen are already in memory, so filtering is immediate. */}
-      <div className="clearable-input-group">
-        <input
-          ref={searchRef}
-          className="clearable-text-field form-control"
-          value={query}
-          placeholder={message(intl, "actions.search", "Search") + "…"}
-          onChange={(e: { target: { value: string } }) => {
-            setQuery(e.target.value);
-          }}
-          onKeyDown={(e: { key?: string }) => {
-            // Enter takes the one candidate the search has narrowed to,
-            // as Stash's onEnter does. Deliberately the candidates rather
-            // than the modifier entries listed above them, which is what
-            // Stash does too.
-            if (e.key !== "Enter" || candidates.length !== 1) return;
-            toggleInclude(candidates[0].value);
-            setQuery("");
-          }}
-        />
-        {query && Bootstrap ? (
-          <Bootstrap.Button
-            // "secondary", not the react-bootstrap default of "primary":
-            // Stash's ClearableInput asks for secondary, and the primary
-            // button paints this one with a solid blue background that
-            // Stash's own .clearable-text-field-clear does not undo.
-            variant="secondary"
-            className="clearable-text-field-clear"
-            title={message(intl, "actions.clear", "Clear")}
-            onClick={() => {
+      {props.search ? (
+        /* Stash searches its candidates server-side and debounces the input;
+           these are already in memory, so filtering is immediate. */
+        <div className="clearable-input-group">
+          <input
+            ref={searchRef}
+            className="clearable-text-field form-control"
+            value={query}
+            placeholder={message(intl, "actions.search", "Search") + "…"}
+            onChange={(e: { target: { value: string } }) => {
+              setQuery(e.target.value);
+            }}
+            onKeyDown={(e: { key?: string }) => {
+              // Enter takes the one candidate the search has narrowed to, as
+              // Stash's onEnter does. Deliberately the candidates rather than the
+              // modifier entries listed above them, which is what Stash does too.
+              if (e.key !== "Enter" || candidates.length !== 1) return;
+              toggleInclude(candidates[0].value);
               setQuery("");
             }}
-          >
-            <Icon icon={Solid.faTimes} />
-          </Bootstrap.Button>
-        ) : null}
-      </div>
+          />
+          {query && Bootstrap ? (
+            <Bootstrap.Button
+              // "secondary", not the react-bootstrap default of "primary":
+              // Stash's ClearableInput asks for secondary, and the primary button
+              // paints this one with a solid blue background that Stash's own
+              // .clearable-text-field-clear does not undo.
+              variant="secondary"
+              className="clearable-text-field-clear"
+              title={message(intl, "actions.clear", "Clear")}
+              onClick={() => {
+                setQuery("");
+              }}
+            >
+              <Icon icon={Solid.faTimes} />
+            </Bootstrap.Button>
+          ) : null}
+        </div>
+      ) : null}
       <ul>
         {showModifiers ? (
           <LanguageRow
@@ -648,16 +748,14 @@ export function SidebarLanguageFilter(props: {
             variant="sidebar"
             key={o.value}
             label={o.label}
-            flag={flagOf(o)}
+            {...(props.plainCandidates ? {} : decoration(props, o))}
             state="candidate"
             canExclude
             onClick={() => {
-              toggleInclude(o.value);
-              setQuery("");
+              pick(o.value);
             }}
             onExclude={() => {
-              toggleExclude(o.value);
-              setQuery("");
+              unpick(o.value);
             }}
           />
         ))}
@@ -667,181 +765,87 @@ export function SidebarLanguageFilter(props: {
 }
 
 /**
- * The gallery list's censorship filter — the language section's shape, on two
- * fixed values.
+ * The three valued sections, as data — everything the hook above needs to draw
+ * one of them, which is what makes the components below a few lines apiece.
+ */
+const VALUED_SECTIONS: { [name: string]: Omit<ValuedSectionProps, "filter"> } =
+  {
+    language: {
+      fieldKey: NS.FIELD_NAME,
+      stateKey: SECTION_STATE_KEY,
+      heading: fieldLabel,
+      what: "language",
+      read: readLanguageFilter,
+      apply: applyLanguage,
+      relabel: relabelTags,
+      options: visibleOptions,
+      search: true,
+      adopt: adoptLanguageCriterion,
+      hideCandidatesWhileModifier: true,
+      clearQueryOnPick: true,
+    },
+    censorship: {
+      fieldKey: NS.CENSORSHIP_FIELD_NAME,
+      stateKey: CENSORSHIP_SECTION_STATE_KEY,
+      heading: censorshipHeading,
+      what: "censorship",
+      read: readCensorshipFilter,
+      apply: applyCensorship,
+      relabel: relabelCensorshipTags,
+      options: (intl) => censorshipOptions(intl),
+      leading: (o) => censorshipLeading(o.value),
+      hideCandidatesWhileModifier: true,
+    },
+    translationGroup: {
+      fieldKey: NS.TRANSLATION_GROUP_FIELD_NAME,
+      stateKey: GROUP_SECTION_STATE_KEY,
+      heading: translationGroupHeading,
+      what: "translation group",
+      read: readGroupFilter,
+      apply: applyGroup,
+      relabel: relabelGroupTags,
+      options: (_intl, selection) => translationGroupOptions(selection),
+      search: true,
+      plainCandidates: true,
+    },
+  };
+
+/**
+ * The gallery list's language filter, one of the sections Stash's sidebar
+ * renders through its own patch container.
  *
- * Same mechanism as the language section (read the filter, write the URL, repair
- * the tag), minus the search box and the flag: two values need no search, and a
- * chess piece stands in for the flag.
+ * Reads the current selection from the filter model it is handed — published by
+ * the entry file from `FilteredGalleryList`'s output, since the container is
+ * handed nothing but children — and reports changes by rewriting the URL, which
+ * is the route in (see applyLanguage).
+ *
+ * It is also the one section that repairs the criterion Stash owns, handing it
+ * over to Stash's own controls (see adoptLanguageCriterion) so that the filter it
+ * sets shows as this plugin's card rather than as a generic custom field.
+ */
+export function SidebarLanguageFilter(props: {
+  filter: MangaToolsFilterModel;
+}) {
+  return useValuedSection({
+    ...VALUED_SECTIONS.language,
+    filter: props.filter,
+  });
+}
+
+/**
+ * The gallery list's censorship filter: one of the three valued sections, over
+ * two fixed values.
+ *
+ * No search box — two values need none — and a chess piece where the others draw
+ * a flag. See censorshipOptions and censorshipLeading.
  */
 export function SidebarCensorshipFilter(props: {
   filter: MangaToolsFilterModel;
 }) {
-  const { intl, history, open, toggleOpen } = useSidebarSection(
-    CENSORSHIP_SECTION_STATE_KEY
-  );
-
-  const selection = readCensorshipFilter(props.filter);
-
-  const tagLabelsFor = fieldTagLabels(
-    intl,
-    props.filter,
-    NS.CENSORSHIP_FIELD_NAME
-  );
-
-  React.useLayoutEffect(() => {
-    if (tagLabelsFor) relabelCensorshipTags(tagLabelsFor);
+  return useValuedSection({
+    ...VALUED_SECTIONS.censorship,
+    filter: props.filter,
   });
-
-  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
-  const Icon = PluginApi.components.Icon;
-
-  function update(next: MangaToolsLanguageSelection) {
-    applyCensorship(props.filter, history, next);
-  }
-
-  // The same shared operations as the language section — the meaning of a click
-  // is defined there, so the two sections cannot drift apart.
-  function toggleInclude(value: string) {
-    update(toggleIncluded(selection, value));
-  }
-  function toggleExclude(value: string) {
-    update(toggleExcluded(selection, value));
-  }
-  function setModifier(modifier: "any" | "none") {
-    update(withModifier(selection, modifier));
-  }
-  function clearModifier() {
-    update(withoutModifier(selection));
-  }
-
-  const options = censorshipOptions(intl);
-  const chosen = options.filter(
-    (o) => selection.included.indexOf(o.value) !== -1
-  );
-  const excludedChosen = options.filter(
-    (o) => selection.excluded.indexOf(o.value) !== -1
-  );
-  // Nothing is selectable while (Any) or (None) is set — there is no particular
-  // value to pick in those states — so the two values step aside the moment a
-  // modifier is chosen. The same rule the language section follows, from the same
-  // place: see selectableOptions.
-  const candidates = selectableOptions(selection, options).filter(
-    (o) =>
-      selection.included.indexOf(o.value) === -1 &&
-      selection.excluded.indexOf(o.value) === -1
-  );
-
-  const showModifiers = isEmptySelection(selection);
-
-  const chosenItems: ReactElement[] = [];
-  if (selection.modifier) {
-    chosenItems.push(
-      <li className="selected-object modifier-object" key="modifier">
-        <a tabIndex={0} onClick={clearModifier}>
-          <div className="label-group">
-            <Icon className="fa-fw include-button" icon={Solid.faCheckCircle} />
-            <span className="TruncatedText inline selected-object-label">
-              {"(" +
-                message(
-                  intl,
-                  "criterion_modifier_values." + selection.modifier,
-                  selection.modifier === "any" ? "Any" : "None"
-                ) +
-                ")"}
-            </span>
-          </div>
-        </a>
-      </li>
-    );
-  }
-  chosen.forEach((o) => {
-    chosenItems.push(
-      <LanguageRow
-        variant="sidebar"
-        key={"in-" + o.value}
-        label={o.label}
-        leading={censorshipLeading(o.value)}
-        state="included"
-        onClick={() => {
-          toggleInclude(o.value);
-        }}
-      />
-    );
-  });
-
-  const excludedItems = excludedChosen.map((o) => (
-    <LanguageRow
-      variant="sidebar"
-      key={"ex-" + o.value}
-      label={o.label}
-      leading={censorshipLeading(o.value)}
-      state="excluded"
-      onClick={() => {
-        toggleExclude(o.value);
-      }}
-    />
-  ));
-
-  return (
-    <SidebarSection
-      heading={censorshipHeading(intl)}
-      open={open}
-      onToggle={toggleOpen}
-      chosenItems={chosenItems}
-      excludedItems={excludedItems}
-      what="censorship"
-    >
-      <ul>
-        {showModifiers ? (
-          <LanguageRow
-            variant="sidebar"
-            label={
-              "(" + message(intl, "criterion_modifier_values.any", "Any") + ")"
-            }
-            state="candidate"
-            modifier
-            canExclude={false}
-            onClick={() => {
-              setModifier("any");
-            }}
-          />
-        ) : null}
-        {showModifiers ? (
-          <LanguageRow
-            variant="sidebar"
-            label={
-              "(" +
-              message(intl, "criterion_modifier_values.none", "None") +
-              ")"
-            }
-            state="candidate"
-            modifier
-            canExclude={false}
-            onClick={() => {
-              setModifier("none");
-            }}
-          />
-        ) : null}
-        {candidates.map((o) => (
-          <LanguageRow
-            variant="sidebar"
-            key={o.value}
-            label={o.label}
-            leading={censorshipLeading(o.value)}
-            state="candidate"
-            canExclude
-            onClick={() => {
-              toggleInclude(o.value);
-            }}
-            onExclude={() => {
-              toggleExclude(o.value);
-            }}
-          />
-        ))}
-      </ul>
-    </SidebarSection>
-  );
 }
 
 /**
@@ -1050,222 +1054,20 @@ function translationGroupOptions(
 }
 
 /**
- * The gallery list's translation group filter: the language section's shape, over
- * names the library defines rather than a table this plugin ships.
+ * The gallery list's translation group filter: one of the three valued sections,
+ * over names the library defines rather than a table this plugin ships.
  *
- * Same modifier entries, same include/exclude lists, same search box — the list is
- * short enough to show and long enough that typing beats scrolling (the measured
- * library has around twenty-five groups, most of them used once or twice), and the
- * one difference that matters is that a value here is free text nobody curates. So
- * a group is offered only while some gallery carries it, and a name the filter
- * holds keeps its row regardless — see translationGroupOptions.
+ * A group is free text nobody curates, and that is what makes it different: it is
+ * offered only while some gallery carries it, and a name the filter holds keeps
+ * its row regardless — see translationGroupOptions.
  */
 export function SidebarTranslationGroupFilter(props: {
   filter: MangaToolsFilterModel;
 }) {
-  const { intl, history, open, toggleOpen } = useSidebarSection(
-    GROUP_SECTION_STATE_KEY
-  );
-
-  const queryState = React.useState("");
-  const query = queryState[0];
-  const setQuery = queryState[1];
-
-  const searchRef = React.useRef<HTMLInputElement | null>(null);
-
-  const selection = readGroupFilter(props.filter);
-
-  const tagLabelsFor = fieldTagLabels(
-    intl,
-    props.filter,
-    NS.TRANSLATION_GROUP_FIELD_NAME
-  );
-
-  React.useLayoutEffect(() => {
-    if (tagLabelsFor) relabelGroupTags(tagLabelsFor);
+  return useValuedSection({
+    ...VALUED_SECTIONS.translationGroup,
+    filter: props.filter,
   });
-
-  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
-  const Icon = PluginApi.components.Icon;
-  const Bootstrap = PluginApi.libraries.Bootstrap;
-
-  function update(next: MangaToolsLanguageSelection) {
-    applyGroup(props.filter, history, next);
-
-    if (!isTouchDevice() && searchRef.current) {
-      searchRef.current.focus();
-    }
-  }
-
-  function toggleInclude(name: string) {
-    update(toggleIncluded(selection, name));
-  }
-
-  function toggleExclude(name: string) {
-    update(toggleExcluded(selection, name));
-  }
-
-  function setModifier(modifier: "any" | "none") {
-    update(withModifier(selection, modifier));
-  }
-
-  function clearModifier() {
-    update(withoutModifier(selection));
-  }
-
-  const options = translationGroupOptions(selection);
-
-  // The same three lists the language section keeps: chosen, excluded, and the
-  // candidates the search has not narrowed away.
-  const chosen = options.filter(
-    (o) => selection.included.indexOf(o.value) !== -1
-  );
-  const excludedChosen = options.filter(
-    (o) => selection.excluded.indexOf(o.value) !== -1
-  );
-  const candidates = options.filter(
-    (o) =>
-      selection.included.indexOf(o.value) === -1 &&
-      selection.excluded.indexOf(o.value) === -1 &&
-      matchesQuery(o, query)
-  );
-
-  const showModifiers = isEmptySelection(selection);
-
-  const chosenItems: ReactElement[] = [];
-  if (selection.modifier) {
-    chosenItems.push(
-      <li className="selected-object modifier-object" key="modifier">
-        <a tabIndex={0} onClick={clearModifier}>
-          <div className="label-group">
-            <Icon className="fa-fw include-button" icon={Solid.faCheckCircle} />
-            <span className="TruncatedText inline selected-object-label">
-              {"(" +
-                message(
-                  intl,
-                  "criterion_modifier_values." + selection.modifier,
-                  selection.modifier === "any" ? "Any" : "None"
-                ) +
-                ")"}
-            </span>
-          </div>
-        </a>
-      </li>
-    );
-  }
-  chosen.forEach((o) => {
-    chosenItems.push(
-      <LanguageRow
-        variant="sidebar"
-        key={"in-" + o.value}
-        label={o.label}
-        flag={flagOf(o)}
-        state="included"
-        onClick={() => {
-          toggleInclude(o.value);
-        }}
-      />
-    );
-  });
-
-  const excludedItems = excludedChosen.map((o) => (
-    <LanguageRow
-      variant="sidebar"
-      key={"ex-" + o.value}
-      label={o.label}
-      flag={flagOf(o)}
-      state="excluded"
-      onClick={() => {
-        toggleExclude(o.value);
-      }}
-    />
-  ));
-
-  return (
-    <SidebarSection
-      heading={t(intl, "mangaTools.translationGroup.heading")}
-      open={open}
-      onToggle={toggleOpen}
-      chosenItems={chosenItems}
-      excludedItems={excludedItems}
-      what="translation group"
-    >
-      <div className="clearable-input-group">
-        <input
-          ref={searchRef}
-          className="clearable-text-field form-control"
-          value={query}
-          placeholder={message(intl, "actions.search", "Search") + "…"}
-          onChange={(e: { target: { value: string } }) => {
-            setQuery(e.target.value);
-          }}
-          onKeyDown={(e: { key?: string }) => {
-            if (e.key !== "Enter" || candidates.length !== 1) return;
-            toggleInclude(candidates[0].value);
-            setQuery("");
-          }}
-        />
-        {query && Bootstrap ? (
-          <Bootstrap.Button
-            variant="secondary"
-            className="clearable-text-field-clear"
-            title={message(intl, "actions.clear", "Clear")}
-            onClick={() => {
-              setQuery("");
-            }}
-          >
-            <Icon icon={Solid.faTimes} />
-          </Bootstrap.Button>
-        ) : null}
-      </div>
-      <ul>
-        {showModifiers ? (
-          <LanguageRow
-            variant="sidebar"
-            label={
-              "(" + message(intl, "criterion_modifier_values.any", "Any") + ")"
-            }
-            state="candidate"
-            canExclude={false}
-            modifier
-            onClick={() => {
-              setModifier("any");
-            }}
-          />
-        ) : null}
-        {showModifiers ? (
-          <LanguageRow
-            variant="sidebar"
-            label={
-              "(" +
-              message(intl, "criterion_modifier_values.none", "None") +
-              ")"
-            }
-            state="candidate"
-            canExclude={false}
-            modifier
-            onClick={() => {
-              setModifier("none");
-            }}
-          />
-        ) : null}
-        {candidates.map((o) => (
-          <LanguageRow
-            variant="sidebar"
-            key={o.value}
-            label={o.label}
-            state="candidate"
-            onClick={() => {
-              toggleInclude(o.value);
-            }}
-            onExclude={() => {
-              toggleExclude(o.value);
-            }}
-          />
-        ))}
-      </ul>
-    </SidebarSection>
-  );
 }
 
 // Published on the namespace so the smoke tests can exercise the tag re-wording
