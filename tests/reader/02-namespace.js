@@ -2,13 +2,7 @@
  * One area of the reader's suite, lifted out of tests/reader.js. The
  * world it runs in is harness.js; the sections below are as they were.
  */
-const {
-  assert,
-  fs,
-  path,
-  runSection,
-  NR,
-} = require("./harness.js");
+const { assert, fs, path, runSection, NR } = require("./harness.js");
 
 module.exports = async () => {
   /**
