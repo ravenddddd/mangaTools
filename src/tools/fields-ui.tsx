@@ -129,3 +129,114 @@ export function formatLanguageOption(option: MangaToolsOption) {
     </span>
   );
 }
+
+// ────────── The edit page's own pieces, drawn by the bulk row too ──────────
+//
+// A group option is not a MangaToolsOption: that type carries a flag, which is a
+// fact about a language, and a group has no such thing. `createLabel` says instead
+// that this entry is text somebody typed, offered so that choosing it is how a new
+// group gets set. The class names are read off a native form row at render time, so
+// a row this plugin draws lines up with Stash's own in whatever theme is on.
+export type NativeFieldClasses = {
+  group: string;
+  label: string;
+  control: string;
+};
+
+export type MangaToolsGroupOption = {
+  value: string;
+  label: string;
+  /** The wording for the create entry, already localised — see below. */
+  createLabel?: string;
+  /**
+   * The language this group's galleries usually carry, for the menu's hint, or
+   * null when there is nothing to say about it. Both forms, because which one is
+   * drawn is the "Show flags" setting's business and that is read while
+   * react-select renders — see formatGroupOption.
+   */
+  hint?: { flag: string | null; name: string } | null;
+};
+
+/**
+ * Renders a group option: the name, or — in the menu only — the offer to create it
+ * and the language its galleries usually carry.
+ *
+ * The "value" context is the box itself, and there the text is simply the name: an
+ * offer to create what is already selected would read as a question, and a hint
+ * about the group's usual language is not something to draw twice — the language
+ * row above says what the language is. In the menu it is prefixed, so the entry
+ * nobody has used before is told apart from the groups that exist, and the hint
+ * rides at its far end.
+ *
+ * The hint is a flag or a name, and which one is the "Show flags" setting's call —
+ * the same call it makes for the badge and the detail row, where a language is
+ * drawn as a flag or as its name. A name is much the longer of the two, so it is
+ * the one that gives way when the row runs out of room (see .manga-tools-hint-text).
+ *
+ * Everything drawn here is carried on the option rather than looked up in this
+ * function: it is called by react-select while it renders, and a component's worth
+ * of hooks cannot be used in something invoked per option. The options are built
+ * in MangaFieldBlock, which has the reader's `intl` in hand.
+ */
+export function formatGroupOption(
+  option: MangaToolsGroupOption,
+  meta?: { context?: string }
+) {
+  if (meta?.context !== "menu") return option.label;
+
+  const hint = option.hint ? (
+    NS.showFlags && option.hint.flag ? (
+      <Flag
+        flag={option.hint.flag}
+        className="manga-tools-flag manga-tools-hint"
+      />
+    ) : (
+      <span className="manga-tools-hint-text">{option.hint.name}</span>
+    )
+  ) : null;
+
+  if (!option.createLabel) {
+    // Plain names get the hint, and nothing else. Deliberately not the shared
+    // `.manga-tools-option`: that one spaces an icon off its label, and spreading
+    // its children apart here would push this row's name and hint to opposite
+    // ends of a menu the other two dropdowns also draw.
+    if (!hint) return option.label;
+    return (
+      <span className="manga-tools-group-option">
+        <span>{option.label}</span>
+        {hint}
+      </span>
+    );
+  }
+
+  return <span className="manga-tools-option">{option.createLabel}</span>;
+}
+
+/**
+ * Copies the class names for each layer off the studio field's DOM.
+ *
+ * Column widths are deliberately not hard-coded: renderField's defaults differ
+ * between Stash versions — develop uses { sm: 3, xl: 2 } while the build
+ * actually running only had { sm: 3 }. The extra col-xl-2 made our label
+ * column narrower than the native ones on wide screens, so nothing lined up.
+ * Copying the class names that are already there is correct regardless of
+ * version or breakpoint.
+ *
+ * Returns null when nothing can be read, and the caller falls back to a
+ * conservative default.
+ */
+export function readNativeFieldClasses(
+  anchor: Element | null
+): NativeFieldClasses | null {
+  if (!anchor) return null;
+
+  const label = anchor.querySelector("label");
+  const control = label?.nextElementSibling;
+  if (!label || !control) return null;
+
+  return {
+    group: anchor.className,
+    label: label.className,
+    control: control.className,
+  };
+}
