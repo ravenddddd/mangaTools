@@ -357,7 +357,16 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
     console.warn("[mangaReader] render pass", renders, "|", key.slice(0, 90));
   }
 
-  if (key === renderedFor && panel.childElementCount > 0) return;
+  // **What must still be there for this pass to be a no-op**, and the whole of the
+  // freeze was getting this wrong: `> 0` asks "is the panel non-empty", which is
+  // false for a gallery with *no chapters* — and a panel that is *supposed* to be
+  // empty then re-renders on every pass, changing something each time, so the
+  // observer answers with another pass. Four hundred thousand of them, and the page
+  // is gone. Asked properly, the answer for an empty list is "yes, nothing to draw
+  // is exactly what I drew", and a panel React has emptied underneath us is still
+  // caught: it holds fewer children than the key says it should.
+  const wanted = bulk || form ? 1 : gallery.chapters.length;
+  if (key === renderedFor && panel.children.length >= wanted) return;
   renderedFor = key;
   panelInHand = panel;
 
