@@ -1419,10 +1419,11 @@ mangaTools/
 │   ├── languages.ts          Codes, flags, and the name lookup (pure, no DOM)
 │   ├── messages/             One JSON catalog per locale: en / zh-Hans / zh-Hant
 │   ├── tools/                The managing half
+│   │   ├── core.ts           The state every surface reads: the store, the fetch behind it, the settings
 │   │   ├── index.tsx         Badge, panels, dropdown, bulk row, toolbar switch, settings, patches
-│   │   ├── filter-model.ts   Criterion read/write for all three fields (pure, no DOM)
+│   │   ├── filter-model.ts   Criterion read/write for every field (pure, no DOM)
 │   │   ├── filter-ui.tsx     The rows and tag DOM both filter surfaces share
-│   │   ├── sidebar-filter.tsx  The three sidebar filter sections
+│   │   ├── sidebar-filter.tsx  The five sidebar filter sections
 │   │   ├── dialog-filter.tsx   The dialog's language card
 │   │   ├── censorship.tsx    The censorship vocabulary and its icons
 │   │   └── fields.ts         The custom fields this plugin owns, and how to
