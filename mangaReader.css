@@ -1050,6 +1050,49 @@
   display: none;
 }
 
+/* The page field of the single-chapter form — the same question the bulk table's page
+   column asks, so the same button stands beside it (see .manga-reader-page-peek-box).
+ *
+ * `.form-control` is a block that takes the whole column, which would put the button on
+ * a line of its own below it; the last 44px of the field are the button's, and the
+ * number — four digits of a page — does not need the rest. The spin buttons go for the
+ * same reason they go in the table: this is a number somebody reads off a page and
+ * types, and the arrows on the keyboard still step it.
+ *
+ * `position: relative` is what the preview's box is measured from. Bootstrap's own
+ * columns happen to be positioned, which is why this looks like it would work without
+ * it — relying on that would be relying on somebody else's rule staying true. */
+.manga-reader-chapter-page {
+  position: relative;
+  white-space: nowrap;
+}
+
+.manga-reader-chapter-page .form-control {
+  display: inline-block;
+  width: calc(100% - 44px);
+  vertical-align: middle;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.manga-reader-chapter-page .form-control::-webkit-outer-spin-button,
+.manga-reader-chapter-page .form-control::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* The gap from the number to its button, carried by the button: it is the field's own
+   right-hand end, and a margin on the input would be a margin on every other field. */
+.manga-reader-chapter-page .manga-reader-page-peek {
+  margin-left: 4px;
+}
+
+/* …and in the table the same button is the first of the row's two, so its gap is on the
+   other side, from the delete that follows it. */
+.manga-reader-bulk-acts .manga-reader-page-peek {
+  margin-right: 4px;
+}
+
 /* The bulk editor's table: one row per pasted line, with validity first, the title,
    the page the chapter would begin at, and a delete.
  *
@@ -1187,12 +1230,14 @@
 }
 
 /* The page a number points at, shown on the way in. `hidden` is the one thing that
-   changes, so nothing here is rebuilt to show or hide it.
+   changes, so nothing here is rebuilt to show or hide it. **One rule for both editors**
+   — the bulk table's rows and the single-chapter form's page field share the button and
+   its box, because it is the same question about the same number.
  *
- * Anchored by its **right** edge and growing left: the button is in the table's last
- * column, so a box anchored by its left would run off the right of the table, and to
- * the left there is the width of the whole title column for it to stand in. */
-.manga-reader-bulk-peek-box {
+ * Anchored by its **right** edge and growing left: in both places the button stands at
+ * the right-hand end of the field, so a box anchored by its left would run off that end,
+ * while to the left there is the width of the field to stand in. */
+.manga-reader-page-peek-box {
   position: absolute;
   bottom: 100%;
   right: 0;
@@ -1204,16 +1249,10 @@
   z-index: 20;
 }
 
-.manga-reader-bulk-peek-box img {
+.manga-reader-page-peek-box img {
   display: block;
   max-width: 200px;
   max-height: 280px;
-}
-
-/* The gap between the two buttons, carried by the first of them: the delete is the
-   last thing in the row and a margin on it would be a margin on the table's edge. */
-.manga-reader-bulk-peek {
-  margin-right: 4px;
 }
 
 .manga-reader-bulk-empty {

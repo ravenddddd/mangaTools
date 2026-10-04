@@ -498,6 +498,94 @@ function closeBulk(): void {
 }
 
 /**
+ * Where a page number points, or -1 when it points at nothing.
+ *
+ * One-based, and a *position in the pages as this tab fetched them* — which is path
+ * order, the order Stash's own chapter numbers count in and the order the number means
+ * when the form is saved (see submitForm). Both editors ask this, so a preview and a
+ * write can never disagree about which page a number names.
+ */
+function pageAt(input: HTMLInputElement, gallery: ChaptersInHand): number {
+  const n = Number(input.value);
+  return Number.isFinite(n) && n >= 1 && n <= gallery.pages.length ? n - 1 : -1;
+}
+
+/**
+ * The button that shows the page a number points at, and the box it shows it in.
+ *
+ * Hovering draws the picture above the place the button is; clicking opens the
+ * lightbox at that page — the same call a chapter row makes, and the same page the
+ * number means when the form is saved. Both editors have one of these beside their
+ * page field, and this is the only place either is built.
+ *
+ * The box and its picture are built on the way in and then kept, rather than drawn by
+ * the render: one of the two callers is every row of a table that can hold sixty, and
+ * none of those should load a picture to be looked at.
+ *
+ * `host` is what the box is put in, and **it has to be a positioning context** — the
+ * box is absolutely positioned and hangs off the nearest one, so without it the picture
+ * is measured from whatever ancestor Stash's own layout happens to have positioned.
+ * See .manga-reader-page-peek-box in mangaReader.css.
+ */
+function pagePreview(
+  gallery: ChaptersInHand,
+  input: HTMLInputElement,
+  host: HTMLElement
+): HTMLButtonElement {
+  const peek = document.createElement("button");
+  peek.type = "button";
+  peek.className = "btn btn-secondary btn-sm manga-reader-page-peek";
+  peek.setAttribute(
+    "aria-label",
+    stringFor(gallery.locale, "mangaReader.pagePeek")
+  );
+  peek.setAttribute("title", stringFor(gallery.locale, "mangaReader.pagePeek"));
+  drawIcon(peek, "faImage");
+
+  let box: HTMLElement | null = null;
+  let picture: HTMLImageElement | null = null;
+  let shown = "";
+
+  peek.addEventListener("mouseenter", () => {
+    const at = pageAt(input, gallery);
+    // **The reader's own URL for the page**, not the one the API handed over whole:
+    // the same picture, the same version stamp, the same cache entry as the lightbox —
+    // see pageUrl. A number pointing nowhere shows nothing rather than an empty frame.
+    const src = at < 0 ? "" : pageUrl(gallery.pages[at]);
+    if (!src) return;
+
+    if (!box) {
+      box = document.createElement("div");
+      box.className = "manga-reader-page-peek-box";
+      picture = document.createElement("img");
+      box.appendChild(picture);
+      host.appendChild(box);
+    }
+    // The `src` is written only when it is a different page: it is a whole scanned
+    // page, and starting the same fetch twice is worth not doing.
+    if (picture && shown !== src) {
+      shown = src;
+      picture.src = src;
+    }
+    if (box.hidden) box.hidden = false;
+  });
+  peek.addEventListener("mouseleave", () => {
+    if (box) box.hidden = true;
+  });
+  peek.addEventListener("click", () => {
+    const at = pageAt(input, gallery);
+    if (at < 0) return;
+    takeOver({
+      images: gallery.images,
+      totalCount: gallery.images.length,
+      at,
+    });
+  });
+
+  return peek;
+}
+
+/**
  * The bulk editor, in place of the rows.
  *
  * **The two halves are one-way: the box writes the table, and the table writes nothing.**
@@ -715,82 +803,17 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       pageCell.appendChild(pageInput);
       tr.appendChild(pageCell);
 
-      /** Where the number points, or null when it points at nothing */
-      const pageAt = (): number => {
-        const n = Number(pageInput.value);
-        return Number.isFinite(n) && n >= 1 && n <= gallery.pages.length
-          ? n - 1
-          : -1;
-      };
-
       // The row's two buttons in a column of their own, with the number's cell left
       // holding a number. A cell that is a number *and* a button is a column with two
       // jobs, and in a table of twenty rows the buttons are then the one thing that
       // lines up straight down its side — which is what the eye runs along when it is
-      // looking for the row it has typed a number into.
+      // looking for the row it has typed a number into. The cell is also what the
+      // preview's box is measured from, hence the class rather than a bare `td`.
       const actsCell = document.createElement("td");
       actsCell.className = "manga-reader-bulk-acts";
 
-      // The page the number points at, so it can be looked at without leaving the
-      // list: hovering shows it, clicking opens the lightbox there — which is the
-      // same call a chapter row makes, and the same `at` it counts in.
-      const peek = document.createElement("button");
-      peek.type = "button";
-      peek.className = "btn btn-secondary btn-sm manga-reader-bulk-peek";
-      peek.setAttribute(
-        "aria-label",
-        stringFor(gallery.locale, "mangaReader.bulkPeek")
-      );
-      peek.setAttribute(
-        "title",
-        stringFor(gallery.locale, "mangaReader.bulkPeek")
-      );
-      drawIcon(peek, "faImage");
-
-      // The box and the picture are built on the way in and then kept, rather than
-      // drawn by the render: a table of sixty rows must not load sixty pictures to be
-      // looked at. The `src` is written only when it is a different page, for the same
-      // reason every other write in this file is guarded — and here it is also a whole
-      // scanned page whose fetch is worth not starting twice.
-      let peekBox: HTMLElement | null = null;
-      let peekPicture: HTMLImageElement | null = null;
-      let peekSrc = "";
-
-      peek.addEventListener("mouseenter", () => {
-        const index = pageAt();
-        // **The reader's own URL for the page**, not the one the API handed over
-        // whole: same picture, same version stamp, same cache entry as the lightbox —
-        // see pageUrl. A number pointing nowhere shows nothing rather than an empty
-        // frame.
-        const src = index < 0 ? "" : pageUrl(gallery.pages[index]);
-        if (!src) return;
-
-        if (!peekBox) {
-          peekBox = document.createElement("div");
-          peekBox.className = "manga-reader-bulk-peek-box";
-          peekPicture = document.createElement("img");
-          peekBox.appendChild(peekPicture);
-          actsCell.appendChild(peekBox);
-        }
-        if (peekPicture && peekSrc !== src) {
-          peekSrc = src;
-          peekPicture.src = src;
-        }
-        if (peekBox.hidden) peekBox.hidden = false;
-      });
-      peek.addEventListener("mouseleave", () => {
-        if (peekBox) peekBox.hidden = true;
-      });
-      peek.addEventListener("click", () => {
-        const index = pageAt();
-        if (index < 0) return;
-        takeOver({
-          images: gallery.images,
-          totalCount: gallery.images.length,
-          at: index,
-        });
-      });
-      actsCell.appendChild(peek);
+      // The page the number points at, so it can be looked at without leaving the list
+      actsCell.appendChild(pagePreview(gallery, pageInput, actsCell));
 
       const gone = document.createElement("button");
       gone.type = "button";
@@ -1222,6 +1245,16 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
 
   node.appendChild(container);
 
+  // The page the number names, shown the way the bulk table shows it — hovering the
+  // button draws it, clicking opens the lightbox there. Which is the same page Save
+  // would use, because both ask pageAt. The column is the box's positioning context,
+  // and the class is what says so (see .manga-reader-chapter-page in mangaReader.css).
+  indexField.column.classList.add("manga-reader-chapter-page");
+  indexField.column.insertBefore(
+    pagePreview(gallery, indexField.input, indexField.column),
+    indexField.error
+  );
+
   // Every refusal this form can have is about where the chapter begins — a page that
   // already starts one, a page this gallery has not got, a chapter that is gone —
   // so they all land on that field, which is where the answer is wrong.
@@ -1295,7 +1328,7 @@ function field(
   name: string,
   type: string,
   value: string
-): { input: HTMLInputElement; error: HTMLElement } {
+): { input: HTMLInputElement; error: HTMLElement; column: HTMLElement } {
   const group = document.createElement("div");
   group.className = "form-group row";
   group.setAttribute("data-field", name);
@@ -1325,7 +1358,7 @@ function field(
   group.appendChild(column);
   parent.appendChild(group);
 
-  return { input, error };
+  return { input, error, column };
 }
 
 /**
@@ -1337,7 +1370,12 @@ function field(
  * same thing.
  */
 function refuse(error: HTMLElement | null, message: string): void {
-  const input = error?.parentNode?.children[0] as HTMLElement | undefined;
+  // **The field's input, found as an input** rather than as the column's first child:
+  // the page field has a preview button beside its number, and a position would be one
+  // more thing that has to stay true about markup this file builds elsewhere.
+  const input = error?.parentNode?.querySelector(
+    "input"
+  ) as HTMLInputElement | null;
   if (!error || !input) return;
 
   input.classList.add("is-invalid");

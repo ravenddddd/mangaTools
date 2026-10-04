@@ -286,11 +286,15 @@ module.exports = async () => {
     const formIn = (container) => {
       const form = container.querySelector("form");
       const fields = [...form.querySelectorAll(".form-control")];
+      // **From the buttons row, not from the form**: a field carries a button of this
+      // plugin's own too — the preview beside the page number — and it is a
+      // `btn-secondary` as the Cancel is.
+      const buttons = form.querySelector(".buttons-container");
       return {
         form,
         fields,
         save: form.querySelector(".btn-primary"),
-        cancel: form.querySelector(".btn-secondary"),
+        cancel: buttons.querySelector(".btn-secondary"),
         remove: form.querySelector(".btn-danger"),
       };
     };
@@ -336,6 +340,41 @@ module.exports = async () => {
       "1",
       "which opens at the first page when nobody is reading this gallery"
     );
+
+    // ── the page the number names ──────────────────────────────────────────
+    // The same button the bulk table's rows carry, in the field's own column beside the
+    // number — one preview, two editors, because it is the same question about the same
+    // number, and both ask pageAt so neither can disagree with what a save would write.
+    const field = creating.fields[1].parentNode;
+    const peek = field.querySelector(".manga-reader-page-peek");
+    assert.ok(peek, "the page field offers a look at the page it names");
+    assert.ok(
+      peek.parentNode === field,
+      "…from the field's own column, which is what its box is measured from"
+    );
+
+    peek.dispatch("mouseenter");
+    const peekBox = field.querySelector(".manga-reader-page-peek-box");
+    assert.ok(peekBox, "hovering it draws that page");
+    assert.strictEqual(
+      peekBox.querySelector("img").src,
+      "/image/708/image",
+      "…fetched the way the reader fetches its own pages, as the table's is"
+    );
+    peek.dispatch("mouseleave");
+    assert.strictEqual(peekBox.hidden, true, "and leaving puts it away");
+
+    // A number that points nowhere shows nothing, rather than the last page it showed:
+    // the field is a text box somebody is still typing a number into.
+    creating.fields[1].value = "999";
+    peek.dispatch("mouseenter");
+    assert.strictEqual(
+      peekBox.hidden,
+      true,
+      "a number past the end of the gallery shows no picture"
+    );
+    creating.fields[1].value = "1";
+
     assert.strictEqual(
       creating.remove === null,
       true,
@@ -473,7 +512,8 @@ module.exports = async () => {
       "the field it is about is marked, as Bootstrap marks one"
     );
     assert.strictEqual(
-      refused.fields[1].parentNode.children[1].textContent,
+      refused.fields[1].parentNode.querySelector(".invalid-feedback")
+        .textContent,
       "A chapter already begins here",
       "and the reason is under it"
     );
@@ -952,8 +992,24 @@ module.exports = async () => {
         "path order — the order the rows and the row numbers are in"
     );
 
+    // And its preview opens the lightbox at the page the number names — the reading
+    // page here, 8, which is where this form already says a new chapter would begin.
+    const opens = shown.length;
+    dom.click(form.querySelector(".manga-reader-page-peek"));
+    assert.strictEqual(
+      shown.length - opens,
+      1,
+      "the field's preview opens the lightbox, the way the table's does"
+    );
+    assert.strictEqual(
+      shown[shown.length - 1].props.initialIndex,
+      7,
+      "…at the page the number names: 8 to the field, which counts from one, and 7 to " +
+        "a lightbox, which counts from zero"
+    );
+
     // Now rename a chapter from the tab, with the lightbox open on it.
-    dom.click(form.querySelector(".btn-secondary"));
+    dom.click(form.querySelector(".buttons-container .btn-secondary"));
     await settle();
     dom.click(tab.container.children[0].children[1].children[1]);
     await settle();
@@ -971,10 +1027,6 @@ module.exports = async () => {
     await settle();
     stopHeard();
 
-    console.error(
-      "DEBUG before the rename the menu is",
-      JSON.stringify(chapterMenu(box))
-    );
     assert.strictEqual(
       mutations[at].variables.input.custom_fields.partial[
         "plugin.mangaTools.chapters"
@@ -983,30 +1035,12 @@ module.exports = async () => {
         '{"title":"renamed","images":["708","705","706","707"]}]}',
       "the tab wrote the list"
     );
-    console.error(
-      "DEBUG after the rename the menu is",
-      JSON.stringify(chapterMenu(box))
-    );
     await NR.writeChapters(
       "33",
       [{ title: "direct", images: ["704", "703"] }],
       null
     );
     await settle();
-    console.error(
-      "DEBUG after a direct write the menu is",
-      JSON.stringify(chapterMenu(box))
-    );
-    console.error(
-      "DEBUG fixture field:",
-      String(
-        state.galleries["39"].gallery.custom_fields[
-          "plugin.mangaTools.chapters"
-        ]
-      ).slice(0, 80),
-      "| mutation id:",
-      mutations[at].variables.input.id
-    );
     // And everyone drawing this gallery is told — with the list itself, not only
     // which gallery changed. Asserted by listening rather than by reading the
     // lightbox's menu, and that is a limit of this world rather than a choice: a
@@ -1106,7 +1140,7 @@ module.exports = async () => {
     // The row's two buttons share a cell of their own, with the number's cell left
     // holding a number: one job per column, and in a table this long the buttons are
     // the one thing that lines up straight down its side.
-    const peek = (at) => shown[at].querySelector(".manga-reader-bulk-peek");
+    const peek = (at) => shown[at].querySelector(".manga-reader-page-peek");
     const trash = (at) => shown[at].querySelector(".btn-danger");
 
     assert.ok(
@@ -1133,7 +1167,7 @@ module.exports = async () => {
     // is still blank has not even got one.
     peek(1).dispatch("mouseenter");
     assert.ok(
-      shown[1].querySelector(".manga-reader-bulk-peek-box") === null,
+      shown[1].querySelector(".manga-reader-page-peek-box") === null,
       "a row with no page yet shows no picture"
     );
 
@@ -1165,7 +1199,7 @@ module.exports = async () => {
     // The URL the reader fetches its own pages with, not the one the API published
     // whole: the same stamp, so the same cache entry the lightbox already paid for.
     peek(1).dispatch("mouseenter");
-    const box = shown[1].querySelector(".manga-reader-bulk-peek-box");
+    const box = shown[1].querySelector(".manga-reader-page-peek-box");
     assert.ok(box, "hovering the button draws the page the number points at");
     assert.strictEqual(box.hidden, false, "…and shows it");
     const picture = box.querySelector("img");
@@ -1181,7 +1215,7 @@ module.exports = async () => {
     // Each row looks at its own page, and looking again re-uses what was built: a
     // table of sixty rows must not load sixty pictures to be looked at.
     peek(2).dispatch("mouseenter");
-    const other = shown[2].querySelector(".manga-reader-bulk-peek-box");
+    const other = shown[2].querySelector(".manga-reader-page-peek-box");
     assert.ok(other !== box, "a second row has a picture of its own");
     assert.strictEqual(other.querySelector("img").src, "/image/706/image");
 
@@ -1190,12 +1224,12 @@ module.exports = async () => {
     // `querySelector` answering with the same node it answered with before, so asking
     // for *a* box cannot see the one that should not be there.
     assert.strictEqual(
-      shown[1].querySelectorAll(".manga-reader-bulk-peek-box").length,
+      shown[1].querySelectorAll(".manga-reader-page-peek-box").length,
       1,
       "and hovering the first row again re-uses its box rather than building another"
     );
     assert.ok(
-      shown[1].querySelector(".manga-reader-bulk-peek-box") === box,
+      shown[1].querySelector(".manga-reader-page-peek-box") === box,
       "…the same box, so the fetch it already made is the one it keeps"
     );
     assert.ok(

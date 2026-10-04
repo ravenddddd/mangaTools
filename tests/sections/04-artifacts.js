@@ -781,6 +781,22 @@ module.exports = () => {
       "measured from anywhere else, the picture is drawn off the screen"
   );
 
+  // The single-chapter form's page field, which carries the same button. Its column is
+  // a Bootstrap one, and Bootstrap's own columns happen to be positioned — so this rule
+  // looks redundant and is not: it is this plugin saying where its own box is measured
+  // from rather than relying on somebody else's rule staying true.
+  assert.ok(
+    /\.manga-reader-chapter-page\s*\{[^}]*position:\s*relative/.test(readerCss),
+    "mangaReader.css should anchor the form's preview to its own field column"
+  );
+  assert.ok(
+    /\.manga-reader-chapter-page\s+\.form-control\s*\{[^}]*display:\s*inline-block/.test(
+      readerCss
+    ),
+    "…and lay the number and that button on one line: a `.form-control` is a block, " +
+      "and a block takes the whole column and pushes the button below it"
+  );
+
   // Stash's unscoped `.fa-icon { margin: 0 0.4rem }` again, and this time the icon is
   // in a column twenty-eight pixels wide — the margin is most of the room and pushes
   // the mark off centre. The two buttons in the next cell are exempt from Stash's rule

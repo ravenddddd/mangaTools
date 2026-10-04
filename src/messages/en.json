@@ -45,7 +45,7 @@
   "mangaReader.bulkPaste": "One title per line",
   "mangaReader.bulkTitle": "Title",
   "mangaReader.bulkPage": "Page #",
-  "mangaReader.bulkPeek": "Look at this page",
+  "mangaReader.pagePeek": "Look at this page",
   "mangaReader.bulkCreate": "Create {n} chapters",
   "mangaReader.bulkRemove": "Delete",
   "mangaReader.bulkTooMany": "Too many lines — do it in parts",
