@@ -168,9 +168,6 @@ let bulk = false;
  */
 let bulkPages: string[] = [];
 
-/** TEMPORARY: how many times render has been entered — see the console warning */
-let renders = 0;
-
 /** The tallest pasted list this editor will take — see drawBulk */
 const BULK_LIMIT = 64;
 
@@ -350,13 +347,6 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
         : "list",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
-  // TEMPORARY: counts the passes, so a frozen page can say whether this is the loop.
-  // Remove once the freeze is found — see the note in the README's pending list.
-  renders += 1;
-  if (renders % 200 === 0) {
-    console.warn("[mangaReader] render pass", renders, "|", key.slice(0, 90));
-  }
-
   // **What must still be there for this pass to be a no-op**, and the whole of the
   // freeze was getting this wrong: `> 0` asks "is the panel non-empty", which is
   // false for a gallery with *no chapters* — and a panel that is *supposed* to be
@@ -464,9 +454,11 @@ function ensureBulkButton(panel: HTMLElement): void {
   // **Copied off Stash's own button** rather than written out: it has to look like the
   // Create beside it, and a class list taken from the thing itself cannot drift from
   // it. The same reasoning as readNativeFieldClasses in the tools half.
-  if (bulkButton.className !== owner.className) {
-    bulkButton.className = owner.className;
-  }
+  // Stash's classes plus the gap Stash itself puts between its own buttons, so the
+  // two do not touch. Written only when it changes, for the reason everything else
+  // in this pass is: a class list rewritten on every pass is a pass that never ends.
+  const wanted = owner.className + " ml-2";
+  if (bulkButton.className !== wanted) bulkButton.className = wanted;
 
   if (owner.nextElementSibling !== bulkButton) {
     owner.parentNode?.insertBefore(bulkButton, owner.nextElementSibling);
@@ -690,6 +682,63 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       pageInput.value = bulkPages[at] ?? "";
       pageInput.addEventListener("input", validate);
       pageCell.appendChild(pageInput);
+
+      // The page the number points at, so it can be looked at without leaving the
+      // list: hovering shows it, clicking opens the lightbox there — which is the
+      // same call a chapter row makes, and the same `at` it counts in.
+      const peek = document.createElement("button");
+      peek.type = "button";
+      peek.className = "btn btn-secondary btn-sm manga-reader-bulk-peek";
+      peek.setAttribute(
+        "aria-label",
+        stringFor(gallery.locale, "mangaReader.bulkPeek")
+      );
+      peek.setAttribute(
+        "title",
+        stringFor(gallery.locale, "mangaReader.bulkPeek")
+      );
+      drawIcon(peek, "faImage");
+
+      /** Where the number points, or null when it points at nothing */
+      const pageAt = (): number => {
+        const n = Number(pageInput.value);
+        return Number.isFinite(n) && n >= 1 && n <= gallery.pages.length
+          ? n - 1
+          : -1;
+      };
+
+      // Built on the way in and kept, rather than drawn by the render: a table of
+      // sixty rows must not load sixty pictures to be looked at.
+      let peekBox: HTMLElement | null = null;
+      peek.addEventListener("mouseenter", () => {
+        const index = pageAt();
+        const src = index < 0 ? "" : gallery.images[index]?.paths?.image;
+        if (!src) return;
+
+        if (!peekBox) {
+          peekBox = document.createElement("div");
+          peekBox.className = "manga-reader-bulk-peek-box";
+          pageCell.appendChild(peekBox);
+        }
+        peekBox.textContent = "";
+        const picture = document.createElement("img");
+        picture.src = src;
+        peekBox.appendChild(picture);
+        peekBox.hidden = false;
+      });
+      peek.addEventListener("mouseleave", () => {
+        if (peekBox) peekBox.hidden = true;
+      });
+      peek.addEventListener("click", () => {
+        const index = pageAt();
+        if (index < 0) return;
+        takeOver({
+          images: gallery.images,
+          totalCount: gallery.images.length,
+          at: index,
+        });
+      });
+      pageCell.appendChild(peek);
       tr.appendChild(pageCell);
 
       const goneCell = document.createElement("td");

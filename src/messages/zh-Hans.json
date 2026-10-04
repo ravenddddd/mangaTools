@@ -45,6 +45,7 @@
   "mangaReader.bulkPaste": "一行一个标题",
   "mangaReader.bulkTitle": "标题",
   "mangaReader.bulkPage": "起始页",
+  "mangaReader.bulkPeek": "看一眼这一页",
   "mangaReader.bulkCreate": "创建 {n} 章",
   "mangaReader.bulkRemove": "删除",
   "mangaReader.bulkTooMany": "行数太多了 —— 分批来吧",

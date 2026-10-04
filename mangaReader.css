@@ -1109,17 +1109,42 @@
   content: attr(data-why);
   position: absolute;
   bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+  /* **Anchored at the left, not centred**: the ✕ is the first column, so a bubble
+     centred on it hangs off the left of the screen — which is what it did. */
+  left: 0;
+  max-width: 22em;
   margin-bottom: 4px;
   padding: 1px 8px;
   border-radius: 3px;
   background: #394b59;
   color: #f5f8fa;
   font-size: 12px;
-  white-space: nowrap;
   pointer-events: none;
   z-index: 10;
+}
+
+/* The page a number points at, shown on the way in. `hidden` is the one thing that
+   changes, so nothing here is rebuilt to show or hide it. */
+.manga-reader-bulk-peek-box {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 4px;
+  padding: 2px;
+  border-radius: 3px;
+  background: #202b33;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.manga-reader-bulk-peek-box img {
+  display: block;
+  max-width: 160px;
+  max-height: 220px;
+}
+
+.manga-reader-bulk-peek {
+  margin-left: 4px;
 }
 
 .manga-reader-bulk-empty {
