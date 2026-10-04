@@ -110,5 +110,8 @@
   "mangaTools.filter.original.heading": "原文",
   "mangaTools.filter.original.raw": "生肉",
   "mangaTools.filter.original.cooked": "熟肉",
-  "mangaTools.filter.original.isOriginal": "是否為生肉"
+  "mangaTools.filter.original.isOriginal": "是否為生肉",
+  "mangaTools.settings.sidebarFilters.heading": "側欄篩選",
+  "mangaTools.settings.sidebarFilters.description": "畫廊列表的側欄裡顯示哪些篩選。欄位關掉的篩選顯示不出來，隱藏期間也不記狀態——重新打開欄位，它的篩選就回來。",
+  "mangaTools.settings.sidebarFilters.placeholder": "不顯示任何篩選"
 }

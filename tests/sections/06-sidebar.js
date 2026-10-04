@@ -227,6 +227,38 @@ module.exports = () => {
     "and they all come back exactly where they were"
   );
 
+  // ── the second axis: which filters the sidebar offers at all ──
+  // A field switch says "does this plugin manage this data"; this says "do I want a
+  // box for it on this list". They are separate settings because they are separate
+  // answers — and where they disagree, the sidebar simply does not draw the filter
+  // (nothing in Stash's sidebar is drawn disabled), which is a decision recorded on
+  // filterShowing.
+  NS.sidebarFilters = new Set(["language"]);
+  assert.deepStrictEqual(
+    sectionsNow().map((c) => (c === null ? null : typeof c.type)),
+    ["function", "function", null, null, null, "string"],
+    "only the chosen filters are drawn — and the mark, which is not one of them"
+  );
+
+  // …and with one taken off, turning its *field* off and on again brings it back:
+  // the setting only ever lists filters that could be shown, so a hidden one is not
+  // remembered. That is the whole of the rule, and it is why nothing here has to be
+  // written back when a field returns.
+  NS.sidebarFilters = new Set(["language", "original"]);
+  NS.fieldOriginal = false;
+  assert.deepStrictEqual(
+    sectionsNow().map((c) => (c === null ? null : typeof c.type)),
+    ["function", "function", null, null, null, "string"],
+    "a filter for a field that is off cannot be drawn"
+  );
+  NS.fieldOriginal = true;
+  assert.deepStrictEqual(
+    sectionsNow().map((c) => (c === null ? null : typeof c.type)),
+    ["function", "function", null, null, "function", "string"],
+    "…and it is back the moment the field is"
+  );
+  NS.sidebarFilters = null;
+
   // The publication itself reads the model out of the rendered tree, wherever it
   // sits in it — the elements Stash hands the model to are not at a fixed depth.
   const deep = makeFilterModel([

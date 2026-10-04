@@ -421,25 +421,34 @@ module.exports = () => {
     ],
     "the four fields and the display rows go with the master switch"
   );
+  // The language multiselect specifically — the page now holds two multiselects
+  // (the languages, and the sidebar's filters), so "a multiselect" is not the
+  // question. The languages one is the field's own; the filters one goes with
+  // *some* field showing, since with the master off there is nothing to filter by.
+  const languageMultiselect = (root) =>
+    find(root, (n) => n.props?.isMulti && n.props.placeholder === "全部语言");
   assert.strictEqual(
-    find(
-      bare,
-      (n) => n.props && Array.isArray(n.props.options) && n.props.isMulti
-    ),
+    languageMultiselect(bare),
     null,
     "…including the language multiselect, three levels down"
+  );
+  assert.strictEqual(
+    find(bare, (n) => n.props?.isMulti),
+    null,
+    "and the filters multiselect with it, since no field is on to filter by"
   );
 
   NS.fields = true;
   NS.fieldLanguage = false;
   const noLanguage = call("PluginSettings", { pluginID: "mangaTools" });
   assert.strictEqual(
-    find(
-      noLanguage,
-      (n) => n.props && Array.isArray(n.props.options) && n.props.isMulti
-    ),
+    languageMultiselect(noLanguage),
     null,
     "a field's own settings go with that field's switch"
+  );
+  assert.ok(
+    find(noLanguage, (n) => n.props?.isMulti),
+    "while the sidebar-filter multiselect stays: its subject is the other three"
   );
   assert.ok(
     find(noLanguage, (n) => n.props?.id === "mangaTools-fieldCensorship"),
@@ -1031,6 +1040,12 @@ module.exports = () => {
         openEditBlock: true,
         hidePerformers: true,
         showDisabledFields: false,
+        // Which filters the sidebar offers, as the comma string it is stored as.
+        // Written as an explicit list even when nothing has chosen one: absent
+        // would mean the same thing, but only a written list round-trips through
+        // the setting's own parser, and a settings page that wrote nothing would
+        // be a page whose setting could never be changed.
+        sidebarFilters: "censorship,language,original,translationGroup",
         // The reading half's own settings are part of this map too, and empty here
         // because nothing has been written to the library — see the reader's
         // readSettings, where absent is what puts the browser's value back in force.
@@ -1044,6 +1059,84 @@ module.exports = () => {
     ["ja", "zh-Hans"],
     "the in-memory set should update immediately"
   );
+
+  // ── the sidebar's filter selection ──
+  // Four filters, and the list holds only those whose fields are on: a filter for a
+  // field this plugin does not manage has nothing to ask about, and offering one
+  // would be offering a checkbox that cannot be honoured. **Not remembered while
+  // hidden** — the write puts an off-field's filter back *as on*, so turning the
+  // field off and on again brings its filter back at the default rather than at
+  // whatever it happened to be. That is the rule the reader asked for, and it is why
+  // the value below contains a name the list is not showing.
+  const filtersSelect = (root) =>
+    find(
+      root,
+      (n) =>
+        n.props?.isMulti && n.props?.inputId === "mangaTools-sidebarFilters"
+    );
+  const filtersOf = (root) => {
+    const select = filtersSelect(root);
+    return {
+      options: (select.props.options || []).map((o) => o.value),
+      value: (select.props.value || []).map((o) => o.value),
+      change: select.props.onChange,
+    };
+  };
+
+  NS.fieldOriginal = false;
+  const withoutRaw = filtersOf(
+    call("PluginSettings", { pluginID: "mangaTools" })
+  );
+  assert.deepStrictEqual(
+    withoutRaw.options,
+    ["language", "censorship", "translationGroup"],
+    "a filter whose field is off is not in the list at all"
+  );
+
+  state.capturedConfigWrite = null;
+  withoutRaw.change([{ value: "language", label: "语言" }]);
+  assert.deepStrictEqual(
+    [...NS.sidebarFilters],
+    ["language", "original"],
+    "and ticking one writes the hidden ones back as on, rather than forgetting them " +
+      "as a value with no option"
+  );
+  assert.strictEqual(
+    state.capturedConfigWrite.input.sidebarFilters,
+    "language,original",
+    "…to the library, as the comma string the setting is stored as"
+  );
+
+  NS.fieldOriginal = true;
+  const withRaw = filtersOf(call("PluginSettings", { pluginID: "mangaTools" }));
+  assert.deepStrictEqual(
+    withRaw.options,
+    ["language", "censorship", "translationGroup", "original"],
+    "the field's return puts its filter back in the list"
+  );
+  assert.deepStrictEqual(
+    withRaw.value,
+    ["language", "original"],
+    "…ticked where it was left on, and unticked where it was never chosen"
+  );
+
+  // The sidebar asks the two questions as one — see filterShowing.
+  assert.strictEqual(NS.filterShowing("language"), true, "a filter that is on");
+  assert.strictEqual(
+    NS.filterShowing("censorship"),
+    false,
+    "one that was taken off"
+  );
+  NS.fieldCensorship = false;
+  assert.strictEqual(
+    NS.filterShowing("censorship"),
+    false,
+    "…and the field's own switch is still part of it"
+  );
+  NS.fieldCensorship = true;
+  NS.fieldOriginal = true;
+  NS.sidebarFilters = null;
+  state.capturedConfigWrite = null;
 
   // Clearing writes "" (which parses back to "no restriction").
   settingsSelect.props.onChange(null);
@@ -1097,6 +1190,7 @@ module.exports = () => {
       openEditBlock: true,
       hidePerformers: true,
       showDisabledFields: false,
+      sidebarFilters: "censorship,language,original,translationGroup",
       // The reading half's own settings ride along, as the string the library holds
       // them as. Empty here because this library has never been written to — see
       // readSettings in the reader, where an absent value is what puts the browser's

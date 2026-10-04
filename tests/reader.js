@@ -2845,6 +2845,7 @@ async function main() {
         "showCoverBadge",
         "showDisabledFields",
         "showFlags",
+        "sidebarFilters",
       ],
       "…and it is the whole map: saving the reader's settings cannot take the " +
         "managing half's with it, because there is one place that builds all of it"

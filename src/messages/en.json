@@ -110,5 +110,8 @@
   "mangaTools.filter.original.heading": "Original text",
   "mangaTools.filter.original.raw": "Raw",
   "mangaTools.filter.original.cooked": "Translated",
-  "mangaTools.filter.original.isOriginal": "Is the original"
+  "mangaTools.filter.original.isOriginal": "Is the original",
+  "mangaTools.settings.sidebarFilters.heading": "Sidebar filters",
+  "mangaTools.settings.sidebarFilters.description": "Which of this plugin's filters the gallery list's sidebar offers. A filter whose field is switched off cannot be shown, and is not remembered while it is hidden — turning the field back on brings its filter back.",
+  "mangaTools.settings.sidebarFilters.placeholder": "No filters"
 }

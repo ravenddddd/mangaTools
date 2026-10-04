@@ -781,6 +781,29 @@ the manga info is shown rather than about any one field. The group only appears 
 at least one field is on: a page the plugin draws no fields on is a page those three
 are not about either, and the performers row is left alone with them.
 
+**Two settings, two questions: which fields the plugin manages, and which filters the
+sidebar offers.** `sidebarFilters` (0.9.56) is the second, under 漫画信息的显示, drawn as
+the same multiselect the enabled languages use. They are separate because they are
+separate answers — a reader who wants a field but no box for it on the list had to
+switch the *field* off before this, which is how you lose data — and where they
+disagree the rule is one line: a filter whose field is off **cannot be shown**, so the
+sidebar does not draw it. Deliberately not drawn greyed: nothing in Stash's sidebar is,
+and the reader's "why is it missing" is answered on the settings page, where both
+switches are visible at once.
+
+**A hidden filter's state is not remembered**, which is a decision rather than a
+consequence: the setting only ever lists filters that could be shown, the multiselect's
+list holds only those, and writing puts an off-field's filter back **as on**. So turning
+a field off and on again brings its filter back at the default rather than at whatever it
+happened to be — the reader asked for exactly that. Absent means every filter whose field
+is on, so an install that predates the setting behaves as it always did; the empty list
+means none, which is the opposite of what empty means for the languages beside it, and
+that is worth knowing before reading either one.
+
+**The mark's section is not in that setting** — it is the one that is always there,
+since the mark is what makes a gallery this plugin's at all. It is also the first of the
+five, and the four fields follow in their own order.
+
 **The mark's three are siblings, not sub-settings.** Asking before unmarking and
 clearing the plugin's fields with the mark are two answers about one action rather
 than a parent and its child, so they are not wrapped in the group Stash's stylesheet

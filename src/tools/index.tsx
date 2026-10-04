@@ -72,6 +72,7 @@ import type {
   MangaToolsApolloOperation,
   MangaToolsCustomFields,
   MangaToolsDescription,
+  MangaToolsFieldName,
   MangaToolsIntl,
   MangaToolsOption,
   MangaToolsPatchFn,
@@ -677,6 +678,11 @@ function refreshSettings(): void {
       const pluginCfg = plugins?.[PLUGIN_ID];
       NS.enabledLanguages = NS.parseEnabledLanguages(
         pluginCfg ? pluginCfg.enabledLanguages : null
+      );
+      // Absent means "every filter whose field is on", which is what the plugin did
+      // before this setting existed.
+      NS.sidebarFilters = NS.parseSidebarFilters(
+        pluginCfg ? pluginCfg.sidebarFilters : null
       );
       // Absent reads as the default (on), so an install predating these
       // settings keeps its behaviour until the user turns something off.
@@ -1535,6 +1541,13 @@ function settingsInput(): { [key: string]: unknown } {
     enabledLanguages: NS.enabledLanguages
       ? NS.serializeEnabledLanguages(NS.enabledLanguages)
       : "",
+    // An empty list serialises to "", which parses back as null ("every filter whose
+    // field is on") — the same round trip enabledLanguages makes, with the opposite
+    // default at the end of it: absence there means "no restriction", here it means
+    // "all of them", and both are what an install that predates the setting did.
+    sidebarFilters: NS.serializeSidebarFilters(
+      NS.sidebarFilters || NS.SIDEBAR_FILTERS
+    ),
     readerTakeover: NS.readerTakeover,
     manageChapters: NS.manageChapters,
     fields: NS.fields,
@@ -2752,6 +2765,101 @@ function SettingsNote(props: { children: ReactNode }) {
   );
 }
 
+/**
+ * Which of this plugin's filters the gallery list's sidebar offers.
+ *
+ * The same control the enabled-languages setting uses — a multiselect over a
+ * fixed list, written to a comma-separated string — because it is the same kind of
+ * question: which of these do you want.
+ *
+ * **The list holds only filters whose fields are on**, and that is the whole of how
+ * the two settings are allowed to disagree: a filter for a field this plugin does
+ * not manage has nothing to ask about, so it is not offered here either. It is
+ * deliberately *not* remembered while it is hidden — see filterShowing — so turning
+ * a field off and on again brings its filter back on, at the default, rather than
+ * at whatever it happened to be. That is why the write below adds the hidden names
+ * back **as ticked**: what the reader cannot see, they cannot choose, and a state
+ * kept in secret is worse than one that starts fresh.
+ */
+function SidebarFiltersSetting(props: { persist: () => void }) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+  const Select = resolveSelect();
+  const persist = props.persist;
+  if (!Select) return null;
+
+  // Drawn only while some field is showing, like the performers setting on the same
+  // page and for the same reason: with all four off there is nothing for a sidebar
+  // filter to be about, and an empty list of nothing to choose from is worse than
+  // no row. The setting itself is not forgotten — it is read again the moment a
+  // field is back on.
+  if (!NS.anyFieldShowing()) return null;
+
+  const available = NS.SIDEBAR_FILTERS.filter((name) =>
+    NS.fieldShowing(name as MangaToolsFieldName)
+  );
+
+  const labelOf = (name: string): string => {
+    if (name === "language") return fieldLabel(intl);
+    if (name === "censorship") return t(intl, "mangaTools.censorship.heading");
+    if (name === "translationGroup")
+      return t(intl, "mangaTools.translationGroup.heading");
+    return t(intl, "mangaTools.filter.original.isOriginal");
+  };
+
+  const options = available.map((name) => ({
+    value: name,
+    label: labelOf(name),
+    flag: null,
+  }));
+  const value = options.filter(
+    (o) => NS.sidebarFilters === null || NS.sidebarFilters.has(o.value)
+  );
+
+  return (
+    <div className="setting manga-tools-settings">
+      <div className="manga-tools-settings-block">
+        <h3>{t(intl, "mangaTools.settings.sidebarFilters.heading")}</h3>
+        <div className="sub-heading">
+          {t(intl, "mangaTools.settings.sidebarFilters.description")}
+        </div>
+        <div className="manga-tools-settings-control">
+          <Select
+            className="manga-tools-settings-select"
+            classNamePrefix="react-select"
+            // An id, so the tests can find this box the way they find the switches
+            // rather than by reading its placeholder in one locale.
+            inputId="mangaTools-sidebarFilters"
+            isMulti
+            isClearable
+            menuPlacement="auto"
+            placeholder={t(
+              intl,
+              "mangaTools.settings.sidebarFilters.placeholder"
+            )}
+            value={value}
+            options={options}
+            components={{ IndicatorSeparator: () => null }}
+            onChange={(selected: MangaToolsOption[] | null) => {
+              const ticked = (selected || []).map((o) => o.value);
+              // The hidden ones are written back as on: see the note above.
+              const hidden = NS.SIDEBAR_FILTERS.filter(
+                (name) => available.indexOf(name as MangaToolsFieldName) === -1
+              );
+              const all = ticked.concat(hidden as string[]);
+
+              NS.sidebarFilters = NS.parseSidebarFilters(
+                NS.serializeSidebarFilters(all)
+              );
+              emit();
+              persist();
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Which part of the example card a setting's help panel is about */
 type HelpExample = "badge" | "mark";
 
@@ -3500,6 +3608,8 @@ function MangaToolsSettings() {
               NS.showDisabledFields = next;
             })}
           />
+
+          <SidebarFiltersSetting persist={persist} />
         </SettingsGroup>
       </SettingSwitch>
 
@@ -5400,16 +5510,16 @@ registerPatch("after", "FilteredGalleryList.SidebarSections", (...args) => {
           (which language, whose translation), then the two that qualify the
           edition (censorship, and whether it is the original). */}
       <SidebarMangaFilter filter={filter} />
-      {NS.fieldShowing("language") ? (
+      {NS.filterShowing("language") ? (
         <SidebarLanguageFilter filter={filter} />
       ) : null}
-      {NS.fieldShowing("censorship") ? (
+      {NS.filterShowing("censorship") ? (
         <SidebarCensorshipFilter filter={filter} />
       ) : null}
-      {NS.fieldShowing("translationGroup") ? (
+      {NS.filterShowing("translationGroup") ? (
         <SidebarTranslationGroupFilter filter={filter} />
       ) : null}
-      {NS.fieldShowing("original") ? (
+      {NS.filterShowing("original") ? (
         <SidebarOriginalFilter filter={filter} />
       ) : null}
       {result}

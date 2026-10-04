@@ -387,6 +387,23 @@ export interface MangaToolsNamespace {
   parseFlag(raw: unknown, fallback: boolean): boolean;
 
   /**
+   * Which of the four fields' filters the gallery list's sidebar offers, or null
+   * for "every one whose field is on". Set on the plugin's own settings page, from
+   * the same comma-separated storage the languages use.
+   */
+  sidebarFilters: Set<string> | null;
+  /** The four names the setting holds, in the fields' own order */
+  SIDEBAR_FILTERS: readonly string[];
+  parseSidebarFilters(raw: unknown): Set<string> | null;
+  serializeSidebarFilters(names: Iterable<string>): string;
+  /**
+   * Whether a field's sidebar filter is offered: its field is drawn, and the reader
+   * has not taken that filter off the sidebar. See fields.ts for why the two are one
+   * question.
+   */
+  filterShowing(field: MangaToolsFieldName): boolean;
+
+  /**
    * What the tools half makes of the page it is on. For a console, not for code:
    * `MangaTools.diag()` in the browser, when something this plugin draws is
    * missing from the page and the console says nothing about why.

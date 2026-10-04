@@ -333,6 +333,79 @@ NS.fieldShowing = (field: MangaToolsFieldName): boolean => {
 };
 
 /**
+ * The four filters the sidebar's selection setting names, in the fields' own order.
+ *
+ * The mark is deliberately not one of them: it is not a field of this plugin but
+ * what makes a gallery one, so its section is drawn whatever this setting says —
+ * see the render in mangaTools.tsx.
+ */
+NS.SIDEBAR_FILTERS = [
+  "language",
+  "censorship",
+  "translationGroup",
+  "original",
+] as const;
+
+/**
+ * Parses the stored `sidebarFilters` setting — a comma-separated list of filter
+ * names, e.g. "language,translationGroup" — into a Set. Null for an empty or unset
+ * value, which means every filter whose field is on is shown.
+ *
+ * Only the four names above survive, so a hand-edited value cannot invent a
+ * filter, and duplicates collapse to one entry.
+ */
+NS.parseSidebarFilters = (raw: unknown): Set<string> | null => {
+  if (raw === null || raw === undefined) return null;
+  const s = String(raw).trim();
+  if (s === "") return null;
+
+  const out = new Set<string>();
+  s.split(",").forEach((piece) => {
+    const name = piece.trim();
+    if ((NS.SIDEBAR_FILTERS as readonly string[]).includes(name)) out.add(name);
+  });
+
+  return out.size ? out : null;
+};
+
+/** The inverse of parseSidebarFilters, ordered so any writer produces the same value. */
+NS.serializeSidebarFilters = (names: Iterable<string>): string =>
+  Array.from(names).sort().join(",");
+
+/**
+ * Whether a sidebar filter is offered: its field is drawn, **and** the reader has
+ * not taken that filter off the sidebar.
+ *
+ * Two questions, and the first is not decoration: a filter for a field this plugin
+ * does not manage has nothing to ask about. That is also why the sidebar simply
+ * does not draw it rather than drawing it greyed — nothing in Stash's sidebar is
+ * drawn disabled, and the reader's own answer to "why is it missing" is one screen
+ * away, in the settings, where both switches are visible at once.
+ *
+ * A filter whose field is off is **not remembered**: the setting only ever lists
+ * filters that could be shown, so turning a field off and on again brings its
+ * filter back at its default (on) rather than at whatever it was before. That is
+ * the decision, not an oversight — a filter that cannot be seen cannot be chosen,
+ * and a hidden checkbox that silently keeps a state is worse than one that starts
+ * from the default.
+ */
+NS.filterShowing = (field: MangaToolsFieldName): boolean =>
+  NS.fieldShowing(field) &&
+  (NS.sidebarFilters === null || NS.sidebarFilters.has(field));
+
+/**
+ * Until the settings have been read — and for an install that has never set it —
+ * every filter whose field is on is offered, which is what the plugin did before
+ * this setting existed.
+ *
+ * A default rather than a null check in the predicate, because the two are not the
+ * same thing to a reader: `null` is the value the setting *has*, and this is the
+ * value it has before anything has said otherwise. Leaving it undefined made
+ * `filterShowing` throw on the first render of every surface that asks.
+ */
+NS.sidebarFilters = null;
+
+/**
  * Whether any of the four is drawn.
  *
  * The question a block *made of* the fields asks before drawing itself: with all
