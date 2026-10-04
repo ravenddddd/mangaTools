@@ -42,8 +42,15 @@
  * `filter-model.ts` the criterion read/write logic, `filter-ui.tsx` the rows
  * both surfaces share, `sidebar-filter.tsx` the five sidebar sections, and
  * `dialog-filter.tsx` the dialog's language card. `fields-ui.tsx` and `icons.tsx`
- * hold the small pieces more than one surface draws, and the settings page is a
- * module of its own, mounted by a patch here. What is left below draws the rest.
+ * hold the small pieces more than one surface draws, `mark.ts` the mark and the
+ * one write path, and `hosts.ts` the mount points every portal goes through.
+ *
+ * Every surface is a module of its own from there: the card's badge and mark
+ * (cards.tsx), the toolbar switch (toolbar.tsx), the details tab's block
+ * (details.tsx), the edit form's block (edit-page.tsx), the bulk dialog's rows
+ * (bulk.tsx), and the settings page (settings-page.tsx). **This file is what is
+ * left: the patches that mount them, and `install()`** — a surface is drawn by
+ * the patch that has the right props in hand, and by no other surface.
  *
  * New features should keep the same shape: patches that hand anything they do
  * not own straight back to the original component, shared data in a module
@@ -55,6 +62,7 @@
  * and there is no load order left to get wrong.
  */
 import "./fields";
+import "./diag";
 import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
 import { DialogLanguageFilter } from "./dialog-filter";
@@ -73,26 +81,20 @@ import type { MangaToolsFilterModel } from "../plugin-api";
 import {
   PLUGIN_ID,
   currentGalleryId,
-  currentPath,
-  isGalleryContext,
-  locationListener,
-  pathNow,
   pickLanguage,
   start,
-  started,
   storedIsManga,
   store,
   useGlobalVersion,
 } from "./core";
 import type { CustomFieldsMap } from "./core";
 import { MangaToolsSettings } from "./settings-page";
-import { bulkAnchor, fieldHosts } from "./hosts";
 import { MangaFieldBlock } from "./edit-page";
 import { MangaDetailsPanel, guardedBlock } from "./details";
 import { LanguageBadge, MangaPopoverMark } from "./cards";
 import { CAN_WRITE, GalleryToolbar } from "./toolbar";
 import { noteFired, registerPatch } from "./patches";
-import { BulkFieldsRow, bulkRenders, captureSelection } from "./bulk";
+import { BulkFieldsRow, captureSelection } from "./bulk";
 import { isMarkedNow, setEditForm } from "./mark";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
@@ -331,49 +333,6 @@ registerPatch("instead", "CustomFieldInput", (...args: unknown[]) => {
   }
 
   return <Original {...props} />;
-});
-
-/**
- * What this half makes of the page it is on, for a console.
- *
- * `MangaTools.diag()` — nothing in the plugin reads it. It exists because this
- * file keeps meeting the same shape of failure: a row that should be on the page
- * is not, and the console says nothing at all, because the two things that decide
- * it — a patch onto a component name Stash may not have, and a guard reading a
- * route the plugin may never have learned — are both silent by construction.
- * `noteFired` covers the first. This covers the rest, by reporting the inputs
- * those guards read rather than the conclusion they reached:
- *
- *   url / path          the browser's path, the path checks' answer, and the last
- *                       one Stash announced. A disagreement here is the whole of
- *                       one entire class of bug (see pathNow)
- *   locationListener    whether the plugin hears about navigation at all
- *   bulkRenders         whether the bulk rows ever ran — 0 with a dialog open means
- *                       the RatingSystem patch did not fire, not that a guard said no
- *   bulkAnchor / hosts  where the rows would go, and whether that mount point is
- *                       actually on the page ("detached" is a node React has
- *                       dropped out of the document while the plugin still portals
- *                       into it)
- */
-NS.diag = () => ({
-  url: window.location.pathname || "",
-  path: pathNow(),
-  rememberedPath: currentPath,
-  galleryContext: isGalleryContext(),
-  galleryId: currentGalleryId(),
-  started,
-  locationListener,
-  eventApi: !!PluginApi.Event?.addEventListener,
-  bulkRenders,
-  bulkAnchor: !!bulkAnchor(),
-  hosts: Object.keys(fieldHosts).map((key): [string, string] => [
-    key,
-    fieldHosts[key]
-      ? fieldHosts[key]?.parentNode
-        ? "attached"
-        : "detached"
-      : "none",
-  ]),
 });
 
 // 4. Detail page: show the language as "flag + localised name", positioned

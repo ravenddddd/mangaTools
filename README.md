@@ -1427,7 +1427,8 @@ mangaTools/
 │   │   ├── toolbar.tsx       The manga switch in the gallery toolbar, and the question before it
 │   │   ├── bulk.tsx          The bulk edit dialog's rows, their pending state and the mutation hookup
 │   │   ├── patches.ts        Registering a patch, and the two once-only logs
-│   │   ├── index.tsx         Every patch registration, and the diagnostic behind them
+│   │   ├── index.tsx         Every patch registration, and `install()`
+│   │   ├── diag.ts           `MangaTools.diag()`: the inputs the guards read, for a console
 │   │   ├── settings-page.tsx   The plugin's own settings page, and the multiselect it draws
 │   │   ├── fields-ui.tsx     The flag, the badge chip, the select resolver, the option formatter
 │   │   ├── icons.tsx         The mark's icon and the two steaks
