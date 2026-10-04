@@ -591,22 +591,28 @@ with the values coming from the library instead of a table. The one thing that
 differs is where the values come from, and what follows from it: a group is offered
 while some gallery carries it (the store's answer, via `NS.translationGroups`), and
 a name the filter already asks for keeps its row even after the last gallery stops
-using it — the same rule that keeps a disabled language visible. Each row carries
-its galleries' usual language as a flag, which is the glyph the edit page's menu and
-the bulk row already draw from the same walk of the same store.
+using it — the same rule that keeps a disabled language visible. **Its rows are plain
+names, with no flags**: the flag a group could carry is its galleries' usual
+language, which is a suggestion about a *different* field — it belongs where it is a
+suggestion (the edit page's menu, the bulk dialog's row) and not in a list whose job
+is "which group". Its two modifier entries are Stash's own **(任意) / (无)**, worded
+the way the language section words its own.
 
 **Raw got the mark's section rather than a list**, because it is the same kind of
-field: a presence, with two states and no value to type. Its rows say 生肉/熟肉 in
-the plugin's own words — the words the edit page's button and the bulk dialog's
-steak already use — and each draws its own steak where a language row draws a flag.
-Its *tag* says 原文 是 生肉, and that name is deliberate: a criterion called 生肉 with
-a value called 生肉 reads as the same word twice.
+field: a presence, with two states and no value to type. Its heading is 是否为生肉 and
+its rows are Stash's own 是/否 — the field's vocabulary (生肉/熟肉) is what the heading
+and the *tag* say, and repeating it as the values would put the same word on both
+sides of the question. Its tag says 原文 是 生肉, and that criterion name is
+deliberate: one called 生肉 with a value called 生肉 reads as the same word twice.
 
-**Every section carries the mark's own icon beside its heading**, dimmed. The
+**Every section carries the mark's own icon beside its heading**, dimmed to 0.4 and
+sized to 0.8em so it sits in a line of text rather than reading as a badge. The
 sidebar is Stash's and its own sections sit in the same column with the same look,
 so without it a reader has no way to tell which of the fourteen headings came from a
 plugin — and the icon is the one the covers already wear, so the answer is a thing
-they have seen rather than a new vocabulary.
+they have seen rather than a new vocabulary. A flag in one of these rows gets a
+right margin (`.manga-tools-row-flag`): flag-icons' `.fi` is a width and nothing
+else, so flags sat flush against their labels in every one of the plugin's rows.
 
 **The bulk dialog got a row for it in 0.9.51**, and the row is the edit page's
 field moved into a dialog: the same select (the library's groups, create-entry and

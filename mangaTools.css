@@ -1005,11 +1005,17 @@
  * The mark's icon after a sidebar section's heading, saying which headings in that
  * column are this plugin's.
  *
- * Dimmed rather than drawn at full strength, and that is the whole of the rule: a
- * full-strength mark beside a heading reads as one more icon *of* the section — a
- * thing to click, or a state — where this is a label on the heading. `0.5` is the
- * same value the unmarked manga switch and the absent shop logos use for "present,
- * not claiming anything", so the plugin has one dimming rather than three.
+ * Dimmed rather than drawn at full strength: a full-strength mark beside a heading
+ * reads as one more icon *of* the section — a thing to click, or a state — where
+ * this is a label on the heading. `0.4` is close to the dimming the unmarked manga
+ * switch uses for "present, not claiming anything".
+ *
+ * At 0.8em rather than the 1em the artwork takes everywhere else, because it sits
+ * in a line of *text* rather than beside a control: at the shared size it came out
+ * taller than the heading's own letters and read as a badge. `vertical-align:
+ * middle` is what centres it on that line — the artwork's own `-0.125em` is
+ * FontAwesome's baseline nudge, which is right for an icon in a row of icons and
+ * leaves a stroked shape sitting low against a word.
  *
  * The margin is Stash's own icon margin (the `.fa-icon { margin: 0 0.4rem }` its
  * index.scss sets unscoped) — written here rather than inherited because this is a
@@ -1017,8 +1023,28 @@
  * otherwise end flush against the icon.
  */
 .sidebar-list-filter .manga-tools-sidebar-mark {
+  height: 0.8em;
   margin-left: 0.4rem;
-  opacity: 0.5;
+  opacity: 0.4;
+  vertical-align: middle;
+  width: 0.8em;
+}
+
+/*
+ * A flag in one of this plugin's own rows: the sidebar sections and the filter
+ * dialog's card. One gap, in the one place.
+ *
+ * flag-icons' `.fi` is `display: inline-block; width: 1.333em` and nothing else —
+ * no margin — so the flag sat flush against the label in every one of these rows
+ * until this rule. The value is the same `0.4rem` the plugin's own icons take from
+ * FontAwesome, which is what the flag is standing in for.
+ *
+ * Deliberately not a rule on `.fi` itself: that class is flag-icons', the
+ * stylesheet is loaded by Stash for its own use, and a plugin reaching into it
+ * would be restyling somebody else's furniture everywhere on the page.
+ */
+.manga-tools-row-flag {
+  margin-right: 0.4rem;
 }
 
 /*

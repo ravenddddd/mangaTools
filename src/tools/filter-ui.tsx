@@ -187,7 +187,9 @@ export function LanguageRow(props: {
           {props.leading != null ? (
             props.leading
           ) : props.flag ? (
-            <Flag flag={props.flag} />
+            // The gap between flag and label is this class's one job — flag-icons
+            // leaves `.fi` with a width and no margin, so without it they touch.
+            <Flag flag={props.flag} className="manga-tools-row-flag" />
           ) : null}
           {sidebar ? (
             <span className={"TruncatedText inline " + labelClass}>

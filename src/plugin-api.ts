@@ -231,8 +231,6 @@ export interface MangaToolsNamespace {
    * instead, see visibleOptions.
    */
   translationGroups(): string[];
-  /** The same store, walked once, for the flags the group filter draws. */
-  usualLanguages(): MangaToolsUsualLanguageMap;
   /**
    * Which of this plugin's fields a key names — the canonical name, or "" for a
    * key that is not ours. The one list every recogniser asks.

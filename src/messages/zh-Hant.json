@@ -107,9 +107,8 @@
   "mangaTools.bulk.remove": "移除",
   "mangaTools.bulk.unmarkWarning": "取消標記會從選中的畫廊上移除本外掛的全部自訂欄位（包括章節）。",
   "mangaTools.bulk.unmarkWarningKeep": "只移除漫畫標記，不會移除本外掛的自訂欄位。",
-  "mangaTools.filter.group.any": "任意翻譯組",
-  "mangaTools.filter.group.none": "沒有翻譯組",
   "mangaTools.filter.original.heading": "原文",
   "mangaTools.filter.original.raw": "生肉",
-  "mangaTools.filter.original.cooked": "熟肉"
+  "mangaTools.filter.original.cooked": "熟肉",
+  "mangaTools.filter.original.isOriginal": "是否為生肉"
 }

@@ -75,7 +75,6 @@ import type {
   MangaToolsIntl,
   MangaToolsOption,
   MangaToolsPatchFn,
-  MangaToolsUsualLanguageMap,
 } from "../plugin-api";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
@@ -1317,9 +1316,6 @@ function SteakIcon(props: { raw: boolean }) {
  * walk of the same store the edit page's menu and the bulk row already use.
  */
 NS.translationGroups = (): string[] => knownTranslationGroups();
-
-NS.usualLanguages = (): MangaToolsUsualLanguageMap =>
-  NS.usualLanguagesOf(store);
 
 function knownTranslationGroups(): string[] {
   if (!store) return [];

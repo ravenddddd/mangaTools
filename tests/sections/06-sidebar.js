@@ -146,7 +146,7 @@ module.exports = () => {
     });
   assert.deepStrictEqual(
     sectionFaces().map((f) => f.heading),
-    ["是否为漫画", "语言", "修正", "翻译组", "生肉"],
+    ["是否为漫画", "语言", "修正", "翻译组", "是否为生肉"],
     "the five headings, in the order the fields are named in"
   );
   sectionFaces().forEach((f, at) => {
@@ -1049,26 +1049,17 @@ module.exports = () => {
       const groupSection = renderGroupFilter();
       assert.deepStrictEqual(
         labelsOf(groupSection.node),
-        ["任意翻译组", "没有翻译组", "Aozora", "Lily Manga"],
+        ["(任意)", "(无)", "Aozora", "Lily Manga"],
         "the group candidates are the library's own names, behind Stash's two modifiers"
       );
 
       // …and each one draws its galleries' usual language where a language row
       // draws a flag, which is the same fact the edit page's menu shows.
-      const lilyRow = candidatesOf(groupSection.node).find(
-        (row) => row.props.label === "Lily Manga"
-      );
-      assert.strictEqual(
-        lilyRow.props.flag,
-        "cn",
-        "a group whose galleries are usually zh-Hans carries that flag"
-      );
-      assert.strictEqual(
-        candidatesOf(groupSection.node).find(
-          (row) => row.props.label === "Aozora"
-        ).props.flag,
-        null,
-        "and a group the store has nothing to say about carries none"
+      assert.deepStrictEqual(
+        candidatesOf(groupSection.node).map((row) => row.props.flag),
+        [undefined, undefined, undefined, undefined],
+        "with no flags: a group's usual language is a suggestion about another " +
+          "field, and this list is answering 'which group'"
       );
 
       // Raw: two rows and no search box — two values need neither a search nor an
@@ -1076,8 +1067,8 @@ module.exports = () => {
       const rawSection = renderOriginalFilter();
       assert.deepStrictEqual(
         labelsOf(rawSection.node),
-        ["生肉", "熟肉"],
-        "raw offers its two states, in the plugin's own words"
+        ["是", "否"],
+        "raw offers Stash's two boolean words, as the mark's section does"
       );
       assert.strictEqual(
         find(rawSection.node, (n) => {
@@ -1089,11 +1080,10 @@ module.exports = () => {
         "…with no search box, because two values are not a list to search"
       );
       assert.deepStrictEqual(
-        candidatesOf(rawSection.node).map(
-          (row) => row.props.leading.props.className
-        ),
-        ["fa-fw manga-tools-raw-icon", "fa-fw manga-tools-cooked-icon"],
-        "each row draws its own steak where a language row draws a flag"
+        candidatesOf(rawSection.node).map((row) => row.props.leading),
+        [undefined, undefined],
+        "and no glyph at all — the steaks belong to the button that sets this, not " +
+          "to a list of two words"
       );
 
       // Clicking one writes the presence condition the model turns it into.

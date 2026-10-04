@@ -377,27 +377,6 @@ function SidebarSection(props: {
   );
 }
 
-/**
- * The two steaks, drawn where a language row draws its flag.
- *
- * By class rather than by the entry file's `SteakIcon`, which this module cannot
- * reach: the artwork's rules live in the stylesheet (`.manga-tools-raw-icon` and
- * `.manga-tools-cooked-icon` set the mask and take the colour from `currentColor`),
- * so a span wearing one is the same drawing. `fa-fw` is FontAwesome's fixed width,
- * which is what the row's leading slot is sized by — the censorship section's chess
- * piece wears it for the same reason.
- */
-function steakLeading(raw: boolean): ReactElement {
-  return (
-    <span
-      className={
-        "fa-fw " + (raw ? "manga-tools-raw-icon" : "manga-tools-cooked-icon")
-      }
-      aria-hidden="true"
-    />
-  );
-}
-
 /** The chess icon for a censorship value, drawn where a language row draws its flag */
 function censorshipLeading(value: string): ReactElement | null {
   const Icon = PluginApi.components.Icon;
@@ -555,7 +534,6 @@ export function SidebarLanguageFilter(props: {
         variant="sidebar"
         key={"in-" + o.value}
         label={o.label}
-        flag={flagOf(o)}
         state="included"
         onClick={() => {
           toggleInclude(o.value);
@@ -569,7 +547,6 @@ export function SidebarLanguageFilter(props: {
       variant="sidebar"
       key={"ex-" + o.value}
       label={o.label}
-      flag={flagOf(o)}
       state="excluded"
       onClick={() => {
         toggleExclude(o.value);
@@ -966,23 +943,13 @@ export function SidebarOriginalFilter(props: {
     if (tagLabelsFor) relabelOriginalTags(tagLabelsFor);
   });
 
-  // The two states, in the order the bulk row's cycle puts them: raw first, since
-  // that is the one the field is named for.
-  const options: {
-    value: MangaToolsMangaState;
-    label: string;
-    raw: boolean;
-  }[] = [
-    {
-      value: "marked",
-      label: t(intl, "mangaTools.filter.original.raw"),
-      raw: true,
-    },
-    {
-      value: "unmarked",
-      label: t(intl, "mangaTools.filter.original.cooked"),
-      raw: false,
-    },
+  // Stash's own two words for a boolean criterion, exactly as the mark's section
+  // uses them — 是/否 in Chinese, 有効/無効 in Japanese. The field's own vocabulary
+  // (生肉/熟肉) is what the heading and the tag say; repeating it as the *values*
+  // would put the same word on both sides of the question.
+  const options: { value: MangaToolsMangaState; label: string }[] = [
+    { value: "marked", label: message(intl, "true", "Yes") },
+    { value: "unmarked", label: message(intl, "false", "No") },
   ];
 
   // Choosing the chosen value clears it; choosing the other moves the filter —
@@ -999,7 +966,6 @@ export function SidebarOriginalFilter(props: {
       variant="sidebar"
       key={o.value}
       label={o.label}
-      leading={steakLeading(o.raw)}
       state="included"
       canExclude={false}
       onClick={() => {
@@ -1010,7 +976,7 @@ export function SidebarOriginalFilter(props: {
 
   return (
     <SidebarSection
-      heading={t(intl, "mangaTools.translationGroup.original")}
+      heading={t(intl, "mangaTools.filter.original.isOriginal")}
       open={open}
       onToggle={toggleOpen}
       chosenItems={chosenItems}
@@ -1023,7 +989,6 @@ export function SidebarOriginalFilter(props: {
             variant="sidebar"
             key={o.value}
             label={o.label}
-            leading={steakLeading(o.raw)}
             state="candidate"
             canExclude={false}
             singleValue
@@ -1038,30 +1003,27 @@ export function SidebarOriginalFilter(props: {
 }
 
 /**
- * The translation group's options: the names the library holds, each carrying the
- * flag of its galleries' usual language — the same glyph the edit page's menu and
- * the bulk dialog's row put beside a group, from the same walk of the same store.
+ * The translation group's options: the names the library holds, and nothing else.
+ *
+ * **No flags**, unlike the language list beside it: the flag a group could carry is
+ * its galleries' usual language, which is a *suggestion* about a different field —
+ * it belongs where it is a suggestion, which is the edit page's menu and the bulk
+ * dialog's row, and in a list whose job is "which group" it is one more thing to
+ * read past. The names are the whole of the answer here.
  *
  * A name the filter already asks for is kept even when no gallery carries it any
  * more, for the reason the language list keeps a disabled code (see
  * visibleOptions): a filter showing a value that is not in its own list is a filter
- * nobody can read. Those come in with no flag, since the store has nothing to say
- * about a group it does not hold.
+ * nobody can read.
  */
 function translationGroupOptions(
-  intl: MangaToolsIntl,
   selection: MangaToolsLanguageSelection
 ): MangaToolsOption[] {
-  const usual = NS.usualLanguages();
-  const options: MangaToolsOption[] = NS.translationGroups().map((name) => {
-    const language = usual[NS.groupKey(name)];
-    const described = language ? NS.describe(language.code, intl.locale) : null;
-    return {
-      value: name,
-      label: name,
-      flag: described ? described.flag : null,
-    };
-  });
+  const options: MangaToolsOption[] = NS.translationGroups().map((name) => ({
+    value: name,
+    label: name,
+    flag: null,
+  }));
 
   const known: { [value: string]: true } = {};
   options.forEach((o) => {
@@ -1142,7 +1104,7 @@ export function SidebarTranslationGroupFilter(props: {
     update(withoutModifier(selection));
   }
 
-  const options = translationGroupOptions(intl, selection);
+  const options = translationGroupOptions(selection);
 
   // The same three lists the language section keeps: chosen, excluded, and the
   // candidates the search has not narrowed away.
@@ -1251,7 +1213,9 @@ export function SidebarTranslationGroupFilter(props: {
         {showModifiers ? (
           <LanguageRow
             variant="sidebar"
-            label={t(intl, "mangaTools.filter.group.any")}
+            label={
+              "(" + message(intl, "criterion_modifier_values.any", "Any") + ")"
+            }
             state="candidate"
             canExclude={false}
             modifier
@@ -1263,7 +1227,11 @@ export function SidebarTranslationGroupFilter(props: {
         {showModifiers ? (
           <LanguageRow
             variant="sidebar"
-            label={t(intl, "mangaTools.filter.group.none")}
+            label={
+              "(" +
+              message(intl, "criterion_modifier_values.none", "None") +
+              ")"
+            }
             state="candidate"
             canExclude={false}
             modifier
@@ -1277,7 +1245,6 @@ export function SidebarTranslationGroupFilter(props: {
             variant="sidebar"
             key={o.value}
             label={o.label}
-            flag={flagOf(o)}
             state="candidate"
             onClick={() => {
               toggleInclude(o.value);

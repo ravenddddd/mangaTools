@@ -107,9 +107,8 @@
   "mangaTools.bulk.remove": "Remove",
   "mangaTools.bulk.unmarkWarning": "Unmarking removes every one of this plugin's custom fields from the selected galleries (chapters included).",
   "mangaTools.bulk.unmarkWarningKeep": "Only the manga mark is removed; this plugin's custom fields are kept.",
-  "mangaTools.filter.group.any": "Any translation group",
-  "mangaTools.filter.group.none": "No translation group",
   "mangaTools.filter.original.heading": "Original text",
   "mangaTools.filter.original.raw": "Raw",
-  "mangaTools.filter.original.cooked": "Translated"
+  "mangaTools.filter.original.cooked": "Translated",
+  "mangaTools.filter.original.isOriginal": "Is the original"
 }
