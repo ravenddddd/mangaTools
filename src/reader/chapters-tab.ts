@@ -32,15 +32,17 @@
  * images and chapters, at the index the chapter begins at. Which also means the
  * lightbox a chapter opens is the one the reader will be drawing in.
  */
-import { stringFor } from "../i18n";
+import { numbered, stringFor } from "../i18n";
 import { NS } from "../tools/fields";
 import { bridged, takeOver } from "./bridge";
 import {
   type MangaReaderChapter,
   type MangaReaderPlacedChapter,
   addChapterAt,
+  addChaptersAt,
   chaptersFromStash,
   moveChapterStart,
+  parseChapterList,
   parseChapters,
   placeChapters,
   removeChapterAt,
@@ -140,6 +142,33 @@ let busy = false;
  * already carries the state, so a pass cannot draw the wrong half of it.
  */
 let confirming = false;
+
+/** The entry to the bulk editor, kept between passes so the panel's neighbours stay put */
+let bulkButton: HTMLButtonElement | null = null;
+
+/**
+ * Whether the bulk editor is up, in place of the rows.
+ *
+ * What has been pasted and typed is *not* here: the list lives in the textarea and
+ * the pages live in the table's inputs, and both are read when Create is pressed —
+ * the rule the single-chapter form already follows, and for the same reason. A key
+ * that changes on a keystroke is a table rebuilt under the cursor.
+ */
+let bulk = false;
+
+/**
+ * The pages typed into the bulk table, by row.
+ *
+ * Module state rather than something the drawing closes over, because the rows are
+ * rebuilt whenever the *list* changes (see drawBulk) and the numbers must survive
+ * that: a reader who pastes, numbers six rows and then fixes a typo in the paste box
+ * should not lose the six numbers. Written by the table's own listeners and never put
+ * in the render key, so it cannot rebuild anything by itself.
+ */
+let bulkPages: string[] = [];
+
+/** The tallest pasted list this editor will take — see drawBulk */
+const BULK_LIMIT = 64;
 
 /**
  * One pass over the document: is a Chapters tab on screen, and does it say what
@@ -296,9 +325,11 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
     gallery.own ? "own" : "none",
     String(gallery.importable.length),
     busy ? "busy" : confirming ? "confirm" : "idle",
-    form
-      ? "form:" + (form.startPageId ?? "new") + (formError ? ":bad" : "")
-      : "list",
+    bulk
+      ? "bulk"
+      : form
+        ? "form:" + (form.startPageId ?? "new") + (formError ? ":bad" : "")
+        : "list",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
   if (key === renderedFor && panel.childElementCount > 0) return;
@@ -306,10 +337,13 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
   panelInHand = panel;
 
   takeOverCreate(panel);
-  toggleCreate(panel, !form);
+  ensureBulkButton(panel);
+  toggleCreate(panel, !form && !bulk);
 
   panel.textContent = "";
-  if (form) {
+  if (bulk) {
+    drawBulk(panel, gallery);
+  } else if (form) {
     drawForm(panel, gallery);
   } else {
     for (const chapter of gallery.chapters) {
@@ -317,8 +351,8 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
     }
   }
 
-  // The import is about the list, so it is not offered while the form is on top of it.
-  if (form) hideImport();
+  // The import is about the list, and both editors are on top of it.
+  if (form || bulk) hideImport();
   else drawImport(panel, gallery);
 }
 
@@ -352,6 +386,347 @@ function takeOverCreate(panel: HTMLElement): void {
     },
     true
   );
+}
+
+/** The id the entry button carries, so a test can find it */
+const BULK_ID = "manga-reader-chapters-bulk";
+/** …and the one the Create button carries, for the same reason */
+const BULK_CREATE_ID = "manga-reader-bulk-create";
+
+/**
+ * The way into the bulk editor: a button of this plugin's own beside Stash's Create.
+ *
+ * Inserted **before** Stash's button rather than after the panel, which is where the
+ * import control went. `findPanel` knows a panel by the button immediately above it,
+ * so a node between the two would be taken for Stash's own and would hide the panel
+ * from the next pass; before it, both lookups keep working and the two buttons sit
+ * together, which is what the mock asked for.
+ *
+ * It is put away while either editor is up, for the same reason the import is: an
+ * editor on top of the rows is not a place to offer another way to write them.
+ */
+function ensureBulkButton(panel: HTMLElement): void {
+  const owner = panel.previousElementSibling;
+  if (!isStashButton(owner)) return;
+
+  if (!bulkButton) {
+    bulkButton = document.createElement("button");
+    bulkButton.type = "button";
+    bulkButton.id = BULK_ID;
+    bulkButton.className = "btn btn-secondary btn-sm";
+    bulkButton.addEventListener("click", (event: Event) => {
+      event.preventDefault();
+      openBulk();
+    });
+  }
+
+  if (bulkButton.parentNode !== owner.parentNode) {
+    owner.parentNode?.insertBefore(bulkButton, owner);
+  }
+
+  bulkButton.textContent = stringFor(
+    inHand?.locale,
+    "mangaReader.chaptersFromList"
+  );
+  bulkButton.hidden = bulk || form !== null;
+}
+
+/** Opens the bulk editor on an empty paste box */
+function openBulk(): void {
+  if (!inHand) return;
+  bulk = true;
+  bulkPages = [];
+  redraw();
+}
+
+/** Closes it without writing anything */
+function closeBulk(): void {
+  bulk = false;
+  bulkPages = [];
+  redraw();
+}
+
+/**
+ * The bulk editor, in place of the rows.
+ *
+ * **The list is parsed as it is typed, and the table is rebuilt under it** — but the
+ * paste box is never touched by that rebuild, so the caret stays where it was, and the
+ * numbers already in the table are kept in `bulkPages` and put back. What none of it
+ * does is re-render the panel: the key does not carry the list or the numbers, so no
+ * pass can rebuild the box under the cursor.
+ *
+ * The validity column, and the Create button's count and disabled state, are updated
+ * by the inputs' own listeners (`validate`) rather than by the render, which is the
+ * shape the single-chapter form already uses for its Save button, and the reason the
+ * reader can type a page number and watch the row go green without anything moving.
+ *
+ * The delete button is `btn-danger`, as Stash's own Delete in that form is, and it
+ * removes the *row* — a row that is wrong is deleted, which is how the heading line
+ * and any prose that came with the paste are got rid of.
+ */
+function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
+  const node = document.createElement("form");
+  node.setAttribute("novalidate", "");
+  node.addEventListener("submit", (event: Event) => event.preventDefault());
+
+  const container = document.createElement("div");
+  container.className = "form-container px-3";
+
+  const label = document.createElement("label");
+  label.className = "form-label";
+  label.setAttribute("for", "chapter_list");
+  label.textContent = stringFor(gallery.locale, "mangaReader.bulkPaste");
+  container.appendChild(label);
+
+  const area = document.createElement("textarea");
+  area.id = "chapter_list";
+  area.className = "text-input form-control";
+  area.rows = 8;
+  container.appendChild(area);
+
+  const table = document.createElement("table");
+  table.className = "manga-reader-bulk-table";
+  container.appendChild(table);
+
+  const create = document.createElement("button");
+  create.type = "button";
+  create.id = BULK_CREATE_ID;
+  create.className = "btn btn-primary";
+
+  const empty = document.createElement("div");
+  empty.className = "manga-reader-bulk-empty";
+  empty.textContent = stringFor(gallery.locale, "mangaReader.bulkEmpty");
+  container.appendChild(empty);
+
+  /**
+   * The rows as built, in the order they are shown.
+   *
+   * Held here rather than looked up in the table again: it is this module's own
+   * markup, and a walk of it to find the same three nodes on every keystroke is work
+   * with nothing behind it. (It is also the plainest DOM — this file builds every
+   * other node with `createElement`, and a table is no different.)
+   */
+  let built: Array<{
+    tr: HTMLTableRowElement;
+    mark: HTMLSpanElement;
+    title: HTMLInputElement;
+    page: HTMLInputElement;
+  }> = [];
+
+  /** What the table says, one entry per row */
+  const rows = (): Array<{ title: string; page: string }> =>
+    built.map((row) => ({
+      title: row.title.value.trim(),
+      page: row.page.value.trim(),
+    }));
+
+  /** What is wrong with one row, as a message id, or "" when nothing is */
+  const wrongWith = (
+    row: { title: string; page: string },
+    all: Array<{ title: string; page: string }>,
+    at: number
+  ): string => {
+    if (!row.title) return "mangaReader.bulkNoTitle";
+    if (!row.page) return "mangaReader.bulkNoPage";
+
+    const page = Number(row.page);
+    if (!Number.isFinite(page) || page < 1 || page > gallery.pages.length) {
+      return "mangaReader.bulkPageRange";
+    }
+    for (let i = 0; i < all.length; i++) {
+      if (i !== at && all[i].page === row.page)
+        return "mangaReader.bulkPageTwice";
+    }
+    if (gallery.chapters.some((c) => c.at === page - 1)) {
+      return "mangaReader.bulkPageTaken";
+    }
+    return "";
+  };
+
+  /**
+   * Re-reads the table and says what it makes of it: the marks, the reasons, and
+   * whether Create can be pressed.
+   */
+  const validate = (): void => {
+    const all = rows();
+    let good = 0;
+    const lined: string[] = [];
+
+    for (let i = 0; i < all.length; i++) {
+      lined[i] = all[i].page;
+      const wrong = wrongWith(all[i], all, i);
+      const mark = built[i]?.mark;
+      if (mark) {
+        mark.textContent = wrong ? "\u2715" : "\u2713";
+        mark.className = wrong
+          ? "manga-reader-bulk-bad"
+          : "manga-reader-bulk-ok";
+        mark.setAttribute(
+          "title",
+          wrong ? stringFor(gallery.locale, wrong) : ""
+        );
+      }
+      if (!wrong) good++;
+    }
+
+    bulkPages = lined;
+    create.disabled = all.length === 0 || good !== all.length;
+    create.textContent = numbered(
+      gallery.locale,
+      "mangaReader.bulkCreate",
+      all.length
+    );
+    empty.hidden = all.length > 0;
+  };
+
+  /** The table, from the list in the box and the pages already typed */
+  const build = (): void => {
+    const titles = parseChapterList(area.value);
+    table.textContent = "";
+
+    if (titles.length > BULK_LIMIT) {
+      // A table is a thing a person edits by hand; past this it wants cutting up.
+      const over = document.createElement("div");
+      over.className = "manga-reader-bulk-empty";
+      over.textContent = stringFor(gallery.locale, "mangaReader.bulkTooMany");
+      container.insertBefore(over, table);
+      return;
+    }
+
+    const head = document.createElement("tr");
+    head.setAttribute("data-head", "");
+    ["", "mangaReader.bulkTitle", "mangaReader.bulkPage", ""].forEach(
+      (key, at) => {
+        const th = document.createElement("th");
+        if (key) th.textContent = stringFor(gallery.locale, key);
+        if (at === 2) th.className = "manga-reader-bulk-page";
+        head.appendChild(th);
+      }
+    );
+    table.appendChild(head);
+
+    built = [];
+
+    titles.forEach((title, at) => {
+      const tr = document.createElement("tr");
+
+      const valid = document.createElement("td");
+      valid.className = "manga-reader-bulk-valid";
+      const mark = document.createElement("span");
+      valid.appendChild(mark);
+      tr.appendChild(valid);
+
+      const titleCell = document.createElement("td");
+      const titleInput = document.createElement("input");
+      titleInput.type = "text";
+      titleInput.className = "text-input form-control";
+      titleInput.value = title;
+      titleInput.addEventListener("input", validate);
+      titleCell.appendChild(titleInput);
+      tr.appendChild(titleCell);
+
+      const pageCell = document.createElement("td");
+      pageCell.className = "manga-reader-bulk-page";
+      const pageInput = document.createElement("input");
+      pageInput.type = "number";
+      pageInput.className = "text-input form-control";
+      pageInput.value = bulkPages[at] ?? "";
+      pageInput.addEventListener("input", validate);
+      pageCell.appendChild(pageInput);
+      tr.appendChild(pageCell);
+
+      const goneCell = document.createElement("td");
+      const gone = document.createElement("button");
+      gone.type = "button";
+      gone.className = "btn btn-danger btn-sm";
+      gone.textContent = stringFor(gallery.locale, "mangaReader.bulkRemove");
+      gone.addEventListener("click", () => {
+        bulkPages.splice(at, 1);
+        const goneAt = built.findIndex((shown) => shown.tr === tr);
+        if (goneAt >= 0) built.splice(goneAt, 1);
+        tr.remove();
+        // The box is what the table is built from, so a row taken out here has to go
+        // out of the list too — otherwise the next keystroke in the box puts it back.
+        area.value = titles.filter((_, i) => i !== at).join("\n");
+        titles.splice(at, 1);
+        validate();
+      });
+      goneCell.appendChild(gone);
+      tr.appendChild(goneCell);
+
+      table.appendChild(tr);
+      built.push({ tr, mark, title: titleInput, page: pageInput });
+    });
+  };
+
+  area.addEventListener("input", () => {
+    build();
+    validate();
+  });
+
+  const buttons = document.createElement("div");
+  buttons.className = "buttons-container px-3";
+  const row = document.createElement("div");
+  row.className = "d-flex";
+
+  create.addEventListener("click", () => {
+    const all = rows();
+    if (all.some((r, i) => wrongWith(r, all, i))) return;
+    createFromList(
+      gallery,
+      all.map((r) => ({ title: r.title, page: Number(r.page) }))
+    );
+  });
+  row.appendChild(create);
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "ml-2 btn btn-secondary";
+  cancel.textContent = stringFor(gallery.locale, "mangaReader.cancel");
+  cancel.addEventListener("click", closeBulk);
+  row.appendChild(cancel);
+
+  buttons.appendChild(row);
+  node.appendChild(container);
+  node.appendChild(buttons);
+  panel.appendChild(node);
+
+  build();
+  validate();
+}
+
+/**
+ * The list as chapters: one write, so one undo.
+ *
+ * The pages are handed over as positions in the order the tab fetched them, which is
+ * what the `#N` on every row counts in — the numbers the reader typed are one-based
+ * and this is the only place they become ids.
+ *
+ * `addChaptersAt` writes nothing at all when any one of them cannot be cut, and the
+ * table has already refused every case it can see; this is here for the one it
+ * cannot — two surfaces changing the list between a keystroke and the click.
+ */
+function createFromList(
+  gallery: ChaptersInHand,
+  entries: Array<{ title: string; page: number }>
+): void {
+  const order = gallery.pages.map((page) => page.id);
+  const next = addChaptersAt(
+    gallery.stored,
+    order,
+    entries.map((e) => ({ pageId: order[e.page - 1], title: e.title }))
+  );
+
+  if (!next) {
+    console.error(
+      "[mangaReader] those chapters could not be cut, so none were written"
+    );
+    return;
+  }
+
+  bulk = false;
+  bulkPages = [];
+  applyEdit(gallery, next);
 }
 
 /**

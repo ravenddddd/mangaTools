@@ -1010,4 +1010,166 @@ module.exports = async () => {
     stopTab(tab);
     stopReader(box);
   });
+  await runSection("a pasted list becomes chapters", async () => {
+    mountBridge();
+    dom.window.location.pathname = "/galleries/32";
+    const tab = buildChaptersTab([]);
+    dom.flush();
+    await settle();
+
+    // ── the way in ─────────────────────────────────────────────────────────
+    // A button of this plugin's own, *before* Stash's Create rather than after the
+    // panel: `findPanel` knows a panel by the button immediately above it, so a node
+    // between the two would hide the panel from the next pass.
+    const entry = dom.body.querySelector("#manga-reader-chapters-bulk");
+    assert.ok(entry, "the way into the bulk editor is drawn");
+    assert.strictEqual(
+      entry.nextElementSibling,
+      tab.button,
+      "…beside Stash's own Create button"
+    );
+    assert.strictEqual(
+      tab.container.previousElementSibling,
+      tab.button,
+      "…which is still the marker the panel is found by"
+    );
+
+    dom.click(entry);
+    const area = dom.body.querySelector("#chapter_list");
+    assert.ok(area, "the paste box takes the panel's place");
+
+    // ── the list ───────────────────────────────────────────────────────────
+    area.value = [
+      "収録作品",
+      "・図書室ノ彼女　1(RJ242738)",
+      "・図書室ノ彼女　2(RJ260594)",
+    ].join("\n");
+    area.dispatchEvent({ type: "input" });
+
+    const table = dom.body.querySelector(".manga-reader-bulk-table");
+    // Found by tag rather than through `table.rows`: that collection belongs to the
+    // real `HTMLTableElement`, and the markup here is built out of plain nodes like
+    // every other node in this file.
+    const shown = table.querySelectorAll("tr");
+    const title = (at) => shown[at].querySelectorAll("input")[0];
+    const page = (at) => shown[at].querySelectorAll("input")[1];
+    const mark = (at) =>
+      shown[at].querySelector(".manga-reader-bulk-valid span");
+
+    assert.strictEqual(shown.length, 4, "a heading row and one row per line");
+    assert.strictEqual(
+      title(1).value,
+      "収録作品",
+      "the heading arrives like any other line — this does not decide what a title is"
+    );
+    assert.strictEqual(
+      title(2).value,
+      "図書室ノ彼女　1(RJ242738)",
+      "and the bullet is off while the code stays, which is content"
+    );
+
+    const create = dom.body.querySelector("#manga-reader-bulk-create");
+
+    assert.strictEqual(
+      create.disabled,
+      true,
+      "nothing can be created while a page is missing"
+    );
+    assert.strictEqual(
+      mark(1).getAttribute("title"),
+      "No page yet — a chapter has to begin somewhere",
+      "and the row says why, where the reader is already looking"
+    );
+    assert.strictEqual(mark(1).textContent, "\u2715");
+
+    // ── the pages, typed by hand ───────────────────────────────────────────
+    [2, 3, 4].forEach((n, at) => {
+      const input = page(at + 1);
+      input.value = String(n);
+      input.dispatchEvent({ type: "input" });
+    });
+
+    assert.strictEqual(
+      mark(1).textContent,
+      "\u2713",
+      "a filled row goes green"
+    );
+    assert.strictEqual(create.disabled, false, "and Create comes to life");
+    assert.strictEqual(
+      create.textContent,
+      "Create 3 chapters",
+      "saying what it would write"
+    );
+
+    // Two rows wanting one page is the failure a table like this is for.
+    const second = page(3);
+    second.value = "2";
+    second.dispatchEvent({ type: "input" });
+    assert.strictEqual(
+      mark(3).getAttribute("title"),
+      "This page is in the table twice",
+      "a page used twice is named before anything is written"
+    );
+    assert.strictEqual(create.disabled, true);
+    second.value = "4";
+    second.dispatchEvent({ type: "input" });
+
+    // A page a chapter of this gallery's own already begins at is refused the same
+    // way — and the page it says is the one the reader typed, not an index.
+    const third = page(2);
+    third.value = "1";
+    third.dispatchEvent({ type: "input" });
+    assert.strictEqual(
+      mark(2).getAttribute("title"),
+      "A chapter already begins here"
+    );
+    assert.strictEqual(create.disabled, true);
+    third.value = "3";
+    third.dispatchEvent({ type: "input" });
+
+    // ── one write, one undo ────────────────────────────────────────────────
+    const at = mutations.length;
+    dom.click(create);
+    await settle();
+
+    const written = JSON.parse(
+      mutations[at].variables.input.custom_fields.partial[
+        "plugin.mangaTools.chapters"
+      ]
+    ).chapters;
+    assert.deepStrictEqual(
+      written.map((c) => c.title),
+      [
+        "第一話",
+        "収録作品",
+        "図書室ノ彼女　1(RJ242738)",
+        "図書室ノ彼女　2(RJ260594)",
+        "第二話",
+      ],
+      "…and a chapter per row, cut *between* the gallery's own two, which are both " +
+        "still there: a chapter is a boundary, not a box"
+    );
+    // The pages are one-based numbers in the table and positions in the fetched order
+    // on the way out — that translation is the only thing the numbers mean. Each
+    // chapter holds the run from its page to the next chapter's start, and the pages
+    // nobody claimed are in nobody's chapter, as they already were.
+    assert.deepStrictEqual(
+      written.map((c) => c.images.length),
+      [1, 1, 1, 1, 4],
+      "each chapter holds the run from its page to the next chapter's start"
+    );
+    assert.strictEqual(
+      mutations.length - at,
+      1,
+      "one write for the whole list, so one undo takes it back"
+    );
+    assert.strictEqual(
+      dom.body.querySelector("#chapter_list"),
+      null,
+      "and the editor is closed once it has written"
+    );
+
+    tab.close();
+    dom.window.location.pathname = "/";
+  });
 };

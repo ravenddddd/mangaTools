@@ -1379,6 +1379,23 @@ A **new** chapter takes the pages from that index to the next chapter's start, o
 whatever held them. Its index opens on the page you were last reading, when you were
 reading this gallery — which is the one thing this form does that Stash's does not.
 
+**Several at once, from a pasted list.** Beside Create there is a second way in: paste a
+list — one title per line, as a doujin work's description usually lists what the volume
+contains — and the tab shows
+a table with a row for each line, an empty page column, and a Create button that counts
+what it would write. The parsing takes off the decoration and nothing else: a leading
+`・` goes, and so do the brackets a line is wholly wrapped in, while `(RJ242738)` and
+`(10P)` stay, because they are content. The heading line and any prose pasted with the
+list arrive as rows like any other, have no page, and are deleted from the table with
+the red ✕ — this plugin does not try to tell a title from a sentence, and the
+measurements behind that are in `doc/mock/bulk-chapters.html`.
+
+Nothing is written until every row has a title, a page within the gallery, and a
+position no other row or existing chapter has taken; the ✕ on a row carries the reason
+on hover. It is one write, so the one undo the tab already had takes the whole batch
+back, and the chapters already there are not replaced — a chapter is a boundary, so the
+new ones are cut between them.
+
 Changing an existing chapter's index **moves its start**, and the chapters are re-cut
 as the runs between their starts: the pages it gives up go to the chapter before it,
 because that is what a chapter's pages mean — the earlier chapter runs up to this

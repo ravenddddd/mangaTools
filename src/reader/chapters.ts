@@ -500,12 +500,13 @@ export function removeChapterAt(
  * The characters a pasted list decorates a line with.
  *
  * Measured rather than guessed: across the 244 galleries of the user's library whose
- * description carries a 収録作品 block, the entries begin with `・`, with `■`, or with
- * nothing at all. The rest of the set is what a hand-made list tends to use.
+ * description lists what the volume contains, the entries begin with a middle dot
+ * (U+30FB), with a filled square (U+25A0), or with nothing at all. The rest of the set
+ * is what a hand-made list tends to use.
  *
- * **Nothing beyond this is touched.** The line's tail is content — `(RJ242738)`,
- * `(10P)`, `(前後編)`, `(C104新刊)`, `全3話` — and a parser that decided those were
- * decoration would be editing the title.
+ * **Nothing beyond this is touched.** The tail of a line is content — a product code
+ * like `(RJ242738)`, a length like `(10P)`, a bracketed remark, a count of instalments
+ * — and a parser that decided those were decoration would be editing the title.
  */
 const BULLETS = "・･•‣∙-–—*+■□●○◎※>";
 
@@ -553,8 +554,8 @@ function unwrapped(line: string): string {
  * `doc/mock/bulk-chapters.html` for the measurements).
  *
  * Blank lines are dropped, which is what makes a pasted block with air in it behave
- * like one without. A line left empty by the unwrapping — `【】` — is dropped too:
- * there is no such title.
+ * like one without. A line left empty by the unwrapping — a pair of brackets with
+ * nothing between them — is dropped too: there is no such title.
  */
 export function parseChapterList(text: string): string[] {
   const out: string[] = [];

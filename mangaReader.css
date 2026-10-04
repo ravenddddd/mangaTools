@@ -1049,3 +1049,57 @@
 .manga-reader-chapters-editing {
   display: none;
 }
+
+/* The bulk editor's table: one row per pasted line, with validity first, the title,
+   the page the chapter would begin at, and a delete.
+ *
+ * Nothing here is a colour of Stash's: the ✓ and the ✕ are Stash's own `$success` and
+ * `$danger` from `_theme.scss`, and the rest is spacing. The table is this plugin's
+ * own markup — Stash has no table on that tab to copy — so it borrows the form's
+ * widths instead: `.form-control` for the inputs, as the single-chapter form uses. */
+.manga-reader-bulk-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+}
+
+.manga-reader-bulk-table th {
+  text-align: left;
+  font-weight: 500;
+  color: #bfccd6;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.manga-reader-bulk-table td {
+  padding: 2px 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* The validity column, and the one thing in the table that is a colour: a row nobody
+   can create is the row to look at, so it says so where the eye already is. The page
+   column is a number and never needs the width a title does. */
+.manga-reader-bulk-valid {
+  width: 22px;
+  text-align: center;
+}
+
+.manga-reader-bulk-page {
+  width: 96px;
+}
+
+.manga-reader-bulk-ok {
+  color: #3dcc91;
+}
+
+.manga-reader-bulk-bad {
+  color: #db3737;
+  cursor: help;
+}
+
+.manga-reader-bulk-empty {
+  color: #bfccd6;
+  font-size: 13px;
+  margin-top: 8px;
+}

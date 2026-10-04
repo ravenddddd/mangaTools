@@ -801,9 +801,9 @@ module.exports = async () => {
   await runSection("a pasted list, and many chapters at once", () => {
     // ── the list ────────────────────────────────────────────────────────────
     // Decoration off and content kept. Measured against the user's own library:
-    // across the 244 galleries whose description carries a 収録作品 block, the
-    // entries begin with ・, with ■, or with nothing, and the tail of a line is
-    // always content — (RJ242738), (10P), 全3話, (前後編).
+    // across the 244 galleries whose description lists what the volume contains, the
+    // entries begin with a bullet, with a filled square, or with nothing, and the tail
+    // of a line is always content — a code, a page count, a count of instalments.
     assert.deepStrictEqual(
       NR.parseChapterList(
         [
