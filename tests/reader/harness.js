@@ -1038,7 +1038,95 @@ const NR = global.window.MangaReader;
 /** The tools half's namespace, which the chapter import reaches its write through */
 const NS = global.window.MangaTools;
 
+async function startReader(options) {
+  const {
+    galleryId = "7",
+    at = 1,
+    total = 5,
+    on = true,
+    language = null,
+    counterText,
+    search = "",
+    ids = null,
+    mode = null,
+    // A page with no gallery, or a gallery this plugin does not touch, has no
+    // switch of ours — and a section about that would be asking for the wrong thing.
+    expectSwitch = true,
+  } = options || {};
+
+  for (const child of dom.body.children.slice()) child.remove();
+  dom.window.location.pathname = galleryId ? `/galleries/${galleryId}` : "/";
+  // Cleared every time, not left as the last test set it: the order is read from
+  // the URL as the gallery is fetched, so a leftover would be a section reading
+  // another section's sort.
+  dom.window.location.search = search;
+  state.language = language;
+  dom.flush();
+
+  // What the carousel is showing, unless the section says otherwise: the gallery's
+  // own images, which is what Stash would have loaded. The reader finds its place by
+  // matching that image against its list, so any order of the same images does.
+  const showing =
+    ids ||
+    (state.galleries[galleryId]
+      ? (
+          state.galleries[galleryId].pathImages ||
+          state.galleries[galleryId].images ||
+          []
+        ).map((i) => String(i.id))
+      : null);
+
+  const box = buildLightbox(at, total, showing);
+  // Some lightboxes have no counter at all — Stash draws it only for more than one
+  // image — and that has to be true before the mode is turned on, not after.
+  if (counterText !== undefined) box.counter.textContent = counterText;
+  const popover = box.openPopover();
+  dom.flush();
+
+  // The pairing is the reader's own now, in its own header — see chrome.ts. It is
+  // there for a marked gallery whether or not a pair is on, because the mode is not
+  // what puts the reader on a gallery: the mark is.
+  await settle();
+  // Which of the three ways the pages are laid out. `on` still says whether they are
+  // paired, because that is what most of the suite means by it; the mode is named
+  // when a section wants the column, which cannot be reached through `on` at all.
+  const wanted = {
+    single: "#manga-reader-single-page",
+    double: "#manga-reader-double-page",
+    scroll: "#manga-reader-scroll",
+  }[mode || (on ? "double" : "single")];
+  const input = box.lightbox.querySelector(wanted);
+  if (expectSwitch) {
+    assert.ok(
+      input,
+      "the pairing should be in the lightbox's own options menu"
+    );
+  }
+
+  // Whether to press it, read off the control: a press on the half already chosen
+  // says nothing at all, so doing it unconditionally would be a section turning the
+  // mode on twice and calling the second one a change.
+  if (input && !input.classList.contains("is-on")) dom.click(input);
+  await settle();
+
+  return { box, input, popover };
+}
+
+function stopReader(box) {
+  box.close();
+  dom.flush();
+}
+
+function stopTab(tab) {
+  tab.close();
+  dom.window.location.pathname = "/";
+  dom.flush();
+}
+
 module.exports = {
+  stopTab,
+  stopReader,
+  startReader,
   assert,
   fs,
   path,
