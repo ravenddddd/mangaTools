@@ -1012,6 +1012,27 @@ module.exports = () => {
   );
 
   // Off a gallery page there is no row at all
+  // **A second RatingSystem must not draw a second set of rows.** The mount point
+  // is one node and every instance that finds it portals into it, so an instance
+  // belonging to something else on the page puts a copy of the rows there — which
+  // is what a reader saw on a studio's Galleries tab, where the page draws its own
+  // rating row for the studio just above the tab. Both display marks are checked,
+  // because the two kinds of extra instance are marked differently.
+  assert.strictEqual(
+    callAfter("RatingSystem", { value: 0, clickToRate: true }, ratingResult),
+    ratingResult,
+    "a list row's rating is handed straight back, not added to"
+  );
+  assert.strictEqual(
+    callAfter(
+      "RatingSystem",
+      { value: 0, disabled: true, withoutContext: true },
+      ratingResult
+    ),
+    ratingResult,
+    "…and so is a wall card's, which is the same story on another layout"
+  );
+
   const onScene14 = callAfter("RatingSystem", { value: 0 }, ratingResult);
   assert.strictEqual(
     onScene14.props.children[1].type(onScene14.props.children[1].props),

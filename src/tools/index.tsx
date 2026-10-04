@@ -579,6 +579,23 @@ registerPatch("instead", "GalleryList", (...args: unknown[]) => {
 registerPatch("after", "RatingSystem", (...args: unknown[]) => {
   noteFired("RatingSystem");
 
+  // **Only the dialog's own rating row draws the rows.** Stash renders
+  // RatingSystem in twenty-odd places, and with a dialog open a gallery list has
+  // more than one of them live at once: the dialog's, and whatever the page
+  // happens to draw besides — a studio's page gives one to the *studio's* rating
+  // just above the Galleries tab, and the list's table and wall layouts give one
+  // to every row or card. They all share the one mount point, so an extra
+  // instance portals a *second* copy of the rows into the same node: the reader
+  // sees two sets, each with its own pending values, neither aware of the other.
+  //
+  // Two props say "this is a display, not the dialog": `clickToRate` is what the
+  // list's rows and an entity's own rating are given, and `withoutContext` is the
+  // wall card's way of saying display-only. The dialog's row has neither — it is
+  // the one wrapped in BulkUpdateFormGroup name="rating", which is the row this
+  // plugin's mount point is placed under.
+  const props = args[0] as { clickToRate?: boolean; withoutContext?: boolean };
+  if (props.clickToRate || props.withoutContext) return resultFrom(args);
+
   return (
     <>
       {resultFrom(args)}
