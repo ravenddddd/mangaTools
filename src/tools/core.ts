@@ -159,15 +159,26 @@ export function useGlobalVersion(): number {
 }
 
 /**
- * Only show the language dropdown on gallery edit panels.
+ * Whether the page in front of the reader is about galleries.
  *
- * CustomFieldsInput is shared by the scene, performer, studio, tag and image
- * edit panels. Without this check the language field would show up on every
- * one of them. A gallery detail page is /galleries/{id}, and the bulk edit
- * dialog opens over the gallery list at /galleries.
+ * CustomFieldsInput is shared by the scene, performer, studio, tag and image edit
+ * panels, so without a check the plugin's field would show up on every one of
+ * them. The same question gates the bulk dialog's rows, which belong in the
+ * *galleries* dialog — galleries, images, scenes and groups all draw the rating row
+ * those rows are mounted from.
+ *
+ * Asked as a path **segment** rather than a prefix, because Stash scopes a gallery
+ * list to whatever the reader came from: `/studios/422/galleries`,
+ * `/performers/565/galleries` and `/tags/2140/galleries` are all gallery lists, and
+ * a prefix test on "/galleries" answered no to every one of them — so those pages
+ * got no rows and said nothing about it. `/scenes/5` and `/performers/3` have no
+ * such segment, which is the case this exists to refuse.
+ *
+ * A gallery detail page is `/galleries/{id}` and the plain list is `/galleries`;
+ * both still answer yes.
  */
 export function isGalleryContext(): boolean {
-  return pathNow().indexOf("/galleries") === 0;
+  return pathNow().split("/").indexOf("galleries") !== -1;
 }
 
 /**

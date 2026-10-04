@@ -919,6 +919,13 @@ module.exports = () => {
     "…and the rows draw from the URL alone, with no event of any kind"
   );
 
+  // …on a list Stash scoped to an entity as well: the dialog there is the galleries
+  // one, and its rows are ours to add to. This is the page the reader reported —
+  // the rows simply were not there, and nothing on the console said why.
+  global.window.location.pathname = "/studios/422/galleries";
+  assert.ok(!!bulkRow(), "…and on a studio's own gallery list");
+  global.window.location.pathname = "/galleries";
+
   // **A route that says otherwise is not worth a line, and this is where that is
   // pinned.** The rating row this component is mounted from belongs to *a* bulk
   // dialog, and galleries, images, scenes and groups all draw that same row — so a

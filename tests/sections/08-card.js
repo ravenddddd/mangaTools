@@ -165,6 +165,33 @@ module.exports = () => {
     null,
     "and on the gallery list page (bulk edit)"
   );
+  // …and on a gallery list Stash has scoped to an entity. Those are gallery lists
+  // too — the reader got there from a studio, a performer or a tag — and a prefix
+  // test on "/galleries" refused all three, so the plugin's rows went missing on
+  // them with nothing said.
+  for (const scoped of [
+    "/studios/422/galleries",
+    "/performers/565/galleries",
+    "/tags/2140/galleries",
+  ]) {
+    nav(scoped);
+    assert.notStrictEqual(
+      renderRow({ "plugin.mangaTools.language": "zh-Hans" }),
+      null,
+      "the dropdown should appear on " +
+        scoped +
+        " — a gallery list like any other"
+    );
+  }
+  // The entities' *own* pages still refuse, which is what the guard is for.
+  nav("/images/7");
+  assert.strictEqual(
+    renderRow({ "plugin.mangaTools.language": "zh-Hans" }),
+    null,
+    "and still not on an image page"
+  );
+  // Back to where this section found the path: everything below reads a page.
+  nav("/galleries");
   console.log(
     "✓ route scoping (hidden on scenes/performers, shown on galleries)"
   );
