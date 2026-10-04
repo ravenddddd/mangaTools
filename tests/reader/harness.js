@@ -1038,7 +1038,6 @@ const NR = global.window.MangaReader;
 /** The tools half's namespace, which the chapter import reaches its write through */
 const NS = global.window.MangaTools;
 
-
 module.exports = {
   assert,
   fs,
