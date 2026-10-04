@@ -1242,9 +1242,19 @@ export function applyOriginal(
   history.replace(Object.assign({}, history.location, { search: search }));
 }
 
-/** The language table's own label, from Stash's locale files (see mangaTools.tsx
- *  for the longer note; this is the same message, duplicated so this module
- *  does not have to reach back into the entry file). */
+/**
+ * Localised text for the "language" label.
+ *
+ * Reuses config.ui.language.heading straight out of Stash's own locale files.
+ * It exists in **every** locale Stash ships (en-GB "Language", zh-CN "语言",
+ * ja-JP "言語", …), so this gets all of Stash's UI languages for free instead
+ * of maintaining a label table here.
+ *
+ * Written twice until the tools half's surfaces stopped importing from its entry
+ * file — the copy here existed precisely so that this module would not have to
+ * reach back into index.tsx. With the dependency running one way, the entry file
+ * imports this one and the other copy is gone.
+ */
 export function fieldLabel(intl: MangaToolsIntl): string {
   return intl.formatMessage({
     id: "config.ui.language.heading",

@@ -1420,7 +1420,10 @@ mangaTools/
 │   ├── messages/             One JSON catalog per locale: en / zh-Hans / zh-Hant
 │   ├── tools/                The managing half
 │   │   ├── core.ts           The state every surface reads: the store, the fetch behind it, the settings
-│   │   ├── index.tsx         Badge, panels, dropdown, bulk row, toolbar switch, settings, patches
+│   │   ├── index.tsx         Badge, panels, dropdown, bulk row, toolbar switch, patches
+│   │   ├── settings-page.tsx   The plugin's own settings page, and the multiselect it draws
+│   │   ├── fields-ui.tsx     The flag, the badge chip, the select resolver, the option formatter
+│   │   ├── icons.tsx         The mark's icon and the two steaks
 │   │   ├── filter-model.ts   Criterion read/write for every field (pure, no DOM)
 │   │   ├── filter-ui.tsx     The rows and tag DOM both filter surfaces share
 │   │   ├── sidebar-filter.tsx  The five sidebar filter sections
