@@ -576,18 +576,26 @@ function useValuedSection(props: ValuedSectionProps) {
   }
 
   const options = props.options(intl, selection);
-  const chosen = options.filter(
-    (o) => selection.included.indexOf(o.value) !== -1
-  );
-  const excludedChosen = options.filter(
-    (o) => selection.excluded.indexOf(o.value) !== -1
-  );
+
   // Nothing is selectable while (Any) or (None) is set — there is no particular
   // value to pick in those states, and Stash's own useCandidates returns an empty
   // list for IsNull and NotNull, which is why choosing (None) in its studio filter
   // makes the studios disappear. Every valued field follows that, or two sections
   // would behave differently for no reason the reader can see.
-  const candidates = selectableOptions(selection, options).filter(
+  //
+  // It answers all three lists rather than only the candidates, which is what the
+  // language section always did: a modifier is a statement that no particular
+  // value is being asked for, so a value shown *beside* it would contradict it.
+  // (Only a hand-built criterion can hold both — the four operations here cannot
+  // produce one — which is why this has never been visible.)
+  const listed = selectableOptions(selection, options);
+  const chosen = listed.filter(
+    (o) => selection.included.indexOf(o.value) !== -1
+  );
+  const excludedChosen = listed.filter(
+    (o) => selection.excluded.indexOf(o.value) !== -1
+  );
+  const candidates = listed.filter(
     (o) =>
       selection.included.indexOf(o.value) === -1 &&
       selection.excluded.indexOf(o.value) === -1 &&

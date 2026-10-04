@@ -1106,6 +1106,19 @@ module.exports = () => {
         "with (Any) set, the group names are not offered — as in the language list"
       );
 
+      // Every candidate offers the exclude side, the two modifier entries above
+      // them excepted. The group's rows did not: they carried an `onExclude`
+      // handler and no `canExclude`, so the ✗ was never drawn and the handler was
+      // dead code — and nothing in this file mentioned `canExclude` at all, which
+      // is how it survived. The language and censorship lists always had it.
+      assert.deepStrictEqual(
+        candidatesOf(groupSection.node)
+          .slice(2)
+          .map((row) => row.props.canExclude),
+        [true, true],
+        "a group name can be excluded as well as included, as a language can"
+      );
+
       // Raw: two rows and no search box — two values need neither a search nor an
       // exclude, which is the mark's own reasoning.
       const rawSection = renderOriginalFilter();
