@@ -424,11 +424,19 @@ function ensureBulkButton(panel: HTMLElement): void {
     owner.parentNode?.insertBefore(bulkButton, owner);
   }
 
-  bulkButton.textContent = stringFor(
-    inHand?.locale,
-    "mangaReader.chaptersFromList"
-  );
-  bulkButton.hidden = bulk || form !== null;
+  // **Written only when it changes**, and that is not tidiness: this runs inside a
+  // pass over the document, and every write here is a change the observer sees and
+  // answers with another pass. Assigning the same string to `textContent` is not a
+  // no-op — it replaces the text node — so an unconditional write, on a page whose
+  // panel draws nothing (no chapters and no form: `render`'s early return needs a
+  // non-empty panel, so those passes come round again) is an endless loop, and an
+  // endless loop is a frozen page. See manageDialogTags in dialog-filter.ts, where
+  // the same rule is written down for the same reason.
+  const wording = stringFor(inHand?.locale, "mangaReader.chaptersFromList");
+  if (bulkButton.textContent !== wording) bulkButton.textContent = wording;
+
+  const away = bulk || form !== null;
+  if (bulkButton.hidden !== away) bulkButton.hidden = away;
 }
 
 /** Opens the bulk editor on an empty paste box */
