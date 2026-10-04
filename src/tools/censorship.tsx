@@ -24,9 +24,10 @@ import type { MangaToolsIntl } from "../plugin-api";
 const PluginApi = requirePluginApi();
 
 // Must stay: the classic JSX transform compiles every element to
-// React.createElement, which resolves to this binding. This is the only module
-// that uses JSX without a direct `React.*` call, so the linter cannot see the
-// use — it reads as unused even though the transform emits a reference to it.
+// React.createElement, which resolves to this binding. This module uses JSX
+// without a direct `React.*` call, so the linter cannot see the use — it reads as
+// unused even though the transform emits a reference to it. fields-ui.tsx is the
+// other module in the same position.
 // biome-ignore lint/correctness/noUnusedVariables: used by the JSX below, via the classic transform
 const React = PluginApi.React;
 

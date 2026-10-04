@@ -706,6 +706,97 @@ export function refreshForSuggestions(): void {
   refreshAfterWrite();
 }
 
+// ──────────────────────── Writing the settings ────────────────────────
+//
+// The read side is refreshSettings, above. This is the write side: one map built
+// from the live `NS.*` values, one configurePlugin call that replaces the whole
+// map, and the two bridges the reading half saves through — which are here rather
+// than in the reader because saving plugin settings means writing the whole map,
+// and half of that map is this half's.
+/**
+ * Saves every setting at once, which is what Stash's own mutation takes.
+ *
+ * `configurePlugin`'s input is the plugin's **whole** settings map, so a write that
+ * carried only what changed would take the rest of it with them. Everything that saves
+ * anything goes through here, and here is where the whole map is built — the one place
+ * that knows it.
+ */
+function settingsInput(): { [key: string]: unknown } {
+  return {
+    enabledLanguages: NS.enabledLanguages
+      ? NS.serializeEnabledLanguages(NS.enabledLanguages)
+      : "",
+    // An empty list serialises to "", which parses back as null ("every filter whose
+    // field is on") — the same round trip enabledLanguages makes, with the opposite
+    // default at the end of it: absence there means "no restriction", here it means
+    // "all of them", and both are what an install that predates the setting did.
+    sidebarFilters: NS.serializeSidebarFilters(
+      NS.sidebarFilters || NS.SIDEBAR_FILTERS
+    ),
+    readerTakeover: NS.readerTakeover,
+    manageChapters: NS.manageChapters,
+    fields: NS.fields,
+    fieldLanguage: NS.fieldLanguage,
+    fieldCensorship: NS.fieldCensorship,
+    fieldTranslationGroup: NS.fieldTranslationGroup,
+    fieldOriginal: NS.fieldOriginal,
+    coverIcon: NS.coverIcon,
+    confirmUnmark: NS.confirmUnmark,
+    deleteOnUnmark: NS.deleteOnUnmark,
+    showFlags: NS.showFlags,
+    showCoverBadge: NS.showCoverBadge,
+    openDetailsBlock: NS.openDetailsBlock,
+    openEditBlock: NS.openEditBlock,
+    hidePerformers: NS.hidePerformers,
+    showDisabledFields: NS.showDisabledFields,
+    // Absent reads as a library that has never been written to, which is what puts the
+    // browser's own remembered value back in force — see readSettings in the reader.
+    readerSettings: NS.readerSettingsRaw ?? "",
+  };
+}
+
+export function saveSettings(): void {
+  const client = stashClient();
+  if (!client) {
+    console.error("[mangaTools] no Apollo client, the settings were not saved");
+    return;
+  }
+
+  client
+    .mutate({
+      mutation: gqlDoc(
+        [
+          "mutation MangaToolsSettings($plugin_id: ID!, $input: Map!) {",
+          "  configurePlugin(plugin_id: $plugin_id, input: $input)",
+          "}",
+        ].join("\n"),
+        "write settings"
+      ),
+      variables: { plugin_id: PLUGIN_ID, input: settingsInput() },
+    })
+    .catch((e) => {
+      console.error("[mangaTools] failed to save plugin settings:", e);
+    });
+}
+
+/**
+ * Writes the reading half's settings: kept here, and saved with everything else.
+ *
+ * The reader calls this rather than a client of its own, because saving plugin
+ * settings means writing the whole map and half of that map is this half's. It is
+ * applied to the answer first — so the reader's own next read sees it, with no round
+ * trip in the way — and then saved.
+ */
+NS.writeReaderSettings = (raw: string): void => {
+  if (NS.readerSettingsRaw === raw) return;
+
+  NS.readerSettingsRaw = raw;
+  saveSettings();
+};
+
+/** Runs `fn` when the settings are re-read, and returns the way to stop. */
+NS.watchReaderSettings = (fn: () => void): (() => void) => subscribe(fn);
+
 // ───────────────── The rest of the settings' defaults ─────────────────
 //
 // FEATURE_ON_BY_DEFAULT and its block of assignments are above, beside the

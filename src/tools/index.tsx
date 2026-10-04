@@ -73,7 +73,6 @@ import type { ReactNode } from "react";
 import type { MangaToolsFilterModel } from "../plugin-api";
 import type {
   MangaToolsApolloOperation,
-  MangaToolsDescription,
   MangaToolsFieldName,
   MangaToolsIntl,
   MangaToolsOption,
@@ -87,7 +86,6 @@ import {
   ORIGINAL_FIELD_NAME,
   PLUGIN_ID,
   TRANSLATION_GROUP_FIELD_NAME,
-  assetBase,
   censorshipOf,
   currentGalleryId,
   currentPath,
@@ -98,6 +96,7 @@ import {
   pickLanguage,
   refreshAfterWrite,
   refreshForSuggestions,
+  saveSettings,
   start,
   started,
   stashClient,
@@ -106,6 +105,13 @@ import {
   useGlobalVersion,
 } from "./core";
 import type { CustomFieldsMap } from "./core";
+import {
+  Flag,
+  formatLanguageOption,
+  languageChip,
+  resolveSelect,
+} from "./fields-ui";
+import { MangaIcon, SteakIcon } from "./icons";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
 // load time. Binding the result once gives every reference below a
@@ -297,74 +303,7 @@ function useLocale(): string {
   return PluginApi.libraries.Intl.useIntl().locale;
 }
 
-/**
- * A regional flag.
- *
- * flag-icons' CSS is loaded globally by Stash (index.scss imports
- * `flag-icons/css/flag-icons.min.css`), so emitting `<span class="fi fi-jp">`
- * is all that is needed — no assets to ship.
- *
- * These are CSS-drawn flags, not emoji: Windows' Segoe UI Emoji has no flag
- * glyphs, so a flag emoji degrades into a pair of boxed letters there.
- */
-function Flag(props: { flag: string; className?: string }) {
-  return (
-    <span
-      className={
-        "fi fi-" + props.flag + (props.className ? " " + props.className : "")
-      }
-    />
-  );
-}
-
 // ─────────────────────────── Cover badge ───────────────────────────
-
-/**
- * The badge itself, from an already-described value.
- *
- * Split out of LanguageBadge so that the example in the settings page's help
- * panel is drawn by this same code: an example built from its own copy of these
- * three cases is an example that can quietly stop being true, and this one is
- * looked at to decide what a setting does.
- *
- * A plain function rather than a component, so that nothing new appears in the
- * element tree between LanguageBadge and the div it draws — the tests read that
- * tree to reach the flag, and a component boundary there would be a level they
- * have to know about. It has no hooks of its own to lose by being called
- * directly, and `NS.showFlags` is read at the moment it is drawn either way.
- */
-function languageChip(info: MangaToolsDescription, className?: string) {
-  // Appended to whichever of the three chips below is drawn, so that the help
-  // panel can ring the badge itself: the ring has to be on the absolutely
-  // positioned chip, not on a wrapper of it, which would be a box in the flow.
-  const extra = className ? " " + className : "";
-
-  // No flag to show, for one of two reasons — and they are not the same chip:
-  //
-  //   unrecognised  arbitrary data, so it is bounded and ellipsised; a long junk
-  //                 value must not end up covering the cover
-  //   flags off     a real language name, so it is shown whole — clipping
-  //                 "印度尼西亚语" or "Traditional Chinese" to a few characters
-  //                 would make the setting hard to use
-  //
-  // The look is identical; what differs is whether the text may run its length.
-  if (!info.known) {
-    return (
-      <div className={"manga-tools-badge is-unknown" + extra}>{info.name}</div>
-    );
-  }
-  if (!NS.showFlags) {
-    return (
-      <div className={"manga-tools-badge is-name" + extra}>{info.name}</div>
-    );
-  }
-
-  return (
-    <div className={"manga-tools-badge" + extra} aria-label={info.name}>
-      <Flag flag={info.flag as string} />
-    </div>
-  );
-}
 
 /** Reads the in-memory store only; issues no requests. */
 function LanguageBadge(props: { galleryId: string }) {
@@ -607,53 +546,6 @@ function ensureToolbarHost(): HTMLElement | null {
 }
 
 /**
- * One of the SVG files this plugin ships, drawn as a mask.
- *
- * A span with a mask rather than an `<svg>`: the artwork is a file, shipped as
- * downloaded with its attribution comment intact, and a file cannot see the
- * page's `currentColor` — that only works for markup inlined into the page. A CSS
- * mask reads the shape and ignores the colour, so the file supplies one and
- * `background-color` supplies the other, and a state is a colour rule each. The
- * class names the icon: `.manga-tools-<name>-icon` carries the file, and the
- * declarations they all share are written once in mangaTools.css.
- */
-function AssetIcon(props: { file: string; className: string }) {
-  // The stylesheet carries a relative URL for this, and it is right whenever
-  // plugin files sit under one path. This is the same answer reached from the
-  // plugin's own tag instead, which does not depend on that being true — and it is
-  // only known after start() has run.
-  const style = assetBase
-    ? ({
-        "--manga-tools-icon": `url("${assetBase}assets/icons/${props.file}")`,
-      } as React.CSSProperties)
-    : undefined;
-
-  return <span className={props.className} aria-hidden="true" style={style} />;
-}
-
-/** The mark's icon — the one that makes a gallery manga. */
-function MangaIcon() {
-  return <AssetIcon className="manga-tools-manga-icon" file="manga.svg" />;
-}
-
-/**
- * The two steaks: 生肉 is raw, and 熟肉 is what a translation makes of it.
- *
- * The joke is the Chinese fandom's — 生 and 熟 are how food is described, and a
- * gallery nobody has translated is 生肉, raw meat. It is worth keeping for a
- * reason beyond the joke: neither file says a word of anybody's language, so the
- * state of the field reads the same whatever Stash's UI is set to. The words go in
- * the button's name and its tooltip, where the reader's language does apply.
- */
-function SteakIcon(props: { raw: boolean }) {
-  return props.raw ? (
-    <AssetIcon className="manga-tools-raw-icon" file="raw.svg" />
-  ) : (
-    <AssetIcon className="manga-tools-cooked-icon" file="cooked.svg" />
-  );
-}
-
-/**
  * The translation groups already in use, in the order the edit field offers them.
  *
  * Out of this plugin's own store, which is the same set of galleries everything
@@ -890,90 +782,6 @@ NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
  * no business having.
  */
 NS.readerSettingsRaw = null;
-
-/**
- * Saves every setting at once, which is what Stash's own mutation takes.
- *
- * `configurePlugin`'s input is the plugin's **whole** settings map, so a write that
- * carried only what changed would take the rest of it with them. Everything that saves
- * anything goes through here, and here is where the whole map is built — the one place
- * that knows it.
- */
-function settingsInput(): { [key: string]: unknown } {
-  return {
-    enabledLanguages: NS.enabledLanguages
-      ? NS.serializeEnabledLanguages(NS.enabledLanguages)
-      : "",
-    // An empty list serialises to "", which parses back as null ("every filter whose
-    // field is on") — the same round trip enabledLanguages makes, with the opposite
-    // default at the end of it: absence there means "no restriction", here it means
-    // "all of them", and both are what an install that predates the setting did.
-    sidebarFilters: NS.serializeSidebarFilters(
-      NS.sidebarFilters || NS.SIDEBAR_FILTERS
-    ),
-    readerTakeover: NS.readerTakeover,
-    manageChapters: NS.manageChapters,
-    fields: NS.fields,
-    fieldLanguage: NS.fieldLanguage,
-    fieldCensorship: NS.fieldCensorship,
-    fieldTranslationGroup: NS.fieldTranslationGroup,
-    fieldOriginal: NS.fieldOriginal,
-    coverIcon: NS.coverIcon,
-    confirmUnmark: NS.confirmUnmark,
-    deleteOnUnmark: NS.deleteOnUnmark,
-    showFlags: NS.showFlags,
-    showCoverBadge: NS.showCoverBadge,
-    openDetailsBlock: NS.openDetailsBlock,
-    openEditBlock: NS.openEditBlock,
-    hidePerformers: NS.hidePerformers,
-    showDisabledFields: NS.showDisabledFields,
-    // Absent reads as a library that has never been written to, which is what puts the
-    // browser's own remembered value back in force — see readSettings in the reader.
-    readerSettings: NS.readerSettingsRaw ?? "",
-  };
-}
-
-function saveSettings(): void {
-  const client = stashClient();
-  if (!client) {
-    console.error("[mangaTools] no Apollo client, the settings were not saved");
-    return;
-  }
-
-  client
-    .mutate({
-      mutation: gqlDoc(
-        [
-          "mutation MangaToolsSettings($plugin_id: ID!, $input: Map!) {",
-          "  configurePlugin(plugin_id: $plugin_id, input: $input)",
-          "}",
-        ].join("\n"),
-        "write settings"
-      ),
-      variables: { plugin_id: PLUGIN_ID, input: settingsInput() },
-    })
-    .catch((e) => {
-      console.error("[mangaTools] failed to save plugin settings:", e);
-    });
-}
-
-/**
- * Writes the reading half's settings: kept here, and saved with everything else.
- *
- * The reader calls this rather than a client of its own, because saving plugin
- * settings means writing the whole map and half of that map is this half's. It is
- * applied to the answer first — so the reader's own next read sees it, with no round
- * trip in the way — and then saved.
- */
-NS.writeReaderSettings = (raw: string): void => {
-  if (NS.readerSettingsRaw === raw) return;
-
-  NS.readerSettingsRaw = raw;
-  saveSettings();
-};
-
-/** Runs `fn` when the settings are re-read, and returns the way to stop. */
-NS.watchReaderSettings = (fn: () => void): (() => void) => subscribe(fn);
 
 /**
  * Whether Stash's edit form has changes that have not been saved.
@@ -1321,44 +1129,6 @@ function GalleryToolbar(props: { galleryId: string; values: CustomFieldsMap }) {
 }
 
 // ─────────────────────────── Edit-page dropdown ───────────────────────────
-
-/**
- * react-select is a namespace import on PluginApi.libraries, and the component
- * is its default export. It is looked up at runtime, so there is no static
- * type to give it.
- */
-// biome-ignore lint/suspicious/noExplicitAny: react-select is reached through a namespace import at runtime, so its component has no static type.
-let SELECT: any = null;
-
-// biome-ignore lint/suspicious/noExplicitAny: as above — the component itself.
-function resolveSelect(): any {
-  if (SELECT) return SELECT;
-
-  const RS = PluginApi.libraries.ReactSelect;
-  if (!RS) {
-    console.error("[mangaTools] react-select not available");
-    return null;
-  }
-
-  SELECT = RS.default || RS.Select || RS;
-  return SELECT;
-}
-
-/**
- * Renders a dropdown option: flag plus localised name.
- * react-select calls this for both the menu item and the selected value, so
- * the two always look the same.
- */
-function formatLanguageOption(option: MangaToolsOption) {
-  return (
-    <span className="manga-tools-option">
-      {NS.showFlags && option.flag ? (
-        <Flag flag={option.flag} className="manga-tools-flag" />
-      ) : null}
-      <span>{option.label}</span>
-    </span>
-  );
-}
 
 /**
  * One entry in the translation group's menu.
