@@ -768,6 +768,18 @@ module.exports = () => {
     ),
     "and should place that popover under the gear that opened it"
   );
+
+  // The same fault once more, one row of a table further down: the bulk editor's
+  // picture of a page is absolutely positioned and hangs off the cell its button is in.
+  // With nothing positioned between it and Stash's page, it is measured from whatever
+  // ancestor happens to be a positioning context — and `bottom: 100%` of that is not
+  // the row. The picture is there and hovering does nothing anybody can see, which is
+  // exactly what the stub cannot tell: it builds the box and knows nothing of layout.
+  assert.ok(
+    /\.manga-reader-bulk-acts\s*\{[^}]*position:\s*relative/.test(readerCss),
+    "mangaReader.css should anchor the page preview to the cell its button is in: " +
+      "measured from anywhere else, the picture is drawn off the screen"
+  );
   // Under the gear's right edge rather than centred on it. Centred is what Stash's
   // own popover does, and it gets away with it because a library measures it and
   // pushes it back inside the window; this header has none, and the gear is three

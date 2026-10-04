@@ -1100,7 +1100,42 @@ module.exports = async () => {
       "No page yet — a chapter has to begin somewhere",
       "and the row says why, where the reader is already looking"
     );
-    assert.strictEqual(mark(1).textContent, "\u2715");
+    assert.strictEqual(mark(1).dataset.icon, "faTimes");
+
+    // ── the page a number points at ────────────────────────────────────────
+    // The row's two buttons share a cell of their own, with the number's cell left
+    // holding a number: one job per column, and in a table this long the buttons are
+    // the one thing that lines up straight down its side.
+    const peek = (at) => shown[at].querySelector(".manga-reader-bulk-peek");
+    const trash = (at) => shown[at].querySelector(".btn-danger");
+
+    assert.ok(
+      peek(1),
+      "every row offers a look at the page its number points at"
+    );
+    // **A node compared with `===` inside `assert.ok`, never `strictEqual(a, b)`**:
+    // when two stub nodes are compared and differ, Node builds the message out of the
+    // value and runs away — what surfaces is `RangeError: Array buffer allocation
+    // failed` with no stack, which reads like a runaway loop in the plugin and is
+    // nothing of the kind. The same goes for a node against `null`.
+    assert.ok(
+      peek(1).parentNode === trash(1).parentNode,
+      "…from the same cell as the row's other button"
+    );
+    assert.strictEqual(
+      page(1).parentNode.querySelectorAll("button").length,
+      0,
+      "…and the number's own cell holds the number and nothing else"
+    );
+
+    // A number pointing nowhere shows nothing: no picture, and no empty frame either.
+    // The box is built on the way in rather than by the render, so a row whose number
+    // is still blank has not even got one.
+    peek(1).dispatch("mouseenter");
+    assert.ok(
+      shown[1].querySelector(".manga-reader-bulk-peek-box") === null,
+      "a row with no page yet shows no picture"
+    );
 
     // ── the pages, typed by hand ───────────────────────────────────────────
     [2, 3, 4].forEach((n, at) => {
@@ -1110,9 +1145,14 @@ module.exports = async () => {
     });
 
     assert.strictEqual(
-      mark(1).textContent,
-      "\u2713",
+      mark(1).dataset.icon,
+      "faCheck",
       "a filled row goes green"
+    );
+    assert.strictEqual(
+      mark(1).className,
+      "manga-reader-bulk-ok",
+      "\u2026the icon being Stash's own and the colour this plugin's"
     );
     assert.strictEqual(create.disabled, false, "and Create comes to life");
     assert.strictEqual(
@@ -1120,6 +1160,49 @@ module.exports = async () => {
       "Create 3 chapters",
       "saying what it would write"
     );
+
+    // ── the picture itself ─────────────────────────────────────────────────
+    // The URL the reader fetches its own pages with, not the one the API published
+    // whole: the same stamp, so the same cache entry the lightbox already paid for.
+    peek(1).dispatch("mouseenter");
+    const box = shown[1].querySelector(".manga-reader-bulk-peek-box");
+    assert.ok(box, "hovering the button draws the page the number points at");
+    assert.strictEqual(box.hidden, false, "…and shows it");
+    const picture = box.querySelector("img");
+    assert.strictEqual(
+      picture.src,
+      "/image/707/image",
+      "…fetched the way the reader fetches its own pages"
+    );
+
+    peek(1).dispatch("mouseleave");
+    assert.strictEqual(box.hidden, true, "and leaving puts it away again");
+
+    // Each row looks at its own page, and looking again re-uses what was built: a
+    // table of sixty rows must not load sixty pictures to be looked at.
+    peek(2).dispatch("mouseenter");
+    const other = shown[2].querySelector(".manga-reader-bulk-peek-box");
+    assert.ok(other !== box, "a second row has a picture of its own");
+    assert.strictEqual(other.querySelector("img").src, "/image/706/image");
+
+    peek(1).dispatch("mouseenter");
+    // **Counted, not found**: a second box appended beside the first leaves
+    // `querySelector` answering with the same node it answered with before, so asking
+    // for *a* box cannot see the one that should not be there.
+    assert.strictEqual(
+      shown[1].querySelectorAll(".manga-reader-bulk-peek-box").length,
+      1,
+      "and hovering the first row again re-uses its box rather than building another"
+    );
+    assert.ok(
+      shown[1].querySelector(".manga-reader-bulk-peek-box") === box,
+      "…the same box, so the fetch it already made is the one it keeps"
+    );
+    assert.ok(
+      box.querySelector("img") === picture,
+      "…and the same picture inside it, rather than a new element for the same URL"
+    );
+    peek(1).dispatch("mouseleave");
 
     // Two rows wanting one page is the failure a table like this is for.
     const second = page(3);

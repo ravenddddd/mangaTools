@@ -95,7 +95,7 @@ import {
   zoomedBy,
 } from "./scroll";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
-import { layout, screenAt, stepsToAdjacent } from "./spreads";
+import { layout, pageUrl, screenAt, stepsToAdjacent } from "./spreads";
 import {
   CLASS_NAVBUTTON,
   SELECTOR_DISPLAY,
@@ -1215,28 +1215,6 @@ function fadeIn(element: HTMLElement): void {
     duration: FADE_MS,
     easing: "ease-out",
   });
-}
-
-/**
- * The URL to fetch a page from.
- *
- * The path is the one this plugin has always built; the query is Stash's own,
- * lifted from the URL it publishes for the image. That query is a version stamp,
- * and sharing it is the whole reason for any of this: the server answers
- * `/image/<id>/image?t=<mtime>` with `private, max-age=31536000, immutable`, and
- * the same path *without* it with `no-cache`. So a hand-built URL does not merely
- * miss a version — it throws away the caching Stash's own lightbox has already paid
- * for. Every page ends up fetched twice, once by each, with nothing making the two
- * halves of a screen finish together, which is exactly what a reader sees as one
- * page flicking in before the other.
- *
- * The path stays relative rather than using Stash's URL whole: either resolves to
- * the same resource and so the same cache entry, and a relative one cannot be
- * broken by a base URL naming a host the browser cannot reach.
- */
-function pageUrl(page: MangaReaderPage): string {
-  const query = /\?.*$/.exec(page.url || "");
-  return "/image/" + page.id + "/image" + (query ? query[0] : "");
 }
 
 /**

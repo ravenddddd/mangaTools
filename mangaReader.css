@@ -1079,14 +1079,36 @@
 
 /* The validity column, and the one thing in the table that is a colour: a row nobody
    can create is the row to look at, so it says so where the eye already is. The page
-   column is a number and never needs the width a title does. */
+   column is a number and never needs the width a title does.
+ *
+ * The tick and the cross are Stash's own icons, drawn through Stash's own component
+ * (see drawIcon), rather than the two text glyphs this started with: a glyph is a
+ * different font at a different size, and an icon is a shade wider than a glyph, which
+ * is what the column's width is for. */
 .manga-reader-bulk-valid {
-  width: 22px;
+  width: 28px;
   text-align: center;
 }
 
 .manga-reader-bulk-page {
   width: 96px;
+}
+
+/* The row's two buttons, in a column of their own: a look at the page the number
+   points at, and taking the row out. Sharing the number's cell instead would make that
+   column a number *and* a button, and the two buttons of a twenty-row table are the one
+   thing worth having line up down its side.
+ *
+ * **`position: relative` or the picture is drawn somewhere else entirely.** The box is
+ * absolutely positioned and measured from its nearest positioned ancestor; with none
+ * here that is whatever Stash's own layout happens to have positioned, so `bottom:
+ * 100%` is the bottom of a column, or of the page, and the picture lands off the screen
+ * rather than above the row. The same fault, and the same fix, as the header's options
+ * box — see .manga-reader-options-anchor. */
+.manga-reader-bulk-acts {
+  width: 84px;
+  white-space: nowrap;
+  position: relative;
 }
 
 .manga-reader-bulk-ok {
@@ -1130,11 +1152,15 @@
 }
 
 /* The page a number points at, shown on the way in. `hidden` is the one thing that
-   changes, so nothing here is rebuilt to show or hide it. */
+   changes, so nothing here is rebuilt to show or hide it.
+ *
+ * Anchored by its **right** edge and growing left: the button is in the table's last
+ * column, so a box anchored by its left would run off the right of the table, and to
+ * the left there is the width of the whole title column for it to stand in. */
 .manga-reader-bulk-peek-box {
   position: absolute;
   bottom: 100%;
-  left: 0;
+  right: 0;
   margin-bottom: 4px;
   padding: 2px;
   border-radius: 3px;
@@ -1145,12 +1171,14 @@
 
 .manga-reader-bulk-peek-box img {
   display: block;
-  max-width: 160px;
-  max-height: 220px;
+  max-width: 200px;
+  max-height: 280px;
 }
 
+/* The gap between the two buttons, carried by the first of them: the delete is the
+   last thing in the row and a margin on it would be a margin on the table's edge. */
 .manga-reader-bulk-peek {
-  margin-left: 4px;
+  margin-right: 4px;
 }
 
 .manga-reader-bulk-empty {

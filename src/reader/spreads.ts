@@ -25,9 +25,29 @@ export interface MangaReaderPage {
    * — it carries the file's version stamp, which is what makes the reader's
    * requests the same cached images the lightbox's own are. Optional, because a
    * page can be built without it (the tests' fixtures are), and a page without one
-   * is still read; it is just fetched the slow way. See pageUrl in takeover.ts.
+   * is still read; it is just fetched the slow way. See pageUrl below.
    */
   url?: string;
+}
+
+/**
+ * The URL this plugin fetches one page from: Stash's own, rebuilt on its own path.
+ *
+ * **Only the query is kept**, and the query is the whole reason the URL is read off
+ * the API at all: it carries the file's version stamp. Stash answers the stamped URL
+ * `immutable` for a year and the bare `/image/<id>/image` with `no-cache`, so a page
+ * built from the id alone is fetched again on every showing — even with the lightbox
+ * displaying that same page at that same moment. Keeping the stamp is what makes the
+ * reader's request the one the browser already has.
+ *
+ * The *path* is this plugin's own, relative and hostless, so a Stash behind a reverse
+ * proxy whose URLs name a host the browser cannot resolve still serves its pages.
+ * Every page this plugin draws comes through here — the column, the screens, and the
+ * bulk editor's preview — so there is one URL per page rather than one per caller.
+ */
+export function pageUrl(page: MangaReaderPage): string {
+  const query = /\?.*$/.exec(page.url || "");
+  return "/image/" + page.id + "/image" + (query ? query[0] : "");
 }
 
 /** One screenful: what the reader puts on screen at once. */

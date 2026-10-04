@@ -85,6 +85,10 @@ function makeElement(tagName) {
     // to tell Stash's two nav buttons apart.
     dataset: {},
     style: {},
+    // `false` rather than nothing, as in the browser: the plugin asks whether a thing
+    // is hidden before hiding it, and `undefined` would answer `false` to that by
+    // accident — a guard the stub never actually exercised.
+    hidden: false,
     children: [],
     parentNode: null,
     listeners: {},

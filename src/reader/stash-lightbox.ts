@@ -530,7 +530,7 @@ export async function fetchGallery(
       height: file?.height || 0,
       // Stash's own URL for the image, kept for the query on it — which is a
       // version stamp, and is the whole reason this field is fetched at all. See
-      // pageUrl in takeover.ts.
+      // pageUrl in spreads.ts.
       url: image.paths?.image || "",
     };
   });

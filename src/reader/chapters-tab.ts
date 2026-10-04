@@ -35,7 +35,7 @@
 import { numbered, stringFor } from "../i18n";
 import { NS } from "../tools/fields";
 import { bridged, takeOver } from "./bridge";
-import { drawIcon } from "./chrome";
+import { drawIcon, setIcon } from "./chrome";
 import {
   type MangaReaderChapter,
   type MangaReaderPlacedChapter,
@@ -52,7 +52,7 @@ import {
 } from "./chapters";
 import { watchChapters, writeChapters } from "./chapters-edit";
 import { NR } from "./namespace";
-import type { MangaReaderPage } from "./spreads";
+import { type MangaReaderPage, pageUrl } from "./spreads";
 import {
   type LightboxImage,
   fetchGallery,
@@ -602,10 +602,13 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       const wrong = wrongWith(all[i], all, i);
       const mark = built[i]?.mark;
       if (mark) {
-        mark.textContent = wrong ? "\u2715" : "\u2713";
-        mark.className = wrong
-          ? "manga-reader-bulk-bad"
-          : "manga-reader-bulk-ok";
+        // **Stash's own icons**, drawn by Stash's own component: a glyph typed as
+        // text is a different font at a different size, and these two are the whole
+        // of what a row says about itself. `setIcon` draws only when the name has
+        // changed, which matters here: this runs on every keystroke, in every row.
+        setIcon(mark, wrong ? "faTimes" : "faCheck");
+        const look = wrong ? "manga-reader-bulk-bad" : "manga-reader-bulk-ok";
+        if (mark.className !== look) mark.className = look;
         // **Not `title`**: the reason is shown by this plugin's own bubble, drawn from
         // this attribute by the stylesheet (see .manga-reader-bulk-bad). A `title`
         // would put the browser's bubble *beside* ours.
@@ -682,6 +685,23 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       pageInput.value = bulkPages[at] ?? "";
       pageInput.addEventListener("input", validate);
       pageCell.appendChild(pageInput);
+      tr.appendChild(pageCell);
+
+      /** Where the number points, or null when it points at nothing */
+      const pageAt = (): number => {
+        const n = Number(pageInput.value);
+        return Number.isFinite(n) && n >= 1 && n <= gallery.pages.length
+          ? n - 1
+          : -1;
+      };
+
+      // The row's two buttons in a column of their own, with the number's cell left
+      // holding a number. A cell that is a number *and* a button is a column with two
+      // jobs, and in a table of twenty rows the buttons are then the one thing that
+      // lines up straight down its side — which is what the eye runs along when it is
+      // looking for the row it has typed a number into.
+      const actsCell = document.createElement("td");
+      actsCell.className = "manga-reader-bulk-acts";
 
       // The page the number points at, so it can be looked at without leaving the
       // list: hovering shows it, clicking opens the lightbox there — which is the
@@ -699,32 +719,36 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       );
       drawIcon(peek, "faImage");
 
-      /** Where the number points, or null when it points at nothing */
-      const pageAt = (): number => {
-        const n = Number(pageInput.value);
-        return Number.isFinite(n) && n >= 1 && n <= gallery.pages.length
-          ? n - 1
-          : -1;
-      };
-
-      // Built on the way in and kept, rather than drawn by the render: a table of
-      // sixty rows must not load sixty pictures to be looked at.
+      // The box and the picture are built on the way in and then kept, rather than
+      // drawn by the render: a table of sixty rows must not load sixty pictures to be
+      // looked at. The `src` is written only when it is a different page, for the same
+      // reason every other write in this file is guarded — and here it is also a whole
+      // scanned page whose fetch is worth not starting twice.
       let peekBox: HTMLElement | null = null;
+      let peekPicture: HTMLImageElement | null = null;
+      let peekSrc = "";
+
       peek.addEventListener("mouseenter", () => {
         const index = pageAt();
-        const src = index < 0 ? "" : gallery.images[index]?.paths?.image;
+        // **The reader's own URL for the page**, not the one the API handed over
+        // whole: same picture, same version stamp, same cache entry as the lightbox —
+        // see pageUrl. A number pointing nowhere shows nothing rather than an empty
+        // frame.
+        const src = index < 0 ? "" : pageUrl(gallery.pages[index]);
         if (!src) return;
 
         if (!peekBox) {
           peekBox = document.createElement("div");
           peekBox.className = "manga-reader-bulk-peek-box";
-          pageCell.appendChild(peekBox);
+          peekPicture = document.createElement("img");
+          peekBox.appendChild(peekPicture);
+          actsCell.appendChild(peekBox);
         }
-        peekBox.textContent = "";
-        const picture = document.createElement("img");
-        picture.src = src;
-        peekBox.appendChild(picture);
-        peekBox.hidden = false;
+        if (peekPicture && peekSrc !== src) {
+          peekSrc = src;
+          peekPicture.src = src;
+        }
+        if (peekBox.hidden) peekBox.hidden = false;
       });
       peek.addEventListener("mouseleave", () => {
         if (peekBox) peekBox.hidden = true;
@@ -738,16 +762,14 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
           at: index,
         });
       });
-      pageCell.appendChild(peek);
-      tr.appendChild(pageCell);
+      actsCell.appendChild(peek);
 
-      const goneCell = document.createElement("td");
       const gone = document.createElement("button");
       gone.type = "button";
       gone.className = "btn btn-danger btn-sm";
-      // A glyph rather than the word: the row is four columns wide and the word does
-      // not fit in the last of them. The name rides on `aria-label` and the tooltip,
-      // so the button is not silent to anybody who cannot see the icon.
+      // A glyph rather than the word: the last column holds two buttons now, and the
+      // word never fitted in it. The name rides on `aria-label` and the tooltip, so
+      // the button is not silent to anybody who cannot see the icon.
       gone.setAttribute(
         "aria-label",
         stringFor(gallery.locale, "mangaReader.bulkRemove")
@@ -770,8 +792,8 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
         titles.splice(at, 1);
         validate();
       });
-      goneCell.appendChild(gone);
-      tr.appendChild(goneCell);
+      actsCell.appendChild(gone);
+      tr.appendChild(actsCell);
 
       table.appendChild(tr);
       built.push({ tr, mark, title: titleInput, page: pageInput });

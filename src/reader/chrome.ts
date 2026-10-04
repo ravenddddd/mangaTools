@@ -1216,8 +1216,12 @@ function iconFor(opens: Menu, open: boolean): string {
  * pass would be a change per pass, which is the one thing a pass must not be. The
  * name is kept on the button for the same reason — it is what says whether the icon
  * on it is already the icon it should have.
+ *
+ * Exported for the chapters tab's own icons, which are drawn from a keystroke: the
+ * tick and the cross of a pasted row's validity, redrawn whenever anybody types in
+ * that row, and only when the name has actually changed.
  */
-function setIcon(host: HTMLElement, name: string): void {
+export function setIcon(host: HTMLElement, name: string): void {
   if (host.dataset.icon === name) return;
   host.dataset.icon = name;
   drawIcon(host, name);
