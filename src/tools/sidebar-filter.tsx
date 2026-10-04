@@ -22,10 +22,15 @@
  * where no hook is involved.
  *
  * The three valued sections were one section written three times until they
- * became this. Three of the differences between them were *behaviour* rather than
- * shape, and are kept as flags on the table rather than tidied away — a refactor
- * that also changes what a click does is two things at once. Each flag says what
- * it is and why it looks like an oversight.
+ * became this, and writing them once turned up two places where they did not
+ * agree: the group's candidates did not step aside while (Any)/(None) was set,
+ * and its search box was not emptied when a row was picked. **Both were
+ * oversights and both are gone** — with one function there is nothing left to
+ * disagree with, and the rule the language section has always followed now holds
+ * for all three: two sections must not behave differently for no reason the
+ * reader can see.
+ *
+ * One difference is not an oversight and stays; see plainCandidates.
  */
 import { NS } from "../languages";
 import { t } from "../i18n";
@@ -466,36 +471,18 @@ type ValuedSectionProps = {
   /** A repair to the criterion Stash owns, which only the language field needs */
   adopt?: (filter: MangaToolsFilterModel) => void;
   /**
-   * Whether the candidate list steps aside while (Any) or (None) is set.
-   *
-   * The language and censorship sections do, and the translation group's does not
-   * — a difference that predates this being one function. It is kept rather than
-   * tidied because a refactor that also changes behaviour is two things at once,
-   * but it is worth a look: picking a group name while (Any) is set silently
-   * clears the modifier, where the other two do not offer the choice at all.
-   */
-  hideCandidatesWhileModifier?: boolean;
-  /**
    * Whether a *candidate* row carries nothing before its label.
    *
-   * The translation group's does not, and that is the third of the differences
-   * these three sections had while they were three functions. What makes it
-   * invisible either way is that a group option carries no flag to draw — the row
-   * says nothing rather than saying null — but the group's list is answering
-   * "which group", and the flag a group *could* carry is its galleries' usual
-   * language, which is a suggestion about a different field. Kept as it was, for
-   * the reason the two below are; see them.
+   * The translation group's does not, and **this one is a rule rather than a
+   * difference**: its list is answering "which group", while the flag a group
+   * could carry is its galleries' usual language — a suggestion about a different
+   * field, and the two other valued lists are the ones that draw a flag.
+   *
+   * Nothing is drawn either way today, because translationGroupOptions sets no
+   * flag on its options; what this says is that the row would not draw one if it
+   * had. 06-sidebar.js asserts the absence, which is where the rule is checked.
    */
   plainCandidates?: boolean;
-  /**
-   * Whether picking a candidate empties the search box.
-   *
-   * Same story as the flag above, and the same suggestion: the language section
-   * does and the group section does not, which looks like an oversight rather
-   * than a decision — emptying the box is what makes a second value typeable
-   * straight away, and a group name is no different.
-   */
-  clearQueryOnPick?: boolean;
 };
 
 /** What a row draws before its label: a flag, or the field's own leading mark */
@@ -574,15 +561,18 @@ function useValuedSection(props: ValuedSectionProps) {
     update(withoutModifier(selection));
   }
 
-  /** A row's own click: take the value in, and get out of the reader's way */
+  // A row's own click: take the value in, and get out of the reader's way. The box
+  // is emptied so a second value can be typed straight away, which is the same
+  // convenience the focus above is for; a field with no box has nothing to empty,
+  // so this is one behaviour rather than two.
   function pick(value: string) {
     toggleInclude(value);
-    if (props.clearQueryOnPick) setQuery("");
+    setQuery("");
   }
 
   function unpick(value: string) {
     toggleExclude(value);
-    if (props.clearQueryOnPick) setQuery("");
+    setQuery("");
   }
 
   const options = props.options(intl, selection);
@@ -593,12 +583,11 @@ function useValuedSection(props: ValuedSectionProps) {
     (o) => selection.excluded.indexOf(o.value) !== -1
   );
   // Nothing is selectable while (Any) or (None) is set — there is no particular
-  // value to pick in those states — and `hideCandidatesWhileModifier` is what says
-  // whether this field follows that. See it for the one that does not.
-  const offered = props.hideCandidatesWhileModifier
-    ? selectableOptions(selection, options)
-    : options;
-  const candidates = offered.filter(
+  // value to pick in those states, and Stash's own useCandidates returns an empty
+  // list for IsNull and NotNull, which is why choosing (None) in its studio filter
+  // makes the studios disappear. Every valued field follows that, or two sections
+  // would behave differently for no reason the reader can see.
+  const candidates = selectableOptions(selection, options).filter(
     (o) =>
       selection.included.indexOf(o.value) === -1 &&
       selection.excluded.indexOf(o.value) === -1 &&
@@ -781,8 +770,6 @@ const VALUED_SECTIONS: { [name: string]: Omit<ValuedSectionProps, "filter"> } =
       options: visibleOptions,
       search: true,
       adopt: adoptLanguageCriterion,
-      hideCandidatesWhileModifier: true,
-      clearQueryOnPick: true,
     },
     censorship: {
       fieldKey: NS.CENSORSHIP_FIELD_NAME,
@@ -794,7 +781,6 @@ const VALUED_SECTIONS: { [name: string]: Omit<ValuedSectionProps, "filter"> } =
       relabel: relabelCensorshipTags,
       options: (intl) => censorshipOptions(intl),
       leading: (o) => censorshipLeading(o.value),
-      hideCandidatesWhileModifier: true,
     },
     translationGroup: {
       fieldKey: NS.TRANSLATION_GROUP_FIELD_NAME,

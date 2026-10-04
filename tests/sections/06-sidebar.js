@@ -1094,6 +1094,18 @@ module.exports = () => {
           "field, and this list is answering 'which group'"
       );
 
+      // …and the names step aside while (Any) is set, exactly as the language
+      // list's do. Stash's own useCandidates returns an empty list for IsNull and
+      // NotNull — which is why choosing (None) in its studio filter makes the
+      // studios disappear — and two sections must not behave differently for no
+      // reason the reader can see.
+      const groupAny = renderGroupFilter([groupConditionsOf("NOT_NULL")]);
+      assert.deepStrictEqual(
+        labelsOf(groupAny.node),
+        [],
+        "with (Any) set, the group names are not offered — as in the language list"
+      );
+
       // Raw: two rows and no search box — two values need neither a search nor an
       // exclude, which is the mark's own reasoning.
       const rawSection = renderOriginalFilter();
