@@ -193,7 +193,7 @@ export function syncChaptersTab(): void {
   if (NS.markedInStore(id) !== true) return;
 
   const panel = findPanel();
-  if (!panel) return;
+  if (!panel || !tabIsShown(panel)) return;
 
   // Nothing to say without a way to open the lightbox: a takeover that listed
   // chapters nobody could click would be worse than Stash's own rows, which at
@@ -291,6 +291,30 @@ function findPanel(): HTMLElement | null {
 }
 
 /**
+ * Whether this panel's tab is the one on screen.
+ *
+ * **The shape test alone is not enough to know it is the Chapters panel.** "A
+ * container with a button above it" is a shape a gallery page has more than once —
+ * the edit tab, the images tab — and managing one of those means drawing chapter rows
+ * into somebody else's container: a page whose DOM grows on every pass, and a frozen
+ * tab. A hidden tab is not managed, which is also what "this is the Chapters tab" is
+ * supposed to mean.
+ *
+ * Stash marks the visible pane `aria-hidden="false"` and the others `"true"`; the
+ * reader suite's world has no tabs at all, and a panel in no pane is managed as
+ * before.
+ */
+function tabIsShown(panel: HTMLElement): boolean {
+  const pane = panel.closest(".tab-pane");
+  if (!pane) return true;
+
+  return (
+    pane.getAttribute("aria-hidden") === "false" ||
+    pane.classList.contains("active")
+  );
+}
+
+/**
  * Stash's Create button above a panel, stepping over this plugin's own button.
  *
  * The bulk editor's entry sits **to the right of** Stash's, which puts it between that
@@ -355,7 +379,14 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
   ensureBulkButton(panel);
   toggleCreate(panel, !form && !bulk);
 
-  panel.textContent = "";
+  // **Cleared only when there is something to clear**, and that is what keeps a pass
+  // from being a change the observer answers with another pass. `textContent = ""` is
+  // not a no-op: it removes the children and appends an empty *text node*, which is a
+  // mutation — and `childElementCount` counts elements, so a panel holding nothing but
+  // that text node still reads as empty and the early return above never applies. The
+  // result is a pass that draws nothing, changes something, and comes round again: a
+  // frozen page. See the guarded writes in ensureBulkButton for the same rule.
+  if (panel.children.length > 0) panel.textContent = "";
   if (bulk) {
     drawBulk(panel, gallery);
   } else if (form) {
