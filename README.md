@@ -1424,6 +1424,7 @@ mangaTools/
 │   │   ├── settings-page.tsx   The plugin's own settings page, and the multiselect it draws
 │   │   ├── fields-ui.tsx     The flag, the badge chip, the select resolver, the option formatter
 │   │   ├── icons.tsx         The mark's icon and the two steaks
+│   │   ├── hosts.ts          The mount points: the three anchors, and the host nodes under them
 │   │   ├── filter-model.ts   Criterion read/write for every field (pure, no DOM)
 │   │   ├── filter-ui.tsx     The rows and tag DOM both filter surfaces share
 │   │   ├── sidebar-filter.tsx  The five sidebar filter sections
