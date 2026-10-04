@@ -66,8 +66,8 @@ NS.normalizeCensorship = (raw: unknown): string => {
 /**
  * One icon per state, and the one place the three names are written down.
  *
- * The pairing is a Chinese pun rather than anything to do with chess: 步兵,
- * "infantry", is what a censored release is *not*, and 骑兵, "cavalry", is what it
+ * The pairing is a pun in the fandom's own vocabulary rather than anything to do
+ * with chess: "cavalry" is what a censored release is, and "infantry" is what it
  * is — by way of the mosaic a censor lays over the page. A pawn and a knight say
  * the same thing in one glyph each. The joke is deliberately explained nowhere on
  * screen: the icons carry it, and a tooltip that spelled it out would be a

@@ -661,7 +661,7 @@ function valuedConditionLabel(
  * One condition's tag sentence, for a presence field.
  *
  * A presence has only two conditions, NOT_NULL and IS_NULL, and its tag says
- * "marked" / "unmarked" — or 生肉 / 熟肉 — rather than "is (not) null": the
+ * "marked" / "unmarked" — the field's own two words — rather than "is (not) null": the
  * latter is the *mechanism*, and a reader filtering a shelf wants the meaning.
  * Anything else is a condition this plugin does not write, and is left to
  * Stash.
@@ -1057,8 +1057,8 @@ export function applyOriginal(
  * Localised text for the "language" label.
  *
  * Reuses config.ui.language.heading straight out of Stash's own locale files.
- * It exists in **every** locale Stash ships (en-GB "Language", zh-CN "语言",
- * ja-JP "言語", …), so this gets all of Stash's UI languages for free instead
+ * It exists in **every** locale Stash ships (en-GB, zh-CN, ja-JP, …), so this gets
+ * all of Stash's UI languages for free instead of maintaining a label table here.
  * of maintaining a label table here.
  *
  * Written twice until the tools half's surfaces stopped importing from its entry
@@ -1086,11 +1086,11 @@ export function translationGroupHeading(intl: MangaToolsIntl): string {
 /**
  * The raw field's criterion name, which is deliberately not the field's own name.
  *
- * The field is 生肉, and its two states are 生肉 and 熟肉 — so a tag built from the
- * field's name says "生肉 是 生肉", which is the same word twice and reads as a
- * mistake. The criterion is therefore the *thing being asked about* (原文, the
- * original text) and the values are its two answers, which is the shape the
- * censorship tag already has: "修正 是 有修正".
+ * The field's own name and its two states are the same word, so a tag built from
+ * that name says the word twice and reads as a mistake. The criterion is therefore
+ * the *thing being asked about* (the original text) and the values are its two
+ * answers, which is the shape the censorship tag already has: the state's name
+ * under the field's name.
  */
 export function originalHeading(intl: MangaToolsIntl): string {
   return t(intl, "mangaTools.filter.original.heading");

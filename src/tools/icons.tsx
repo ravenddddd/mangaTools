@@ -51,10 +51,10 @@ export function MangaIcon() {
 }
 
 /**
- * The two steaks: 生肉 is raw, and 熟肉 is what a translation makes of it.
+ * The two steaks: raw, and cooked.
  *
- * The joke is the Chinese fandom's — 生 and 熟 are how food is described, and a
- * gallery nobody has translated is 生肉, raw meat. It is worth keeping for a
+ * The joke is the fandom's — an untranslated work is "raw meat", and what a
+ * translation makes of it is that meat cooked. It is worth keeping for a
  * reason beyond the joke: neither file says a word of anybody's language, so the
  * state of the field reads the same whatever Stash's UI is set to. The words go in
  * the button's name and its tooltip, where the reader's language does apply.

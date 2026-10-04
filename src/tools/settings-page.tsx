@@ -160,7 +160,7 @@ type HelpExample = "badge" | "mark";
  * The example a help panel holds: a gallery card, drawn with Stash's own markup
  * and class names so that Stash's stylesheet draws it.
  *
- * That is the whole point of it. "封面右下角那个徽章" is a sentence that has to
+ * That is the whole point of it. A claim about where the badge goes has to be believed;
  * be believed; a card drawn with the plugin's own classes would be *the plugin's
  * idea of* where the badge goes, and would keep saying so after Stash moved it.
  * With `.gallery-card`, `.gallery-card-cover`, `.gallery-card-image`,

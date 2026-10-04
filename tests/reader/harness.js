@@ -903,7 +903,7 @@ const OWN_CHAPTERS = {
  * starts count in path order. Expanded against CHAPTERS_PATH, the first one holds
  * the four images at the *end* of the reversed path — so on screen its earliest
  * page is fifth, while the second chapter's earliest is the first page of all.
- * The menu has to show 第二話 before 第一話, which is what "the list is in the
+ * The menu has to show the later-started chapter first, which is what "the list is in the
  * order on screen" means.
  */
 const STASH_CHAPTERS = {

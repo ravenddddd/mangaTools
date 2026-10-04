@@ -70,7 +70,7 @@ export function languageChip(info: MangaToolsDescription, className?: string) {
   //   unrecognised  arbitrary data, so it is bounded and ellipsised; a long junk
   //                 value must not end up covering the cover
   //   flags off     a real language name, so it is shown whole — clipping
-  //                 "印度尼西亚语" or "Traditional Chinese" to a few characters
+  //                 long localised name or "Traditional Chinese" to a few characters
   //                 would make the setting hard to use
   //
   // The look is identical; what differs is whether the text may run its length.

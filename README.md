@@ -289,9 +289,10 @@ Three states, and the third is the absence of the field rather than a value:
 | Censored | `censored` | a knight | a knight |
 | Uncensored | `uncensored` | a pawn | a pawn |
 
-**Why a knight and a pawn.** 骑兵, "cavalry", is what a censored release is, and
-步兵, "infantry", is what it is not — the mosaic a censor lays over the page has
-had that name in Chinese for long enough that the joke needs no explaining to
+**Why a knight and a pawn.** The word for a censored release is the word for
+cavalry, and the word for an uncensored one is the word for infantry — the mosaic
+a censor lays over the page has had that name for long enough that the joke needs
+no explaining to
 the reader it is aimed at. The icons carry it and nothing on screen spells it
 out: a tooltip about a word rather than about the gallery would be worse than no
 tooltip. If the pun wears off, `censorshipIcon` in `src/mangaTools.tsx` is the

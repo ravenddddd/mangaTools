@@ -67,7 +67,7 @@
  *   .is-unknown  an unrecognised value — arbitrary data, so it is bounded and
  *                ellipsised. "klingon" and a pasted paragraph both behave.
  *   .is-name     a recognised language with the "Show flags" setting turned off.
- *                The name is one of ours and can be long — 印度尼西亚语,
+ *                The name is one of ours and can be long — a language's own name,
  *                "Traditional Chinese", "Chinesisch (traditionell)" — so it is
  *                shown whole rather than clipped to a few characters.
  *
@@ -296,7 +296,7 @@
 
 /*
  * The group box's statement reads at full strength while the control around it is
- * dimmed: 生肉（无翻译组） is what the field is saying while it is off, not a hint
+ * dimmed: the statement is what the field is saying while it is off, not a hint
  * about what to type, and a grey sentence in a grey box is the look of an empty
  * field — which is the state this is at pains to be told apart from.
  *

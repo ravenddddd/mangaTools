@@ -37,8 +37,8 @@ module.exports = () => {
     "the badge flag sizing rule is missing"
   );
   // The text chip's truncation belongs to unrecognised values only. A recognised
-  // language name is shown whole — clipping it is what made "印度尼西亚语" come out
-  // as "印度尼…" with flags turned off.
+  // language name is shown whole — clipping it is what made a recognised name come out
+  // ellipsised, with flags turned off.
   const boundedChip = /\.manga-tools-badge\.is-unknown\s*\{([^}]*)\}/.exec(css);
   assert.ok(
     boundedChip && /text-overflow:\s*ellipsis/.test(boundedChip[1]),

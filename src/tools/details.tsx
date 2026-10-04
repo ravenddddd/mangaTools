@@ -200,7 +200,7 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
       {original && !language ? (
         // Raw with no language row to carry the mark, so it stands on its own —
         // and without the group's label, for the reason above. The wording carries
-        // the rest: a bare "原文" under that label would read like a group called
+        // the rest: a bare "original" under that label would read like a group called
         // that, which is why the string says what it does.
         //
         // "No language row" rather than "no language set": with the language field

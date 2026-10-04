@@ -451,7 +451,7 @@ module.exports = () => {
   //
   // The class matters as much as the text: an unrecognised value is bounded and
   // ellipsised, while a recognised name is not clipped at all. Getting those the
-  // same way round is what stopped "印度尼西亚语" rendering as "印度尼…".
+  // same way round is what stopped a recognised name rendering as an ellipsised one.
   assert.strictEqual(
     card("1").type,
     React.Fragment,
@@ -646,7 +646,7 @@ module.exports = () => {
   // The fifth field, and the second one that is a presence rather than a value: a
   // gallery is the original text or it is not. It is the translation group's own
   // subject and deliberately not a value of it — a state in a field of names
-  // cannot be told from a name, and this library has a group called 沒有漢化.
+  // cannot be told from a name, and this library has a group whose name is a sentence.
   assert.strictEqual(
     NS.ownField(NS.ORIGINAL_FIELD_NAME),
     NS.ORIGINAL_FIELD_NAME,
@@ -1425,10 +1425,10 @@ module.exports = () => {
     };
   };
 
-  // The icon it draws is the state: 熟肉 — cooked — while a translation group is
-  // what the gallery has, 生肉 once it is declared the original. Two files, and
-  // neither says a word of anybody's language, which is the point of using a
-  // picture for a piece of slang.
+  // The icon it draws is the state: cooked while a translation group is what the
+  // gallery has, raw once it is declared the original. Two files, and neither says a
+  // word of anybody's language, which is the point of using a picture for a piece of
+  // slang.
   const steakOf = (chip) =>
     find(
       chip,
@@ -2235,7 +2235,7 @@ module.exports = () => {
   assert.ok(!hasText(groupOnly, "未标注"), "nor an empty censorship row");
 
   // The original on its own is a panel as well, and its row is worded so it cannot
-  // be read as a group called 原文 — the whole reason the state is its own field
+  // be read as a group called "original" — the whole reason the state is its own field
   // rather than a value of that one.
   const originalOnly = renderChild(
     panelOf({ [NS.ORIGINAL_FIELD_NAME]: "true" })

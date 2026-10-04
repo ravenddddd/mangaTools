@@ -393,7 +393,7 @@ export function MangaFieldBlock(props: {
           isClearable
           isSearchable={false}
           // The placeholder is the third state's name, so it reads the same as
-          // the row in the details block: 未标注 rather than an empty box.
+          // the row in the details block: the state's name rather than an empty box.
           placeholder={t(intl, "mangaTools.censorship.unset")}
           value={markSelected}
           options={markOptions}
@@ -501,9 +501,9 @@ export function MangaFieldBlock(props: {
   // the field it belongs to — always drawn, because a control that vanishes when
   // it is on is a control nobody can turn off.
   //
-  // It draws a steak rather than a word: 熟肉 by default, 生肉 once the gallery is
-  // declared the original. A picture of the state rather than its name is the point
-  // — 生肉/熟肉 is a piece of slang, and one that only reads in one language.
+  // It draws a steak rather than a word: raw by default, cooked once the gallery is
+  // declared the original. A picture rather than a name is the point — the fandom's
+  // words for the two states are slang, and slang that only reads in one language.
   //
   // `manga-tools-chip` is the same hook the language row's button carries: it is
   // what the stylesheet stretches to the field's height. `active` is Bootstrap's

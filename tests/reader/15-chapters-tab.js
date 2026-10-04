@@ -473,7 +473,8 @@ module.exports = async () => {
     dom.flush();
     await settle();
 
-    // 中盤 begins at page 1 and 開幕 at page 5, so that is the order the rows are in.
+    // The first title begins at page 1 and the second at page 5, so that is the
+    // order the rows are in.
     assert.deepStrictEqual(
       drawnRows(own.container),
       ["中盤 - #1", "開幕 - #5"],
@@ -848,7 +849,7 @@ module.exports = async () => {
       dom.flush();
       await settle();
 
-      // The second row is 第二話, which begins at path position 4 — the tab lists
+      // The second row is the second title, which begins at path position 4 — the tab lists
       // path order, so that is both what the row says and where the click goes.
       dom.click(tab.container.children[1].children[1].children[0]);
 
@@ -911,7 +912,7 @@ module.exports = async () => {
     dom.flush();
     await settle();
 
-    // By title: 701 first, so 開幕 (which holds 703 and 704) comes before 中盤.
+    // By title: 701 first, so the chapter holding 703 and 704 comes before the other.
     assert.deepStrictEqual(
       chapterMenu(box),
       ["開幕", "中盤"],

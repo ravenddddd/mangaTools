@@ -532,7 +532,7 @@
  * `.Lightbox-header .fa-icon { width: 1.5rem; height: 1.5rem }`: the size of the *header's*
  * buttons, which this "?" is not. That one has the same specificity as a single-class rule of
  * this panel's, so `font-size: 0.85em` beside it did nothing at all and the glyph came out at
- * a header button's size — which is what "0.85 没生效" was.
+ * a header button's size — which is what that rule was doing nothing about.
  *
  * So the size is said here, in `em` of the button's own 0.85em: the glyph scales with the word
  * it stands beside, which is what every other icon in this plugin does. The wrapper is in the

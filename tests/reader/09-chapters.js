@@ -546,7 +546,8 @@ module.exports = async () => {
       // Which row is marked is the header's own answer, and this is the assertion
       // that says the two cannot disagree: the header names the chapter of the page
       // its screen *starts* on, and the jump asked for a page inside it — so here it
-      // is 開幕, because page 5 of 8 pairs with the page before it, which is the last
+      // is the first chapter's name, because page 5 of 8 pairs with the page
+      // before it, which is the last
       // page of the chapter before.
       assert.strictEqual(
         chrome.querySelector(".manga-reader-chapter").textContent,

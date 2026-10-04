@@ -391,7 +391,7 @@ module.exports = () => {
   // …and the re-worded tag is still known to be the language one afterwards, which
   // is what the dialog needs: it has to find the tag again on later renders, to
   // hide and to show it. The attribute recording the wording is how, since the
-  // wording itself ("语言 是 …") no longer opens with the raw field name.
+  // wording itself no longer opens with the raw field name.
   state.tagQuery = () => [ourTag];
   NS.relabelTags(["语言 是 日语"]);
   state.tagQuery = () => [];

@@ -851,11 +851,11 @@ export function SidebarCensorshipFilter(props: {
  * nothing to list and nothing to search. What differs between the two is data;
  * see PRESENCE_SECTIONS.
  *
- * The two values are Stash's own words for a boolean criterion — 是/否 in
- * Chinese, 有効/無効 in Japanese — so this reads exactly like its own "organized"
+ * The two values are Stash's own words for a boolean criterion — its yes and no, in
+ * every language it ships — so this reads exactly like its own "organized"
  * section; English has no such message in Stash's catalogs, so the fallback is
  * what shows there. **A field's own vocabulary is its heading and its tag, never
- * its values**: putting 生肉/熟肉 on both sides of the question would ask it with
+ * its values**: putting the field's own word on both sides of the question would ask it
  * the same word twice.
  *
  * A **custom hook that is called, not a component that is rendered**, and both
@@ -995,7 +995,7 @@ export function SidebarMangaFilter(props: { filter: MangaToolsFilterModel }) {
  * The gallery list's raw filter: the mark's section, on the other field that is
  * a presence rather than a value.
  *
- * 生肉/熟肉 is what this field is *called* everywhere else in the plugin, so it is
+ * The field's own two words are what it is *called* everywhere else in the plugin, so
  * what the heading and the tag say; a filter whose words differed from the button
  * that sets the same thing would be two vocabularies for one field. The values
  * stay Stash's own two, as the shell says.

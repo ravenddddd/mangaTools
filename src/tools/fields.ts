@@ -256,7 +256,8 @@ NS.isManga = (customFields: unknown): boolean =>
  *
  * It is about the translation group without being a value of it, and the
  * difference is not tidiness. A group's name is whatever it calls itself, and
- * this library has one called 沒有漢化 — a statement to look at, and a name. A
+ * this library has a group whose name is a whole sentence — a statement to look
+ * at, and a name. A
  * state kept in the same field as names like that can be told from a name by
  * nothing: not by the reader looking at the row, and not by the rule that reads a
  * group's galleries to work out a language.

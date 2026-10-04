@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.9.78
+version: 0.9.79
 ui:
   javascript:
     - mangaTools.js
@@ -28,7 +28,7 @@ ui:
     - mangaReader.css
   # The things this plugin ships that are not code: the icon for the mark that
   # makes a gallery manga, and the two steaks the original-text button draws
-  # (raw.svg for 生肉, cooked.svg for 熟肉). Stash serves a mapped directory at
+  # (raw.svg for the original text, cooked.svg for a translation). Stash serves a mapped directory at
   # /plugin/{pluginId}/assets/<path>, so `assets/icons/x.svg` is fetched from
   # /plugin/mangaTools/assets/icons/x.svg.
   #

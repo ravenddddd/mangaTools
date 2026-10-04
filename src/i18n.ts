@@ -118,7 +118,7 @@ export function stringFor(
  *
  * The catalogs are a lookup rather than a formatter, and nothing in either half
  * needed a number *inside* a string until the reader had to name a chapter that has
- * no name: "第 6 章" and "Chapter 6" put the number in a different place, so the
+ * no name: a numbered name and "Chapter 6" put the number in a different place, so the
  * whole string has to come from the catalog. One token with one replacement, rather
  * than a placeholder syntax with no translator to serve.
  *
