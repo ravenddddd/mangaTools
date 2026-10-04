@@ -1094,8 +1094,32 @@
 }
 
 .manga-reader-bulk-bad {
+  position: relative;
   color: #db3737;
   cursor: help;
+}
+
+/* **This plugin's own bubble, not the browser's.** A `title` is drawn by the browser,
+   in the browser's colours, after the browser's delay, and cannot be styled at all —
+   which is why the reason is carried on `data-why` and put on screen here instead:
+   `attr()` reads it out of the markup, so there is no JavaScript in it and nothing to
+   keep in step. `$secondary` is Stash's own, so the bubble is the colour of the
+   popovers it already draws. */
+.manga-reader-bulk-bad[data-why]:hover::after {
+  content: attr(data-why);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: #394b59;
+  color: #f5f8fa;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .manga-reader-bulk-empty {

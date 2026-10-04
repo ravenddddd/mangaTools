@@ -1093,8 +1093,10 @@ module.exports = async () => {
       true,
       "nothing can be created while a page is missing"
     );
+    // Carried on `data-why`, which the stylesheet turns into this plugin's own bubble:
+    // a `title` would put the browser's bubble beside it, in the browser's own colours.
     assert.strictEqual(
-      mark(1).getAttribute("title"),
+      mark(1).getAttribute("data-why"),
       "No page yet — a chapter has to begin somewhere",
       "and the row says why, where the reader is already looking"
     );
@@ -1124,7 +1126,7 @@ module.exports = async () => {
     second.value = "2";
     second.dispatchEvent({ type: "input" });
     assert.strictEqual(
-      mark(3).getAttribute("title"),
+      mark(3).getAttribute("data-why"),
       "This page is in the table twice",
       "a page used twice is named before anything is written"
     );
@@ -1138,7 +1140,7 @@ module.exports = async () => {
     third.value = "1";
     third.dispatchEvent({ type: "input" });
     assert.strictEqual(
-      mark(2).getAttribute("title"),
+      mark(2).getAttribute("data-why"),
       "A chapter already begins here"
     );
     assert.strictEqual(create.disabled, true);

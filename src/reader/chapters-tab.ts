@@ -588,10 +588,12 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
         mark.className = wrong
           ? "manga-reader-bulk-bad"
           : "manga-reader-bulk-ok";
-        mark.setAttribute(
-          "title",
-          wrong ? stringFor(gallery.locale, wrong) : ""
-        );
+        // **Not `title`**: the reason is shown by this plugin's own bubble, drawn from
+        // this attribute by the stylesheet (see .manga-reader-bulk-bad). A `title`
+        // would put the browser's bubble *beside* ours.
+        if (wrong)
+          mark.setAttribute("data-why", stringFor(gallery.locale, wrong));
+        else mark.removeAttribute("data-why");
       }
       if (!wrong) good++;
     }
