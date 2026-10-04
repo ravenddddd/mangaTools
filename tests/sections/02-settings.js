@@ -1120,6 +1120,51 @@ module.exports = () => {
     "…ticked where it was left on, and unticked where it was never chosen"
   );
 
+  // **Unticking every one of them is a choice, not an absence.** It shipped broken:
+  // an empty list serialised to "", which parsed back as "unset" — every filter — so
+  // the four came straight back and the box could not be emptied at all. The format
+  // could say "all" but not "none", and the fix is the sentinel the setting writes
+  // when there is nothing to write.
+  state.capturedConfigWrite = null;
+  withRaw.change([]);
+  assert.strictEqual(
+    state.capturedConfigWrite.input.sidebarFilters,
+    "none",
+    "clearing the box writes the sentinel, not an empty string"
+  );
+  assert.strictEqual(
+    NS.sidebarFilters.size,
+    0,
+    "the in-memory set is empty rather than null: those are different answers"
+  );
+  assert.strictEqual(
+    NS.filterShowing("language"),
+    false,
+    "…and nothing is offered"
+  );
+  assert.deepStrictEqual(
+    filtersOf(call("PluginSettings", { pluginID: "mangaTools" })).value,
+    [],
+    "so the box comes back empty rather than repopulated"
+  );
+
+  // …and the sentinel round-trips, which is the whole of what it is for.
+  assert.strictEqual(
+    NS.serializeSidebarFilters(NS.parseSidebarFilters("none")),
+    "none",
+    "none parses to the empty set and writes back as itself"
+  );
+  assert.strictEqual(
+    NS.parseSidebarFilters(""),
+    null,
+    "while an empty string is still the unset value — all of them"
+  );
+
+  // Put the selection back, which is the state the two assertions below are about:
+  // clearing the box is a change like any other, and this section is read top to
+  // bottom.
+  NS.sidebarFilters = new Set(["language", "original"]);
+
   // The sidebar asks the two questions as one — see filterShowing.
   assert.strictEqual(NS.filterShowing("language"), true, "a filter that is on");
   assert.strictEqual(

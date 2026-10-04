@@ -347,17 +347,32 @@ NS.SIDEBAR_FILTERS = [
 ] as const;
 
 /**
- * Parses the stored `sidebarFilters` setting — a comma-separated list of filter
- * names, e.g. "language,translationGroup" — into a Set. Null for an empty or unset
- * value, which means every filter whose field is on is shown.
+ * The one stored value that is not a filter name: what "none of them" is written as.
  *
- * Only the four names above survive, so a hand-edited value cannot invent a
- * filter, and duplicates collapse to one entry.
+ * Needed because **absent and empty are different answers here** — absent means
+ * "every filter whose field is on", which is what an install that predates this
+ * setting did, and "none" is a choice a reader can make. Without this, unticking all
+ * four wrote "", which parsed back as absent, and the four came straight back: the
+ * format could say "all" but not "none". The names it could collide with are the
+ * four filters' own, so any other token is unambiguous.
+ */
+const SIDEBAR_FILTERS_NONE = "none";
+
+/**
+ * Parses the stored `sidebarFilters` setting — a comma-separated list of filter
+ * names, e.g. "language,translationGroup" — into a Set.
+ *
+ * Three answers, not two: null for an unset value (every filter whose field is on),
+ * an **empty** Set for `"none"`, and the names for a selection. Only the four names
+ * above survive, so a hand-edited value cannot invent a filter, and duplicates
+ * collapse to one entry; a list that parses to nothing is read as `"none"` too,
+ * since a value that names no filter can only mean that.
  */
 NS.parseSidebarFilters = (raw: unknown): Set<string> | null => {
   if (raw === null || raw === undefined) return null;
   const s = String(raw).trim();
   if (s === "") return null;
+  if (s === SIDEBAR_FILTERS_NONE) return new Set<string>();
 
   const out = new Set<string>();
   s.split(",").forEach((piece) => {
@@ -365,12 +380,18 @@ NS.parseSidebarFilters = (raw: unknown): Set<string> | null => {
     if ((NS.SIDEBAR_FILTERS as readonly string[]).includes(name)) out.add(name);
   });
 
-  return out.size ? out : null;
+  return out;
 };
 
-/** The inverse of parseSidebarFilters, ordered so any writer produces the same value. */
-NS.serializeSidebarFilters = (names: Iterable<string>): string =>
-  Array.from(names).sort().join(",");
+/**
+ * The inverse of parseSidebarFilters, ordered so any writer produces the same value
+ * — and writing the sentinel rather than "" when there is nothing to write, or the
+ * round trip would turn "none" into "all".
+ */
+NS.serializeSidebarFilters = (names: Iterable<string>): string => {
+  const all = Array.from(names).sort();
+  return all.length ? all.join(",") : SIDEBAR_FILTERS_NONE;
+};
 
 /**
  * Whether a sidebar filter is offered: its field is drawn, **and** the reader has

@@ -796,9 +796,10 @@ consequence: the setting only ever lists filters that could be shown, the multis
 list holds only those, and writing puts an off-field's filter back **as on**. So turning
 a field off and on again brings its filter back at the default rather than at whatever it
 happened to be — the reader asked for exactly that. Absent means every filter whose field
-is on, so an install that predates the setting behaves as it always did; the empty list
-means none, which is the opposite of what empty means for the languages beside it, and
-that is worth knowing before reading either one.
+is on, so an install that predates the setting behaves as it always did; none of them is
+written as the sentinel `"none"`, because an empty string is the unset value — the format
+could say "all" but not "none" until 0.9.57, which is the bug that made clearing the box
+bring all four straight back.
 
 **The mark's section is not in that setting** — it is the one that is always there,
 since the mark is what makes a gallery this plugin's at all. It is also the first of the
