@@ -9,6 +9,7 @@ const {
   runSection,
   settle,
   state,
+  buildLightbox,
   container,
   drawn,
   NS,
@@ -238,6 +239,53 @@ module.exports = async () => {
           NR.IMAGE_GALLERIES_QUERY_TEXT.indexOf("galleries {") !== -1,
         "…with a query naming the image and its galleries"
       );
+    }
+  );
+  await runSection(
+    "a click inside a card answers before the server is asked",
+    async () => {
+      // The takeover has to happen in the same `step` that first sees the lightbox,
+      // or Stash's own is drawn for a frame first — which is exactly what the user
+      // saw once the lookup became a query. The click that opened it is what makes
+      // that possible: the element it landed on is in hand, so its card, and the
+      // gallery that card links to, need no matching and no round trip.
+      dom.window.location.pathname = "/scenes/11593";
+      for (const child of dom.body.children.slice()) child.remove();
+
+      const card = dom.makeElement("div");
+      card.className = "gallery-card";
+      const header = dom.makeElement("a");
+      header.setAttribute("href", "/galleries/7");
+      card.appendChild(header);
+      const thumb = dom.makeElement("img");
+      thumb.setAttribute(
+        "src",
+        "http://nas.local:9998/image/101/thumbnail?t=1"
+      );
+      card.appendChild(thumb);
+      dom.body.appendChild(card);
+
+      const askedForImages = () =>
+        state.queries.filter((q) => q.variables?.id !== undefined).length;
+      const before = askedForImages();
+
+      dom.click(thumb);
+      const box = buildLightbox(1, 5, ["101", "102", "103", "104", "105"]);
+      dom.flush();
+      await settle();
+
+      assert.strictEqual(
+        askedForImages(),
+        before,
+        "the card the click was in answers, so the server is never asked"
+      );
+      assert.ok(
+        container(),
+        "and the lightbox is this plugin's from the first frame"
+      );
+
+      stopReader(box);
+      dom.window.location.pathname = "/";
     }
   );
 };

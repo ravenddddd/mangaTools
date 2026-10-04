@@ -600,6 +600,16 @@ function createDom() {
         if (event.propagationStopped) break;
       }
 
+      // **And then the document's**, which is where a listener that watches the
+      // whole page puts itself: the reader half keeps one there to see which gallery
+      // a click was inside, and a click that bubbled all the way up has reached it in
+      // a browser. The walk above stops at the body, whose parent is nothing here.
+      if (!event.propagationStopped && document.listeners.click) {
+        const doc = document.listeners.click;
+        if (typeof doc === "function") doc(event);
+        else for (const fn of doc) fn(event);
+      }
+
       return event;
     },
     /** Says the reader has asked their system for less motion */

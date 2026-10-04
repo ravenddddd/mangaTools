@@ -164,6 +164,7 @@ module.exports = () => {
   // nothing to do with how many watchers this card mounts. What the card has to
   // do is add exactly one — not none, and not a second one per render.
   const watchingBefore = observed.length;
+  const clicksBefore = capturedClicks.filter((l) => l.name === "click").length;
   renderDialogCard([
     { field: "plugin.mangaTools.language", modifier: "EQUALS", value: ["ja"] },
   ]);
@@ -185,8 +186,15 @@ module.exports = () => {
     "…and into what is inside the dialog, not just the dialog itself"
   );
 
+  // Counted as a delta for the same reason, and it was counted as a total until the
+  // reader half grew a click listener of its own: *this card* has to add exactly
+  // one, and what else is listening on the document is not its business.
   const clicks = capturedClicks.filter((l) => l.name === "click");
-  assert.strictEqual(clicks.length, 1, "and listen for clicks, once");
+  assert.strictEqual(
+    clicks.length - clicksBefore,
+    1,
+    "and listen for clicks, once"
+  );
   assert.strictEqual(
     clicks[0].capture,
     true,

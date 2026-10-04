@@ -202,6 +202,22 @@ let galleryId: string | null = null;
 let pageGalleryId: string | null = null;
 
 /**
+ * The gallery the last click was inside, or null.
+ *
+ * Read from the clicked element's own ancestors rather than from anything matched
+ * by URL, which is the whole point: the page's thumbnails may have had their `src`
+ * swapped for lazy-loading placeholders — the user's console said exactly that —
+ * so an `img[src*=…]` lookup can miss the very image that was clicked. The element
+ * the click landed on is in hand and in the document, so its card, and the gallery
+ * the card links to, need no matching at all.
+ *
+ * It is what makes the takeover synchronous on a page where the path cannot answer,
+ * and so what keeps Stash's own lightbox from being drawn for a frame first: this
+ * half takes a lightbox over in the same `step` that sees it.
+ */
+let clickedGalleryId: string | null = null;
+
+/**
  * The image whose galleries have been asked for — pending or answered.
  *
  * Held so the question is asked once per lightbox: `galleryOf` runs on every DOM
@@ -306,6 +322,14 @@ function galleryOf(lightbox: Element): string | null {
   const fromPath = galleryIdFromPath(window.location.pathname);
   if (fromPath) return fromPath;
   if (pageGalleryId) return pageGalleryId;
+
+  // What the click that opened this lightbox was inside, when it was inside a
+  // gallery's card — synchronous, so the takeover happens in this same `step` and
+  // Stash's own lightbox is never drawn. See noteClickedCard.
+  if (clickedGalleryId) {
+    pageGalleryId = clickedGalleryId;
+    return pageGalleryId;
+  }
 
   const image = carouselImage(lightbox);
   if (!image) return null;
@@ -1625,6 +1649,25 @@ function arrowsBelongTo(target: HTMLElement | null): boolean {
  * lightbox is moved (see pressArrow), they are what was asked for already, and
  * handling them again would double every step.
  */
+/**
+ * Records the gallery a click was inside, for the lightbox that click may open.
+ *
+ * Only clicks that land inside a card — the image grids a scene's, a performer's or
+ * a tag's page draws — are worth anything here, and a click anywhere else leaves the
+ * last one alone: `galleryOf` is only asked once a lightbox is on screen, and the
+ * click that opened it is the one whose card is right.
+ */
+function noteClickedCard(event: Event): void {
+  const target = event.target as Element | null;
+  if (!target || typeof target.closest !== "function") return;
+
+  const link = target
+    .closest(".gallery-card")
+    ?.querySelector('a[href^="/galleries/"]');
+  const match = /^\/galleries\/(\d+)/.exec(link?.getAttribute("href") || "");
+  if (match) clickedGalleryId = match[1];
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   if (!event.isTrusted || !wanted() || !root) return;
 
@@ -2320,6 +2363,10 @@ export function install(): void {
 
   observer.observe(document.body, { childList: true, subtree: true });
   window.addEventListener("keydown", onKeyDown, true);
+  // Passive and in the capture phase: this only records where the click landed, and
+  // it must not be able to change what the page does with the click — a card's cover
+  // is a link, and this listener has no business in front of its navigation.
+  document.addEventListener("click", noteClickedCard, true);
 
   // Two changes that move everything the reader draws in and leave the document
   // exactly as it was: a window resized, and the lightbox filling the screen or
