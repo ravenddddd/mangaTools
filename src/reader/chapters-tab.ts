@@ -168,6 +168,9 @@ let bulk = false;
  */
 let bulkPages: string[] = [];
 
+/** TEMPORARY: how many times render has been entered — see the console warning */
+let renders = 0;
+
 /** The tallest pasted list this editor will take — see drawBulk */
 const BULK_LIMIT = 64;
 
@@ -347,6 +350,13 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
         : "list",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
+  // TEMPORARY: counts the passes, so a frozen page can say whether this is the loop.
+  // Remove once the freeze is found — see the note in the README's pending list.
+  renders += 1;
+  if (renders % 200 === 0) {
+    console.warn("[mangaReader] render pass", renders, "|", key.slice(0, 90));
+  }
+
   if (key === renderedFor && panel.childElementCount > 0) return;
   renderedFor = key;
   panelInHand = panel;
