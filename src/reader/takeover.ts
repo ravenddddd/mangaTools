@@ -1908,6 +1908,19 @@ function onNavClick(event: Event): void {
 }
 
 /**
+ * Whether an event landed on a page or on the space around one.
+ *
+ * The two are told apart by the event's own target, and both halves of this module need
+ * the answer: a **click** on the letterbox is Stash's close and a click on a page turns
+ * it, and a **press** on the letterbox is nothing at all — Stash's drag is the image's
+ * own handler, so dragging from beside a page does not move the book there, and it did
+ * here for as long as this listener was on the whole picture area.
+ */
+function isOnPage(event: Event): boolean {
+  return (event.target as HTMLElement | null)?.tagName === "IMG";
+}
+
+/**
  * A click on this plugin's own pages, and on the space around them.
  *
  * Both are Stash's behaviours, which the container would otherwise swallow by
@@ -1935,14 +1948,12 @@ function onSpreadClick(event: Event): void {
     return;
   }
 
-  const target = event.target as HTMLElement | null;
-
   // A page in the column is not something to turn: there is no page on either side of
   // it, only more of the same column, which the reader scrolls. The letterbox below
   // still closes the lightbox, so this is the one click that means nothing.
-  if (settings.readingMode === "scroll" && target?.tagName === "IMG") return;
+  if (settings.readingMode === "scroll" && isOnPage(event)) return;
 
-  if (target?.tagName !== "IMG") {
+  if (!isOnPage(event)) {
     // In fullscreen, a click on the space around the pages does nothing at all.
     // Leaving fullscreen is the header's button or Escape, and nobody asking for a
     // page turn hits the letterbox by accident — whereas a reader who has filled the
@@ -1963,7 +1974,7 @@ function onSpreadClick(event: Event): void {
   // nothing laid out yet — goes forward, which is the direction a click on a page
   // means when there is nothing to read into it.
   const click = event as MouseEvent;
-  const width = target.offsetWidth;
+  const width = (event.target as HTMLElement).offsetWidth;
   const forward = !width || click.offsetX >= width / 2;
   if (turnBy(lightbox, forward ? 1 : -1)) event.stopPropagation();
 }
@@ -2138,6 +2149,22 @@ function onSpreadWheel(event: Event): void {
 function onSpreadPress(event: Event): void {
   const press = event as MouseEvent;
   if (press.button !== 0) return;
+
+  // **Only a press that lands on a page is a press on the pages.** Stash's own drag is
+  // the *image's* handler, so pressing the backdrop, or the space beside a page in the
+  // column, drags nothing there — and here the listener is on the whole picture area,
+  // letterbox and margins included, so a drag from empty space moved the book. Which is
+  // the same question onSpreadClick has always asked of a click, and the same answer.
+  //
+  // Nothing is remembered about a press like this: it is not a pan, and it is not a
+  // *held* press either, so the click that follows it is a click — which is what the
+  // letterbox's own click has to be, since closing the lightbox is Stash's.
+  if (!isOnPage(event)) {
+    pressed = null;
+    dragFrom = null;
+    held = false;
+    return;
+  }
 
   // In the column the press begins a *scroll* the reader makes with the pointer,
   // which is what a drag on a column of pages means: the same movement the wheel

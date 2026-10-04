@@ -293,6 +293,30 @@ module.exports = async () => {
         "and nothing else sees it"
       );
 
+      // A press and a release here first, which is not a press on a page: the drag it
+      // might have begun moves nothing, so the click that follows is still a click —
+      // and it has to be, because this is the click that closes the lightbox. Which is
+      // also why the press forgets what the *last* one was: a press that is not on a
+      // page leaves nothing behind, not even "the pointer was held a moment ago".
+      const letterbox = container();
+      letterbox.dispatch(
+        "mousedown",
+        dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
+      );
+      dom.document.dispatch(
+        "mousemove",
+        dom.makeEvent("mousemove", { clientX: 104, clientY: 100 })
+      );
+      dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+
+      keys.length = 0;
+      dom.click(letterbox);
+      assert.deepStrictEqual(
+        keys,
+        ["Escape"],
+        "and a press beside the pages does not turn the click after it into a drag"
+      );
+
       stopReader(box);
     }
   );

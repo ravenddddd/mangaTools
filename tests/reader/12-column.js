@@ -613,10 +613,31 @@ module.exports = async () => {
     rows[0].style.width = "200%";
     container.scrollLeft = 0;
     container.scrollTop = 0;
+
+    // A press on the *margin* first — the box, which is what a press beside a page
+    // lands on. Stash's own drag is the image's, so this does nothing there, and it
+    // scrolled the column here until the press started asking what it landed on.
     container.dispatch(
       "mousedown",
       dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
     );
+    dom.document.dispatch(
+      "mousemove",
+      dom.makeEvent("mousemove", { clientX: 40, clientY: 60 })
+    );
+    assert.strictEqual(
+      container.scrollLeft,
+      0,
+      "a drag begun beside the pages scrolls nothing"
+    );
+    dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+
+    // And the drag itself, on a page: dispatched on the image, bubbling to the box.
+    rows[0]
+      .querySelector("img")
+      .dispatchEvent(
+        dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
+      );
     dom.document.dispatch(
       "mousemove",
       dom.makeEvent("mousemove", { clientX: 40, clientY: 60 })

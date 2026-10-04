@@ -155,6 +155,10 @@ module.exports = async () => {
       // rather than assumed: what the wheel did is this test's subject too.
       wheel(100, { ctrlKey: true });
       const scale = /scale\((.*)\)$/.exec(transform())[1];
+      // A press on the *space* around the pages, which is not a press on them: Stash's
+      // own drag is the image's handler, and this one is on the whole picture area, so
+      // it used to move the book from the letterbox too. Dispatched on the container,
+      // which is what a press beside the pages lands on.
       spread.dispatch(
         "mousedown",
         dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
@@ -165,8 +169,24 @@ module.exports = async () => {
       );
       assert.strictEqual(
         transform(),
+        "translate(0px, 0px) scale(" + scale + ")",
+        "a drag begun on the letterbox moves nothing"
+      );
+      dom.document.dispatch("mouseup", dom.makeEvent("mouseup", {}));
+
+      // And a press on a page, which is the drag Stash has: on the image, and bubbling
+      // up to the container the way a real event does.
+      spread.children[0].children[0].dispatchEvent(
+        dom.makeEvent("mousedown", { button: 0, clientX: 100, clientY: 100 })
+      );
+      dom.document.dispatch(
+        "mousemove",
+        dom.makeEvent("mousemove", { clientX: 140, clientY: 100 })
+      );
+      assert.strictEqual(
+        transform(),
         "translate(40px, 0px) scale(" + scale + ")",
-        "a drag moves the pages by as much as the pointer moved"
+        "a drag on a page moves the pages by as much as the pointer moved"
       );
 
       // And on, past the edge of the screen: Stash's own image follows the pointer
@@ -199,8 +219,7 @@ module.exports = async () => {
       // A press that stayed put but lasted: also not a click. Stash's own other half
       // of the test, and the reason a reader who pressed and thought better of it is
       // not sent a page on.
-      spread.dispatch(
-        "mousedown",
+      spread.children[0].children[0].dispatchEvent(
         dom.makeEvent("mousedown", {
           button: 0,
           clientX: 100,
