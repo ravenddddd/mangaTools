@@ -43,7 +43,6 @@ import {
   TAG_SELECTOR,
   flagOf,
   isFieldTag,
-  isLanguageTag,
   matchesQuery,
   selectableOptions,
   tagText,
@@ -52,6 +51,7 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import type {
   MangaToolsFilterModel,
+  MangaToolsHistory,
   MangaToolsIntl,
   MangaToolsLanguageSelection,
   MangaToolsMangaState,
@@ -94,29 +94,51 @@ function isTouchDevice(): boolean {
   return window.matchMedia("(pointer: coarse)").matches;
 }
 
-/** The same mark, per field: one attribute each, so a re-worded tag stays recognisable. */
-const CENSORSHIP_TAG_MARK = "data-manga-tools-censorship";
-const MANGA_TAG_MARK = "data-manga-tools-manga";
-const GROUP_TAG_MARK = "data-manga-tools-group";
-const ORIGINAL_TAG_MARK = "data-manga-tools-original";
+/**
+ * The fields whose tags this plugin re-words, and the mark it leaves on each.
+ *
+ * One mark per field, because a tag Stash drew for our criterion carries the
+ * custom field's raw key and nothing that says which of our fields it is. The
+ * mark is both how a tag is recognised on a later pass and how one section's
+ * tags are told from another's.
+ *
+ * A table rather than four constants and four predicates: the entries differ in
+ * these three strings and nothing else, and every reader of them is the same
+ * loop.
+ */
+const TAGGED_FIELDS: { name: string; key: string; mark: string }[] = [
+  { name: "language", key: NS.FIELD_NAME, mark: TAG_MARK },
+  {
+    name: "censorship",
+    key: NS.CENSORSHIP_FIELD_NAME,
+    mark: "data-manga-tools-censorship",
+  },
+  { name: "manga", key: NS.MANGA_FIELD_NAME, mark: "data-manga-tools-manga" },
+  {
+    name: "translationGroup",
+    key: NS.TRANSLATION_GROUP_FIELD_NAME,
+    mark: "data-manga-tools-group",
+  },
+  {
+    name: "original",
+    key: NS.ORIGINAL_FIELD_NAME,
+    mark: "data-manga-tools-original",
+  },
+];
 
-/** Is this tag Stash's tag for the censorship criterion? */
-function isCensorshipTag(tag: Element): boolean {
-  return isFieldTag(tag, NS.CENSORSHIP_FIELD_NAME, CENSORSHIP_TAG_MARK);
+/** One entry above, by the name the surfaces know the field by */
+function taggedField(name: string) {
+  for (let i = 0; i < TAGGED_FIELDS.length; i++) {
+    if (TAGGED_FIELDS[i].name === name) return TAGGED_FIELDS[i];
+  }
+  // Not reachable: every caller names a field the table holds.
+  return TAGGED_FIELDS[0];
 }
 
-/** Is this tag Stash's tag for the manga criterion? */
-function isMangaTag(tag: Element): boolean {
-  return isFieldTag(tag, NS.MANGA_FIELD_NAME, MANGA_TAG_MARK);
-}
-
-/** …and for the translation group's and the raw field's */
-function isGroupTag(tag: Element): boolean {
-  return isFieldTag(tag, NS.TRANSLATION_GROUP_FIELD_NAME, GROUP_TAG_MARK);
-}
-
-function isOriginalTag(tag: Element): boolean {
-  return isFieldTag(tag, NS.ORIGINAL_FIELD_NAME, ORIGINAL_TAG_MARK);
+/** Is this tag Stash's tag for that field? */
+function isTagOf(name: string, tag: Element): boolean {
+  const field = taggedField(name);
+  return isFieldTag(tag, field.key, field.mark);
 }
 
 /**
@@ -141,28 +163,9 @@ function listFieldTags(isField: (tag: Element) => boolean): Element[] {
   return ours;
 }
 
-/** The language tags in the list's own row */
-function listLanguageTags(): Element[] {
-  return listFieldTags(isLanguageTag);
-}
-
-/** The censorship tags in the list's own row */
-function listCensorshipTags(): Element[] {
-  return listFieldTags(isCensorshipTag);
-}
-
-/** The manga tags in the list's own row */
-function listMangaTags(): Element[] {
-  return listFieldTags(isMangaTag);
-}
-
-/** The translation group's and the raw field's, likewise */
-function listGroupTags(): Element[] {
-  return listFieldTags(isGroupTag);
-}
-
-function listOriginalTags(): Element[] {
-  return listFieldTags(isOriginalTag);
+/** The tags in the list's own row that belong to one field */
+function listTagsOf(name: string): Element[] {
+  return listFieldTags((tag) => isTagOf(name, tag));
 }
 
 /** Writes labels into tags, in order, one per tag, under the given mark */
@@ -205,27 +208,35 @@ function writeTagLabels(tags: Element[], labels: string[], mark: string): void {
  * tag for each of the criterion's conditions, in their order.
  */
 function relabelTags(labels: string[]): void {
-  writeTagLabels(listLanguageTags(), labels, TAG_MARK);
+  writeTagLabels(listTagsOf("language"), labels, TAG_MARK);
 }
 
 /** Re-words the censorship tags in the list's row. See relabelTags. */
 function relabelCensorshipTags(labels: string[]): void {
-  writeTagLabels(listCensorshipTags(), labels, CENSORSHIP_TAG_MARK);
+  writeTagLabels(
+    listTagsOf("censorship"),
+    labels,
+    taggedField("censorship").mark
+  );
 }
 
 /** Re-words the manga tags in the list's row. See relabelTags. */
 function relabelMangaTags(labels: string[]): void {
-  writeTagLabels(listMangaTags(), labels, MANGA_TAG_MARK);
+  writeTagLabels(listTagsOf("manga"), labels, taggedField("manga").mark);
 }
 
 /** Re-words the translation group tags in the list's row. See relabelTags. */
 function relabelGroupTags(labels: string[]): void {
-  writeTagLabels(listGroupTags(), labels, GROUP_TAG_MARK);
+  writeTagLabels(
+    listTagsOf("translationGroup"),
+    labels,
+    taggedField("translationGroup").mark
+  );
 }
 
 /** Re-words the raw tags in the list's row. See relabelTags. */
 function relabelOriginalTags(labels: string[]): void {
-  writeTagLabels(listOriginalTags(), labels, ORIGINAL_TAG_MARK);
+  writeTagLabels(listTagsOf("original"), labels, taggedField("original").mark);
 }
 
 /**
@@ -834,37 +845,66 @@ export function SidebarCensorshipFilter(props: {
 }
 
 /**
- * The gallery list's manga filter — a boolean section like Stash's organised.
+ * A section for one of the two presence fields: the mark and the raw one.
  *
- * Two values, one of which may be chosen. The chosen one sits above the fold and
- * the other below it, and choosing one clears the other: single-select, no
- * include/exclude, no search box. The mark is a presence, so "marked" is NOT_NULL
- * and "unmarked" is IS_NULL.
+ * They are the same section — two values, one of which may be chosen, and
+ * choosing the chosen one takes it back — because they are the same kind of
+ * question. Single-select, no include/exclude, no search box: a presence has
+ * nothing to list and nothing to search. What differs between the two is data;
+ * see PRESENCE_SECTIONS.
+ *
+ * The two values are Stash's own words for a boolean criterion — 是/否 in
+ * Chinese, 有効/無効 in Japanese — so this reads exactly like its own "organized"
+ * section; English has no such message in Stash's catalogs, so the fallback is
+ * what shows there. **A field's own vocabulary is its heading and its tag, never
+ * its values**: putting 生肉/熟肉 on both sides of the question would ask it with
+ * the same word twice.
+ *
+ * A **custom hook that is called, not a component that is rendered**, and both
+ * halves of that are deliberate. It has to be a hook — it reads the section's
+ * open state and repairs the tag row — and the lint rule that insists on it is
+ * right: called from anywhere but a component or a hook, those calls are a bug.
+ * It is *called* rather than rendered for the reason languageChip gives in
+ * fields-ui.tsx: the element tree is what the section tests navigate, and a
+ * component boundary here would be one more level between a section and the
+ * shell it draws.
  */
-export function SidebarMangaFilter(props: { filter: MangaToolsFilterModel }) {
-  const { intl, history, open, toggleOpen } = useSidebarSection(
-    MANGA_SECTION_STATE_KEY
-  );
+type PresenceSectionProps = {
+  filter: MangaToolsFilterModel;
+  /** The field filtered on — see the table in filter-model.ts */
+  fieldKey: string;
+  stateKey: string;
+  heading: (intl: MangaToolsIntl) => string;
+  /** The word for the Bootstrap-missing message: "manga", "raw" */
+  what: string;
+  read: (filter: MangaToolsFilterModel) => MangaToolsMangaState;
+  apply: (
+    filter: MangaToolsFilterModel,
+    history: MangaToolsHistory,
+    state: MangaToolsMangaState
+  ) => void;
+  relabel: (labels: string[]) => void;
+};
 
-  const state = readMangaFilter(props.filter);
+function usePresenceSection(props: PresenceSectionProps) {
+  const { intl, history, open, toggleOpen } = useSidebarSection(props.stateKey);
 
-  const tagLabelsFor = fieldTagLabels(intl, props.filter, NS.MANGA_FIELD_NAME);
+  const state = props.read(props.filter);
+
+  const tagLabelsFor = fieldTagLabels(intl, props.filter, props.fieldKey);
 
   React.useLayoutEffect(() => {
-    if (tagLabelsFor) relabelMangaTags(tagLabelsFor);
+    if (tagLabelsFor) props.relabel(tagLabelsFor);
   });
 
-  // Stash's own two words for a boolean criterion, so this reads exactly like its
-  // own "organized" section — 是/否 in Chinese, 有効/無効 in Japanese. English has
-  // no such message in Stash's catalogs, so the fallback is what shows there.
   const options: { value: MangaToolsMangaState; label: string }[] = [
     { value: "marked", label: message(intl, "true", "Yes") },
     { value: "unmarked", label: message(intl, "false", "No") },
   ];
 
-  // Choosing the chosen value clears it; choosing the other moves the mark.
+  // Choosing the chosen value clears it; choosing the other moves the filter.
   function choose(value: MangaToolsMangaState) {
-    applyManga(props.filter, history, state === value ? "" : value);
+    props.apply(props.filter, history, state === value ? "" : value);
   }
 
   // Stash's boolean filter shows the chosen value above the fold and the other
@@ -887,12 +927,12 @@ export function SidebarMangaFilter(props: { filter: MangaToolsFilterModel }) {
 
   return (
     <SidebarSection
-      heading={t(intl, "mangaTools.manga.isManga")}
+      heading={props.heading(intl)}
       open={open}
       onToggle={toggleOpen}
       chosenItems={chosenItems}
       excludedItems={[]}
-      what="manga"
+      what={props.what}
     >
       <ul>
         {candidates.map((o) => (
@@ -914,92 +954,61 @@ export function SidebarMangaFilter(props: { filter: MangaToolsFilterModel }) {
 }
 
 /**
- * The gallery list's raw filter: the mark's section, on the other field that is a
- * presence rather than a value.
+ * The two presence sections, as data — everything the shell above needs to
+ * draw one of them, which is what makes the components below one line apiece.
+ */
+const PRESENCE_SECTIONS: {
+  [name: string]: Omit<PresenceSectionProps, "filter">;
+} = {
+  manga: {
+    fieldKey: NS.MANGA_FIELD_NAME,
+    stateKey: MANGA_SECTION_STATE_KEY,
+    heading: (intl) => t(intl, "mangaTools.manga.isManga"),
+    what: "manga",
+    read: readMangaFilter,
+    apply: applyManga,
+    relabel: relabelMangaTags,
+  },
+  original: {
+    fieldKey: NS.ORIGINAL_FIELD_NAME,
+    stateKey: ORIGINAL_SECTION_STATE_KEY,
+    heading: (intl) => t(intl, "mangaTools.filter.original.isOriginal"),
+    what: "raw",
+    read: readOriginalFilter,
+    apply: applyOriginal,
+    relabel: relabelOriginalTags,
+  },
+};
+
+/**
+ * The gallery list's manga filter — a boolean section like Stash's organised.
  *
- * Raw is one thing or the other — a gallery is the original text or it is not —
- * so the filter is a choice among two plus "neither asked for", and the rows carry
- * the two steaks the edit page's button draws. The words are this plugin's rather
- * than Stash's 是/否 that the mark's section uses, because 生肉/熟肉 is what the
- * field is *called* everywhere else in the plugin, and a filter whose words differ
- * from the button that sets the same thing is two vocabularies for one field.
+ * Two values, one of which may be chosen. The mark is a presence, so "marked"
+ * is NOT_NULL and "unmarked" is IS_NULL.
+ */
+export function SidebarMangaFilter(props: { filter: MangaToolsFilterModel }) {
+  return usePresenceSection({
+    ...PRESENCE_SECTIONS.manga,
+    filter: props.filter,
+  });
+}
+
+/**
+ * The gallery list's raw filter: the mark's section, on the other field that is
+ * a presence rather than a value.
+ *
+ * 生肉/熟肉 is what this field is *called* everywhere else in the plugin, so it is
+ * what the heading and the tag say; a filter whose words differed from the button
+ * that sets the same thing would be two vocabularies for one field. The values
+ * stay Stash's own two, as the shell says.
  */
 export function SidebarOriginalFilter(props: {
   filter: MangaToolsFilterModel;
 }) {
-  const { intl, history, open, toggleOpen } = useSidebarSection(
-    ORIGINAL_SECTION_STATE_KEY
-  );
-
-  const state = readOriginalFilter(props.filter);
-
-  const tagLabelsFor = fieldTagLabels(
-    intl,
-    props.filter,
-    NS.ORIGINAL_FIELD_NAME
-  );
-
-  React.useLayoutEffect(() => {
-    if (tagLabelsFor) relabelOriginalTags(tagLabelsFor);
+  return usePresenceSection({
+    ...PRESENCE_SECTIONS.original,
+    filter: props.filter,
   });
-
-  // Stash's own two words for a boolean criterion, exactly as the mark's section
-  // uses them — 是/否 in Chinese, 有効/無効 in Japanese. The field's own vocabulary
-  // (生肉/熟肉) is what the heading and the tag say; repeating it as the *values*
-  // would put the same word on both sides of the question.
-  const options: { value: MangaToolsMangaState; label: string }[] = [
-    { value: "marked", label: message(intl, "true", "Yes") },
-    { value: "unmarked", label: message(intl, "false", "No") },
-  ];
-
-  // Choosing the chosen value clears it; choosing the other moves the filter —
-  // exactly the mark's rule, because it is the same kind of question.
-  function choose(value: MangaToolsMangaState) {
-    applyOriginal(props.filter, history, state === value ? "" : value);
-  }
-
-  const chosen = options.filter((o) => o.value === state);
-  const candidates = options.filter((o) => o.value !== state);
-
-  const chosenItems = chosen.map((o) => (
-    <LanguageRow
-      variant="sidebar"
-      key={o.value}
-      label={o.label}
-      state="included"
-      canExclude={false}
-      onClick={() => {
-        choose(o.value);
-      }}
-    />
-  ));
-
-  return (
-    <SidebarSection
-      heading={t(intl, "mangaTools.filter.original.isOriginal")}
-      open={open}
-      onToggle={toggleOpen}
-      chosenItems={chosenItems}
-      excludedItems={[]}
-      what="raw"
-    >
-      <ul>
-        {candidates.map((o) => (
-          <LanguageRow
-            variant="sidebar"
-            key={o.value}
-            label={o.label}
-            state="candidate"
-            canExclude={false}
-            singleValue
-            onClick={() => {
-              choose(o.value);
-            }}
-          />
-        ))}
-      </ul>
-    </SidebarSection>
-  );
 }
 
 /**
