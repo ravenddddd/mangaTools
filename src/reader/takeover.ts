@@ -218,13 +218,14 @@ let pageGalleryId: string | null = null;
 let clickedGalleryId: string | null = null;
 
 /**
- * The image whose galleries have been asked for — pending or answered.
+ * Every image whose galleries have been asked about, and what came back.
  *
- * Held so the question is asked once per lightbox: `galleryOf` runs on every DOM
- * change, and "none of yours" is an answer that must not become a query per
- * observer callback.
+ * Kept across lightboxes, not per lightbox: the answer cannot change while a page
+ * is up, and it is what makes the *second* visit to an image — or a click that was
+ * preceded by a `pointerdown` far enough ahead — synchronous. See askAboutImage.
  */
-let askedImage: string | null = null;
+const askedAboutImage: { [imageId: string]: boolean } = {};
+const galleriesOfImage: { [imageId: string]: string | null } = {};
 
 let shownAt = -1;
 
@@ -334,27 +335,19 @@ function galleryOf(lightbox: Element): string | null {
   const image = carouselImage(lightbox);
   if (!image) return null;
 
-  if (askedImage !== image.id) {
-    askedImage = image.id;
-    galleryIdOfImage(image.id).then(
-      (id) => {
-        pageGalleryId = id;
-        // The answer moved what this lightbox is, so everything downstream has to
-        // be looked at again — the chapters, the takeover, the drawing.
-        if (root) step();
-      },
-      (e: unknown) => {
-        // A question that could not be asked is one worth asking again: the reader
-        // gets Stash's own lightbox in the meantime, and the next change tries
-        // once more.
-        askedImage = null;
-        console.error(
-          "[mangaReader] could not ask which gallery this image is in:",
-          e
-        );
-      }
-    );
+  // Answered already — by the prefetch, or by an earlier lightbox on this image —
+  // which is the case that makes the takeover happen in this same `step`.
+  if (image.id in galleriesOfImage) {
+    pageGalleryId = galleriesOfImage[image.id];
+    return pageGalleryId;
   }
+
+  askAboutImage(image.id, () => {
+    pageGalleryId = galleriesOfImage[image.id];
+    // The answer moved what this lightbox is, so everything downstream has to be
+    // looked at again — the chapters, the takeover, the drawing.
+    if (root) step();
+  });
 
   return pageGalleryId;
 }
@@ -378,7 +371,6 @@ function step(): void {
     root = lightbox;
     galleryId = null;
     pageGalleryId = null;
-    askedImage = null;
     shownAt = -1;
     place = -1;
     reinsers = 0;
@@ -1668,6 +1660,58 @@ function noteClickedCard(event: Event): void {
   if (match) clickedGalleryId = match[1];
 }
 
+/**
+ * Asks which of this plugin's galleries an image is in, once per image.
+ *
+ * `whenAnswered` runs when the answer is in hand, and immediately when it already
+ * was. The question is never asked twice: `askedAboutImage` stays set even after an
+ * answer of "none of yours", which is what keeps a page of images from becoming a
+ * query per hover, per click and per observer callback.
+ */
+function askAboutImage(imageId: string, whenAnswered: () => void): void {
+  if (askedAboutImage[imageId]) {
+    if (imageId in galleriesOfImage) whenAnswered();
+    return;
+  }
+
+  askedAboutImage[imageId] = true;
+  galleryIdOfImage(imageId).then(
+    (galleryId) => {
+      galleriesOfImage[imageId] = galleryId;
+      whenAnswered();
+    },
+    (e: unknown) => {
+      // A question that could not be asked is one worth asking again — the reader
+      // gets Stash's own lightbox in the meantime.
+      delete askedAboutImage[imageId];
+      console.error(
+        "[mangaReader] could not ask which gallery this image is in:",
+        e
+      );
+    }
+  );
+}
+
+/**
+ * Asks about the image under the pointer, before the click that opens the lightbox.
+ *
+ * **This is what removes the frame of Stash's own lightbox.** The user's scene page
+ * draws its galleries as bare image grids — the click chain is `img.gallery-image <
+ * div.gallery < .tab-pane`, with no card and no link anywhere above the image — so
+ * there is nothing to read at click time, and the answer has to be in hand before
+ * the lightbox appears. `pointerdown` is early enough: a click follows it by a
+ * gesture, where the query takes a moment.
+ *
+ * Nothing happens on a gallery's own page, where the path already answers.
+ */
+function prefetchImage(event: Event): void {
+  if (galleryIdFromPath(window.location.pathname)) return;
+
+  const target = event.target as HTMLImageElement | null;
+  const imageId = /\/image\/([^/]+)\//.exec(target?.src || "")?.[1];
+  if (imageId) askAboutImage(imageId, () => {});
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   if (!event.isTrusted || !wanted() || !root) return;
 
@@ -2367,6 +2411,9 @@ export function install(): void {
   // it must not be able to change what the page does with the click — a card's cover
   // is a link, and this listener has no business in front of its navigation.
   document.addEventListener("click", noteClickedCard, true);
+  // Before the click, so the answer to "which gallery is this image in" is usually
+  // in hand by the time the lightbox it opens appears. See prefetchImage.
+  document.addEventListener("pointerdown", prefetchImage, true);
 
   // Two changes that move everything the reader draws in and leave the document
   // exactly as it was: a window resized, and the lightbox filling the screen or

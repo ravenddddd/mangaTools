@@ -340,6 +340,14 @@ function makeElement(tagName) {
         if (event.propagationStopped) break;
       }
 
+      // …and the document's, for the same reason as `click` below: a listener that
+      // watches the whole page puts itself there, and this walk stops at the body.
+      const doc = document.listeners[event.type];
+      if (!event.propagationStopped && doc) {
+        if (typeof doc === "function") doc(event);
+        else for (const fn of doc) fn(event);
+      }
+
       return true;
     },
 

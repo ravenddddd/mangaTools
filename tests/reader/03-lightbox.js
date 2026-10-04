@@ -288,4 +288,51 @@ module.exports = async () => {
       dom.window.location.pathname = "/";
     }
   );
+  await runSection(
+    "an image with no card above it is asked about before the click",
+    async () => {
+      // The user's scene page draws its galleries as bare image grids — the click
+      // chain is `img.gallery-image < div.gallery < .tab-pane`, with no card and no
+      // link anywhere above the image — so nothing there can be read at click time.
+      // The question is asked on the way down instead: `pointerdown` is a gesture
+      // before the click, and the answer is kept per image.
+      dom.window.location.pathname = "/scenes/11593";
+      for (const child of dom.body.children.slice()) child.remove();
+
+      const grid = dom.makeElement("div");
+      grid.className = "gallery";
+      const thumb = dom.makeElement("img");
+      thumb.className = "gallery-image";
+      thumb.src = "http://nas.local:9998/image/101/thumbnail?t=1";
+      grid.appendChild(thumb);
+      dom.body.appendChild(grid);
+
+      const asked = () =>
+        state.queries.filter((q) => q.variables?.id !== undefined).length;
+      const before = asked();
+
+      thumb.dispatchEvent({ type: "pointerdown" });
+      await settle();
+      assert.strictEqual(
+        asked(),
+        before + 1,
+        "pressing on an image asks about it"
+      );
+
+      // …and the lightbox that click opens is taken over in the step that sees it,
+      // because the answer is already in hand — which is what removes the frame of
+      // Stash's own. Asked once: the second look is the cache.
+      const box = buildLightbox(1, 5, ["101", "102", "103", "104", "105"]);
+      dom.flush();
+      await settle();
+      assert.strictEqual(asked(), before + 1, "…and is not asked again");
+      assert.ok(
+        container(),
+        "and the lightbox is this plugin's from the first frame"
+      );
+
+      stopReader(box);
+      dom.window.location.pathname = "/";
+    }
+  );
 };
