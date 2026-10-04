@@ -158,13 +158,16 @@ let bulkButton: HTMLButtonElement | null = null;
 let bulk = false;
 
 /**
- * The pages typed into the bulk table, by row.
+ * The pages typed into the bulk table, by the *line of the pasted list* they were typed
+ * against.
  *
  * Module state rather than something the drawing closes over, because the rows are
- * rebuilt whenever the *list* changes (see drawBulk) and the numbers must survive
- * that: a reader who pastes, numbers six rows and then fixes a typo in the paste box
- * should not lose the six numbers. Written by the table's own listeners and never put
- * in the render key, so it cannot rebuild anything by itself.
+ * rebuilt whenever the list changes (see drawBulk) and the numbers must survive that: a
+ * reader who pastes, numbers six rows and then fixes a typo in the paste box should not
+ * lose the six numbers. By line rather than by position, because the rows are also
+ * sorted by page number and deleted, and neither of those says anything about which
+ * line a row came from. Written by the table's own listeners and never put in the render
+ * key, so it cannot rebuild anything by itself.
  */
 let bulkPages: string[] = [];
 
@@ -497,11 +500,19 @@ function closeBulk(): void {
 /**
  * The bulk editor, in place of the rows.
  *
- * **The list is parsed as it is typed, and the table is rebuilt under it** — but the
- * paste box is never touched by that rebuild, so the caret stays where it was, and the
- * numbers already in the table are kept in `bulkPages` and put back. What none of it
- * does is re-render the panel: the key does not carry the list or the numbers, so no
- * pass can rebuild the box under the cursor.
+ * **The two halves are one-way: the box writes the table, and the table writes nothing.**
+ * The list is parsed as the box is typed in and the table is rebuilt under it — with the
+ * numbers already typed put back, so fixing a typo in the list does not cost the work
+ * done below it — and a keystroke in the box *is* the pasted text, so what it says is
+ * what the table says. Nothing in the table reaches back up: deleting a row leaves the
+ * box alone, and a line deleted that way is gone from the table until the box is edited
+ * again, which builds the table from the list afresh. The other way round would mean the
+ * table quietly rewriting somebody's pasted text — normalising its bullets away and
+ * dropping the lines it did not make rows of — which is not something a box somebody
+ * pasted into should do behind them.
+ *
+ * Nothing here re-renders the panel: the key does not carry the list or the numbers, so
+ * no pass can rebuild the box under the cursor.
  *
  * The validity column, and the Create button's count and disabled state, are updated
  * by the inputs' own listeners (`validate`) rather than by the render, which is the
@@ -550,9 +561,15 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
    * markup, and a walk of it to find the same three nodes on every keystroke is work
    * with nothing behind it. (It is also the plainest DOM — this file builds every
    * other node with `createElement`, and a table is no different.)
+   *
+   * `line` is the line of the pasted list the row was made from, and it is the row's
+   * identity: the rows are sorted by page number and can be deleted, so where a row
+   * *is* says nothing about which line it holds — and the numbers typed into them are
+   * kept by line (see bulkPages).
    */
   let built: Array<{
     tr: HTMLTableRowElement;
+    line: number;
     mark: HTMLSpanElement;
     title: HTMLInputElement;
     page: HTMLInputElement;
@@ -595,10 +612,17 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
   const validate = (): void => {
     const all = rows();
     let good = 0;
-    const lined: string[] = [];
+    // **Kept by the line the number was typed into, not by where the row is standing.**
+    // The rows are sorted by page number and any of them can be deleted, so a row's
+    // position says nothing about which line it holds — and a table whose numbers were
+    // stored by position would shuffle them all the moment the sort moved anything. The
+    // copy is of the array that is already there: a line with no row on the table at the
+    // moment keeps the number it had, for the rebuild that brings it back.
+    const lined = bulkPages.slice();
 
     for (let i = 0; i < all.length; i++) {
-      lined[i] = all[i].page;
+      const row = built[i];
+      if (row) lined[row.line] = all[i].page;
       const wrong = wrongWith(all[i], all, i);
       const mark = built[i]?.mark;
       if (mark) {
@@ -684,6 +708,10 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       pageInput.className = "text-input form-control";
       pageInput.value = bulkPages[at] ?? "";
       pageInput.addEventListener("input", validate);
+      // The row settles into its place when the number is done, not while it is being
+      // typed: `change` waits for the field to be left (or for Return), so a number
+      // half-written never moves anything under the cursor.
+      pageInput.addEventListener("change", place);
       pageCell.appendChild(pageInput);
       tr.appendChild(pageCell);
 
@@ -782,22 +810,68 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       // a text glyph would be a different font at a different size.
       drawIcon(gone, "faTrash");
       gone.addEventListener("click", () => {
-        bulkPages.splice(at, 1);
         const goneAt = built.findIndex((shown) => shown.tr === tr);
         if (goneAt >= 0) built.splice(goneAt, 1);
         tr.remove();
-        // The box is what the table is built from, so a row taken out here has to go
-        // out of the list too — otherwise the next keystroke in the box puts it back.
-        area.value = titles.filter((_, i) => i !== at).join("\n");
-        titles.splice(at, 1);
+        // **The box above is not touched**, and the number typed into this row is left
+        // where it is. This is the one-way rule the editor is built on: the list is the
+        // box's, the rows are the table's, and each is edited where it is written. A
+        // deleted line therefore stays deleted only until the box is edited, which
+        // rebuilds the table from the list — the price of not having the table quietly
+        // rewrite somebody's pasted text (and of not having a second copy of the list to
+        // keep in step). The number is kept by *line* rather than by position, so the
+        // rows above and below this one keep theirs either way.
         validate();
       });
       actsCell.appendChild(gone);
       tr.appendChild(actsCell);
 
       table.appendChild(tr);
-      built.push({ tr, mark, title: titleInput, page: pageInput });
+      built.push({ tr, line: at, mark, title: titleInput, page: pageInput });
     });
+
+    // The numbers that came back with the rows put them in order, which is the same
+    // thing leaving a page field does — see place.
+    place();
+  };
+
+  /**
+   * Where a row sits once its number is in: the number itself, and everything without
+   * one at the end, under the list's own order.
+   *
+   * **The rows are moved, not rebuilt**, so the field somebody is typing in keeps its
+   * focus and its caret — `appendChild` on a node already in the table moves it. And
+   * the list's order is what holds between two equal keys, because `sort` is stable:
+   * two rows are refused for sharing a page anyway (see bulkPageTwice), so the ties
+   * that matter here are the blanks, which stay in the order they were pasted.
+   *
+   * A number outside the gallery's pages sorts by its value like any other — it reads
+   * as "not here", which is where a wrong number belongs.
+   */
+  const place = (): void => {
+    if (built.length < 2) return;
+
+    /** The number a row sorts by, or the end of the table when it has none yet */
+    const seat = (row: { page: HTMLInputElement }): number => {
+      const n = Number(row.page.value);
+      return Number.isFinite(n) && n >= 1 ? n : Number.POSITIVE_INFINITY;
+    };
+
+    const order = built.slice().sort((a, b) => seat(a) - seat(b));
+    // **Written only when something moves**: this runs inside a pass over the document
+    // like everything else here, and moving a node is a change the observer answers
+    // with another pass. See the guarded writes in ensureBulkButton.
+    let moved = false;
+    for (let i = 0; i < order.length; i++) {
+      if (order[i] !== built[i]) {
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) return;
+
+    for (const row of order) table.appendChild(row.tr);
+    built = order;
   };
 
   area.addEventListener("input", () => {

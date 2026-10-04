@@ -1275,4 +1275,150 @@ module.exports = async () => {
     tab.close();
     dom.window.location.pathname = "/";
   });
+
+  /**
+   * The two halves of the bulk editor are one-way, and the table is in page order.
+   *
+   * The box writes the table and the table writes nothing back: deleting a row leaves
+   * the pasted text exactly as it was, and the line therefore returns when the box is
+   * edited again, which builds the table from the list afresh. And a number, once typed,
+   * is what places its row — the table reads down the book rather than down the paste.
+   */
+  await runSection(
+    "the box writes the table, and nothing writes back",
+    async () => {
+      mountBridge();
+      dom.window.location.pathname = "/galleries/32";
+      const tab = buildChaptersTab([]);
+      dom.flush();
+      await settle();
+
+      dom.click(dom.body.querySelector("#manga-reader-chapters-bulk"));
+      const area = dom.body.querySelector("#chapter_list");
+      // What a real paste looks like: a bullet on every line, a blank line between two of
+      // them, and a heading nobody wants a chapter of.
+      const pasted = [
+        "収録作品",
+        "",
+        "・図書室ノ彼女　1(RJ242738)",
+        "・図書室ノ彼女　2(RJ260594)",
+        "・おまけ",
+      ].join("\n");
+      area.value = pasted;
+      area.dispatchEvent({ type: "input" });
+
+      const table = dom.body.querySelector(".manga-reader-bulk-table");
+      // The table again, after anything that may have moved a row: the snapshot taken
+      // before a sort is stale, because sorting moves the rows rather than rebuilding them.
+      const rowsNow = () => table.querySelectorAll("tr").slice(1);
+      const titlesNow = () =>
+        rowsNow().map((tr) => tr.querySelectorAll("input")[0].value);
+      const pagesNow = () =>
+        rowsNow().map((tr) => tr.querySelectorAll("input")[1].value);
+
+      assert.strictEqual(
+        titlesNow().length,
+        4,
+        "a blank line in the list makes no row — the parser is what decides what a line is"
+      );
+
+      // ── deleting a row leaves the box alone ────────────────────────────────
+      dom.click(rowsNow()[1].querySelector(".btn-danger"));
+      assert.strictEqual(rowsNow().length, 3, "the row goes out of the table");
+      assert.strictEqual(
+        area.value,
+        pasted,
+        "…and the box is untouched, bullets and blank line and all: it is somebody's " +
+          "pasted text, and none of this is written back into it"
+      );
+
+      // Which is the price of that rule, and the other half of it: the list is what the
+      // table is made of, so the line comes back the moment the box is edited. Nobody has
+      // to keep two copies of it in step, and nothing is remembered behind the box's back.
+      area.dispatchEvent({ type: "input" });
+      assert.strictEqual(
+        rowsNow().length,
+        4,
+        "editing the box builds the table from the list again, deleted row and all"
+      );
+
+      // ── the rows settle by their numbers ───────────────────────────────────
+      // Filled in out of order, and one of them left blank: this gallery's own chapters
+      // begin at pages 1 and 5, so those two are the ones the table refuses.
+      const wanted = ["", "4", "2", "6"];
+      const fields = rowsNow().map((tr) => tr.querySelectorAll("input")[1]);
+      /** The row page 2 belongs to, which the sort is going to move to the top */
+      const moves = rowsNow()[2];
+      wanted.forEach((value, at) => {
+        fields[at].value = value;
+        fields[at].dispatchEvent({ type: "input" });
+      });
+      // Left alone until the field is left, so nothing moves while a number is half-typed;
+      // `change` is what leaving it says.
+      fields[1].dispatchEvent({ type: "change" });
+
+      assert.deepStrictEqual(
+        titlesNow(),
+        [
+          "図書室ノ彼女　2(RJ260594)",
+          "図書室ノ彼女　1(RJ242738)",
+          "おまけ",
+          "収録作品",
+        ],
+        "the rows stand in the order their numbers say, with the line that has no number " +
+          "yet at the end — where a number is not here, the list's own order holds"
+      );
+      assert.deepStrictEqual(
+        pagesNow(),
+        ["2", "4", "6", ""],
+        "and each number travelled with its own row rather than staying where it was typed"
+      );
+      // Moved, not rebuilt: a field that is replaced is a field whose focus and caret are
+      // gone, which is what typing a number into a moving table would cost.
+      assert.ok(
+        rowsNow()[0] === moves,
+        "and the rows are the same nodes, moved rather than drawn again"
+      );
+
+      // The two features together, which is where keeping the numbers by *position* comes
+      // apart: the order the rows stand in is no longer the list's order, so a number
+      // written down the way they are standing lands on another line when the table is
+      // built again. The line that had no number yet is the one filled in last, which is
+      // also the ordinary way a table gets finished — the numbers do not arrive in one go.
+      const last = rowsNow()[3].querySelectorAll("input")[1];
+      last.value = "3";
+      last.dispatchEvent({ type: "input" });
+      last.dispatchEvent({ type: "change" });
+      assert.deepStrictEqual(
+        titlesNow(),
+        [
+          "図書室ノ彼女　2(RJ260594)",
+          "収録作品",
+          "図書室ノ彼女　1(RJ242738)",
+          "おまけ",
+        ],
+        "the row that was waiting at the end takes its place among the rest"
+      );
+
+      area.dispatchEvent({ type: "input" });
+      assert.deepStrictEqual(
+        titlesNow(),
+        [
+          "図書室ノ彼女　2(RJ260594)",
+          "収録作品",
+          "図書室ノ彼女　1(RJ242738)",
+          "おまけ",
+        ],
+        "and rebuilding from the box puts them back in page order, not in list order"
+      );
+      assert.deepStrictEqual(
+        pagesNow(),
+        ["2", "3", "4", "6"],
+        "…which holds only while every number is kept by the line it was typed into"
+      );
+
+      tab.close();
+      dom.window.location.pathname = "/";
+    }
+  );
 };
