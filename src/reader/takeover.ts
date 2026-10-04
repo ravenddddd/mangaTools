@@ -105,7 +105,7 @@ import {
   fetchGallery,
   lightboxIsLoading,
   galleryIdFromPath,
-  galleryIdFromImage,
+  galleryIdOfImage,
   inFullscreen,
   lightboxOrder,
   pressEscape,
@@ -201,6 +201,15 @@ let galleryId: string | null = null;
  */
 let pageGalleryId: string | null = null;
 
+/**
+ * The image whose galleries have been asked for — pending or answered.
+ *
+ * Held so the question is asked once per lightbox: `galleryOf` runs on every DOM
+ * change, and "none of yours" is an answer that must not become a query per
+ * observer callback.
+ */
+let askedImage: string | null = null;
+
 let shownAt = -1;
 
 /**
@@ -279,14 +288,19 @@ let place = -1;
  * happens once per gallery, in `loadGallery`.
  */
 /**
- * The gallery a lightbox belongs to, or null when nothing says.
+ * The gallery a lightbox belongs to, or null when nothing says yet.
  *
- * The path answers it on a gallery's own page. On a scene's Galleries tab it cannot
- * — the path is `/scenes/{id}` — and the answer is in the page's markup instead:
- * the image the lightbox is on is one of the images in that gallery's card (see
- * galleryIdFromImage). The lightbox is opened but not yet showing anything for a
- * moment, and the carousel unreadable for a moment longer; both answer null, which
- * says "not yet" rather than "no" — the observer calls back on the next change.
+ * The path answers it on a gallery's own page. On a scene's, a performer's or a
+ * tag's page it cannot — the path names the entity, and the lightbox opened from
+ * that page's gallery tab belongs to one of *its* galleries — so the plugin asks
+ * the server which galleries the image on screen is in (see galleryIdOfImage).
+ *
+ * Asked rather than read out of the page, and that is a correction: the page's
+ * markup was tried first and does not hold on a real one. See the note there.
+ *
+ * Null is "not yet" as much as "no": the carousel is unreadable for a moment after
+ * a lightbox opens, and the answer to the query arrives later still. The observer
+ * calls back on the next change, and the resolve below calls back itself.
  */
 function galleryOf(lightbox: Element): string | null {
   const fromPath = galleryIdFromPath(window.location.pathname);
@@ -294,7 +308,30 @@ function galleryOf(lightbox: Element): string | null {
   if (pageGalleryId) return pageGalleryId;
 
   const image = carouselImage(lightbox);
-  pageGalleryId = image ? galleryIdFromImage(image.id) : null;
+  if (!image) return null;
+
+  if (askedImage !== image.id) {
+    askedImage = image.id;
+    galleryIdOfImage(image.id).then(
+      (id) => {
+        pageGalleryId = id;
+        // The answer moved what this lightbox is, so everything downstream has to
+        // be looked at again — the chapters, the takeover, the drawing.
+        if (root) step();
+      },
+      (e: unknown) => {
+        // A question that could not be asked is one worth asking again: the reader
+        // gets Stash's own lightbox in the meantime, and the next change tries
+        // once more.
+        askedImage = null;
+        console.error(
+          "[mangaReader] could not ask which gallery this image is in:",
+          e
+        );
+      }
+    );
+  }
+
   return pageGalleryId;
 }
 
@@ -317,6 +354,7 @@ function step(): void {
     root = lightbox;
     galleryId = null;
     pageGalleryId = null;
+    askedImage = null;
     shownAt = -1;
     place = -1;
     reinsers = 0;

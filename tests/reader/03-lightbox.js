@@ -3,10 +3,12 @@
  * world it runs in is harness.js; the sections below are as they were.
  */
 const {
+  NR,
   assert,
   dom,
   runSection,
   settle,
+  state,
   container,
   drawn,
   NS,
@@ -186,6 +188,56 @@ module.exports = async () => {
       );
 
       stopReader(box);
+    }
+  );
+  await runSection(
+    "the gallery behind an image is the server's answer, not the page's",
+    async () => {
+      // A scene's, a performer's or a tag's page opens the lightbox over one of
+      // *its* galleries, and the path names the entity rather than the gallery. The
+      // page's own markup was the first answer tried and does not hold on a real
+      // one — see galleryIdOfImage — so the plugin asks, and only a marked gallery
+      // is its business: an image can be in several.
+      assert.strictEqual(
+        await NR.galleryIdOfImage("101"),
+        "7",
+        "the image's gallery, as the server has it"
+      );
+      assert.strictEqual(
+        await NR.galleryIdOfImage("999"),
+        null,
+        "an image in no gallery of ours names none"
+      );
+
+      // A gallery that holds the image and is not this plugin's is passed over —
+      // and "2" sorts before "7", so an implementation that took the first gallery
+      // the server named would answer with the wrong one.
+      state.galleries["2"] = {
+        manga: false,
+        images: [{ id: "101", width: 1000, height: 1500 }],
+      };
+      assert.strictEqual(
+        await NR.galleryIdOfImage("101"),
+        "7",
+        "a gallery the plugin does not manage is not the answer"
+      );
+      delete state.galleries["2"];
+
+      // The query is Stash's, and it is pinned here: the client in this world
+      // answers whatever it is asked, so only the text says whether the real server
+      // would have taken it. `id: ID`, not `ID!` — the schema takes it nullable.
+      const asked = state.queries.filter((q) => q.variables?.id !== undefined);
+      assert.ok(asked.length >= 3, "the image's galleries were asked for");
+      assert.strictEqual(asked[0].variables.id, "101");
+      assert.strictEqual(asked[0].fetchPolicy, "no-cache");
+      // Pinned as text, because what goes over the wire is a parsed document and
+      // the client here answers whatever it is asked — see the chapters query, and
+      // the memory of a query a real Stash refused while every test passed.
+      assert.ok(
+        NR.IMAGE_GALLERIES_QUERY_TEXT.indexOf("findImage(id: $id)") !== -1 &&
+          NR.IMAGE_GALLERIES_QUERY_TEXT.indexOf("galleries {") !== -1,
+        "…with a query naming the image and its galleries"
+      );
     }
   );
 };

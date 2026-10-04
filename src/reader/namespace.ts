@@ -209,7 +209,8 @@ export interface MangaReaderNamespace {
   readSettings(): MangaReaderSettings;
   parseIndicator(text: string): { current: number; total: number } | null;
   galleryIdFromPath(pathname: string): string | null;
-  galleryIdFromImage(imageId: string): string | null;
+  IMAGE_GALLERIES_QUERY_TEXT: string;
+  galleryIdOfImage(imageId: string): Promise<string | null>;
   /** The order the lightbox is showing its images in, read from the URL */
   lightboxOrder(search: string): MangaReaderOrder;
   /**

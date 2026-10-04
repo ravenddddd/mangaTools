@@ -73,6 +73,25 @@ const client = {
     state.queries.push({ query: String(query), variables, fetchPolicy });
     if (state.failing) return Promise.reject(new Error("no answer from Stash"));
 
+    // Which galleries an image is in, for the lightbox a scene's, performer's or
+    // tag's page opens: the path names the entity there, not the gallery, so the
+    // reader asks. Every gallery holding the image is answered — including ones this
+    // plugin does not manage — so that choosing between them stays the plugin's
+    // question rather than this stub's.
+    if (variables?.id !== undefined) {
+      const galleries = Object.keys(state.galleries)
+        .filter((galleryId) =>
+          (state.galleries[galleryId].images || []).some(
+            (i) => String(i.id) === String(variables.id)
+          )
+        )
+        .map((galleryId) => ({ id: galleryId }));
+
+      return Promise.resolve({
+        data: { findImage: { id: variables.id, galleries } },
+      });
+    }
+
     // The tools half's gallery map, told apart by having no variables at all: it bakes
     // its filter into the document, and every query the reader makes names a gallery.
     // Its answer is what tells this plugin a gallery is manga — see markedInStore —

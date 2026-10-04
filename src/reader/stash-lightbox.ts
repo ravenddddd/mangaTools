@@ -13,6 +13,7 @@
  * reads the lightbox returns null rather than guessing, and the caller turns the
  * mode off. A reader that cannot tell where it is must not draw anything.
  */
+import { NS } from "../languages";
 import { gqlDoc, requirePluginApi } from "../plugin-api";
 import { NR, type MangaReaderOrder } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
@@ -97,35 +98,70 @@ export function galleryIdFromPath(pathname: string): string | null {
 }
 
 /**
- * The gallery whose card holds this image, or null when no card does.
+ * Which gallery an image is in, as the server answers it.
  *
- * The path says which gallery a page is about, and on a gallery's own page that is
- * the whole answer (see galleryIdFromPath). A **scene's** Galleries tab is the case
- * where it cannot: the path is `/scenes/{id}`, and the page draws each of the
- * scene's galleries as a card with that gallery's images under it — so a lightbox
- * opened from one of those is a gallery's lightbox, and nothing in the URL says
- * which.
+ * Asked when the path cannot say which gallery a lightbox belongs to: on a gallery's
+ * own page the URL is the whole answer (see galleryIdFromPath), but a scene's, a
+ * performer's or a tag's page opens the lightbox over *that entity's* galleries, and
+ * nothing in the address bar names one.
  *
- * The way back is the image the lightbox is on: it is one of the images in that
- * card, and the card carries the link. **Stash's own link, not this plugin's
- * `[data-gallery]` anchor** — the anchor is only drawn while the cover mark is
- * switched on (`MangaPopoverMark` returns null without `NS.coverIcon`), and a
- * reader who turned that off still gets their lightbox taken over.
+ * **The answer comes from the server rather than from the page**, and that is a
+ * correction rather than a preference: the page was tried first. A scene's Galleries
+ * tab draws each gallery as a card with its images under it, so the image the
+ * lightbox is on is one of the ones in that card — except when it is not. On a real
+ * page of the user's, the image the lightbox was showing was in no `.gallery-card` at
+ * all (the page's own copies had been swapped for lazy-loading placeholders), and the
+ * plugin declined to take the lightbox over with nothing said. The layout is Stash's
+ * to change; the image's galleries are a fact.
  *
- * Every match is tried rather than the first, because the lightbox's own `<img>` is
- * in the document too and carries the same URL — and it is inside no card at all.
+ * Marked galleries only: an image can be in several, and the one this plugin manages
+ * is the only one whose lightbox it has any business in — which is also the condition
+ * the takeover itself is under.
+ *
+ * Null for an image in no gallery of ours, and for a Stash that cannot answer.
  */
-export function galleryIdFromImage(imageId: string): string | null {
-  const images = document.querySelectorAll(
-    'img[src*="/image/' + imageId + '/"]'
-  );
+export const IMAGE_GALLERIES_QUERY_TEXT = [
+  "query MangaReaderImageGalleries($id: ID) {",
+  "  findImage(id: $id) {",
+  "    id",
+  "    galleries {",
+  "      id",
+  "    }",
+  "  }",
+  "}",
+].join("\n");
 
-  for (let i = 0; i < images.length; i++) {
-    const link = images[i]
-      .closest(".gallery-card")
-      ?.querySelector('a[href^="/galleries/"]');
-    const match = /^\/galleries\/(\d+)/.exec(link?.getAttribute("href") || "");
-    if (match) return match[1];
+let imageGalleriesQuery: unknown = null;
+
+export async function galleryIdOfImage(
+  imageId: string
+): Promise<string | null> {
+  if (!imageGalleriesQuery) {
+    imageGalleriesQuery = gqlDoc(
+      IMAGE_GALLERIES_QUERY_TEXT,
+      "build the image's galleries query"
+    );
+  }
+  const query = imageGalleriesQuery;
+  if (!query) return null;
+
+  const data = (await requirePluginApi()
+    .utils.StashService.getClient()
+    // no-cache, as with the gallery query: this is read once per lightbox and
+    // nothing else in the page wants it in Apollo's cache.
+    .query({
+      query,
+      variables: { id: imageId },
+      fetchPolicy: "no-cache",
+    })
+    .then((res) => res?.data)) as
+    | { findImage?: { galleries?: Array<{ id?: string }> } }
+    | undefined;
+
+  const galleries = data?.findImage?.galleries || [];
+  for (let i = 0; i < galleries.length; i++) {
+    const id = galleries[i]?.id ? String(galleries[i].id) : "";
+    if (id && NS.markedInStore(id) === true) return id;
   }
 
   return null;
@@ -552,7 +588,8 @@ export async function fetchGallery(
 
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
-NR.galleryIdFromImage = galleryIdFromImage;
+NR.IMAGE_GALLERIES_QUERY_TEXT = IMAGE_GALLERIES_QUERY_TEXT;
+NR.galleryIdOfImage = galleryIdOfImage;
 NR.lightboxOrder = lightboxOrder;
 /**
  * Whether the lightbox is busy: fetching the page it is on, or swapping to another.
