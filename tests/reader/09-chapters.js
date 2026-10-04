@@ -798,4 +798,98 @@ module.exports = async () => {
       stopReader(box);
     }
   );
+  await runSection("a pasted list, and many chapters at once", () => {
+    // ── the list ────────────────────────────────────────────────────────────
+    // Decoration off and content kept. Measured against the user's own library:
+    // across the 244 galleries whose description carries a 収録作品 block, the
+    // entries begin with ・, with ■, or with nothing, and the tail of a line is
+    // always content — (RJ242738), (10P), 全3話, (前後編).
+    assert.deepStrictEqual(
+      NR.parseChapterList(
+        [
+          "収録作品",
+          "",
+          "・図書室ノ彼女　1(RJ242738)",
+          "・図書室ノ彼女　2(RJ260594)",
+          "・描き下ろしおまけ漫画(10P)",
+        ].join("\n")
+      ),
+      [
+        "収録作品",
+        "図書室ノ彼女　1(RJ242738)",
+        "図書室ノ彼女　2(RJ260594)",
+        "描き下ろしおまけ漫画(10P)",
+      ],
+      "a leading bullet goes; the code and the page count are content, and stay"
+    );
+    // …including the heading line, which is left as it is: this parser does not
+    // decide what a title is. It arrives in the table like any other line, has no
+    // page, and is deleted there — see the mock.
+    assert.deepStrictEqual(
+      NR.parseChapterList(
+        "■肛福家族 全3話\n■エピローグ（描き下ろし）\nはだかぐらし(全7話)"
+      ),
+      ["肛福家族 全3話", "エピローグ（描き下ろし）", "はだかぐらし(全7話)"],
+      "■ goes, and a title written with nothing in front of it is left alone"
+    );
+    assert.deepStrictEqual(
+      NR.parseChapterList("『題名』\n【「入れ子」】\n[かっこ]\n（まる）"),
+      ["題名", "入れ子", "かっこ", "まる"],
+      "a line wholly wrapped in brackets loses them, layer by layer"
+    );
+    assert.deepStrictEqual(
+      NR.parseChapterList("  \n\n【】\n・ \n題名\n"),
+      ["題名"],
+      "blank lines, and lines left empty by the unwrapping, are dropped"
+    );
+    assert.deepStrictEqual(
+      NR.parseChapterList(""),
+      [],
+      "nothing pasted is nothing parsed"
+    );
+    // The one thing it must never do: read a title out of the line.
+    assert.deepStrictEqual(
+      NR.parseChapterList("(C104新刊)付き 前後編"),
+      ["(C104新刊)付き 前後編"],
+      "nor does it touch brackets that are not wrapping the whole line"
+    );
+
+    // ── many at once ────────────────────────────────────────────────────────
+    const order = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+    const entries = [
+      { pageId: "3", title: "一" },
+      { pageId: "6", title: "二" },
+      { pageId: "9", title: "三" },
+    ];
+    const shape = (chapters) =>
+      (chapters || []).map((c) => c.title + ":" + c.images.join(","));
+
+    assert.deepStrictEqual(
+      shape(NR.addChaptersAt([], order, entries)),
+      ["一:3,4,5", "二:6,7,8", "三:9,10"],
+      "each chapter takes the run from its page to the next one's — and the pages " +
+        "before the first of them stay in nobody's chapter, as they always do"
+    );
+    assert.deepStrictEqual(
+      shape(NR.addChaptersAt([], order, [...entries].reverse())),
+      shape(NR.addChaptersAt([], order, entries)),
+      "the order they were given in does not matter: the set of positions decides"
+    );
+    assert.strictEqual(
+      NR.addChaptersAt([], order, [
+        { pageId: "3", title: "一" },
+        { pageId: "3", title: "又一" },
+      ]),
+      null,
+      "two chapters cannot begin at the same page"
+    );
+    assert.strictEqual(
+      NR.addChaptersAt([], order, [
+        { pageId: "3", title: "一" },
+        { pageId: "99", title: "二" },
+      ]),
+      null,
+      "…and one page this gallery does not have loses the whole list, not half of it"
+    );
+  });
 };

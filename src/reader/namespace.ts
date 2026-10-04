@@ -324,6 +324,14 @@ export interface MangaReaderNamespace {
     pageId: string,
     title: string
   ): MangaReaderChapter[] | null;
+  /** One pasted list into titles, decoration off — see chapters.ts */
+  parseChapterList(text: string): string[];
+  /** Several chapters at once, or none at all — see chapters.ts */
+  addChaptersAt(
+    chapters: MangaReaderChapter[],
+    order: string[],
+    entries: Array<{ pageId: string; title: string }>
+  ): MangaReaderChapter[] | null;
   /** The chapter beginning at this page renamed, or null when none begins there */
   renameChapterAt(
     chapters: MangaReaderChapter[],

@@ -496,6 +496,123 @@ export function removeChapterAt(
  * Which chapter that is comes from the chapter's own list of images — not from where
  * the image sits between its neighbours.
  */
+/**
+ * The characters a pasted list decorates a line with.
+ *
+ * Measured rather than guessed: across the 244 galleries of the user's library whose
+ * description carries a 収録作品 block, the entries begin with `・`, with `■`, or with
+ * nothing at all. The rest of the set is what a hand-made list tends to use.
+ *
+ * **Nothing beyond this is touched.** The line's tail is content — `(RJ242738)`,
+ * `(10P)`, `(前後編)`, `(C104新刊)`, `全3話` — and a parser that decided those were
+ * decoration would be editing the title.
+ */
+const BULLETS = "・･•‣∙-–—*+■□●○◎※>";
+
+/** Pairs a whole line may be wrapped in, dropped as a pair and only as a pair */
+const WRAPPERS: Array<[string, string]> = [
+  ["『", "』"],
+  ["「", "」"],
+  ["【", "】"],
+  ["〈", "〉"],
+  ["《", "》"],
+  ["〔", "〕"],
+  ["＜", "＞"],
+  ["<", ">"],
+  ["[", "]"],
+  ["（", "）"],
+  ["(", ")"],
+  ["｛", "｝"],
+  ["{", "}"],
+];
+
+/** A line with one layer of wrapping taken off, or the line itself */
+function unwrapped(line: string): string {
+  for (let i = 0; i < WRAPPERS.length; i++) {
+    const open = WRAPPERS[i][0];
+    const close = WRAPPERS[i][1];
+    if (
+      line.length >= open.length + close.length &&
+      line.startsWith(open) &&
+      line.endsWith(close)
+    ) {
+      return line.slice(open.length, line.length - close.length).trim();
+    }
+  }
+  return line;
+}
+
+/**
+ * The titles in a pasted list, one per line, with the decoration taken off.
+ *
+ * **Decoration only.** A leading bullet goes, and the brackets a line is wholly
+ * wrapped in go, over and over until neither is there — and that is the whole of it.
+ * Nothing here decides what a title is, drops a line for looking odd, or reads
+ * anything out of what follows the title; the reader's own list is what makes this
+ * workable, and the block it comes from is not something this plugin can parse (see
+ * `doc/mock/bulk-chapters.html` for the measurements).
+ *
+ * Blank lines are dropped, which is what makes a pasted block with air in it behave
+ * like one without. A line left empty by the unwrapping — `【】` — is dropped too:
+ * there is no such title.
+ */
+export function parseChapterList(text: string): string[] {
+  const out: string[] = [];
+
+  String(text ?? "")
+    .split(/\r?\n/)
+    .forEach((raw) => {
+      let line = raw.trim();
+
+      while (line.length > 0 && BULLETS.indexOf(line[0]) !== -1) {
+        line = line.slice(1).trim();
+      }
+
+      let was = "";
+      while (line !== was) {
+        was = line;
+        line = unwrapped(line);
+      }
+
+      if (line) out.push(line);
+    });
+
+  return out;
+}
+
+/**
+ * Several chapters at once — or none at all.
+ *
+ * Cut one at a time through addChapterAt and thrown away whole if any of them cannot
+ * be: pages that are not this gallery's, a position two of them want, a position an
+ * existing chapter already begins at. Half a list of chapters is worse than none,
+ * because the reader cannot tell which half arrived.
+ *
+ * The order the entries are given in does not matter: a chapter's pages are the run
+ * from its start to the *next* boundary, so the result is decided by the set of
+ * positions rather than by the order they were cut in.
+ */
+export function addChaptersAt(
+  chapters: MangaReaderChapter[],
+  order: string[],
+  entries: Array<{ pageId: string; title: string }>
+): MangaReaderChapter[] | null {
+  let next = chapters;
+
+  for (let i = 0; i < entries.length; i++) {
+    const added = addChapterAt(
+      next,
+      order,
+      entries[i].pageId,
+      entries[i].title
+    );
+    if (!added) return null;
+    next = added;
+  }
+
+  return next;
+}
+
 export function chapterAt(
   placed: MangaReaderPlacedChapter[],
   pageId: string
@@ -516,6 +633,8 @@ NR.serializeChapters = serializeChapters;
 NR.chaptersFromStash = chaptersFromStash;
 NR.placeChapters = placeChapters;
 NR.addChapterAt = addChapterAt;
+NR.addChaptersAt = addChaptersAt;
+NR.parseChapterList = parseChapterList;
 NR.renameChapterAt = renameChapterAt;
 NR.moveChapterStart = moveChapterStart;
 NR.removeChapterAt = removeChapterAt;
