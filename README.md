@@ -1422,9 +1422,10 @@ mangaTools/
 │   │   ├── core.ts           The state every surface reads: the store, the fetch behind it, the settings
 │   │   ├── mark.ts           Whether a gallery is manga now, and the one function that writes a field
 │   │   ├── edit-page.tsx     The manga block on Stash's gallery edit form, and its group memory
+│   │   ├── details.tsx       The manga block in the details tab, and the boundary around it
 │   │   ├── bulk.tsx          The bulk edit dialog's rows, their pending state and the mutation hookup
 │   │   ├── patches.ts        Registering a patch, and the two once-only logs
-│   │   ├── index.tsx         Badge, panels, dropdown, bulk row, toolbar switch, patches
+│   │   ├── index.tsx         The badge, the popover, the toolbar switch, and every patch
 │   │   ├── settings-page.tsx   The plugin's own settings page, and the multiselect it draws
 │   │   ├── fields-ui.tsx     The flag, the badge chip, the select resolver, the option formatter
 │   │   ├── icons.tsx         The mark's icon and the two steaks
@@ -1471,7 +1472,7 @@ kept apart rather than concatenated.
 time and each inside its own guard.** What that guard cannot catch is anything
 evaluated in a module *body* — a class derived from `React.Component` at the top
 of a file, a startup call made where it stands — so neither half resolves Stash's
-API there. That is the whole reason `guardedBlock` in `tools/index.tsx` is a
+API there. That is the whole reason `guardedBlock` in `tools/details.tsx` is a
 factory rather than a class.
 
 `languages.ts` and `fields.ts` still publish themselves at `window.MangaTools` as
