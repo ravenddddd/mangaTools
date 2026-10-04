@@ -58,7 +58,7 @@ import "./fields";
 import { CensorshipIcon, formatCensorshipOption } from "./censorship";
 import { NS } from "../languages";
 import { t } from "../i18n";
-import { gqlDoc, requirePluginApi } from "../plugin-api";
+import { requirePluginApi } from "../plugin-api";
 import { DialogLanguageFilter } from "./dialog-filter";
 import { fieldLabel, registerLanguageCriterionOption } from "./filter-model";
 import {
@@ -79,7 +79,7 @@ import type {
 } from "../plugin-api";
 import {
   CENSORSHIP_FIELD_NAME,
-  CHAPTER_FIELD_NAME,
+  knownTranslationGroups,
   FIELD_NAME,
   MANGA_FIELD_NAME,
   ORIGINAL_FIELD_NAME,
@@ -97,9 +97,9 @@ import {
   refreshForSuggestions,
   start,
   started,
+  storedIsManga,
   stashClient,
   store,
-  subscribe,
   useGlobalVersion,
 } from "./core";
 import type { CustomFieldsMap } from "./core";
@@ -121,6 +121,13 @@ import {
   fieldHosts,
   BULK_ANCHOR,
 } from "./hosts";
+import {
+  editFormFor,
+  editFormIsDirty,
+  isMarkedNow,
+  setEditForm,
+  writeQuietly,
+} from "./mark";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
 // load time. Binding the result once gives every reference below a
@@ -522,67 +529,6 @@ function ensureToolbarHost(): HTMLElement | null {
 }
 
 /**
- * The translation groups already in use, in the order the edit field offers them.
- *
- * Out of this plugin's own store, which is the same set of galleries everything
- * else here is about: every marked gallery carries its whole custom_fields map,
- * so the values in use are in memory already and no query is needed for them.
- * Empty until the first answer, which is right — before that there is nothing to
- * suggest, and the field is a plain text box regardless.
- *
- * Recomputed on every call rather than cached. The field that asks writes on every
- * keystroke, so this does run once per character — but it walks the marked
- * galleries and sorts the *distinct* names, which is tens of entries, and a walk
- * of a few thousand maps is not worth an invariant that can go stale: the store is
- * both replaced by a refresh and written into in place, and a cache keyed on
- * either one would be quietly wrong about the other.
- *
- * Case is left alone. Two groups whose names differ only in case are two names as
- * far as this is concerned, and folding them here would mean deciding which
- * spelling to offer somebody who typed the other one.
- */
-/**
- * The two things the sidebar's group filter needs from the store, published here
- * rather than reached for by name.
- *
- * The section renders in Stash's sidebar, one module away from the store, and the
- * store is module state on purpose: a second reader of it would be a second answer
- * to "which groups does this library hold", which is the class of bug this file has
- * paid for more than once (see fields.ts on why one list is asked by everything).
- * So the functions are published, not the map — and `usualLanguages` is the same
- * walk of the same store the edit page's menu and the bulk row already use.
- */
-NS.translationGroups = (): string[] => knownTranslationGroups();
-
-function knownTranslationGroups(): string[] {
-  if (!store) return [];
-
-  const seen: { [name: string]: true } = {};
-  store.forEach((fields) => {
-    const name = NS.translationGroupOf(fields);
-    if (name) seen[name] = true;
-  });
-
-  return Object.keys(seen).sort();
-}
-
-/**
- * Whether the store — a filled one — holds this gallery.
- *
- * Since the query asks for the mark, being in the map and being manga are the same
- * question, which is what makes the store a gate rather than a cache. This is the
- * one spelling of that question: isMarkedNow asks it here, so the cover badge, the
- * card's popover mark, the toolbar switch and the panels cannot come to different
- * conclusions about one gallery. They did once — membership here, and the map's
- * own value in the switch — and a gallery whose mark had been hand-set to an empty
- * string was manga to one and not to the other.
- */
-function storedIsManga(galleryId: string): boolean {
-  // `?? false` is the null store: something it cannot answer is not a yes.
-  return store?.has(String(galleryId)) ?? false;
-}
-
-/**
  * Asks before a gallery stops being manga.
  *
  * Because unmarking is not a flag coming off: the plugin's fields go with it — a
@@ -659,28 +605,6 @@ function ConfirmUnmark(props: {
 }
 
 /**
- * The edit form's custom-fields map and its setter, while the edit tab is open.
- *
- * Published by MangaFieldBlock, which is rendered inside that form and so has
- * both. Marking from the toolbar writes through this as well as to the server
- * (see `mark`), so the form's own copy of the map carries the mark and a later
- * Save — which sends the whole map back (`custom_fields: { full: … }`) — cannot
- * drop it. Cleared when the block unmounts: a setter left behind would write into
- * a form that is no longer there.
- */
-let editForm: {
-  /** The gallery the form is for — the form on screen is always the route's */
-  galleryId: string;
-  values: CustomFieldsMap;
-  onChange: (values: CustomFieldsMap) => void;
-} | null = null;
-
-/** The published form, if it is the one for this gallery */
-function editFormFor(galleryId: string): typeof editForm {
-  return editForm && editForm.galleryId === galleryId ? editForm : null;
-}
-
-/**
  * The translation group the original-text mark took away, so that a mis-click can
  * be undone by clicking the same button again.
  *
@@ -696,205 +620,6 @@ function editFormFor(galleryId: string): typeof editForm {
  * reload, which is the price of not keeping a second copy of the name in the data.
  */
 let originalGroupTaken: { galleryId: string; group: string } | null = null;
-
-/**
- * Whether this gallery is manga, as far as anything on screen is concerned.
- *
- * Once the store has an answer it *is* the answer, and a gallery missing from it
- * is one the server does not consider manga (see storedIsManga, which is where
- * the question is actually settled). That is not the same thing as the store
- * having nothing to say yet, which is the only case the values Stash passed in are
- * for — and telling the two apart is what the store being null is for. Reading a
- * missing gallery as "no answer" was wrong in a way that showed: the values come
- * out of Apollo's cache, which both of this plugin's writes leave alone on
- * purpose, so on a gallery the cache still held as marked, taking the mark off
- * left the switch saying it was still on.
- *
- * The store is otherwise the one to trust because the plugin's own writes keep it
- * in step (see `mark` and `write`) *and* it is refreshed from the server.
- * Everything that asks the question — the toolbar switch, the details panel, the
- * edit block — asks it here.
- *
- * The edit form is not consulted, which is worth spelling out: the form holds a
- * mark only when this plugin put one there, and it does that together with the
- * write, so the two agree by construction. A form the reader edited cannot hold
- * one at all — the mark has no control in that form.
- */
-function isMarkedNow(
-  galleryId: string | null | undefined,
-  values?: CustomFieldsMap
-): boolean {
-  // No id means this is not one gallery's page — the list's bulk dialog is the
-  // case that matters — so there is nothing to look up and the values are all
-  // there is to go on. Before the first answer, likewise.
-  if (store === null || !galleryId) return NS.isManga(values);
-  return storedIsManga(galleryId);
-}
-
-/**
- * Whether this plugin's store holds a gallery — and, before it has answered, that it
- * does not know.
- *
- * The reader half's gate, and the reason asking costs nothing: the store is filled
- * from a query that filters on the manga mark *itself* (`refresh` below), so a
- * gallery in it is a gallery marked manga and a gallery without the mark is in
- * nobody's answer. Null is the third answer — before the first fetch — and it means
- * "not yet" rather than "no", which is what keeps a marked gallery from being drawn
- * on in the second before the answer arrives.
- */
-NS.markedInStore = (galleryId: string | null | undefined): boolean | null =>
-  store === null || !galleryId ? null : storedIsManga(galleryId);
-
-/** Runs `fn` whenever the store is refreshed, and returns the way to stop. */
-NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
-
-/**
- * The reading half's settings, as the JSON string they are stored as.
- *
- * A string rather than an object, and deliberately: what this half does with them is
- * carry them to and from the plugin's configuration, and the reading half is the one
- * that knows what is in them — including how to read the shapes they used to be
- * written in. Parsing them here would be a second opinion about a format this half has
- * no business having.
- */
-NS.readerSettingsRaw = null;
-
-/**
- * Whether Stash's edit form has changes that have not been saved.
- *
- * Read out of the DOM because that is the only place it shows. The panel's own
- * Save button is disabled while there is nothing to save — GalleryEditPanel
- * renders it with `disabled={!formik.dirty || …}` — and the panel exists only
- * while its tab is open, so no button means nothing to lose.
- */
-function editFormIsDirty(): boolean {
-  const save = document.querySelector(".edit-buttons-container .edit-button");
-  return !!save && (save as HTMLButtonElement).disabled !== true;
-}
-
-/**
- * The mutation that marks a gallery.
- *
- * Its selection set is `id` and nothing else, which is the whole point: Apollo
- * writes what the mutation returns into the cache, so asking for no gallery
- * fields leaves the cached gallery exactly as it was — same object, same
- * custom_fields — and an edit form built from it does not reinitialise (see
- * refresh() for the same argument about the store's query).
- *
- * Stash's own `useGalleryUpdate` cannot be used here: its document asks for the
- * gallery, which is what we must not have.
- */
-const MARK_QUERY_TEXT = [
-  "mutation MangaToolsSetFields($input: GalleryUpdateInput!) {",
-  "  galleryUpdate(input: $input) {",
-  "    id",
-  "  }",
-  "}",
-].join("\n");
-
-/**
- * The same, as a document — through `gql`, the way every other operation here is
- * built.
- *
- * Handing Apollo the raw text does not work: what `client.mutate` expects is a
- * `DocumentNode`, and a string that Apollo declines to parse comes back as a
- * rejected promise with nothing useful in it. The tests cannot see the
- * difference (their `gql` is a stub that answers with what it was given), which
- * is how this got as far as a release: it was written as a template string and
- * every assertion still passed.
- */
-let markUpdate: unknown = null;
-function getMarkUpdate(): unknown {
-  if (markUpdate) return markUpdate;
-
-  markUpdate = gqlDoc(MARK_QUERY_TEXT, "build the mutation");
-  return markUpdate;
-}
-
-/**
- * Writes fields, and leaves the page's cached gallery alone. See MARK_QUERY_TEXT.
- *
- * Rejects when there is nothing to write *with* — no document, or no client —
- * rather than resolving as though it had been sent. Both of the callers' paths
- * refresh, so the page comes out the same either way; what a rejection buys is
- * the line the caller logs, and without it this is the one failure of the pair
- * that leaves no trace at all: no request on the wire, nothing in the console,
- * and a click that looks exactly like a successful one. Apollo rejects for its
- * own reasons, so the callers already have that path — this only makes the two
- * failures this function can have take it too.
- */
-function writeQuietly(
-  galleryId: string,
-  fields: Record<string, unknown>
-): Promise<unknown> {
-  const mutation = getMarkUpdate();
-  if (!mutation) {
-    return Promise.reject(
-      new Error("[mangaTools] no mutation document, the write was not sent")
-    );
-  }
-
-  const client = stashClient();
-  if (!client) {
-    return Promise.reject(
-      new Error("[mangaTools] no Apollo client, the write was not sent")
-    );
-  }
-
-  return client.mutate({
-    mutation,
-    variables: { input: { id: galleryId, custom_fields: fields } },
-  });
-}
-
-/**
- * Writes a gallery's chapters into this plugin's own field.
- *
- * The value arrives **already serialised**, and that is the point: the shape is the
- * reader half's — it owns the format, its version, and the tolerant parsing of it —
- * and this half's job is to put a string where the reader says. It is also what
- * keeps the dependency between the halves pointing one way; nothing here has to
- * know what a chapter is.
- *
- * The same pairing the mark uses: the store and Stash's own form are told first, so
- * what is on screen follows the click rather than a round trip that may yet fail,
- * and the refresh either confirms it or puts it right. The form copy matters *more*
- * here than it does for the mark — this key is hidden from Stash's own custom-field
- * editor (it is one of ours, see ownField), so a Save that did not know about it is
- * the one way its value could vanish with nothing on screen to notice.
- *
- * Rejects when nothing could be sent, and passes that on: the batch importer counts
- * a gallery it could not write and carries on with the rest.
- */
-NS.writeChapters = (galleryId: string, json: string): Promise<void> => {
-  // Only when there is an entry to update: a gallery the store has never heard of
-  // is one this half is not managing, and inventing an entry for it would be the
-  // store saying it is marked.
-  const current = store?.get(galleryId);
-  if (current) {
-    store?.set(galleryId, NS.setField(current, CHAPTER_FIELD_NAME, json));
-  }
-
-  const form = editFormFor(galleryId);
-  if (form) {
-    form.onChange(NS.setField(form.values, CHAPTER_FIELD_NAME, json));
-  }
-
-  emit();
-
-  return writeQuietly(galleryId, {
-    partial: { [CHAPTER_FIELD_NAME]: json },
-  }).then(
-    () => {
-      refreshAfterWrite();
-    },
-    (e: unknown) => {
-      console.error("[mangaTools] could not write this gallery's chapters:", e);
-      refreshAfterWrite();
-      throw e;
-    }
-  );
-};
 
 function GalleryToolbar(props: { galleryId: string; values: CustomFieldsMap }) {
   useGlobalVersion();
@@ -3197,14 +2922,14 @@ registerPatch("instead", "CustomFieldsInput", (...args: unknown[]) => {
   React.useEffect(() => {
     const galleryId = currentGalleryId();
     if (props.onChange && galleryId) {
-      editForm = {
+      setEditForm({
         galleryId,
         values: props.values ?? {},
         onChange: props.onChange,
-      };
+      });
     }
     return () => {
-      editForm = null;
+      setEditForm(null);
     };
   });
 

@@ -706,6 +706,88 @@ export function refreshForSuggestions(): void {
   refreshAfterWrite();
 }
 
+// ─────────────── What the store says about a gallery ───────────────
+//
+// Two readers over the gallery map, and the bridges the reading half is handed for
+// it. Nothing here fetches: the store is refresh()'s, above.
+
+/**
+ * The library's translation groups, published rather than reachable by name.
+ *
+ * The sidebar's group filter renders in Stash's sidebar, one module away from the
+ * store, and the store is module state on purpose: a second reader of it would be a
+ * second answer to "which groups does this library hold", which is the class of bug
+ * this file has paid for more than once (see fields.ts on why one list is asked by
+ * everything). So the function is published, not the map. The other thing that
+ * filter needs, `NS.usualLanguagesOf`, is published the same way from fields.ts.
+ */
+NS.translationGroups = (): string[] => knownTranslationGroups();
+
+/**
+ * The translation groups already in use, in the order the edit field offers them.
+ *
+ * Out of this plugin's own store, which is the same set of galleries everything
+ * else here is about: every marked gallery carries its whole custom_fields map,
+ * so the values in use are in memory already and no query is needed for them.
+ * Empty until the first answer, which is right — before that there is nothing to
+ * suggest, and the field is a plain text box regardless.
+ *
+ * Recomputed on every call rather than cached. The field that asks writes on every
+ * keystroke, so this does run once per character — but it walks the marked
+ * galleries and sorts the *distinct* names, which is tens of entries, and a walk
+ * of a few thousand maps is not worth an invariant that can go stale: the store is
+ * both replaced by a refresh and written into in place, and a cache keyed on
+ * either one would be quietly wrong about the other.
+ *
+ * Case is left alone. Two groups whose names differ only in case are two names as
+ * far as this is concerned, and folding them here would mean deciding which
+ * spelling to offer somebody who typed the other one.
+ */
+export function knownTranslationGroups(): string[] {
+  if (!store) return [];
+
+  const seen: { [name: string]: true } = {};
+  store.forEach((fields) => {
+    const name = NS.translationGroupOf(fields);
+    if (name) seen[name] = true;
+  });
+
+  return Object.keys(seen).sort();
+}
+
+/**
+ * Whether the store — a filled one — holds this gallery.
+ *
+ * Since the query asks for the mark, being in the map and being manga are the same
+ * question, which is what makes the store a gate rather than a cache. This is the
+ * one spelling of that question: isMarkedNow asks it here, so the cover badge, the
+ * card's popover mark, the toolbar switch and the panels cannot come to different
+ * conclusions about one gallery. They did once — membership here, and the map's
+ * own value in the switch — and a gallery whose mark had been hand-set to an empty
+ * string was manga to one and not to the other.
+ */
+export function storedIsManga(galleryId: string): boolean {
+  // `?? false` is the null store: something it cannot answer is not a yes.
+  return store?.has(String(galleryId)) ?? false;
+}
+
+/**
+ * Whether this plugin's store holds a gallery — and, before it has answered, that it
+ * does not know.
+ *
+ * The reader half's gate, and the reason asking costs nothing: the store is filled
+ * from a query that filters on the manga mark *itself* (`refresh` below), so a
+ * gallery in it is a gallery marked manga and a gallery without the mark is in
+ * nobody's answer. Null is the third answer — before the first fetch — and it means
+ * "not yet" rather than "no", which is what keeps a marked gallery from being drawn
+ * on in the second before the answer arrives.
+ */
+NS.markedInStore = (galleryId: string | null | undefined): boolean | null =>
+  store === null || !galleryId ? null : storedIsManga(galleryId);
+
+/** Runs `fn` whenever the store is refreshed, and returns the way to stop. */
+NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
+
 // ──────────────────────── Writing the settings ────────────────────────
 //
 // The read side is refreshSettings, above. This is the write side: one map built
@@ -796,6 +878,17 @@ NS.writeReaderSettings = (raw: string): void => {
 
 /** Runs `fn` when the settings are re-read, and returns the way to stop. */
 NS.watchReaderSettings = (fn: () => void): (() => void) => subscribe(fn);
+
+/**
+ * The reading half's settings, as the JSON string they are stored as.
+ *
+ * A string rather than an object, and deliberately: what this half does with them is
+ * carry them to and from the plugin's configuration, and the reading half is the one
+ * that knows what is in them — including how to read the shapes they used to be
+ * written in. Parsing them here would be a second opinion about a format this half has
+ * no business having.
+ */
+NS.readerSettingsRaw = null;
 
 // ───────────────── The rest of the settings' defaults ─────────────────
 //
