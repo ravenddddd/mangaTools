@@ -30,6 +30,44 @@ function detach(parent, child) {
  */
 const fullscreen = { element: null };
 
+/**
+ * One selector part — a tag, a class, an id, or one of those with **one attribute
+ * test** — as a predicate over a node.
+ *
+ * The attribute forms are here because the plugin asks for them: the gallery behind
+ * a scene page's lightbox is found by `img[src*="/image/{id}/"]` and named by the
+ * card's own `a[href^="/galleries/"]`. A stub that answered those with nothing
+ * would make that whole path untestable, and a green suite that cannot see a
+ * feature is worse than a red one — it reads as proof.
+ *
+ * Anything else is still refused rather than guessed at: a stub that quietly
+ * matched the wrong thing would hide a broken selector instead of failing on it.
+ */
+function matchesPart(node, sel) {
+  const attr =
+    /^([a-zA-Z]*)(?:([.#][\w-]+))?\[([\w-]+)(?:([*^])=([^\]]*))?\]$/.exec(sel);
+  if (attr) {
+    const tag = attr[1];
+    const mod = attr[2];
+    const name = attr[3];
+    const op = attr[4];
+    const raw = attr[5] || "";
+    if (tag && node.tagName !== tag.toUpperCase()) return false;
+    if (mod && !matchesPart(node, mod)) return false;
+
+    const value = node.getAttribute ? node.getAttribute(name) : null;
+    if (value === null) return false;
+    if (!op) return true;
+
+    const want = raw.replace(/^["']|["']$/g, "");
+    return op === "^" ? value.indexOf(want) === 0 : value.indexOf(want) !== -1;
+  }
+
+  if (sel.startsWith("#")) return node.id === sel.slice(1);
+  if (sel.startsWith(".")) return node.classList.contains(sel.slice(1));
+  return node.tagName === sel.toUpperCase();
+}
+
 /** An element, with the handful of properties the plugin reads and writes. */
 function makeElement(tagName) {
   const el = {
@@ -157,9 +195,37 @@ function makeElement(tagName) {
     },
 
     /**
-     * Only the selector shapes the plugin uses: `.cls`, `.outer .inner`, `#id`, and
-     * a bare tag name — each matching at any depth below the element it is asked of,
-     * the way the real one does.
+     * The nearest ancestor matching, **the element itself included** — as in the
+     * DOM. Asked for as `.gallery-card`: the card an image sits in is how a scene
+     * page's lightbox is traced back to its gallery.
+     */
+    closest(selector) {
+      const parts = selector.trim().split(/\s+/);
+
+      for (let at = el; at; at = at.parentNode) {
+        if (!matchesPart(at, parts[parts.length - 1])) continue;
+
+        let up = at.parentNode;
+        let ok = true;
+        for (let want = parts.length - 2; want >= 0; want--) {
+          while (up && !matchesPart(up, parts[want])) up = up.parentNode;
+          if (!up) {
+            ok = false;
+            break;
+          }
+          up = up.parentNode;
+        }
+
+        if (ok) return at;
+      }
+
+      return null;
+    },
+
+    /**
+     * Only the selector shapes the plugin uses: `.cls`, `.outer .inner`, `#id`, a
+     * bare tag name, and one attribute test (`img[src*="/image/7/"]`) — each matching
+     * at any depth below the element it is asked of, the way the real one does.
      *
      * Anything else returns null rather than guessing: a stub that quietly matched
      * the wrong thing would hide a broken selector instead of failing on it.
@@ -175,22 +241,16 @@ function makeElement(tagName) {
      * to what is below `el`.
      */
     querySelector(selector) {
-      const match = (node, sel) => {
-        if (sel.startsWith("#")) return node.id === sel.slice(1);
-        if (sel.startsWith(".")) return node.classList.contains(sel.slice(1));
-        return node.tagName === sel.toUpperCase();
-      };
-
       const parts = selector.trim().split(/\s+/);
 
       /** Whether this node is the one the selector ends at: the last part is its
        * own, and every part before that has an ancestor of it above */
       const ends = (node) => {
-        if (!match(node, parts[parts.length - 1])) return false;
+        if (!matchesPart(node, parts[parts.length - 1])) return false;
 
         let at = node.parentNode;
         for (let want = parts.length - 2; want >= 0; want--) {
-          while (at && !match(at, parts[want])) at = at.parentNode;
+          while (at && !matchesPart(at, parts[want])) at = at.parentNode;
           if (!at) return false;
           at = at.parentNode;
         }
@@ -224,16 +284,10 @@ function makeElement(tagName) {
       const sel = selector.trim();
       if (/\s/.test(sel) || sel.split(".").length > 2) return [];
 
-      const match = (node) => {
-        if (sel.startsWith("#")) return node.id === sel.slice(1);
-        if (sel.startsWith(".")) return node.classList.contains(sel.slice(1));
-        return node.tagName === sel.toUpperCase();
-      };
-
       const found = [];
       const walk = (node) => {
         for (const child of node.children) {
-          if (match(child)) found.push(child);
+          if (matchesPart(child, sel)) found.push(child);
           walk(child);
         }
       };

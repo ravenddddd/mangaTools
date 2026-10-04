@@ -230,6 +230,55 @@ module.exports = async () => {
     );
   });
 
+  await runSection(
+    "the gallery is read out of the page when the path cannot",
+    () => {
+      // A scene's Galleries tab draws each of the scene's galleries as a card with
+      // that gallery's images under it, so the lightbox opened from one of those is a
+      // gallery's lightbox — and `/scenes/{id}` says nothing about which. The way
+      // back is the image: it is one of the ones in that card.
+      //
+      // The lightbox's own <img> carries the same URL and is in no card, so it is put
+      // in first: an implementation that answered with the *first* match would come
+      // back empty here and pass a test written the other way round.
+      const stray = document.createElement("img");
+      stray.setAttribute("src", "http://nas.local:9998/image/366517/image?t=1");
+      document.body.appendChild(stray);
+
+      const card = document.createElement("div");
+      card.className = "gallery-card";
+      const header = document.createElement("a");
+      header.setAttribute("href", "/galleries/3813");
+      card.appendChild(header);
+      const image = document.createElement("img");
+      image.setAttribute(
+        "src",
+        "http://nas.local:9998/image/366517/thumbnail?t=1"
+      );
+      card.appendChild(image);
+      document.body.appendChild(card);
+
+      assert.strictEqual(
+        NR.galleryIdFromImage("366517"),
+        "3813",
+        "the card the image is in names the gallery"
+      );
+      assert.strictEqual(
+        NR.galleryIdFromImage("999"),
+        null,
+        "an image that is in no card names no gallery"
+      );
+
+      // A card whose link is not a gallery's — a performer's, say — names none either.
+      header.setAttribute("href", "/performers/565");
+      assert.strictEqual(NR.galleryIdFromImage("366517"), null);
+      header.setAttribute("href", "/galleries/3813");
+
+      stray.remove();
+      card.remove();
+    }
+  );
+
   await runSection("what counts as a spread", () => {
     assert.strictEqual(NR.isWideSpreadPage(page("tall")), false);
     assert.strictEqual(NR.isWideSpreadPage(wide("w")), true);

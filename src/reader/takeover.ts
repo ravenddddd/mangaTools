@@ -105,6 +105,7 @@ import {
   fetchGallery,
   lightboxIsLoading,
   galleryIdFromPath,
+  galleryIdFromImage,
   inFullscreen,
   lightboxOrder,
   pressEscape,
@@ -190,6 +191,16 @@ const loaded: Map<string, MangaReaderGallery> = new Map();
 
 /** The gallery being read, and the screen being drawn from it */
 let galleryId: string | null = null;
+
+/**
+ * The gallery a lightbox belongs to, when the path could not say — see galleryOf.
+ *
+ * Held because the answer cannot change while one lightbox is open, and because
+ * finding it walks the page: `wanted()` runs on every key press and `step()` on
+ * every DOM change, and neither should pay for that twice.
+ */
+let pageGalleryId: string | null = null;
+
 let shownAt = -1;
 
 /**
@@ -267,6 +278,26 @@ let place = -1;
  * case, since this runs on every DOM change in the page. Everything expensive
  * happens once per gallery, in `loadGallery`.
  */
+/**
+ * The gallery a lightbox belongs to, or null when nothing says.
+ *
+ * The path answers it on a gallery's own page. On a scene's Galleries tab it cannot
+ * — the path is `/scenes/{id}` — and the answer is in the page's markup instead:
+ * the image the lightbox is on is one of the images in that gallery's card (see
+ * galleryIdFromImage). The lightbox is opened but not yet showing anything for a
+ * moment, and the carousel unreadable for a moment longer; both answer null, which
+ * says "not yet" rather than "no" — the observer calls back on the next change.
+ */
+function galleryOf(lightbox: Element): string | null {
+  const fromPath = galleryIdFromPath(window.location.pathname);
+  if (fromPath) return fromPath;
+  if (pageGalleryId) return pageGalleryId;
+
+  const image = carouselImage(lightbox);
+  pageGalleryId = image ? galleryIdFromImage(image.id) : null;
+  return pageGalleryId;
+}
+
 function step(): void {
   // The gallery page's own Chapters tab, which is a different surface with the same
   // chapters — and is on screen exactly when there is *no* lightbox, so it is
@@ -285,6 +316,7 @@ function step(): void {
     closeLightbox();
     root = lightbox;
     galleryId = null;
+    pageGalleryId = null;
     shownAt = -1;
     place = -1;
     reinsers = 0;
@@ -292,7 +324,7 @@ function step(): void {
     handedFor = null;
   }
 
-  const wantedId = galleryIdFromPath(window.location.pathname);
+  const wantedId = galleryOf(lightbox);
   if (!wantedId) return;
 
   // **Manga first, and nothing of this plugin's anywhere else.** The mark is what
@@ -374,7 +406,7 @@ function wanted(): boolean {
   // the fields, the panels and the badges all stay exactly as they were.
   if (!NS.readerTakeover) return false;
 
-  const id = galleryIdFromPath(window.location.pathname);
+  const id = root ? galleryOf(root) : null;
   return root !== null && id !== null && NS.markedInStore(id) === true;
 }
 

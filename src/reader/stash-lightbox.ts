@@ -97,6 +97,41 @@ export function galleryIdFromPath(pathname: string): string | null {
 }
 
 /**
+ * The gallery whose card holds this image, or null when no card does.
+ *
+ * The path says which gallery a page is about, and on a gallery's own page that is
+ * the whole answer (see galleryIdFromPath). A **scene's** Galleries tab is the case
+ * where it cannot: the path is `/scenes/{id}`, and the page draws each of the
+ * scene's galleries as a card with that gallery's images under it — so a lightbox
+ * opened from one of those is a gallery's lightbox, and nothing in the URL says
+ * which.
+ *
+ * The way back is the image the lightbox is on: it is one of the images in that
+ * card, and the card carries the link. **Stash's own link, not this plugin's
+ * `[data-gallery]` anchor** — the anchor is only drawn while the cover mark is
+ * switched on (`MangaPopoverMark` returns null without `NS.coverIcon`), and a
+ * reader who turned that off still gets their lightbox taken over.
+ *
+ * Every match is tried rather than the first, because the lightbox's own `<img>` is
+ * in the document too and carries the same URL — and it is inside no card at all.
+ */
+export function galleryIdFromImage(imageId: string): string | null {
+  const images = document.querySelectorAll(
+    'img[src*="/image/' + imageId + '/"]'
+  );
+
+  for (let i = 0; i < images.length; i++) {
+    const link = images[i]
+      .closest(".gallery-card")
+      ?.querySelector('a[href^="/galleries/"]');
+    const match = /^\/galleries\/(\d+)/.exec(link?.getAttribute("href") || "");
+    if (match) return match[1];
+  }
+
+  return null;
+}
+
+/**
  * Presses one of the lightbox's own arrow keys, once.
  *
  * **One press, never a burst.** Stash's own key handler drops a press that arrives
@@ -517,6 +552,7 @@ export async function fetchGallery(
 
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
+NR.galleryIdFromImage = galleryIdFromImage;
 NR.lightboxOrder = lightboxOrder;
 /**
  * Whether the lightbox is busy: fetching the page it is on, or swapping to another.
