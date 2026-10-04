@@ -529,18 +529,6 @@ function ensureToolbarHost(): HTMLElement | null {
 }
 
 /**
- * Asks before a gallery stops being manga.
- *
- * Because unmarking is not a flag coming off: the plugin's fields go with it — a
- * gallery the plugin does not manage should not be left carrying half its data
- * (see the note on the toggle). That is worth a question, and Stash's own modal is
- * the way to ask it — the plugin has Bootstrap already.
- *
- * A modal rather than a second click on the switch: the switch has two states and
- * a two-step click would need a third, which is exactly the kind of state naming
- * this plugin went to some trouble to avoid.
- */
-/**
  * A question, in a modal.
  *
  * The shell both of this plugin's confirmations use — taking the manga mark off,
@@ -576,6 +564,18 @@ function ConfirmDialog(props: {
   );
 }
 
+/**
+ * Asks before a gallery stops being manga.
+ *
+ * Because unmarking is not a flag coming off: the plugin's fields go with it — a
+ * gallery the plugin does not manage should not be left carrying half its data
+ * (see the note on the toggle). That is worth a question, and Stash's own modal is
+ * the way to ask it — the plugin has Bootstrap already.
+ *
+ * A modal rather than a second click on the switch: the switch has two states and
+ * a two-step click would need a third, which is exactly the kind of state naming
+ * this plugin went to some trouble to avoid.
+ */
 function ConfirmUnmark(props: {
   onCancel: () => void;
   onConfirm: () => void;
