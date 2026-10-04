@@ -193,7 +193,7 @@ export function syncChaptersTab(): void {
   if (NS.markedInStore(id) !== true) return;
 
   const panel = findPanel();
-  if (!panel || !tabIsShown(panel)) return;
+  if (!panel) return;
 
   // Nothing to say without a way to open the lightbox: a takeover that listed
   // chapters nobody could click would be worse than Stash's own rows, which at
@@ -288,30 +288,6 @@ function findPanel(): HTMLElement | null {
   }
 
   return null;
-}
-
-/**
- * Whether this panel's tab is the one on screen.
- *
- * **The shape test alone is not enough to know it is the Chapters panel.** "A
- * container with a button above it" is a shape a gallery page has more than once —
- * the edit tab, the images tab — and managing one of those means drawing chapter rows
- * into somebody else's container: a page whose DOM grows on every pass, and a frozen
- * tab. A hidden tab is not managed, which is also what "this is the Chapters tab" is
- * supposed to mean.
- *
- * Stash marks the visible pane `aria-hidden="false"` and the others `"true"`; the
- * reader suite's world has no tabs at all, and a panel in no pane is managed as
- * before.
- */
-function tabIsShown(panel: HTMLElement): boolean {
-  const pane = panel.closest(".tab-pane");
-  if (!pane) return true;
-
-  return (
-    pane.getAttribute("aria-hidden") === "false" ||
-    pane.classList.contains("active")
-  );
 }
 
 /**
