@@ -771,8 +771,17 @@ module.exports = () => {
     remove: ["plugin.mangaTools.censorship"],
   });
 
-  // Unmark wins over the other two: every field this plugin owns is removed, and
-  // the language/censorship pendings are ignored.
+  // Unmark wins over the other two: every field this plugin owns is removed, and the
+  // language/censorship pendings are ignored.
+  //
+  // **Which fields, and in which spelling, is not this dialog's opinion.** The list is
+  // the union of `NS.fieldsToClear` over the selected galleries — the same function the
+  // single-gallery unmark uses — so it is each gallery's own keys (gallery 1 carries four
+  // of the six, gallery 6 carries two) and it answers `deleteOnUnmark` itself. It used to
+  // be a hand-written list of canonical names: unconditional, so it destroyed values the
+  // setting promised to keep, and canonical, so a key that had drifted in case stayed
+  // behind. Gallery 2 is the case for the second half — its language key is spelled with
+  // a capital L, and that is the spelling that has to go.
   selectGalleries(["1", "6"]);
   selectOf("manga_tools_language").props.onChange({
     value: "ja",
@@ -782,15 +791,68 @@ module.exports = () => {
   selectOf("manga_tools_censorship").props.onChange({ value: "censored" });
   mangaBox().props.onChange(); // unmark
   r14 = runLink(bulkVars());
-  assert.deepStrictEqual(r14.forwarded.variables.input.custom_fields, {
-    remove: [
-      "plugin.mangaTools.language",
-      "plugin.mangaTools.censorship",
-      "plugin.mangaTools.translationGroup",
-      "plugin.mangaTools.original",
-      "plugin.mangaTools.manga",
+  assert.deepStrictEqual(
+    r14.forwarded.variables.input.custom_fields,
+    {
+      remove: [
+        "plugin.mangaTools.manga",
+        "plugin.mangaTools.language",
+        "plugin.mangaTools.censorship",
+        "plugin.mangaTools.translationGroup",
+      ],
+    },
+    "the keys these two galleries actually carry, and nothing else"
+  );
+
+  selectGalleries(["2"]);
+  mangaBox().props.onChange(); // unmark
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(
+    r14.forwarded.variables.input.custom_fields,
+    { remove: ["plugin.mangaTools.manga", "plugin.mangaTools.Language"] },
+    "a key that drifted in case goes with the rest, under its own spelling"
+  );
+
+  // …and the setting is part of the answer rather than decoration: with it off, an
+  // unmark takes the mark and leaves every value where the reader asked for it to stay.
+  NS.deleteOnUnmark = false;
+  selectGalleries(["1"]);
+  mangaBox().props.onChange(); // unmark
+  const keepWarning = String(bulkChildren()[0].props.children);
+  assert.ok(
+    /只移除漫画标记/.test(keepWarning),
+    "the dialog says so before Apply, rather than promising the other thing"
+  );
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(
+    r14.forwarded.variables.input.custom_fields,
+    { remove: ["plugin.mangaTools.manga"] },
+    "with the setting off, unmarking takes the mark and nothing else"
+  );
+  // Turned back on, the same press is described as what it is again — asked *before*
+  // the write, because a successful write clears the pending values (see the link
+  // hook) and with them the warning.
+  NS.deleteOnUnmark = true;
+  selectGalleries(["1"]);
+  mangaBox().props.onChange(); // unmark
+  assert.ok(
+    /全部自定义字段/.test(String(bulkChildren()[0].props.children)),
+    "and turned back on, the wording says what it takes again"
+  );
+  // Put the mark back to "no view" before leaving: an unmark still pending would hide
+  // the field rows from everything below (they are drawn only for a manga selection),
+  // and this section works in the state it found.
+  mangaBox().props.onChange();
+  assert.deepStrictEqual(
+    bulkChildren().map((r) => r.props["data-field"]),
+    [
+      "manga_tools_manga",
+      "manga_tools_language",
+      "manga_tools_censorship",
+      "manga_tools_translation_group",
     ],
-  });
+    "the rows are back, and nothing is pending"
+  );
 
   // Other entities' bulk updates are never touched, even with a value pending.
   selectGalleries(["1", "6"]);

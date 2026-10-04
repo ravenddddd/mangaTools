@@ -759,6 +759,18 @@ than a parent and its child, so they are not wrapped in the group Stash's styles
 uses to indent a setting's children. The mark is never one of the four fields and is
 never gated on them: it is what makes a gallery this plugin's at all.
 
+**"Clear the plugin's fields when unmarking" is asked of `NS.fieldsToClear`, and both
+places that unmark ask it there.** That is what makes the setting true of the bulk
+dialog as well as of one gallery, which it was not until 0.9.53: the dialog carried its
+own hand-written list of canonical key names, so it cleared those fields whatever the
+setting said — the one place that destroyed values the reader had asked it to keep — and
+being canonical it could not remove a key that had drifted in case, which is the other
+half of what `fieldsToClear` is for. One mutation covers N galleries, so the dialog takes
+the **union** of that answer over everything selected; removing a key a gallery does not
+carry is a no-op on the server, which is what makes one list safe for all of them. The
+dialog's warning follows the setting too, since "it will clear them" and "it will keep
+them" are two sentences rather than one that hedges.
+
 **Two settings carry a "?" and it opens a picture, not a paragraph.** "Cover badge"
 and "the mark's icon" are both answered by *where* something is on a card, which is
 a sentence nobody should have to assemble in their head — so the panel holds a

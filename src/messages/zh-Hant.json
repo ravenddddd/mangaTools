@@ -123,5 +123,6 @@
   "mangaTools.translationGroup.suggestedLanguage": "該翻譯組的畫廊通常是這種語言",
 
   "mangaTools.bulk.remove": "移除",
-  "mangaTools.bulk.unmarkWarning": "取消標記會從選中的畫廊中移除本外掛的漫畫、語言、修正和翻譯組欄位。"
+  "mangaTools.bulk.unmarkWarning": "取消標記會從選中的畫廊上移除本外掛的全部自訂欄位（包括章節）。",
+  "mangaTools.bulk.unmarkWarningKeep": "只移除漫畫標記，不會移除本外掛的自訂欄位。"
 }

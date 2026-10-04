@@ -123,5 +123,6 @@
   "mangaTools.translationGroup.suggestedLanguage": "This group's galleries usually carry this language",
 
   "mangaTools.bulk.remove": "Remove",
-  "mangaTools.bulk.unmarkWarning": "Unmarking removes this plugin's manga, language, censorship and translation group fields from the selected galleries."
+  "mangaTools.bulk.unmarkWarning": "Unmarking removes every one of this plugin's custom fields from the selected galleries (chapters included).",
+  "mangaTools.bulk.unmarkWarningKeep": "Only the manga mark is removed; this plugin's custom fields are kept."
 }

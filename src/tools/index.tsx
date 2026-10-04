@@ -3766,6 +3766,41 @@ function isGalleryBulkUpdate(query: unknown): boolean {
 }
 
 /**
+ * The keys an unmark removes, across everything the dialog has selected.
+ *
+ * **The same function the single-gallery unmark uses** — `NS.fieldsToClear` — so that
+ * "unmark" means one thing wherever it is asked for. That is not a tidying: this path
+ * used to carry its own hand-written list of canonical names, and the list was wrong in
+ * two ways a list cannot help being wrong. It did not consult `deleteOnUnmark`, so the
+ * dialog destroyed values the setting had promised to keep; and being canonical it could
+ * not remove a key that had drifted in case, which is the very thing `fieldsToClear`
+ * exists to get right (a gallery would keep showing a language it was supposed to have
+ * forgotten). It also fell behind: the third and fourth fields were never added to it.
+ *
+ * A union rather than any one gallery's answer, because one mutation covers N galleries
+ * and names one key list. Removing a key a gallery does not carry is a no-op on the
+ * server, which is what makes a single list safe for all of them. Asking the store for a
+ * gallery it does not hold is the ordinary case, not a gap: the store is a gate rather
+ * than a cache (see storedIsManga), and a gallery missing from it is one this plugin does
+ * not consider manga — `fieldsToClear` answers for that case with the canonical mark,
+ * which is exactly what should go.
+ */
+function bulkUnmarkKeys(): string[] {
+  const keys: string[] = [];
+  const seen: { [key: string]: true } = {};
+
+  for (const id of selectedGalleryIds) {
+    for (const key of NS.fieldsToClear(store?.get(id))) {
+      if (seen[key]) continue;
+      seen[key] = true;
+      keys.push(key);
+    }
+  }
+
+  return keys.length ? keys : [MANGA_FIELD_NAME];
+}
+
+/**
  * Merges the pending fields into a bulk gallery update, in place.
  *
  * CustomFieldsInput is what makes this safe: `partial` updates just the named
@@ -3788,23 +3823,7 @@ function applyPendingFields(operation: MangaToolsApolloOperation): boolean {
   const remove: string[] = [];
 
   if (bulkManga === "unmark") {
-    // **Every field this plugin owns, and these four are the whole list.** The
-    // dialog's warning already says it takes the language, censorship and
-    // translation group with the mark; raw became the fourth when it got a row
-    // here, and leaving it out would have made the sentence a lie.
-    //
-    // These are the canonical spellings rather than the keys each gallery actually
-    // carries (`NS.fieldsToClear`, which is what the single-gallery unmark uses).
-    // One mutation covers N galleries and names one key list, so it cannot say what
-    // each gallery holds — see the note on deleteOnUnmark in the bulk section of the
-    // README, which is where the two paths' remaining disagreement is written down.
-    remove.push(
-      FIELD_NAME,
-      CENSORSHIP_FIELD_NAME,
-      TRANSLATION_GROUP_FIELD_NAME,
-      ORIGINAL_FIELD_NAME,
-      MANGA_FIELD_NAME
-    );
+    remove.push(...bulkUnmarkKeys());
   } else {
     if (bulkManga === "mark") partial[MANGA_FIELD_NAME] = NS.MANGA_VALUE;
 
@@ -4571,7 +4590,15 @@ function BulkFieldsRow() {
     <>
       {tri === false && aggregate !== "none" ? (
         <div className="alert alert-warning" role="alert">
-          {t(intl, "mangaTools.bulk.unmarkWarning")}
+          {/* What an unmark will actually do, which is a question the settings
+              answer — and the two answers are far enough apart to need two
+              sentences rather than one that hedges. */}
+          {t(
+            intl,
+            NS.deleteOnUnmark
+              ? "mangaTools.bulk.unmarkWarning"
+              : "mangaTools.bulk.unmarkWarningKeep"
+          )}
         </div>
       ) : null}
       {mangaRow}
