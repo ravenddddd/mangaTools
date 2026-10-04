@@ -1090,8 +1090,43 @@
   text-align: center;
 }
 
+/* Stash's index.scss carries `.fa-icon { margin: 0 0.4rem }` unscoped, so every icon
+   on the page is spaced on both sides unless something takes it off — and this one is
+   in a column twenty-eight pixels wide, where the margin is most of the room and
+   pushes the mark off centre. Zeroed rather than replaced: the column's own
+   `text-align: center` is what places it.
+ *
+ * The two buttons in the next cell need nothing: Stash exempts an icon that is the
+ * only child of a `.btn` (`.btn .fa-icon { &:last-child:first-child { margin: 0 } }`),
+ * which is what drawIcon leaves in each of them. */
+/* biome-ignore lint/style/noDescendingSpecificity: measured against the header's "?"
+   three classes deep, which is a different element on a different part of the page —
+   the two share the `.fa-icon` they end in and nothing else. */
+.manga-reader-bulk-valid .fa-icon {
+  margin: 0;
+}
+
+/* The number, and nothing else — so the spin buttons come off. Stash's own number
+   fields keep them, and here they are fifteen pixels of a column four digits wide,
+   standing where the page number is meant to be typed; the up and down arrows on the
+   keyboard step it either way, so what goes is only the pair of buttons.
+ *
+ * `appearance: textfield` is the standard-ish spelling both engines answer, and the two
+ * `::-webkit-` rules are what Chrome and Safari actually read. Without the spinners the
+ * column gives back the room they were taking, which goes to the title. */
 .manga-reader-bulk-page {
-  width: 96px;
+  width: 76px;
+}
+
+.manga-reader-bulk-page .form-control {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.manga-reader-bulk-page .form-control::-webkit-outer-spin-button,
+.manga-reader-bulk-page .form-control::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* The row's two buttons, in a column of their own: a look at the page the number

@@ -780,6 +780,25 @@ module.exports = () => {
     "mangaReader.css should anchor the page preview to the cell its button is in: " +
       "measured from anywhere else, the picture is drawn off the screen"
   );
+
+  // Stash's unscoped `.fa-icon { margin: 0 0.4rem }` again, and this time the icon is
+  // in a column twenty-eight pixels wide — the margin is most of the room and pushes
+  // the mark off centre. The two buttons in the next cell are exempt from Stash's rule
+  // by being a `.btn`'s only child, so this is the one icon here that needs saying.
+  assert.ok(
+    /\.manga-reader-bulk-valid\s+\.fa-icon\s*\{[^}]*margin:\s*0/.test(
+      readerCss
+    ),
+    "mangaReader.css should zero Stash's icon margin on the validity mark, or the " +
+      "tick and the cross sit off centre in their column"
+  );
+  assert.ok(
+    /\.manga-reader-bulk-page\s+\.form-control::-webkit-inner-spin-button\s*\{[^}]*appearance:\s*none/.test(
+      readerCss
+    ),
+    "and should take the spin buttons off the page number: they are fifteen pixels " +
+      "of a four-digit column, standing where the number is meant to be typed"
+  );
   // Under the gear's right edge rather than centred on it. Centred is what Stash's
   // own popover does, and it gets away with it because a library measures it and
   // pushes it back inside the window; this header has none, and the gear is three
