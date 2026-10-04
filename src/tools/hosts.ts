@@ -134,6 +134,84 @@ export function ensureDetailHost(): HTMLElement | null {
   return detailHost;
 }
 
+/** Class of the mount point in the gallery toolbar */
+const TOOLBAR_HOST_CLASS = "manga-tools-toolbar-host";
+
+/**
+ * Whether this Stash has the client the switch writes through.
+ *
+ * Both of the switch’s writes go through this plugin’s own mutation, so the
+ * client is all it needs. Stash injects StashService itself (it is a namespace
+ * import of `src/core/StashService`), so a version without `getClient` is the
+ * only way the lookup fails, and on such a version the toolbar gets nothing
+ * rather than a switch that cannot work.
+ *
+ * Read defensively, with a Stash that has no API at all in mind: this line is in
+ * the module body, so it is evaluated while the bundle loads, and this half
+ * shares a bundle with the reader's — which must not be taken down by anything
+ * that happens here.
+ */
+const CAN_WRITE =
+  typeof PluginApi.utils?.StashService?.getClient === "function";
+
+if (!CAN_WRITE) {
+  console.error(
+    "[mangaTools] this Stash has no Apollo client, so the toolbar switch " +
+      "cannot be shown. The rest of the plugin is unaffected."
+  );
+}
+
+/** As above, held at module scope so a re-render reuses the same node. */
+
+let toolbarHost: HTMLElement | null = null;
+
+/**
+ * Finds (creating if needed) the mount point in the gallery detail page's
+ * toolbar, directly after the span holding Stash's organized button.
+ *
+ * Why the DOM at all: the toolbar is rendered by `Gallery`, which is not a
+ * registered component, so there is no patch to hang a React child off — the
+ * same situation as the detail row (see ensureDetailHost).
+ *
+ * Why that button and not the group's two spans by position: the second span is
+ * the operation menu, whose contents depend on the entity and on the user's
+ * settings. The organized button is drawn for every gallery, on every version,
+ * in a group of its own, which makes it the one stable handle in there.
+ *
+ * Scoped to `.gallery-toolbar`, so the bulk edit dialog's organized button —
+ * same class, different place — is never mistaken for it.
+ */
+export function ensureToolbarHost(): HTMLElement | null {
+  const button = document.querySelector(".gallery-toolbar .organized-button");
+
+  // The button is not always there, and its absence is not the toolbar's: Stash
+  // renders a spinner in its place while its own save runs (OrganizedButton has a
+  // `loading` branch), which is exactly what clicking organized does. Treating
+  // that as "no toolbar" took this plugin's switch off the page — the reader saw
+  // it vanish under their own cursor and stay gone until the next refresh.
+  // Nothing about the button's absence says anything about the host.
+  if (!button) return toolbarHost;
+
+  const anchor = (button?.parentNode || null) as HTMLElement | null;
+  if (!anchor?.parentNode) {
+    toolbarHost = null;
+    return null;
+  }
+
+  if (!toolbarHost) {
+    toolbarHost = document.createElement("span");
+    toolbarHost.className = TOOLBAR_HOST_CLASS;
+  }
+
+  // A React re-render may displace it; keep it directly after that span, which
+  // puts it between the organized button and the operation menu.
+  if (anchor.nextElementSibling !== toolbarHost) {
+    anchor.parentNode.insertBefore(toolbarHost, anchor.nextElementSibling);
+  }
+
+  return toolbarHost;
+}
+
 /** Class name of the edit field's mount point */
 const FIELD_HOST_CLASS = "manga-tools-field-host";
 
