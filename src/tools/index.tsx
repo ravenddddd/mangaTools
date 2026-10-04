@@ -60,6 +60,8 @@ import {
   SidebarCensorshipFilter,
   SidebarLanguageFilter,
   SidebarMangaFilter,
+  SidebarOriginalFilter,
+  SidebarTranslationGroupFilter,
   currentSidebarFilter,
   publishSidebarFilter,
 } from "./sidebar-filter";
@@ -73,6 +75,7 @@ import type {
   MangaToolsIntl,
   MangaToolsOption,
   MangaToolsPatchFn,
+  MangaToolsUsualLanguageMap,
 } from "../plugin-api";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
@@ -1302,6 +1305,22 @@ function SteakIcon(props: { raw: boolean }) {
  * far as this is concerned, and folding them here would mean deciding which
  * spelling to offer somebody who typed the other one.
  */
+/**
+ * The two things the sidebar's group filter needs from the store, published here
+ * rather than reached for by name.
+ *
+ * The section renders in Stash's sidebar, one module away from the store, and the
+ * store is module state on purpose: a second reader of it would be a second answer
+ * to "which groups does this library hold", which is the class of bug this file has
+ * paid for more than once (see fields.ts on why one list is asked by everything).
+ * So the functions are published, not the map — and `usualLanguages` is the same
+ * walk of the same store the edit page's menu and the bulk row already use.
+ */
+NS.translationGroups = (): string[] => knownTranslationGroups();
+
+NS.usualLanguages = (): MangaToolsUsualLanguageMap =>
+  NS.usualLanguagesOf(store);
+
 function knownTranslationGroups(): string[] {
   if (!store) return [];
 
@@ -5378,14 +5397,25 @@ registerPatch("after", "FilteredGalleryList.SidebarSections", (...args) => {
     <>
       {/* One section per field, each drawn only while its field is. The manga
           section is not one of them: the mark is what makes a gallery this
-          plugin's at all, so it is offered whatever the four switches say. */}
+          plugin's at all, so it is offered whatever the four switches say — and
+          it is first, because it is the one that is always there.
+
+          The order is the fields' own: the two that describe what a gallery *is*
+          (which language, whose translation), then the two that qualify the
+          edition (censorship, and whether it is the original). */}
+      <SidebarMangaFilter filter={filter} />
       {NS.fieldShowing("language") ? (
         <SidebarLanguageFilter filter={filter} />
       ) : null}
       {NS.fieldShowing("censorship") ? (
         <SidebarCensorshipFilter filter={filter} />
       ) : null}
-      <SidebarMangaFilter filter={filter} />
+      {NS.fieldShowing("translationGroup") ? (
+        <SidebarTranslationGroupFilter filter={filter} />
+      ) : null}
+      {NS.fieldShowing("original") ? (
+        <SidebarOriginalFilter filter={filter} />
+      ) : null}
       {result}
     </>
   );

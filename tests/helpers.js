@@ -1124,6 +1124,17 @@ const mangaConditionsOf = (modifier) => ({
   modifier,
 });
 
+const groupConditionsOf = (modifier, value) => {
+  const c = { field: "plugin.mangaTools.translationGroup", modifier };
+  if (value !== undefined) c.value = value;
+  return c;
+};
+
+const originalConditionsOf = (modifier) => ({
+  field: "plugin.mangaTools.original",
+  modifier,
+});
+
 /**
  * A stand-in for one of Stash's tags: the text node holding the label, the
  * attributes the tag helpers use, and `closest` answered from the list of
@@ -1219,6 +1230,7 @@ module.exports = {
   capturedClicks,
   capturedQueries,
   censorshipConditionsOf,
+  groupConditionsOf,
   conditionsOf,
   customFieldsCriterion,
   displayNamesCalls,
@@ -1238,6 +1250,7 @@ module.exports = {
   mutationWrites,
   observed,
   original,
+  originalConditionsOf,
   queryOptions,
   patched,
   patchedAfter,

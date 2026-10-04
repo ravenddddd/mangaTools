@@ -160,8 +160,12 @@ wall are all covered by one hook.
 
 #### Filtering
 
-The gallery list's sidebar gains a **language** section, built to work the way
-Stash's own studio section does:
+The gallery list's sidebar gains **five** sections — the mark, the language, the
+censorship, the translation group and raw — each built to work the way Stash's own
+studio section does, and each drawn only while its field is (the mark's is the one
+that is always there, since it is what makes a gallery this plugin's at all). They
+are one shell and one read/write model; what differs per field is the values and
+the wording. Every one of them carries the plugin's mark beside its heading.
 
 - a heading you can fold away, with whatever is selected **above** it, so the
   selection stays visible while the list of choices is folded
@@ -579,12 +583,30 @@ that it no longer does. Nothing waits on the answer: the menu opens with what is
 in hand and is redrawn when the fetch lands.
 
 
-There is deliberately **no sidebar section** for it: that would have to be a
-free-text search rather than the checkbox list the other three are, which is an
-addition with its own design questions rather than a column in an existing table.
-It is recognised as one of this plugin's fields all the same — see `NS.ownField` —
-so it never shows up as a raw custom-field row in the edit form, and unmarking
-clears it along with the rest.
+**Its sidebar section arrived in 0.9.54**, and the design question the note that
+used to stand here raised — "that would have to be a free-text search rather than
+the checkbox list the other three are" — turned out not to be one: the language
+section already *is* a search box over a list, so the group section is that shape
+with the values coming from the library instead of a table. The one thing that
+differs is where the values come from, and what follows from it: a group is offered
+while some gallery carries it (the store's answer, via `NS.translationGroups`), and
+a name the filter already asks for keeps its row even after the last gallery stops
+using it — the same rule that keeps a disabled language visible. Each row carries
+its galleries' usual language as a flag, which is the glyph the edit page's menu and
+the bulk row already draw from the same walk of the same store.
+
+**Raw got the mark's section rather than a list**, because it is the same kind of
+field: a presence, with two states and no value to type. Its rows say 生肉/熟肉 in
+the plugin's own words — the words the edit page's button and the bulk dialog's
+steak already use — and each draws its own steak where a language row draws a flag.
+Its *tag* says 原文 是 生肉, and that name is deliberate: a criterion called 生肉 with
+a value called 生肉 reads as the same word twice.
+
+**Every section carries the mark's own icon beside its heading**, dimmed. The
+sidebar is Stash's and its own sections sit in the same column with the same look,
+so without it a reader has no way to tell which of the fourteen headings came from a
+plugin — and the icon is the one the covers already wear, so the answer is a thing
+they have seen rather than a new vocabulary.
 
 **The bulk dialog got a row for it in 0.9.51**, and the row is the edit page's
 field moved into a dialog: the same select (the library's groups, create-entry and

@@ -18,16 +18,20 @@ import { requirePluginApi } from "../plugin-api";
 import {
   adoptLanguageCriterion,
   applyCensorship,
+  applyGroup,
   applyLanguage,
   applyManga,
+  applyOriginal,
   censorshipHeading,
   fieldLabel,
   fieldTagLabels,
   isEmptySelection,
   message,
   readCensorshipFilter,
+  readGroupFilter,
   readLanguageFilter,
   readMangaFilter,
+  readOriginalFilter,
   toggleExcluded,
   toggleIncluded,
   withModifier,
@@ -75,6 +79,8 @@ const React = PluginApi.React;
 const SECTION_STATE_KEY = "mangaToolsLanguageOpen";
 const CENSORSHIP_SECTION_STATE_KEY = "mangaToolsCensorshipOpen";
 const MANGA_SECTION_STATE_KEY = "mangaToolsMangaOpen";
+const GROUP_SECTION_STATE_KEY = "mangaToolsTranslationGroupOpen";
+const ORIGINAL_SECTION_STATE_KEY = "mangaToolsOriginalOpen";
 
 /**
  * Whether the reader is on a touch device.
@@ -91,6 +97,8 @@ function isTouchDevice(): boolean {
 /** The same mark, per field: one attribute each, so a re-worded tag stays recognisable. */
 const CENSORSHIP_TAG_MARK = "data-manga-tools-censorship";
 const MANGA_TAG_MARK = "data-manga-tools-manga";
+const GROUP_TAG_MARK = "data-manga-tools-group";
+const ORIGINAL_TAG_MARK = "data-manga-tools-original";
 
 /** Is this tag Stash's tag for the censorship criterion? */
 function isCensorshipTag(tag: Element): boolean {
@@ -100,6 +108,15 @@ function isCensorshipTag(tag: Element): boolean {
 /** Is this tag Stash's tag for the manga criterion? */
 function isMangaTag(tag: Element): boolean {
   return isFieldTag(tag, NS.MANGA_FIELD_NAME, MANGA_TAG_MARK);
+}
+
+/** …and for the translation group's and the raw field's */
+function isGroupTag(tag: Element): boolean {
+  return isFieldTag(tag, NS.TRANSLATION_GROUP_FIELD_NAME, GROUP_TAG_MARK);
+}
+
+function isOriginalTag(tag: Element): boolean {
+  return isFieldTag(tag, NS.ORIGINAL_FIELD_NAME, ORIGINAL_TAG_MARK);
 }
 
 /**
@@ -137,6 +154,15 @@ function listCensorshipTags(): Element[] {
 /** The manga tags in the list's own row */
 function listMangaTags(): Element[] {
   return listFieldTags(isMangaTag);
+}
+
+/** The translation group's and the raw field's, likewise */
+function listGroupTags(): Element[] {
+  return listFieldTags(isGroupTag);
+}
+
+function listOriginalTags(): Element[] {
+  return listFieldTags(isOriginalTag);
 }
 
 /** Writes labels into tags, in order, one per tag, under the given mark */
@@ -190,6 +216,16 @@ function relabelCensorshipTags(labels: string[]): void {
 /** Re-words the manga tags in the list's row. See relabelTags. */
 function relabelMangaTags(labels: string[]): void {
   writeTagLabels(listMangaTags(), labels, MANGA_TAG_MARK);
+}
+
+/** Re-words the translation group tags in the list's row. See relabelTags. */
+function relabelGroupTags(labels: string[]): void {
+  writeTagLabels(listGroupTags(), labels, GROUP_TAG_MARK);
+}
+
+/** Re-words the raw tags in the list's row. See relabelTags. */
+function relabelOriginalTags(labels: string[]): void {
+  writeTagLabels(listOriginalTags(), labels, ORIGINAL_TAG_MARK);
 }
 
 /**
@@ -307,6 +343,19 @@ function SidebarSection(props: {
             fixedWidth
           />
           <span>{props.heading}</span>
+          {/* **Every section carries the mark's icon, because every section is this
+              plugin's.** The sidebar is Stash's, and its own sections sit in the
+              same column with the same look; a reader who has not just read the
+              README has no way to tell which of the fourteen headings came from a
+              plugin. The icon is the one the covers already wear, so the answer is
+              a thing they have seen rather than a new vocabulary — and it is
+              dimmed, because it is a label on the heading and not a control.
+              A span rather than the entry file's MangaIcon for the same reason as
+              the steaks above: the rule is in the stylesheet. */}
+          <span
+            className="manga-tools-manga-icon manga-tools-sidebar-mark"
+            aria-hidden="true"
+          />
         </Bootstrap.Button>
       </div>
 
@@ -325,6 +374,27 @@ function SidebarSection(props: {
         </div>
       </Bootstrap.Collapse>
     </div>
+  );
+}
+
+/**
+ * The two steaks, drawn where a language row draws its flag.
+ *
+ * By class rather than by the entry file's `SteakIcon`, which this module cannot
+ * reach: the artwork's rules live in the stylesheet (`.manga-tools-raw-icon` and
+ * `.manga-tools-cooked-icon` set the mask and take the colour from `currentColor`),
+ * so a span wearing one is the same drawing. `fa-fw` is FontAwesome's fixed width,
+ * which is what the row's leading slot is sized by — the censorship section's chess
+ * piece wears it for the same reason.
+ */
+function steakLeading(raw: boolean): ReactElement {
+  return (
+    <span
+      className={
+        "fa-fw " + (raw ? "manga-tools-raw-icon" : "manga-tools-cooked-icon")
+      }
+      aria-hidden="true"
+    />
   );
 }
 
@@ -866,8 +936,366 @@ export function SidebarMangaFilter(props: { filter: MangaToolsFilterModel }) {
   );
 }
 
+/**
+ * The gallery list's raw filter: the mark's section, on the other field that is a
+ * presence rather than a value.
+ *
+ * Raw is one thing or the other — a gallery is the original text or it is not —
+ * so the filter is a choice among two plus "neither asked for", and the rows carry
+ * the two steaks the edit page's button draws. The words are this plugin's rather
+ * than Stash's 是/否 that the mark's section uses, because 生肉/熟肉 is what the
+ * field is *called* everywhere else in the plugin, and a filter whose words differ
+ * from the button that sets the same thing is two vocabularies for one field.
+ */
+export function SidebarOriginalFilter(props: {
+  filter: MangaToolsFilterModel;
+}) {
+  const { intl, history, open, toggleOpen } = useSidebarSection(
+    ORIGINAL_SECTION_STATE_KEY
+  );
+
+  const state = readOriginalFilter(props.filter);
+
+  const tagLabelsFor = fieldTagLabels(
+    intl,
+    props.filter,
+    NS.ORIGINAL_FIELD_NAME
+  );
+
+  React.useLayoutEffect(() => {
+    if (tagLabelsFor) relabelOriginalTags(tagLabelsFor);
+  });
+
+  // The two states, in the order the bulk row's cycle puts them: raw first, since
+  // that is the one the field is named for.
+  const options: {
+    value: MangaToolsMangaState;
+    label: string;
+    raw: boolean;
+  }[] = [
+    {
+      value: "marked",
+      label: t(intl, "mangaTools.filter.original.raw"),
+      raw: true,
+    },
+    {
+      value: "unmarked",
+      label: t(intl, "mangaTools.filter.original.cooked"),
+      raw: false,
+    },
+  ];
+
+  // Choosing the chosen value clears it; choosing the other moves the filter —
+  // exactly the mark's rule, because it is the same kind of question.
+  function choose(value: MangaToolsMangaState) {
+    applyOriginal(props.filter, history, state === value ? "" : value);
+  }
+
+  const chosen = options.filter((o) => o.value === state);
+  const candidates = options.filter((o) => o.value !== state);
+
+  const chosenItems = chosen.map((o) => (
+    <LanguageRow
+      variant="sidebar"
+      key={o.value}
+      label={o.label}
+      leading={steakLeading(o.raw)}
+      state="included"
+      canExclude={false}
+      onClick={() => {
+        choose(o.value);
+      }}
+    />
+  ));
+
+  return (
+    <SidebarSection
+      heading={t(intl, "mangaTools.translationGroup.original")}
+      open={open}
+      onToggle={toggleOpen}
+      chosenItems={chosenItems}
+      excludedItems={[]}
+      what="raw"
+    >
+      <ul>
+        {candidates.map((o) => (
+          <LanguageRow
+            variant="sidebar"
+            key={o.value}
+            label={o.label}
+            leading={steakLeading(o.raw)}
+            state="candidate"
+            canExclude={false}
+            singleValue
+            onClick={() => {
+              choose(o.value);
+            }}
+          />
+        ))}
+      </ul>
+    </SidebarSection>
+  );
+}
+
+/**
+ * The translation group's options: the names the library holds, each carrying the
+ * flag of its galleries' usual language — the same glyph the edit page's menu and
+ * the bulk dialog's row put beside a group, from the same walk of the same store.
+ *
+ * A name the filter already asks for is kept even when no gallery carries it any
+ * more, for the reason the language list keeps a disabled code (see
+ * visibleOptions): a filter showing a value that is not in its own list is a filter
+ * nobody can read. Those come in with no flag, since the store has nothing to say
+ * about a group it does not hold.
+ */
+function translationGroupOptions(
+  intl: MangaToolsIntl,
+  selection: MangaToolsLanguageSelection
+): MangaToolsOption[] {
+  const usual = NS.usualLanguages();
+  const options: MangaToolsOption[] = NS.translationGroups().map((name) => {
+    const language = usual[NS.groupKey(name)];
+    const described = language ? NS.describe(language.code, intl.locale) : null;
+    return {
+      value: name,
+      label: name,
+      flag: described ? described.flag : null,
+    };
+  });
+
+  const known: { [value: string]: true } = {};
+  options.forEach((o) => {
+    known[o.value] = true;
+  });
+
+  const asked = selection.included.concat(selection.excluded);
+  asked.forEach((name) => {
+    if (known[name]) return;
+    known[name] = true;
+    options.push({ value: name, label: name, flag: null });
+  });
+
+  return options;
+}
+
+/**
+ * The gallery list's translation group filter: the language section's shape, over
+ * names the library defines rather than a table this plugin ships.
+ *
+ * Same modifier entries, same include/exclude lists, same search box — the list is
+ * short enough to show and long enough that typing beats scrolling (the measured
+ * library has around twenty-five groups, most of them used once or twice), and the
+ * one difference that matters is that a value here is free text nobody curates. So
+ * a group is offered only while some gallery carries it, and a name the filter
+ * holds keeps its row regardless — see translationGroupOptions.
+ */
+export function SidebarTranslationGroupFilter(props: {
+  filter: MangaToolsFilterModel;
+}) {
+  const { intl, history, open, toggleOpen } = useSidebarSection(
+    GROUP_SECTION_STATE_KEY
+  );
+
+  const queryState = React.useState("");
+  const query = queryState[0];
+  const setQuery = queryState[1];
+
+  const searchRef = React.useRef<HTMLInputElement | null>(null);
+
+  const selection = readGroupFilter(props.filter);
+
+  const tagLabelsFor = fieldTagLabels(
+    intl,
+    props.filter,
+    NS.TRANSLATION_GROUP_FIELD_NAME
+  );
+
+  React.useLayoutEffect(() => {
+    if (tagLabelsFor) relabelGroupTags(tagLabelsFor);
+  });
+
+  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
+  const Icon = PluginApi.components.Icon;
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+
+  function update(next: MangaToolsLanguageSelection) {
+    applyGroup(props.filter, history, next);
+
+    if (!isTouchDevice() && searchRef.current) {
+      searchRef.current.focus();
+    }
+  }
+
+  function toggleInclude(name: string) {
+    update(toggleIncluded(selection, name));
+  }
+
+  function toggleExclude(name: string) {
+    update(toggleExcluded(selection, name));
+  }
+
+  function setModifier(modifier: "any" | "none") {
+    update(withModifier(selection, modifier));
+  }
+
+  function clearModifier() {
+    update(withoutModifier(selection));
+  }
+
+  const options = translationGroupOptions(intl, selection);
+
+  // The same three lists the language section keeps: chosen, excluded, and the
+  // candidates the search has not narrowed away.
+  const chosen = options.filter(
+    (o) => selection.included.indexOf(o.value) !== -1
+  );
+  const excludedChosen = options.filter(
+    (o) => selection.excluded.indexOf(o.value) !== -1
+  );
+  const candidates = options.filter(
+    (o) =>
+      selection.included.indexOf(o.value) === -1 &&
+      selection.excluded.indexOf(o.value) === -1 &&
+      matchesQuery(o, query)
+  );
+
+  const showModifiers = isEmptySelection(selection);
+
+  const chosenItems: ReactElement[] = [];
+  if (selection.modifier) {
+    chosenItems.push(
+      <li className="selected-object modifier-object" key="modifier">
+        <a tabIndex={0} onClick={clearModifier}>
+          <div className="label-group">
+            <Icon className="fa-fw include-button" icon={Solid.faCheckCircle} />
+            <span className="TruncatedText inline selected-object-label">
+              {"(" +
+                message(
+                  intl,
+                  "criterion_modifier_values." + selection.modifier,
+                  selection.modifier === "any" ? "Any" : "None"
+                ) +
+                ")"}
+            </span>
+          </div>
+        </a>
+      </li>
+    );
+  }
+  chosen.forEach((o) => {
+    chosenItems.push(
+      <LanguageRow
+        variant="sidebar"
+        key={"in-" + o.value}
+        label={o.label}
+        flag={flagOf(o)}
+        state="included"
+        onClick={() => {
+          toggleInclude(o.value);
+        }}
+      />
+    );
+  });
+
+  const excludedItems = excludedChosen.map((o) => (
+    <LanguageRow
+      variant="sidebar"
+      key={"ex-" + o.value}
+      label={o.label}
+      flag={flagOf(o)}
+      state="excluded"
+      onClick={() => {
+        toggleExclude(o.value);
+      }}
+    />
+  ));
+
+  return (
+    <SidebarSection
+      heading={t(intl, "mangaTools.translationGroup.heading")}
+      open={open}
+      onToggle={toggleOpen}
+      chosenItems={chosenItems}
+      excludedItems={excludedItems}
+      what="translation group"
+    >
+      <div className="clearable-input-group">
+        <input
+          ref={searchRef}
+          className="clearable-text-field form-control"
+          value={query}
+          placeholder={message(intl, "actions.search", "Search") + "…"}
+          onChange={(e: { target: { value: string } }) => {
+            setQuery(e.target.value);
+          }}
+          onKeyDown={(e: { key?: string }) => {
+            if (e.key !== "Enter" || candidates.length !== 1) return;
+            toggleInclude(candidates[0].value);
+            setQuery("");
+          }}
+        />
+        {query && Bootstrap ? (
+          <Bootstrap.Button
+            variant="secondary"
+            className="clearable-text-field-clear"
+            title={message(intl, "actions.clear", "Clear")}
+            onClick={() => {
+              setQuery("");
+            }}
+          >
+            <Icon icon={Solid.faTimes} />
+          </Bootstrap.Button>
+        ) : null}
+      </div>
+      <ul>
+        {showModifiers ? (
+          <LanguageRow
+            variant="sidebar"
+            label={t(intl, "mangaTools.filter.group.any")}
+            state="candidate"
+            canExclude={false}
+            modifier
+            onClick={() => {
+              setModifier("any");
+            }}
+          />
+        ) : null}
+        {showModifiers ? (
+          <LanguageRow
+            variant="sidebar"
+            label={t(intl, "mangaTools.filter.group.none")}
+            state="candidate"
+            canExclude={false}
+            modifier
+            onClick={() => {
+              setModifier("none");
+            }}
+          />
+        ) : null}
+        {candidates.map((o) => (
+          <LanguageRow
+            variant="sidebar"
+            key={o.value}
+            label={o.label}
+            flag={flagOf(o)}
+            state="candidate"
+            onClick={() => {
+              toggleInclude(o.value);
+            }}
+            onExclude={() => {
+              toggleExclude(o.value);
+            }}
+          />
+        ))}
+      </ul>
+    </SidebarSection>
+  );
+}
+
 // Published on the namespace so the smoke tests can exercise the tag re-wording
 // without rendering a section.
 NS.relabelTags = relabelTags;
 NS.relabelCensorshipTags = relabelCensorshipTags;
 NS.relabelMangaTags = relabelMangaTags;
+NS.relabelGroupTags = relabelGroupTags;
+NS.relabelOriginalTags = relabelOriginalTags;

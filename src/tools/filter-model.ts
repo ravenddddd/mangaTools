@@ -521,6 +521,61 @@ function mangaConditionLabel(
 }
 
 /**
+ * The translation group's wording for a condition, in the same shape as the two
+ * above — except that the values are printed as they are.
+ *
+ * There is no table to look a group up in: the name in the condition is the name a
+ * reader typed into some gallery, so it is the name the tag says. That is also the
+ * one thing this wording must not do, and the language one must: normalise. A group
+ * spelled oddly in the filter is a filter that matches nothing, and the tag has to
+ * show that rather than a tidier name that would match something.
+ */
+function groupConditionLabel(
+  intl: MangaToolsIntl,
+  condition: MangaToolsCustomFieldCondition
+): string | null {
+  const word = modifierWord(intl, condition.modifier);
+  if (word === null) return null;
+
+  return intl.formatMessage(
+    { id: "criterion_modifier.format_string" },
+    {
+      criterion: translationGroupHeading(intl),
+      modifierString: word,
+      valueString: conditionValues(condition).join(", "),
+    }
+  );
+}
+
+/**
+ * The raw field's wording for a condition, in the manga mark's shape and for the
+ * same reason: its only two conditions are NOT_NULL and IS_NULL, and the tag should
+ * say 生肉 / 熟肉 rather than "is (not) null", which is the mechanism rather than
+ * the meaning.
+ */
+function originalConditionLabel(
+  intl: MangaToolsIntl,
+  condition: MangaToolsCustomFieldCondition
+): string | null {
+  const state =
+    condition.modifier === "NOT_NULL"
+      ? t(intl, "mangaTools.filter.original.raw")
+      : condition.modifier === "IS_NULL"
+        ? t(intl, "mangaTools.filter.original.cooked")
+        : null;
+  if (state === null) return null;
+
+  return intl.formatMessage(
+    { id: "criterion_modifier.format_string" },
+    {
+      criterion: originalHeading(intl),
+      modifierString: message(intl, "criterion_modifier.equals", "is"),
+      valueString: state,
+    }
+  );
+}
+
+/**
  * One condition's tag sentence, for whichever of this plugin's fields it names.
  *
  * Dispatches on the field, because the three fields share one criterion and so
@@ -537,6 +592,10 @@ export function conditionLabel(
   if (field === NS.FIELD_NAME) return languageConditionLabel(intl, condition);
   if (field === NS.CENSORSHIP_FIELD_NAME)
     return censorshipConditionLabel(intl, condition);
+  if (field === NS.TRANSLATION_GROUP_FIELD_NAME)
+    return groupConditionLabel(intl, condition);
+  if (field === NS.ORIGINAL_FIELD_NAME)
+    return originalConditionLabel(intl, condition);
   if (field === NS.MANGA_FIELD_NAME)
     return mangaConditionLabel(intl, condition);
   return null;
@@ -848,6 +907,139 @@ export function applyCensorship(
   history.replace(Object.assign({}, history.location, { search: search }));
 }
 
+// ── Translation group: the language filter's shape, on names the library defines ──
+//
+// Read and written exactly as the language is — (Any)/(None) plus include and
+// exclude lists — because it is the same kind of question: which of a list of
+// names. Two things differ. The list comes from the library rather than from a
+// table this plugin ships (see NS.translationGroups), and a value is free text, so
+// a tag prints the name it holds rather than looking one up — which is also what
+// lets a group that no gallery carries any more still read as itself.
+
+/** Is this condition about the translation group? */
+function isGroupCondition(condition: MangaToolsCustomFieldCondition): boolean {
+  return (
+    !!condition &&
+    NS.ownField(condition.field) === NS.TRANSLATION_GROUP_FIELD_NAME
+  );
+}
+
+/** Reads the translation group selection from the filter. */
+export function readGroupFilter(
+  filter: MangaToolsFilterModel
+): MangaToolsLanguageSelection {
+  const criterion = customFieldsCriterion(filter);
+  if (!criterion?.value) return EMPTY_SELECTION;
+
+  const selection: MangaToolsLanguageSelection = {
+    modifier: "",
+    included: [],
+    excluded: [],
+  };
+
+  criterion.value.forEach((condition) => {
+    if (!isGroupCondition(condition)) return;
+
+    if (condition.modifier === "NOT_NULL") selection.modifier = "any";
+    else if (condition.modifier === "IS_NULL") selection.modifier = "none";
+    else if (condition.modifier === "EQUALS") {
+      selection.included = conditionValues(condition);
+    } else if (condition.modifier === "NOT_EQUALS") {
+      selection.excluded = conditionValues(condition);
+    }
+  });
+
+  return selection;
+}
+
+/** The conditions a group selection turns into. See selectionConditions. */
+function groupSelectionConditions(
+  selection: MangaToolsLanguageSelection
+): MangaToolsCustomFieldCondition[] {
+  if (selection.modifier === "any") {
+    return [{ field: NS.TRANSLATION_GROUP_FIELD_NAME, modifier: "NOT_NULL" }];
+  }
+  if (selection.modifier === "none") {
+    return [{ field: NS.TRANSLATION_GROUP_FIELD_NAME, modifier: "IS_NULL" }];
+  }
+
+  const conditions: MangaToolsCustomFieldCondition[] = [];
+  if (selection.included.length) {
+    conditions.push({
+      field: NS.TRANSLATION_GROUP_FIELD_NAME,
+      modifier: "EQUALS",
+      value: selection.included.slice(),
+    });
+  }
+  if (selection.excluded.length) {
+    conditions.push({
+      field: NS.TRANSLATION_GROUP_FIELD_NAME,
+      modifier: "NOT_EQUALS",
+      value: selection.excluded.slice(),
+    });
+  }
+  return conditions;
+}
+
+/** The query parameters for the filter with this group selection applied. */
+export function groupFilterQuery(
+  filter: MangaToolsFilterModel,
+  selection: MangaToolsLanguageSelection
+): string | null {
+  if (!filter || typeof filter.clone !== "function") return null;
+
+  // The same custom-fields criterion the other fields use (see
+  // censorshipFilterQuery): one criterion per list, holding a condition per field.
+  const options = filter.options?.criterionOptions || [];
+  let option: MangaToolsCriterionOption | null = null;
+  for (let i = 0; i < options.length; i++) {
+    if (options[i].type === CUSTOM_FIELDS_TYPE) option = options[i];
+  }
+  if (!option) return null;
+  const criterionOption = option;
+
+  const next = filter.clone();
+  let criterion = customFieldsCriterion(next);
+
+  const kept: MangaToolsCustomFieldCondition[] = [];
+  if (criterion?.value) {
+    for (let j = 0; j < criterion.value.length; j++) {
+      if (!isGroupCondition(criterion.value[j])) kept.push(criterion.value[j]);
+    }
+  }
+
+  const conditions = kept.concat(groupSelectionConditions(selection));
+
+  if (!conditions.length) {
+    next.criteria = (next.criteria || []).filter((c) => c !== criterion);
+  } else {
+    if (!criterion) {
+      criterion = criterionOption.makeCriterion();
+      next.criteria = (next.criteria || []).concat([criterion]);
+    }
+    criterion.value = conditions;
+  }
+
+  return next.makeQueryParameters();
+}
+
+/** Reports a group change the way applyLanguage does, by replacing the URL. */
+export function applyGroup(
+  filter: MangaToolsFilterModel,
+  history: MangaToolsHistory,
+  selection: MangaToolsLanguageSelection
+): void {
+  const search = groupFilterQuery(filter, selection);
+  if (search === null) {
+    console.error(
+      "[mangaTools] this list has no custom-fields filter, so the translation group filter is unavailable"
+    );
+    return;
+  }
+
+  history.replace(Object.assign({}, history.location, { search: search }));
+}
+
 // ── Manga mark: a boolean filter, like Stash's organised ──────────────────
 // The mark is a presence, so the filter is one choice among two — marked or
 // unmarked — plus "neither asked for". No include/exclude, no search box: two
@@ -946,6 +1138,110 @@ export function applyManga(
   history.replace(Object.assign({}, history.location, { search: search }));
 }
 
+// ── Raw: a presence, like the manga mark ──────────────────────────────────
+//
+// The field carries one value and means one thing by being there, so the filter is
+// a choice among two — raw or not — plus "neither asked for", and presence is what
+// is asked. `NS.setField` deletes a key written empty, so a gallery that stopped
+// being the original has no key at all rather than an empty one, which is what
+// makes "the key is there" the same question as `NS.isOriginal`.
+
+/** Is this condition about the raw mark? */
+function isOriginalCondition(
+  condition: MangaToolsCustomFieldCondition
+): boolean {
+  return !!condition && NS.ownField(condition.field) === NS.ORIGINAL_FIELD_NAME;
+}
+
+/** Reads the raw state from the filter. */
+export function readOriginalFilter(
+  filter: MangaToolsFilterModel
+): MangaToolsMangaState {
+  const criterion = customFieldsCriterion(filter);
+  if (!criterion?.value) return "";
+
+  let state: MangaToolsMangaState = "";
+  criterion.value.forEach((condition) => {
+    if (!isOriginalCondition(condition)) return;
+
+    if (condition.modifier === "NOT_NULL") state = "marked";
+    else if (condition.modifier === "IS_NULL") state = "unmarked";
+  });
+
+  return state;
+}
+
+/** The condition a raw state turns into, or none for "not asked". */
+function originalSelectionConditions(
+  state: MangaToolsMangaState
+): MangaToolsCustomFieldCondition[] {
+  if (state === "marked") {
+    return [{ field: NS.ORIGINAL_FIELD_NAME, modifier: "NOT_NULL" }];
+  }
+  if (state === "unmarked") {
+    return [{ field: NS.ORIGINAL_FIELD_NAME, modifier: "IS_NULL" }];
+  }
+  return [];
+}
+
+/** The query parameters for the filter with this raw state applied. */
+export function originalFilterQuery(
+  filter: MangaToolsFilterModel,
+  state: MangaToolsMangaState
+): string | null {
+  if (!filter || typeof filter.clone !== "function") return null;
+
+  const options = filter.options?.criterionOptions || [];
+  let option: MangaToolsCriterionOption | null = null;
+  for (let i = 0; i < options.length; i++) {
+    if (options[i].type === CUSTOM_FIELDS_TYPE) option = options[i];
+  }
+  if (!option) return null;
+  const criterionOption = option;
+
+  const next = filter.clone();
+  let criterion = customFieldsCriterion(next);
+
+  const kept: MangaToolsCustomFieldCondition[] = [];
+  if (criterion?.value) {
+    for (let j = 0; j < criterion.value.length; j++) {
+      if (!isOriginalCondition(criterion.value[j]))
+        kept.push(criterion.value[j]);
+    }
+  }
+
+  const conditions = kept.concat(originalSelectionConditions(state));
+
+  if (!conditions.length) {
+    next.criteria = (next.criteria || []).filter((c) => c !== criterion);
+  } else {
+    if (!criterion) {
+      criterion = criterionOption.makeCriterion();
+      next.criteria = (next.criteria || []).concat([criterion]);
+    }
+    criterion.value = conditions;
+  }
+
+  return next.makeQueryParameters();
+}
+
+/** Reports a raw change the way applyLanguage does, by replacing the URL. */
+export function applyOriginal(
+  filter: MangaToolsFilterModel,
+  history: MangaToolsHistory,
+  state: MangaToolsMangaState
+): void {
+  const search = originalFilterQuery(filter, state);
+  if (search === null) {
+    console.error(
+      "[mangaTools] this list has no custom-fields filter, so the raw filter is unavailable"
+    );
+    return;
+  }
+
+  history.replace(Object.assign({}, history.location, { search: search }));
+}
+
 /** The language table's own label, from Stash's locale files (see mangaTools.tsx
  *  for the longer note; this is the same message, duplicated so this module
  *  does not have to reach back into the entry file). */
@@ -959,6 +1255,24 @@ export function fieldLabel(intl: MangaToolsIntl): string {
 /** The censorship field's own label — this plugin's word, since Stash has none */
 export function censorshipHeading(intl: MangaToolsIntl): string {
   return t(intl, "mangaTools.censorship.heading");
+}
+
+/** The translation group's label, and the raw field's — this plugin's words too */
+export function translationGroupHeading(intl: MangaToolsIntl): string {
+  return t(intl, "mangaTools.translationGroup.heading");
+}
+
+/**
+ * The raw field's criterion name, which is deliberately not the field's own name.
+ *
+ * The field is 生肉, and its two states are 生肉 and 熟肉 — so a tag built from the
+ * field's name says "生肉 是 生肉", which is the same word twice and reads as a
+ * mistake. The criterion is therefore the *thing being asked about* (原文, the
+ * original text) and the values are its two answers, which is the shape the
+ * censorship tag already has: "修正 是 有修正".
+ */
+export function originalHeading(intl: MangaToolsIntl): string {
+  return t(intl, "mangaTools.filter.original.heading");
 }
 
 /** Stash's own wording for the two list states, so nothing here reads as foreign */
@@ -988,5 +1302,9 @@ NS.readCensorshipFilter = readCensorshipFilter;
 NS.censorshipFilterQuery = censorshipFilterQuery;
 NS.readMangaFilter = readMangaFilter;
 NS.mangaFilterQuery = mangaFilterQuery;
+NS.readGroupFilter = readGroupFilter;
+NS.groupFilterQuery = groupFilterQuery;
+NS.readOriginalFilter = readOriginalFilter;
+NS.originalFilterQuery = originalFilterQuery;
 NS.registerLanguageCriterionOption = registerLanguageCriterionOption;
 NS.adoptLanguageCriterion = adoptLanguageCriterion;

@@ -221,6 +221,19 @@ export interface MangaToolsNamespace {
     galleries: Map<string, unknown> | null
   ): MangaToolsUsualLanguageMap;
   /**
+   * Every translation group the library holds, by name, sorted.
+   *
+   * The sidebar's group filter offers these rather than a free-text box, the same
+   * way the language filter offers the languages — and from the same store, which
+   * is why this is a function on the namespace rather than the section reaching
+   * into a map it has no business holding. A group that no gallery carries any
+   * more is not in it; the filter keeps such a value visible from the *filter*
+   * instead, see visibleOptions.
+   */
+  translationGroups(): string[];
+  /** The same store, walked once, for the flags the group filter draws. */
+  usualLanguages(): MangaToolsUsualLanguageMap;
+  /**
    * Which of this plugin's fields a key names — the canonical name, or "" for a
    * key that is not ours. The one list every recogniser asks.
    */
@@ -419,10 +432,29 @@ export interface MangaToolsNamespace {
     filter: MangaToolsFilterModel,
     state: MangaToolsMangaState
   ): string | null;
+  /**
+   * The translation group's filter, in the language filter's shape: the groups
+   * named in the filter, with the same include/exclude/(Any)/(None) meaning.
+   */
+  readGroupFilter(filter: MangaToolsFilterModel): MangaToolsLanguageSelection;
+  groupFilterQuery(
+    filter: MangaToolsFilterModel,
+    selection: MangaToolsLanguageSelection
+  ): string | null;
+  /** The raw mark's filter state, in the manga mark's shape: raw, not, or neither. */
+  readOriginalFilter(filter: MangaToolsFilterModel): MangaToolsMangaState;
+  originalFilterQuery(
+    filter: MangaToolsFilterModel,
+    state: MangaToolsMangaState
+  ): string | null;
   /** Re-words Stash's tags for the censorship filter, one label per tag. */
   relabelCensorshipTags(labels: string[]): void;
   /** Re-words Stash's tags for the manga filter, one label per tag. */
   relabelMangaTags(labels: string[]): void;
+  /** Re-words Stash's tags for the translation group's filter. */
+  relabelGroupTags(labels: string[]): void;
+  /** Re-words Stash's tags for the raw filter. */
+  relabelOriginalTags(labels: string[]): void;
   /**
    * Adds the Language criterion to a list's filter options, so Stash's "edit
    * filters" dialog offers a card for it. Idempotent.

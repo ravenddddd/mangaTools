@@ -798,6 +798,39 @@ module.exports = () => {
     ["漫画 是 已标记"]
   );
 
+  // The last two fields word their tags the same way, from their own conditions.
+  // The group's prints the name it holds: there is no table to look a group up in,
+  // and a name spelled oddly in the filter matches nothing, so the tag has to say
+  // what the filter says rather than a tidier name that would match something else.
+  const lastTwoCriterion = makeFilterModel([
+    customFieldsCriterion([
+      {
+        field: NS.TRANSLATION_GROUP_FIELD_NAME,
+        modifier: "EQUALS",
+        value: ["Lily Manga"],
+      },
+      { field: NS.ORIGINAL_FIELD_NAME, modifier: "NOT_NULL" },
+    ]),
+  ]);
+  assert.deepStrictEqual(
+    NS.fieldTagLabels(intl, lastTwoCriterion, NS.TRANSLATION_GROUP_FIELD_NAME),
+    ["翻译组 是 Lily Manga"],
+    "a group tag names the criterion and prints the value as it stands"
+  );
+  assert.deepStrictEqual(
+    NS.fieldTagLabels(intl, lastTwoCriterion, NS.ORIGINAL_FIELD_NAME),
+    ["原文 是 生肉"],
+    "and a raw tag says the state, not the mechanism"
+  );
+  assert.strictEqual(
+    NS.conditionLabel(intl, {
+      field: NS.ORIGINAL_FIELD_NAME,
+      modifier: "IS_NULL",
+    }),
+    "原文 是 熟肉",
+    "…either way round"
+  );
+
   // Two conditions of one field are two tags, as Stash draws them
   assert.deepStrictEqual(
     NS.fieldTagLabels(

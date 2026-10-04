@@ -11,8 +11,10 @@ const {
   conditionsOf,
   customFieldsCriterion,
   encodedCriteria,
+  groupConditionsOf,
   makeFilterModel,
   mangaConditionsOf,
+  originalConditionsOf,
   sel,
 } = require("../helpers.js");
 
@@ -477,7 +479,155 @@ module.exports = () => {
     "the manga write keeps both other fields and adds its own"
   );
 
+  // ── 10c3. The translation group and raw: the same two shapes again ──
+  // The group is the language filter's shape on a field whose values the library
+  // defines; raw is the manga filter's shape on the other field that is a presence.
+  // Tested for the same three things as the rest: read, write, and leaving the
+  // other fields' conditions alone.
+
+  assert.deepStrictEqual(
+    NS.readGroupFilter(makeFilterModel()),
+    sel(),
+    "a filter with no criteria means no group selection"
+  );
+  assert.deepStrictEqual(
+    NS.readGroupFilter(
+      makeFilterModel([customFieldsCriterion([groupConditionsOf("NOT_NULL")])])
+    ),
+    sel("any"),
+    "NOT_NULL is the (Any) state here too"
+  );
+  assert.deepStrictEqual(
+    NS.readGroupFilter(
+      makeFilterModel([
+        customFieldsCriterion([
+          groupConditionsOf("EQUALS", ["Lily Manga", "Aozora"]),
+        ]),
+      ])
+    ),
+    sel("", ["Lily Manga", "Aozora"]),
+    "EQUALS reads back as the included groups, in order"
+  );
+  assert.deepStrictEqual(
+    NS.readGroupFilter(
+      makeFilterModel([
+        customFieldsCriterion([groupConditionsOf("NOT_EQUALS", ["Aozora"])]),
+      ])
+    ),
+    sel("", [], ["Aozora"]),
+    "NOT_EQUALS reads back as excluded"
+  );
+  assert.deepStrictEqual(
+    NS.readGroupFilter(
+      makeFilterModel([
+        customFieldsCriterion([
+          groupConditionsOf("NOT_NULL"),
+          conditionsOf("EQUALS", ["ja"]),
+        ]),
+      ])
+    ),
+    sel("any"),
+    "and a language condition beside it is not read as a group"
+  );
+
+  function writeGroup(selection, conditions) {
+    const model = makeFilterModel(
+      conditions === undefined ? [] : [customFieldsCriterion(conditions)]
+    );
+    encodedCriteria.length = 0;
+    NS.groupFilterQuery(model, selection);
+    return encodedCriteria.length
+      ? encodedCriteria[encodedCriteria.length - 1]
+      : null;
+  }
+  assert.deepStrictEqual(
+    languageConditions(writeGroup(sel("", ["Lily Manga"]))),
+    [groupConditionsOf("EQUALS", ["Lily Manga"])],
+    "an included group becomes one EQUALS condition holding its name"
+  );
+  assert.deepStrictEqual(
+    languageConditions(writeGroup(sel("", [], ["Aozora"]))),
+    [groupConditionsOf("NOT_EQUALS", ["Aozora"])],
+    "and an excluded one a NOT_EQUALS"
+  );
+  assert.deepStrictEqual(
+    writeGroup(sel(), [groupConditionsOf("EQUALS", ["Lily Manga"])]),
+    [],
+    "clearing the selection drops the criterion when nothing else is on it"
+  );
+  assert.deepStrictEqual(
+    languageConditions(
+      writeGroup(sel("", ["Aozora"]), [
+        conditionsOf("EQUALS", ["ja"]),
+        censorshipConditionsOf("EQUALS", ["censored"]),
+      ])
+    ),
+    [
+      conditionsOf("EQUALS", ["ja"]),
+      censorshipConditionsOf("EQUALS", ["censored"]),
+      groupConditionsOf("EQUALS", ["Aozora"]),
+    ],
+    "the group write keeps the other fields and adds its own at the end"
+  );
+
+  assert.strictEqual(
+    NS.readOriginalFilter(makeFilterModel()),
+    "",
+    "no criteria means no raw state"
+  );
+  assert.strictEqual(
+    NS.readOriginalFilter(
+      makeFilterModel([
+        customFieldsCriterion([originalConditionsOf("NOT_NULL")]),
+      ])
+    ),
+    "marked",
+    "NOT_NULL is raw — the key is there or the gallery is not the original"
+  );
+  assert.strictEqual(
+    NS.readOriginalFilter(
+      makeFilterModel([
+        customFieldsCriterion([
+          originalConditionsOf("IS_NULL"),
+          groupConditionsOf("EQUALS", ["Aozora"]),
+        ]),
+      ])
+    ),
+    "unmarked",
+    "IS_NULL is not raw, read beside another field's condition"
+  );
+
+  function writeOriginal(state, conditions) {
+    const model = makeFilterModel(
+      conditions === undefined ? [] : [customFieldsCriterion(conditions)]
+    );
+    encodedCriteria.length = 0;
+    const result = NS.originalFilterQuery(model, state);
+    return {
+      result,
+      criteria: encodedCriteria.length
+        ? encodedCriteria[encodedCriteria.length - 1]
+        : null,
+    };
+  }
+  assert.deepStrictEqual(
+    languageConditions(writeOriginal("marked").criteria),
+    [originalConditionsOf("NOT_NULL")],
+    "raw becomes NOT_NULL"
+  );
+  assert.deepStrictEqual(
+    languageConditions(writeOriginal("unmarked").criteria),
+    [originalConditionsOf("IS_NULL")],
+    "and not-raw IS_NULL"
+  );
+  assert.deepStrictEqual(
+    writeOriginal("", [originalConditionsOf("NOT_NULL")]).criteria,
+    [],
+    "clearing the raw state drops the criterion entirely"
+  );
+
   console.log(
     "✓ censorship & manga filters (read and write, composed on the one criterion)"
   );
+  console.log("✓ translation group & raw filters (read and write)");
 };

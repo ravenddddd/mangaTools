@@ -44,31 +44,23 @@
   "mangaReader.reimportWarning": "用 Stash 的章节替换这本的？插件已有的那份会被覆盖。",
   "mangaReader.reimportReplace": "替换",
   "mangaReader.reimportCancel": "取消",
-
   "mangaTools.select.placeholder": "选择语言…",
-
   "mangaTools.settings.readerTakeover.heading": "接管 Stash 原生灯箱",
   "mangaTools.settings.readerTakeover.description": "标记为漫画的画廊，灯箱由本插件重新设计，不会更改原生灯箱设置。",
   "mangaTools.settings.readerTakeover.note": "插件灯箱相关设置在灯箱页面设置中调整。",
-
   "mangaTools.settings.manageChapters.heading": "接管 Stash 的章节系统",
   "mangaTools.settings.manageChapters.description": "标签页的创建和编辑由插件接管，写入插件自己的章节字段。已存在的 Stash 原生章节会被静默导入，但不会被修改。",
   "mangaTools.settings.manageChapters.note": "开启后，对章节的任何编辑都不会修改 Stash 的原生章节。",
-
   "mangaTools.settings.fields.heading": "自定义字段",
   "mangaTools.settings.fields.description": "插件的字段通过写入 custom fields 添加，不影响原生数据；关掉任何一个，都不会清除画廊上已有的值。",
-
   "mangaTools.settings.enabledLanguages.heading": "启用的语言",
   "mangaTools.settings.enabledLanguages.description": "只有这些语言会出现在编辑页的下拉框里。显示方式（封面徽章和详情页那一行）不受影响。留空表示显示全部语言。",
   "mangaTools.settings.enabledLanguages.placeholder": "全部语言",
-
   "mangaTools.settings.showFlags.heading": "显示国旗",
   "mangaTools.settings.showFlags.description": "在语言名称旁画出国旗。关掉后只显示名称。",
-
   "mangaTools.settings.showCoverBadge.heading": "在封面上显示语言",
   "mangaTools.settings.showCoverBadge.description": "画廊封面右下角的徽章。关掉国旗时显示语言名称而不是国旗。",
   "mangaTools.settings.showCoverBadge.help": "只决定画不画：关掉后封面不带语言。画廊上的值一个都不会少，重新打开就还在。",
-
   "mangaTools.settings.display.heading": "漫画信息的显示",
   "mangaTools.settings.openDetailsBlock.heading": "漫画信息详情默认展开",
   "mangaTools.settings.openEditBlock.heading": "漫画信息编辑默认展开",
@@ -77,38 +69,29 @@
   "mangaTools.settings.showDisabledFields.heading": "显示禁用的插件字段",
   "mangaTools.settings.showDisabledFields.description": "开启时，禁用的字段不再隐藏，详情页和编辑页上由 Stash 原生显示自定义字段。该选项不会修改对应的值。",
   "mangaTools.settings.showDisabledFields.note": "启用的字段始终由插件接管",
-
   "mangaTools.settings.mark.heading": "漫画标记",
   "mangaTools.settings.confirmUnmark.heading": "取消漫画标记时确认",
   "mangaTools.settings.deleteOnUnmark.heading": "取消漫画标记时清除插件字段",
   "mangaTools.settings.deleteOnUnmark.description": "开启时，取消标记会连同插件自定义字段一起清除。关闭后，取消标记时这些值会保留在画廊上。",
   "mangaTools.settings.coverIcon.heading": "在封面信息栏显示漫画图标",
   "mangaTools.settings.coverIcon.help": "和语言徽章不是一回事：它说的是「这本归插件管理」，而这不是一个会在封面上去扫的值。",
-
   "mangaTools.settings.help.cover": "封面",
   "mangaTools.settings.help.card.title": "示例漫画标题",
   "mangaTools.settings.help.card.date": "2026-09-30",
-
   "mangaTools.manga.mark": "标记为漫画",
   "mangaTools.manga.marked": "漫画",
   "mangaTools.manga.isManga": "是否为漫画",
-
   "mangaTools.filter.manga.marked": "已标记",
   "mangaTools.filter.manga.unmarked": "未标记",
-
   "mangaTools.manga.confirm": "确定不再把这个画廊作为漫画管理吗？它的语言、修正和翻译组的值会被删除。",
   "mangaTools.manga.confirmResetsForm": "编辑页有未保存的改动，取消标记会把该表单重置。",
   "mangaTools.manga.confirmCancel": "取消",
   "mangaTools.manga.confirmOk": "取消标记",
-
   "mangaTools.panel.heading": "漫画信息",
-
   "mangaTools.censorship.heading": "修正",
-
   "mangaTools.censorship.censored": "有修正",
   "mangaTools.censorship.uncensored": "无修正",
   "mangaTools.censorship.unset": "未标注",
-
   "mangaTools.translationGroup.heading": "翻译组",
   "mangaTools.translationGroup.create": "创建",
   "mangaTools.translationGroup.placeholder": "填写翻译组…",
@@ -121,8 +104,12 @@
   "mangaTools.translationGroup.originalInline": "（生肉）",
   "mangaTools.translationGroup.originalMixed": "部分已标为生肉 —— 点击全部标上",
   "mangaTools.translationGroup.suggestedLanguage": "该翻译组的画廊通常是这种语言",
-
   "mangaTools.bulk.remove": "移除",
   "mangaTools.bulk.unmarkWarning": "取消标记会从选中的画廊上移除本插件的全部自定义字段（包括章节）。",
-  "mangaTools.bulk.unmarkWarningKeep": "只移除漫画标记，不会移除本插件的自定义字段。"
+  "mangaTools.bulk.unmarkWarningKeep": "只移除漫画标记，不会移除本插件的自定义字段。",
+  "mangaTools.filter.group.any": "任意翻译组",
+  "mangaTools.filter.group.none": "没有翻译组",
+  "mangaTools.filter.original.heading": "原文",
+  "mangaTools.filter.original.raw": "生肉",
+  "mangaTools.filter.original.cooked": "熟肉"
 }

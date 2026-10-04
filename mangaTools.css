@@ -1002,6 +1002,26 @@
  */
 
 /*
+ * The mark's icon after a sidebar section's heading, saying which headings in that
+ * column are this plugin's.
+ *
+ * Dimmed rather than drawn at full strength, and that is the whole of the rule: a
+ * full-strength mark beside a heading reads as one more icon *of* the section — a
+ * thing to click, or a state — where this is a label on the heading. `0.5` is the
+ * same value the unmarked manga switch and the absent shop logos use for "present,
+ * not claiming anything", so the plugin has one dimming rather than three.
+ *
+ * The margin is Stash's own icon margin (the `.fa-icon { margin: 0 0.4rem }` its
+ * index.scss sets unscoped) — written here rather than inherited because this is a
+ * span and not an `<i>`, so that rule never reaches it, and the heading would
+ * otherwise end flush against the icon.
+ */
+.sidebar-list-filter .manga-tools-sidebar-mark {
+  margin-left: 0.4rem;
+  opacity: 0.5;
+}
+
+/*
  * ─────────────────────── The manga switch ───────────────────────
  *
  * The switch that makes a gallery manga — this plugin's entry point, and the only

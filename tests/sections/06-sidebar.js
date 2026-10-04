@@ -17,9 +17,11 @@ const {
   fakeHistory,
   find,
   hasText,
+  groupConditionsOf,
   historyReplaces,
   makeFilterModel,
   mangaConditionsOf,
+  runSection,
   state,
   tagWithText,
 } = require("../helpers.js");
@@ -89,11 +91,13 @@ module.exports = () => {
     return Object.assign({}, el, { node: shell.type(shell.props), shell });
   };
 
+  // The sections in the order the container draws them: the mark first (it is the
+  // one that is always there), then the four fields in their own order.
+  const renderMangaFilter = (conditions) => renderSidebarSection(0, conditions);
   const renderLanguageFilter = (conditions) =>
-    renderSidebarSection(0, conditions);
-  const renderCensorshipFilter = (conditions) =>
     renderSidebarSection(1, conditions);
-  const renderMangaFilter = (conditions) => renderSidebarSection(2, conditions);
+  const renderCensorshipFilter = (conditions) =>
+    renderSidebarSection(2, conditions);
 
   let section = renderLanguageFilter();
 
@@ -111,19 +115,47 @@ module.exports = () => {
   );
   assert.strictEqual(
     container.props.children.length,
-    4,
-    "three plugin sections and Stash's own output"
+    6,
+    "five plugin sections and Stash's own output"
   );
   assert.deepStrictEqual(
-    container.props.children.slice(0, 3).map((c) => typeof c.type),
-    ["function", "function", "function"],
-    "the three sections come first"
+    container.props.children.slice(0, 5).map((c) => typeof c.type),
+    ["function", "function", "function", "function", "function"],
+    "the five sections come first"
   );
   assert.strictEqual(
-    container.props.children[3],
+    container.props.children[5],
     original,
     "…and Stash's own filter sections after them"
   );
+
+  // What each one is, read from what it draws: the heading it wraps, and the mark
+  // that says the heading is this plugin's. The mark is on every section — the
+  // sidebar is Stash's and its own sections look the same, so without it a reader
+  // has no way to tell which of the fourteen came from a plugin.
+  const sectionFaces = () =>
+    [0, 1, 2, 3, 4].map((index) => {
+      // `shell` is the shared shell *element* — its props are the heading and the
+      // rows it was handed — and `node` is that shell rendered, which is where the
+      // heading button's own children are.
+      const { shell, node } = renderSidebarSection(index);
+      // The header div holds the button as its only child, so that is not a list.
+      const button = node.props.children[0].props.children;
+      const kids = button.props.children;
+      return { heading: shell.props.heading, mark: kids[2].props.className };
+    });
+  assert.deepStrictEqual(
+    sectionFaces().map((f) => f.heading),
+    ["是否为漫画", "语言", "修正", "翻译组", "生肉"],
+    "the five headings, in the order the fields are named in"
+  );
+  sectionFaces().forEach((f, at) => {
+    assert.ok(
+      f.mark.split(/\s+/).includes("manga-tools-manga-icon") &&
+        f.mark.split(/\s+/).includes("manga-tools-sidebar-mark"),
+      "section " + at + " carries the plugin's mark beside its heading"
+    );
+  });
 
   // The filter they are built from is the one published from FilteredGalleryList's
   // output — the sidebar's container is handed nothing else.
@@ -153,34 +185,46 @@ module.exports = () => {
   const noLanguage = sectionsNow();
   assert.deepStrictEqual(
     noLanguage.map((c) => (c === null ? null : typeof c.type)),
-    [null, "function", "function", "string"],
+    ["function", null, "function", "function", "function", "string"],
     "a field turned off takes its own section and nothing else"
   );
   assert.strictEqual(
-    noLanguage[1].props.filter,
+    noLanguage[4].props.filter,
     published,
-    "the two left still read the filter the list published"
+    "the four left still read the filter the list published"
   );
 
   NS.fieldCensorship = false;
   const neither = sectionsNow();
   assert.deepStrictEqual(
     neither.map((c) => (c === null ? null : typeof c.type)),
-    [null, null, "function", "string"],
+    ["function", null, null, "function", "function", "string"],
     "and the same for the censorship field"
   );
   assert.strictEqual(
-    neither[2].props.filter,
+    neither[0].props.filter,
     published,
     "while the manga section stays: it is a mark, not a field"
   );
+
+  // The two fields that arrived last are gated the same way as the two that were
+  // here first — a section per field, drawn while its field is.
+  NS.fieldTranslationGroup = false;
+  NS.fieldOriginal = false;
+  assert.deepStrictEqual(
+    sectionsNow().map((c) => (c === null ? null : typeof c.type)),
+    ["function", null, null, null, null, "string"],
+    "the group's and raw's switches take their sections too"
+  );
+  NS.fieldTranslationGroup = true;
+  NS.fieldOriginal = true;
 
   NS.fieldLanguage = true;
   NS.fieldCensorship = true;
   assert.deepStrictEqual(
     sectionsNow().map((c) => (c === null ? null : typeof c.type)),
-    ["function", "function", "function", "string"],
-    "and both come back exactly where they were"
+    ["function", "function", "function", "function", "function", "string"],
+    "and they all come back exactly where they were"
   );
 
   // The publication itself reads the model out of the rendered tree, wherever it
@@ -382,9 +426,6 @@ module.exports = () => {
   assert.ok(
     /"modifier":"NOT_EQUALS","value":\["ja"\]/.test(historyReplaces[0].search),
     "the URL should carry a NOT_EQUALS condition"
-  );
-  console.log(
-    "✓ sidebar section (placement / native markup / search / candidates / include / exclude)"
   );
 
   // Clicking (Any) asks for galleries that have a language at all
@@ -951,6 +992,144 @@ module.exports = () => {
   );
 
   console.log(
+    "✓ sidebar section (placement / native markup / search / candidates / include / exclude)"
+  );
+  console.log(
     "✓ censorship & manga sections (shared shell, values, and URL writes)"
   );
+
+  // ── 10d3. The two sections that arrived last ──
+  // The group's is the language section's shape over names the library defines
+  // rather than a table this plugin ships; raw's is the mark's, on the other field
+  // that is a presence rather than a value. What is worth asserting is what each
+  // one *offers*, since that is where they differ from the two above them.
+  //
+  // **In a timer, because these read what the library holds** — the store the
+  // plugin fills from its first fetch, which is why the runner keeps the sections
+  // that need it for afterwards. The rest of this file reads tables and filters and
+  // waits for nothing.
+  setTimeout(() => {
+    runSection("10d3 the group and raw sections", () => {
+      const renderGroupFilter = (conditions) =>
+        renderSidebarSection(3, conditions);
+      const renderOriginalFilter = (conditions) =>
+        renderSidebarSection(4, conditions);
+
+      // Children nest: a JSX list holds another list where a `.map()` produced
+      // rows, so this flattens all the way down rather than one level.
+      const asArray = (kids) => {
+        const out = [];
+        (Array.isArray(kids) ? kids : [kids]).forEach((kid) => {
+          if (kid === null || kid === undefined || kid === false) return;
+          if (Array.isArray(kid)) out.push(...asArray(kid));
+          else out.push(kid);
+        });
+        return out;
+      };
+      const candidatesOf = (sectionEl) => {
+        const list = find(sectionEl, (n) => {
+          return n.props && n.props.className === "queryable-candidate-list";
+        });
+        // The list holds the search box and then the rows; either level may be a
+        // single child rather than an array, which is React's own rule.
+        const ul = asArray(list.props.children).pop();
+        return asArray(ul.props.children).filter(
+          (r) =>
+            r && typeof r === "object" && r.props && r.props.label !== undefined
+        );
+      };
+      const labelsOf = (sectionEl) =>
+        candidatesOf(sectionEl)
+          .map((row) => row.props.label)
+          .filter((label) => typeof label === "string");
+
+      // Nothing chosen: Stash's two modifier entries, then every group the library
+      // holds, in name order. This is the whole difference from the language list —
+      // the values are what the library has rather than a table this plugin ships.
+      const groupSection = renderGroupFilter();
+      assert.deepStrictEqual(
+        labelsOf(groupSection.node),
+        ["任意翻译组", "没有翻译组", "Aozora", "Lily Manga"],
+        "the group candidates are the library's own names, behind Stash's two modifiers"
+      );
+
+      // …and each one draws its galleries' usual language where a language row
+      // draws a flag, which is the same fact the edit page's menu shows.
+      const lilyRow = candidatesOf(groupSection.node).find(
+        (row) => row.props.label === "Lily Manga"
+      );
+      assert.strictEqual(
+        lilyRow.props.flag,
+        "cn",
+        "a group whose galleries are usually zh-Hans carries that flag"
+      );
+      assert.strictEqual(
+        candidatesOf(groupSection.node).find(
+          (row) => row.props.label === "Aozora"
+        ).props.flag,
+        null,
+        "and a group the store has nothing to say about carries none"
+      );
+
+      // Raw: two rows and no search box — two values need neither a search nor an
+      // exclude, which is the mark's own reasoning.
+      const rawSection = renderOriginalFilter();
+      assert.deepStrictEqual(
+        labelsOf(rawSection.node),
+        ["生肉", "熟肉"],
+        "raw offers its two states, in the plugin's own words"
+      );
+      assert.strictEqual(
+        find(rawSection.node, (n) => {
+          return (
+            n.props && n.props.className === "clearable-text-field form-control"
+          );
+        }),
+        null,
+        "…with no search box, because two values are not a list to search"
+      );
+      assert.deepStrictEqual(
+        candidatesOf(rawSection.node).map(
+          (row) => row.props.leading.props.className
+        ),
+        ["fa-fw manga-tools-raw-icon", "fa-fw manga-tools-cooked-icon"],
+        "each row draws its own steak where a language row draws a flag"
+      );
+
+      // Clicking one writes the presence condition the model turns it into.
+      historyReplaces.length = 0;
+      candidatesOf(rawSection.node)[0].props.onClick();
+      assert.strictEqual(
+        historyReplaces.length,
+        1,
+        "choosing raw rewrites the URL"
+      );
+      assert.ok(
+        /"field":"plugin.mangaTools.original","modifier":"NOT_NULL"/.test(
+          decodeURIComponent(historyReplaces[0].search)
+        ),
+        "as a NOT_NULL on the raw field — the key is there or it is not"
+      );
+
+      // A group the filter already asks for stays in the list even when no gallery
+      // carries it any more, for the reason the language list keeps a disabled
+      // code: a filter showing a value its own list does not have is one nobody
+      // can read.
+      const stale = renderGroupFilter([groupConditionsOf("EQUALS", ["Gone"])]);
+      // Above the fold, as every chosen value is — the list of candidates is what
+      // the search narrows, and what the filter already asks for is not a
+      // candidate for anything.
+      const staleChosen = find(
+        stale.node,
+        (n) => n.props && n.props.className === "selected-list"
+      );
+      assert.ok(
+        hasText(staleChosen, "Gone"),
+        "a group the library no longer holds is still shown while the filter asks for it"
+      );
+      console.log(
+        "✓ the group and raw sections (the library's names / the steaks / the modifiers)"
+      );
+    });
+  }, 20);
 };

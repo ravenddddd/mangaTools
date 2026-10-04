@@ -44,31 +44,23 @@
   "mangaReader.reimportWarning": "用 Stash 的章節取代這本的？外掛已有的那份會被覆蓋。",
   "mangaReader.reimportReplace": "取代",
   "mangaReader.reimportCancel": "取消",
-
   "mangaTools.select.placeholder": "選擇語言…",
-
   "mangaTools.settings.readerTakeover.heading": "接管 Stash 原生燈箱",
   "mangaTools.settings.readerTakeover.description": "標記為漫畫的畫廊，燈箱由本外掛重新設計，不會更改原生燈箱設定。",
   "mangaTools.settings.readerTakeover.note": "外掛燈箱相關設定在燈箱頁面設定中調整。",
-
   "mangaTools.settings.manageChapters.heading": "接管 Stash 的章節系統",
   "mangaTools.settings.manageChapters.description": "分頁的建立和編輯由外掛接管，寫入外掛自己的章節欄位。已存在的 Stash 原生章節會被靜默匯入，但不會被修改。",
   "mangaTools.settings.manageChapters.note": "開啟後，對章節的任何編輯都不會修改 Stash 的原生章節。",
-
   "mangaTools.settings.fields.heading": "自訂欄位",
   "mangaTools.settings.fields.description": "外掛的欄位透過寫入 custom fields 加入，不影響原生資料；關掉任何一個，都不會清除畫廊上已有的值。",
-
   "mangaTools.settings.enabledLanguages.heading": "啟用的語言",
   "mangaTools.settings.enabledLanguages.description": "只有這些語言會出現在編輯頁的下拉選單裡。顯示方式（封面徽章和詳細頁那一行）不受影響。留空表示顯示全部語言。",
   "mangaTools.settings.enabledLanguages.placeholder": "全部語言",
-
   "mangaTools.settings.showFlags.heading": "顯示國旗",
   "mangaTools.settings.showFlags.description": "在語言名稱旁畫出國旗。關掉後只顯示名稱。",
-
   "mangaTools.settings.showCoverBadge.heading": "在封面顯示語言",
   "mangaTools.settings.showCoverBadge.description": "畫廊封面右下角的徽章。關掉國旗時顯示語言名稱而不是國旗。",
   "mangaTools.settings.showCoverBadge.help": "只決定畫不畫：關掉後封面不帶語言。畫廊上的值一個都不會少，重新打開就還在。",
-
   "mangaTools.settings.display.heading": "漫畫資訊的顯示",
   "mangaTools.settings.openDetailsBlock.heading": "漫畫資訊詳情預設展開",
   "mangaTools.settings.openEditBlock.heading": "漫畫資訊編輯預設展開",
@@ -77,38 +69,29 @@
   "mangaTools.settings.showDisabledFields.heading": "顯示停用的外掛欄位",
   "mangaTools.settings.showDisabledFields.description": "開啟時，停用的欄位不再隱藏，詳細頁和編輯頁上由 Stash 原生顯示自訂欄位。該選項不會修改對應的值。",
   "mangaTools.settings.showDisabledFields.note": "啟用的欄位始終由外掛接管",
-
   "mangaTools.settings.mark.heading": "漫畫標記",
   "mangaTools.settings.confirmUnmark.heading": "取消漫畫標記時確認",
   "mangaTools.settings.deleteOnUnmark.heading": "取消漫畫標記時清除外掛欄位",
   "mangaTools.settings.deleteOnUnmark.description": "開啟時，取消標記會連同外掛自訂欄位一起清除。關閉後，取消標記時這些值會保留在畫廊上。",
   "mangaTools.settings.coverIcon.heading": "在封面資訊欄顯示漫畫圖示",
   "mangaTools.settings.coverIcon.help": "和語言徽章不是一回事：它說的是「這本歸外掛管理」，而這不是一個會在封面上去掃的值。",
-
   "mangaTools.settings.help.cover": "封面",
   "mangaTools.settings.help.card.title": "範例漫畫標題",
   "mangaTools.settings.help.card.date": "2026-09-30",
-
   "mangaTools.manga.mark": "標記為漫畫",
   "mangaTools.manga.marked": "漫畫",
   "mangaTools.manga.isManga": "是否為漫畫",
-
   "mangaTools.filter.manga.marked": "已標記",
   "mangaTools.filter.manga.unmarked": "未標記",
-
   "mangaTools.manga.confirm": "確定不再把這個畫廊作為漫畫管理嗎？它的語言、修正和翻譯組的值會被刪除。",
   "mangaTools.manga.confirmResetsForm": "編輯頁有未儲存的改動，取消標記會把該表單重置。",
   "mangaTools.manga.confirmCancel": "取消",
   "mangaTools.manga.confirmOk": "取消標記",
-
   "mangaTools.panel.heading": "漫畫資訊",
-
   "mangaTools.censorship.heading": "修正",
-
   "mangaTools.censorship.censored": "有修正",
   "mangaTools.censorship.uncensored": "無修正",
   "mangaTools.censorship.unset": "未標註",
-
   "mangaTools.translationGroup.heading": "翻譯組",
   "mangaTools.translationGroup.create": "建立",
   "mangaTools.translationGroup.placeholder": "填寫翻譯組…",
@@ -121,8 +104,12 @@
   "mangaTools.translationGroup.originalInline": "（生肉）",
   "mangaTools.translationGroup.originalMixed": "部分已標為生肉 —— 點擊全部標上",
   "mangaTools.translationGroup.suggestedLanguage": "該翻譯組的畫廊通常是這種語言",
-
   "mangaTools.bulk.remove": "移除",
   "mangaTools.bulk.unmarkWarning": "取消標記會從選中的畫廊上移除本外掛的全部自訂欄位（包括章節）。",
-  "mangaTools.bulk.unmarkWarningKeep": "只移除漫畫標記，不會移除本外掛的自訂欄位。"
+  "mangaTools.bulk.unmarkWarningKeep": "只移除漫畫標記，不會移除本外掛的自訂欄位。",
+  "mangaTools.filter.group.any": "任意翻譯組",
+  "mangaTools.filter.group.none": "沒有翻譯組",
+  "mangaTools.filter.original.heading": "原文",
+  "mangaTools.filter.original.raw": "生肉",
+  "mangaTools.filter.original.cooked": "熟肉"
 }
