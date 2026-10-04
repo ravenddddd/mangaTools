@@ -9,10 +9,10 @@
  * the `data-field` anchor each one hangs off, the host node itself, and the rule
  * that keeps a host where it was put when React re-renders around it.
  *
- * **Nothing here imports anything of this plugin's.** It is Stash's markup, a
- * document, and three attribute selectors, which is what lets every surface reach
- * it in the same direction: index.tsx portals through it today, and each screen
- * that moves out of the entry file will too.
+ * **Nothing here imports anything of this plugin's** — Stash's API, for the one
+ * hook below that cannot be written without it, and nothing else. That is what
+ * lets every surface reach this module in the same direction: index.tsx portals
+ * through it today, and each screen that moves out of the entry file will too.
  *
  * The anchors are deliberately three different strings. Two of them name rows a
  * *dialog* has — the bulk dialog's own studio row and the row that identifies a
@@ -20,6 +20,44 @@
  * carries the same attribute), which is why finding one means searching inside
  * the dialog's own form rather than the document.
  */
+import { requirePluginApi } from "../plugin-api";
+
+const PluginApi = requirePluginApi();
+
+// React is read for the hook below and nothing else — this module draws no
+// JSX, so there is no transform to keep a binding alive for.
+const React = PluginApi.React;
+
+/**
+ * Forces one more render once a component has mounted.
+ *
+ * Every mount point in this plugin is found by looking in the document, and the
+ * first render of a page happens *before* React has committed any of it: a lookup
+ * at that point sees the previous page's markup, which on a load is nothing at
+ * all. Effects flush after the commit, so the extra render this asks for is the
+ * first one that can see the host. One bump and not a loop: the dependency list is
+ * empty, so the effect never runs twice.
+ *
+ * A layout effect rather than a plain one, for the reason this whole module
+ * exists: it runs after React has written the DOM but before the browser paints,
+ * which is the only window in which the second render is invisible. A plain effect
+ * would leave the node missing for a frame.
+ *
+ * It is here rather than beside either of its callers — the toolbar switch and the
+ * card's mark — because both portal into a host this module owns, and because what
+ * it answers is the question the rest of the module is about: when is a mount point
+ * there to be found.
+ *
+ * The tests' React stub runs the callback immediately and its state setter is
+ * inert, so under the stub this is a no-op — which is sound, because a test builds
+ * the DOM it wants found *before* calling the component.
+ */
+export function useAfterMount(): void {
+  const bump = React.useState(0)[1];
+  React.useLayoutEffect(() => {
+    bump(1);
+  }, []);
+}
 
 /**
  * Anchors for the two places a language field is inserted.

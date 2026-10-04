@@ -1423,13 +1423,14 @@ mangaTools/
 │   │   ├── mark.ts           Whether a gallery is manga now, and the one function that writes a field
 │   │   ├── edit-page.tsx     The manga block on Stash's gallery edit form, and its group memory
 │   │   ├── details.tsx       The manga block in the details tab, and the boundary around it
+│   │   ├── cards.tsx         The cover badge and the mark on the card's popover row
 │   │   ├── bulk.tsx          The bulk edit dialog's rows, their pending state and the mutation hookup
 │   │   ├── patches.ts        Registering a patch, and the two once-only logs
-│   │   ├── index.tsx         The badge, the popover, the toolbar switch, and every patch
+│   │   ├── index.tsx         The toolbar switch, and every patch registration
 │   │   ├── settings-page.tsx   The plugin's own settings page, and the multiselect it draws
 │   │   ├── fields-ui.tsx     The flag, the badge chip, the select resolver, the option formatter
 │   │   ├── icons.tsx         The mark's icon and the two steaks
-│   │   ├── hosts.ts          The mount points: the three anchors, and the host nodes under them
+│   │   ├── hosts.ts          The mount points: the anchors, the host nodes, and the hook that finds them
 │   │   ├── filter-model.ts   Criterion read/write for every field (pure, no DOM)
 │   │   ├── filter-ui.tsx     The rows and tag DOM both filter surfaces share
 │   │   ├── sidebar-filter.tsx  The five sidebar filter sections
