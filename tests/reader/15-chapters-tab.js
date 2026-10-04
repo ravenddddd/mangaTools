@@ -144,10 +144,23 @@ module.exports = async () => {
         "and the offer sits after the list, not in it and not between it and " +
           "Stash's own button"
       );
+      // The panel is found by the button above it — and the bulk editor's entry sits
+      // between the two, to the right of Stash's. What has to hold is that the walk
+      // finds Stash's button *through* ours, which is what `findPanel` now does.
       assert.strictEqual(
-        tab.container.previousElementSibling === tab.button,
-        true,
-        "which is the shape the panel is found by, so it has to still hold"
+        tab.container.previousElementSibling?.id,
+        "manga-reader-chapters-bulk",
+        "the entry is between Stash's button and the panel"
+      );
+      assert.strictEqual(
+        tab.container.previousElementSibling.previousElementSibling,
+        tab.button,
+        "…and Stash's button is still the one above it, one step further back"
+      );
+      assert.strictEqual(
+        tab.container.previousElementSibling.nextElementSibling,
+        tab.container,
+        "…so the tab is still found, which is what the shape is for"
       );
 
       const offer = control.children[0];
@@ -1024,14 +1037,19 @@ module.exports = async () => {
     const entry = dom.body.querySelector("#manga-reader-chapters-bulk");
     assert.ok(entry, "the way into the bulk editor is drawn");
     assert.strictEqual(
-      entry.nextElementSibling,
+      entry.previousElementSibling,
       tab.button,
-      "…beside Stash's own Create button"
+      "…to the right of Stash's own Create button"
     );
     assert.strictEqual(
       tab.container.previousElementSibling,
+      entry,
+      "…immediately above the panel, which is what the shape asks for"
+    );
+    assert.strictEqual(
+      entry.previousElementSibling,
       tab.button,
-      "…which is still the marker the panel is found by"
+      "…with Stash's own button one step further back, still the marker it is read by"
     );
 
     dom.click(entry);

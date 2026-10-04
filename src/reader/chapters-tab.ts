@@ -35,6 +35,7 @@
 import { numbered, stringFor } from "../i18n";
 import { NS } from "../tools/fields";
 import { bridged, takeOver } from "./bridge";
+import { drawIcon } from "./chrome";
 import {
   type MangaReaderChapter,
   type MangaReaderPlacedChapter,
@@ -283,10 +284,24 @@ function findPanel(): HTMLElement | null {
   const panels = document.querySelectorAll(SEL_PANEL);
   for (let i = 0; i < panels.length; i++) {
     const panel = panels[i] as HTMLElement;
-    if (isStashButton(panel.previousElementSibling)) return panel;
+    if (isStashButton(stashButtonBefore(panel))) return panel;
   }
 
   return null;
+}
+
+/**
+ * Stash's Create button above a panel, stepping over this plugin's own button.
+ *
+ * The bulk editor's entry sits **to the right of** Stash's, which puts it between that
+ * button and the panel — and the panel is found by the button above it, so a walk that
+ * stopped at the first node would find ours, refuse it, and lose the tab on every
+ * later pass. Ours carries an id, and that is what this steps over.
+ */
+function stashButtonBefore(panel: HTMLElement): Element | null {
+  let at = panel.previousElementSibling;
+  while (at && at.id === BULK_ID) at = at.previousElementSibling;
+  return at;
 }
 
 /**
@@ -372,7 +387,7 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
  * refuses.
  */
 function takeOverCreate(panel: HTMLElement): void {
-  const button = panel.previousElementSibling;
+  const button = stashButtonBefore(panel);
   if (!isStashButton(button)) return;
   if (button.getAttribute(TAKEN) !== null) return;
 
@@ -420,8 +435,15 @@ function ensureBulkButton(panel: HTMLElement): void {
     });
   }
 
-  if (bulkButton.parentNode !== owner.parentNode) {
-    owner.parentNode?.insertBefore(bulkButton, owner);
+  // **Copied off Stash's own button** rather than written out: it has to look like the
+  // Create beside it, and a class list taken from the thing itself cannot drift from
+  // it. The same reasoning as readNativeFieldClasses in the tools half.
+  if (bulkButton.className !== owner.className) {
+    bulkButton.className = owner.className;
+  }
+
+  if (owner.nextElementSibling !== bulkButton) {
+    owner.parentNode?.insertBefore(bulkButton, owner.nextElementSibling);
   }
 
   // **Written only when it changes**, and that is not tidiness: this runs inside a
@@ -478,7 +500,9 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
   node.addEventListener("submit", (event: Event) => event.preventDefault());
 
   const container = document.createElement("div");
-  container.className = "form-container px-3";
+  // No `px-3`, unlike the single-chapter form: this editor is a table, and its rows
+  // want the panel's whole width.
+  container.className = "form-container";
 
   const label = document.createElement("label");
   label.className = "form-label";
@@ -500,11 +524,6 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
   create.type = "button";
   create.id = BULK_CREATE_ID;
   create.className = "btn btn-primary";
-
-  const empty = document.createElement("div");
-  empty.className = "manga-reader-bulk-empty";
-  empty.textContent = stringFor(gallery.locale, "mangaReader.bulkEmpty");
-  container.appendChild(empty);
 
   /**
    * The rows as built, in the order they are shown.
@@ -578,13 +597,15 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
     }
 
     bulkPages = lined;
+    // Nothing to show before there is a list: the box says what it is for, and an
+    // empty table with an empty placeholder under it says nothing twice.
+    table.hidden = all.length === 0;
     create.disabled = all.length === 0 || good !== all.length;
     create.textContent = numbered(
       gallery.locale,
       "mangaReader.bulkCreate",
       all.length
     );
-    empty.hidden = all.length > 0;
   };
 
   /** The table, from the list in the box and the pages already typed */
@@ -647,7 +668,20 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
       const gone = document.createElement("button");
       gone.type = "button";
       gone.className = "btn btn-danger btn-sm";
-      gone.textContent = stringFor(gallery.locale, "mangaReader.bulkRemove");
+      // A glyph rather than the word: the row is four columns wide and the word does
+      // not fit in the last of them. The name rides on `aria-label` and the tooltip,
+      // so the button is not silent to anybody who cannot see the icon.
+      gone.setAttribute(
+        "aria-label",
+        stringFor(gallery.locale, "mangaReader.bulkRemove")
+      );
+      gone.setAttribute(
+        "title",
+        stringFor(gallery.locale, "mangaReader.bulkRemove")
+      );
+      // Stash's own icon component, drawn by the same helper the lightbox chrome uses:
+      // a text glyph would be a different font at a different size.
+      drawIcon(gone, "faTrash");
       gone.addEventListener("click", () => {
         bulkPages.splice(at, 1);
         const goneAt = built.findIndex((shown) => shown.tr === tr);
@@ -673,7 +707,9 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
   });
 
   const buttons = document.createElement("div");
-  buttons.className = "buttons-container px-3";
+  // `mt-3` rather than a rule of this plugin's own: the gap above the buttons is the
+  // one Stash's own forms put there.
+  buttons.className = "buttons-container mt-3";
   const row = document.createElement("div");
   row.className = "d-flex";
 
@@ -948,7 +984,7 @@ function importChapters(): void {
  * `findPanel` refuses a panel for.
  */
 function toggleCreate(panel: HTMLElement, shown: boolean): void {
-  const button = panel.previousElementSibling;
+  const button = stashButtonBefore(panel);
   if (!isStashButton(button)) return;
 
   button.classList.toggle(CLASS_EDITING, !shown);

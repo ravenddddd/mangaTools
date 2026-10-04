@@ -1242,7 +1242,7 @@ function panel(opens: Menu, extra: string): HTMLElement {
  * the way every other icon on the page is drawn. A glyph typed as text would be a
  * different font in a different size, and would look like a plugin.
  */
-function drawIcon(host: HTMLElement, name: string): void {
+export function drawIcon(host: HTMLElement, name: string): void {
   const api = requirePluginApi();
   const Solid = api.libraries.FontAwesomeSolid || {};
   const Icon = api.components.Icon;
