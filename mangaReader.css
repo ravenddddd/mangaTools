@@ -1112,6 +1112,12 @@
   /* **Anchored at the left, not centred**: the ✕ is the first column, so a bubble
      centred on it hangs off the left of the screen — which is what it did. */
   left: 0;
+  /* **`max-content` or it is a column of single characters.** Absolutely positioned
+     with only `left`, the bubble's width is shrunk to fit its *containing block* —
+     and that is the ✕ itself, ten pixels wide, so a sentence wraps one character at a
+     time. `max-content` asks for the width the text needs and `max-width` is what stops
+     a long one running off the right. */
+  width: max-content;
   max-width: 22em;
   margin-bottom: 4px;
   padding: 1px 8px;
