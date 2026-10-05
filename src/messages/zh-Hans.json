@@ -57,6 +57,7 @@
   "mangaReader.reimportWarning": "用 Stash 的章节替换这本的？插件已有的那份会被覆盖。",
   "mangaReader.reimportReplace": "替换",
   "mangaReader.reimportCancel": "取消",
+  "mangaTools.language.noLanguage": "无语言",
   "mangaTools.select.placeholder": "选择语言…",
   "mangaTools.settings.readerTakeover.heading": "接管 Stash 原生灯箱",
   "mangaTools.settings.readerTakeover.description": "标记为漫画的画廊，灯箱由本插件重新设计，不会更改原生灯箱设置。",

@@ -278,11 +278,29 @@ NS.name = (code: unknown, locale?: string | null): string => {
   }
 
   const names = displayNamesFor(locale || NS.FALLBACK_LOCALE);
-  if (!names) return canonical;
 
   // of() echoes a code it cannot resolve, so the fallback here covers
   // implementations that return undefined instead of echoing.
-  return names.of(canonical) || canonical;
+  const named = names ? names.of(canonical) || canonical : canonical;
+  if (named !== canonical) return named;
+
+  // **The engine could not name it** — either it has no DisplayNames at all, or its
+  // CLDR has no entry for this code. `zxx` is in CLDR but not in every engine's copy
+  // of it: browsers trim theirs, and one that cannot name it hands the code back,
+  // which is not a name in anybody's language.
+  //
+  // So the one code this plugin gives a meaning of its own gets a name of its own too,
+  // from the catalogs. Every other code keeps the rule above and its own code back —
+  // an unrecognised value is still shown as the data it is, and English is still never
+  // invented for anything (see the note on this function).
+  if (canonical !== NS.NO_LANGUAGE) return canonical;
+
+  return (
+    NS.stringFor(
+      locale || NS.FALLBACK_LOCALE,
+      "mangaTools.language.noLanguage"
+    ) || "No language"
+  );
 };
 
 /**

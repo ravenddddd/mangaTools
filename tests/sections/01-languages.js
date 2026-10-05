@@ -161,6 +161,26 @@ module.exports = () => {
     "ja",
     "no DisplayNames at all degrades to the code"
   );
+
+  // **The one exception to that rule**, and it is not an exception to its reason: a
+  // code the engine cannot name is shown as the code, because a name invented here
+  // would be this plugin pretending to know something. It does know what `zxx` means
+  // — it is the plugin's own value — so for that one it has a word of its own in the
+  // catalogs, and that is what is shown instead of `zxx`. Which is the case on a
+  // browser whose trimmed CLDR has no entry for it, where `of()` hands the code back.
+  // Two locales nothing above has asked for, or the per-locale cache would hand back
+  // an engine that *can* name it and the two branches would never be reached.
+  assert.strictEqual(
+    NS.name(NS.NO_LANGUAGE, "zh-SG"),
+    "无语言",
+    "the value the plugin invented is named by the plugin when the engine cannot"
+  );
+  assert.strictEqual(
+    NS.name(NS.NO_LANGUAGE, "fi-FI"),
+    "No language",
+    "…in the reader's own language, and in English for a UI the catalogs do not cover"
+  );
+
   assert.strictEqual(
     NS.describe("zh-Hant", "nl-NL").name,
     "zh-Hant",

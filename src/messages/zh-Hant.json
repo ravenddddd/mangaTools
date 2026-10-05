@@ -57,6 +57,7 @@
   "mangaReader.reimportWarning": "用 Stash 的章節取代這本的？外掛已有的那份會被覆蓋。",
   "mangaReader.reimportReplace": "取代",
   "mangaReader.reimportCancel": "取消",
+  "mangaTools.language.noLanguage": "無語言",
   "mangaTools.select.placeholder": "選擇語言…",
   "mangaTools.settings.readerTakeover.heading": "接管 Stash 原生燈箱",
   "mangaTools.settings.readerTakeover.description": "標記為漫畫的畫廊，燈箱由本外掛重新設計，不會更改原生燈箱設定。",

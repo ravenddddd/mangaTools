@@ -57,6 +57,7 @@
   "mangaReader.reimportWarning": "Replace this gallery's chapters with Stash's? The plugin's own list for it is overwritten.",
   "mangaReader.reimportReplace": "Replace",
   "mangaReader.reimportCancel": "Cancel",
+  "mangaTools.language.noLanguage": "No language",
   "mangaTools.select.placeholder": "Select language…",
   "mangaTools.settings.readerTakeover.heading": "Take over Stash's lightbox",
   "mangaTools.settings.readerTakeover.description": "A gallery marked as manga is read in this plugin's own lightbox, redesigned from the ground up. Nothing about Stash's own lightbox settings is changed.",
