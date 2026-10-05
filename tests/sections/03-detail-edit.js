@@ -313,7 +313,7 @@ module.exports = () => {
   );
   assert.strictEqual(
     (
-      noneRow.props.children.find((c) => c && c.props?.className)?.props
+      noneRow.props.children.find((c) => c?.props?.className)?.props
         .className || ""
     ).indexOf("manga-tools-language-mark") !== -1,
     true,
