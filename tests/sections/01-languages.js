@@ -218,6 +218,39 @@ module.exports = () => {
 
   assert.strictEqual(NS.describe("", "zh-CN"), null);
   assert.strictEqual(NS.describe(null, "zh-CN"), null);
+
+  // The one value that is not a place: known, named by the engine, and with no flag.
+  const none = NS.describe(NS.NO_LANGUAGE, "en-US");
+  assert.strictEqual(none.known, true, "no language is a value, not junk");
+  assert.strictEqual(
+    none.flag,
+    null,
+    "…and has no flag, because it is nowhere"
+  );
+  assert.strictEqual(none.name, "No linguistic content");
+  assert.strictEqual(
+    NS.describe(NS.NO_LANGUAGE, "zh-CN").name,
+    "无语言内容",
+    "the name is the engine's in every language, which is why this value was chosen"
+  );
+
+  // What may be done with it. An unrecognised value is **not** this: it says nothing
+  // about whether the work has a language, so nothing is declared from it.
+  assert.strictEqual(NS.isNoLanguage(NS.NO_LANGUAGE), true);
+  assert.strictEqual(
+    NS.isNoLanguage("ZXX"),
+    true,
+    "case is not a second value"
+  );
+  assert.strictEqual(NS.isNoLanguage(" " + NS.NO_LANGUAGE + " "), true);
+  assert.strictEqual(NS.isNoLanguage("ja"), false);
+  assert.strictEqual(NS.isNoLanguage(""), false);
+  assert.strictEqual(NS.isNoLanguage(null), false);
+  assert.strictEqual(
+    NS.isNoLanguage("klingonish"),
+    false,
+    "an unknown value is treated as no value at all, not as no language"
+  );
   console.log("✓ describe (flag mapping, case tolerance, unknown values)");
 
   // ── 5. Every language has a flag, and every one is offered ────────
@@ -228,12 +261,30 @@ module.exports = () => {
   // it, and that is the property to hold on to.
   Object.keys(NS.LANGUAGES).forEach((code) => {
     const entry = NS.LANGUAGES[code];
+    // **One entry has no flag, and it is the one that is not a place**: "no
+    // linguistic content" is not anywhere, and the plugin draws its own mark where a
+    // language draws a flag. Everything else is still a two-letter country code.
+    if (NS.isNoLanguage(code)) {
+      assert.strictEqual(
+        entry.flag,
+        null,
+        "no language should have no flag, not a made-up one"
+      );
+      return;
+    }
     assert.ok(
       entry.flag && entry.flag.length === 2,
       `${code} is missing a flag code`
     );
   });
   const offered = NS.languageOptions("en-US").map((o) => o.value);
+  assert.strictEqual(
+    offered[offered.length - 1],
+    NS.NO_LANGUAGE,
+    "and no language is offered last, whatever the interface language would sort " +
+      "its name to — it is not one of them, and a reader should find it in the same " +
+      "place every time"
+  );
   assert.deepStrictEqual(
     offered.slice().sort(),
     Object.keys(NS.LANGUAGES).sort(),
@@ -269,8 +320,10 @@ module.exports = () => {
       "Thai",
       "Traditional Chinese",
       "Vietnamese",
+      "No linguistic content",
     ],
-    "options should be ordered by the displayed name"
+    "options should be ordered by the displayed name — and the one value that is not " +
+      "a language at the end, whatever its own name would sort to"
   );
 
   // …and it is a *collated* order rather than code-point order. For Chinese the
@@ -278,7 +331,10 @@ module.exports = () => {
   // plain .sort() — which would put Thai and Chinese in an order no reader of
   // those scripts would recognise.
   const zhOptions = NS.languageOptions("zh-CN");
-  const zhLabels = zhOptions.map((o) => o.label);
+  // The one value that is not a language is appended rather than collated, so it is
+  // taken off the end before the rest is compared with a sort of itself.
+  const zhLabels = zhOptions.slice(0, -1).map((o) => o.label);
+  assert.strictEqual(zhOptions[zhOptions.length - 1].value, NS.NO_LANGUAGE);
   assert.deepStrictEqual(
     zhLabels,
     zhLabels.slice().sort(new Intl.Collator("zh-CN").compare),

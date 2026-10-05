@@ -13,6 +13,7 @@
  */
 import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
+import { noLanguageMark } from "./fields-ui";
 import { message } from "./filter-model";
 import type { ReactElement } from "react";
 import type {
@@ -78,6 +79,22 @@ export function matchesQuery(option: MangaToolsOption, query: string): boolean {
 /** The flag to draw for an option, or null when flags are turned off */
 export function flagOf(option: MangaToolsOption): string | null {
   return NS.showFlags ? option.flag : null;
+}
+
+/**
+ * What a language row draws before its label: its flag, or — for the one value that
+ * is not a place — this plugin's own mark.
+ *
+ * Spread onto a LanguageRow, so it says `flag` for every language and `leading` for
+ * the one that has none; a value the table cannot name gets neither, which is what
+ * such a value has always got. See noLanguageMark in fields-ui.tsx.
+ */
+export function languageMark(option: MangaToolsOption): {
+  flag?: string | null;
+  leading?: ReactElement | null;
+} {
+  const mark = noLanguageMark(option.value);
+  return mark ? { leading: mark } : { flag: flagOf(option) };
 }
 
 /** A regional flag, drawn by flag-icons' CSS — the same markup the dropdowns use */

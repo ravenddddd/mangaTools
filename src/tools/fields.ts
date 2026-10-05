@@ -282,6 +282,21 @@ NS.isOriginal = (customFields: unknown): boolean =>
   NS.pickField(customFields, NS.ORIGINAL_FIELD_NAME) !== "";
 
 /**
+ * Whether a gallery is the original — the mark, **or a language that is not one**.
+ *
+ * "No linguistic content" means there was nothing to translate, which is the whole of
+ * what the raw mark says, so the two are one answer, and this is the one spelling of
+ * it. The field itself is written when that language is chosen (see the edit page's
+ * writeLanguage), so this differs from isOriginal only for a gallery whose language
+ * was set some other way — by hand, or by a version that predates the rule — and what
+ * it buys there is a mark that agrees with the value instead of a disabled control
+ * reading "not original" beside a language that says otherwise.
+ */
+NS.isRaw = (customFields: unknown): boolean =>
+  NS.isOriginal(customFields) ||
+  NS.isNoLanguage(NS.pickField(customFields, NS.FIELD_NAME));
+
+/**
  * Where this plugin keeps a gallery's chapters.
  *
  * A JSON string — the only shape a custom field can hold: Stash rejects arrays

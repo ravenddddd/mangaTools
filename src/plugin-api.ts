@@ -23,8 +23,14 @@ import type {
 
 /** One entry of the language table in languages.ts */
 export interface MangaToolsLanguage {
-  /** flag-icons alpha-2 *country* code, not a language code */
-  flag: string;
+  /**
+   * flag-icons alpha-2 *country* code, not a language code.
+   *
+   * null for the one entry that is not a place — "no linguistic content", which has
+   * no country to draw a flag of. Where a language draws a flag this plugin draws
+   * its own mark for it instead. See NS.NO_LANGUAGE.
+   */
+  flag: string | null;
 }
 
 /**
@@ -138,6 +144,15 @@ export interface MangaToolsNamespace {
   LANGUAGES: { [code: string]: MangaToolsLanguage };
   FALLBACK_LOCALE: string;
 
+  /**
+   * The code for "no linguistic content" — the one language value that is not a
+   * language. See languages.ts, and isNoLanguage below for what may be done with it.
+   */
+  NO_LANGUAGE: string;
+
+  /** Whether a stored value is that one, and nothing else. */
+  isNoLanguage(raw: unknown): boolean;
+
   /** The language field's name. See fields.ts. */
   FIELD_NAME: string;
   /** The censorship field's name. See fields.ts. */
@@ -159,6 +174,9 @@ export interface MangaToolsNamespace {
   ORIGINAL_VALUE: string;
   /** Whether a gallery's custom fields declare it the original text. */
   isOriginal(customFields: unknown): boolean;
+
+  /** Whether a gallery is the original: that mark, or a language that is not one. */
+  isRaw(customFields: unknown): boolean;
   /**
    * Whether this plugin's store says a gallery is manga — null before it has
    * answered. See the note where it is defined in the tools half.

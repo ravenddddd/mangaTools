@@ -22,7 +22,7 @@
 import { NS } from "../languages";
 import { t } from "../i18n";
 import { CensorshipIcon } from "./censorship";
-import { Flag } from "./fields-ui";
+import { Flag, noLanguageMark } from "./fields-ui";
 import { fieldLabel } from "./filter-model";
 import { ensureDetailHost } from "./hosts";
 import { censorshipOf, pickLanguage, useGlobalVersion } from "./core";
@@ -124,7 +124,7 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   const group = NS.fieldShowing("translationGroup")
     ? NS.translationGroupOf(props.values)
     : "";
-  const original = NS.fieldShowing("original") && NS.isOriginal(props.values);
+  const original = NS.fieldShowing("original") && NS.isRaw(props.values);
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
   const Icon = PluginApi.components.Icon;
   const Button = PluginApi.libraries.Bootstrap?.Button;
@@ -141,10 +141,15 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   const host = ensureDetailHost();
   if (!host) return null;
 
-  // The flag and the space before the name are conditional, and both for the same
-  // reason: an unknown value has no flag, and a row that always put a space there
-  // would read "Language:  klingon".
-  const showFlag = NS.showFlags && !!language?.flag;
+  // The mark and the space before the name are conditional, and both for the same
+  // reason: an unknown value has no mark, and a row that always put a space there
+  // would read "Language:  klingon". Which is why this asks whether there is a
+  // *mark* rather than whether there is a language — a known value can be markless
+  // too, and one of them is: see noLanguageMark.
+  const showFlag =
+    NS.showFlags &&
+    !!language &&
+    (!!language.flag || NS.isNoLanguage(language.code));
 
   // Two <h6>s, exactly as the rows above and below are drawn — the pieces are
   // separate children rather than a label and a value in a wrapper, so the text
@@ -168,8 +173,10 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
       {language ? (
         <h6 className="manga-tools-detail">
           {fieldLabel(intl) + ": "}
-          {showFlag ? (
-            <Flag flag={language.flag as string} className="manga-tools-flag" />
+          {showFlag && language.flag ? (
+            <Flag flag={language.flag} className="manga-tools-flag" />
+          ) : showFlag ? (
+            noLanguageMark(language.code, "manga-tools-flag")
           ) : null}
           {showFlag ? " " : null}
           {language.name}

@@ -14,6 +14,7 @@
 import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
 import type { MangaToolsDescription, MangaToolsOption } from "../plugin-api";
+import type { ReactElement } from "react";
 
 const PluginApi = requirePluginApi();
 
@@ -40,6 +41,45 @@ export function Flag(props: { flag: string; className?: string }) {
     <span
       className={
         "fi fi-" + props.flag + (props.className ? " " + props.className : "")
+      }
+    />
+  );
+}
+
+/**
+ * The mark for a value that is not a language of anywhere: a speech bubble struck
+ * through, which is what "no linguistic content" says.
+ *
+ * Drawn where a language draws its flag — four surfaces do — and **it returns null
+ * for every other value**, an unrecognised one included. That is what lets a caller
+ * put it in front of the flag it would otherwise draw and let this one decide: a
+ * code the table cannot name says nothing about whether the work has a language, so
+ * it gets the mark a nameless value always got, which is none.
+ *
+ * A plain function rather than a component, like languageChip below and for the same
+ * reason: the callers ask whether it drew anything, and an element is not null even
+ * when the component inside it is.
+ *
+ * **It behaves exactly as the flag does.** Nothing when the "Show flags" setting is
+ * off — what that setting governs is whether a language row carries a mark at all,
+ * and one row marked among a column of bare names would be the plugin saying
+ * something the reader asked it not to say.
+ */
+export function noLanguageMark(
+  code: string,
+  className?: string
+): ReactElement | null {
+  if (!NS.showFlags || !NS.isNoLanguage(code)) return null;
+
+  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
+  const Icon = PluginApi.components.Icon;
+  if (!Icon) return null;
+
+  return (
+    <Icon
+      icon={Solid.faCommentSlash}
+      className={
+        "fa-fw manga-tools-language-mark" + (className ? " " + className : "")
       }
     />
   );
@@ -85,9 +125,19 @@ export function languageChip(info: MangaToolsDescription, className?: string) {
     );
   }
 
+  // A known value with no flag of its own — the one that is not a place. The badge
+  // is the same shape as the flag's: the mark alone, named for a screen reader.
+  if (!info.flag) {
+    return (
+      <div className={"manga-tools-badge" + extra} aria-label={info.name}>
+        {noLanguageMark(info.code)}
+      </div>
+    );
+  }
+
   return (
     <div className={"manga-tools-badge" + extra} aria-label={info.name}>
-      <Flag flag={info.flag as string} />
+      <Flag flag={info.flag} />
     </div>
   );
 }
@@ -124,7 +174,9 @@ export function formatLanguageOption(option: MangaToolsOption) {
     <span className="manga-tools-option">
       {NS.showFlags && option.flag ? (
         <Flag flag={option.flag} className="manga-tools-flag" />
-      ) : null}
+      ) : (
+        noLanguageMark(option.value, "manga-tools-flag")
+      )}
       <span>{option.label}</span>
     </span>
   );

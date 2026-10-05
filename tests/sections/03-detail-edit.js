@@ -301,6 +301,25 @@ module.exports = () => {
     "the mark should follow the name on the language row"
   );
 
+  // No language: a value with no flag, so this plugin draws its own mark in the flag's
+  // place — and the raw mark comes with it, because a work with no language was not
+  // translated. Which is the whole reason the two are one value here.
+  r9 = detail({ "plugin.mangaTools.language": NS.NO_LANGUAGE });
+  const noneRow = rowsIn(r9.portal)[0];
+  assert.deepStrictEqual(
+    noneRow.props.children.filter((c) => typeof c === "string"),
+    ["语言: ", " ", "无语言内容", "（生肉）"],
+    "the row reads as the language and the raw mark, with the mark's own gap after it"
+  );
+  assert.strictEqual(
+    (
+      noneRow.props.children.find((c) => c && c.props?.className)?.props
+        .className || ""
+    ).indexOf("manga-tools-language-mark") !== -1,
+    true,
+    "…and the thing drawn where a flag goes is this plugin's own mark"
+  );
+
   // Raw with no language to carry it: the mark stands on its own, and still
   // without that label. It is the one row left, so the panel keeps drawing.
   r9 = detail({ "plugin.mangaTools.original": "true" });
@@ -703,6 +722,79 @@ module.exports = () => {
     "…and live again when the raw field is turned off"
   );
   NS.fieldOriginal = true;
+
+  // ── No language ────────────────────────────────────────────────────────
+  // The one value of this field that is not a language of anywhere. Choosing it says
+  // the work has no language of its own, and a work with no language was not
+  // translated — so the group box is disabled and says which of the two emptinesses
+  // this is, and the raw mark is on and stuck.
+  const noneNode = editField({
+    "plugin.mangaTools.language": NS.NO_LANGUAGE,
+  }).node;
+  const noneBox = find(
+    noneNode,
+    (n) => n.props?.inputId === "manga_tools_translation_group"
+  );
+  assert.strictEqual(
+    noneBox.props.isDisabled,
+    true,
+    "a gallery with no language has no group to enter"
+  );
+  assert.strictEqual(
+    noneBox.props.placeholder,
+    "无语言（无翻译组）",
+    "…and the box says which emptiness this is, in the reader's language"
+  );
+
+  const noneSteak = find(
+    noneNode,
+    (n) => (n.props?.className || "").indexOf("manga-tools-original") !== -1
+  );
+  assert.strictEqual(
+    noneSteak.props.disabled,
+    true,
+    "…and the raw mark cannot be turned off either"
+  );
+  assert.strictEqual(
+    noneSteak.props["aria-pressed"],
+    true,
+    "…because it is on: nothing was translated"
+  );
+
+  // The write itself. Stash's form persists what it is handed, so this is one map:
+  // the language, the original declared, and the group taken away — in one call,
+  // because two would each be computed from props the other had made stale.
+  let chosen = null;
+  const picker = find(
+    editField({ "plugin.mangaTools.language": "ja" }, (next) => {
+      chosen = next;
+    }).node,
+    (n) => n.props?.inputId === "manga_tools_language"
+  );
+  picker.props.onChange({ value: NS.NO_LANGUAGE, label: "x" });
+  assert.strictEqual(chosen["plugin.mangaTools.language"], NS.NO_LANGUAGE);
+  assert.strictEqual(
+    chosen["plugin.mangaTools.original"],
+    "true",
+    "and the original is declared in the same map"
+  );
+  assert.strictEqual(
+    "plugin.mangaTools.translationGroup" in chosen,
+    false,
+    "…with the group taken away, whether or not this gallery had one — setField " +
+      'clears a key by removing it, which is what Stash\'s own onChange means by ""'
+  );
+
+  // A real language is the ordinary write, with neither of those touched: choosing a
+  // language back does not undo what no language declared.
+  chosen = null;
+  picker.props.onChange({ value: "ja", label: "Japanese" });
+  assert.strictEqual(chosen["plugin.mangaTools.language"], "ja");
+  assert.strictEqual(
+    chosen["plugin.mangaTools.original"],
+    undefined,
+    "picking a language leaves the raw mark exactly as it was"
+  );
 
   // All four off is the one arrangement with no block at all — and with it goes the
   // class that hides Stash's performers row, because a page the plugin draws nothing

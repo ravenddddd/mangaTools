@@ -911,6 +911,17 @@ const FAKE_NAMES = {
   th: { "en-US": "Thai", "zh-CN": "泰语" },
   vi: { "en-US": "Vietnamese", "zh-CN": "越南语" },
   id: { "en-US": "Indonesian", en: "Indonesian", "zh-CN": "印度尼西亚语" },
+  // The one entry that is not a place, and the reason it was chosen: the real engine
+  // names it in every language the plugin might be read in, so the plugin carries no
+  // string for it. These are the strings it actually returns, checked against Node's
+  // ICU the way the Chinese ones above are.
+  zxx: {
+    "en-US": "No linguistic content",
+    en: "No linguistic content",
+    "zh-CN": "无语言内容",
+    "zh-TW": "無語言內容",
+    "ja-JP": "言語的内容なし",
+  },
 };
 
 /** Every locale the stub has any data for, so "unsupported" can be modelled */

@@ -222,6 +222,20 @@
 }
 
 /*
+ * What this plugin draws where a language has no flag to draw: a speech bubble struck
+ * through, for "no linguistic content".
+ *
+ * Sized to the flag it stands in for rather than to the text around it — `.manga-tools-flag`
+ * is 0.9rem tall, and FontAwesome draws a glyph at 1em, so the same 0.9rem here makes
+ * the two the same height in the row, the dropdown and the badge. Same reasoning, and
+ * the same number, as `.manga-tools-chip .fa-icon` below.
+ */
+.manga-tools-language-mark {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+}
+
+/*
  * The detail-page row. It is deliberately rendered as an <h6>, matching the
  * "studio code" and "photographer" rows above it; font and line-height come from
  * Stash's own `.gallery-details h6`, so all this does is align the flag.

@@ -36,6 +36,13 @@ module.exports = () => {
     /\.manga-tools-badge\s+\.fi\s*\{[^}]*height:/.test(css),
     "the badge flag sizing rule is missing"
   );
+  // …and the same for the mark drawn where a language has no flag to draw: sized to
+  // the flag rather than to the text around it, or the one badge that carries it comes
+  // out a different height from every other badge on the page.
+  assert.ok(
+    /\.manga-tools-language-mark\s*\{[^}]*font-size:\s*0\.9rem/.test(css),
+    "the no-language mark has to be sized like the flag it stands in for"
+  );
   // The text chip's truncation belongs to unrecognised values only. A recognised
   // language name is shown whole — clipping it is what made a recognised name come out
   // ellipsised, with flags turned off.

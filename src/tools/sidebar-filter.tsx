@@ -63,6 +63,7 @@ import {
   TAG_MARK,
   TAG_SELECTOR,
   flagOf,
+  languageMark,
   isFieldTag,
   matchesQuery,
   selectableOptions,
@@ -490,9 +491,14 @@ function decoration(
   field: ValuedSectionProps,
   option: MangaToolsOption
 ): { leading?: ReactElement | null; flag?: string | null } {
-  return field.leading
-    ? { leading: field.leading(option) }
-    : { flag: flagOf(option) };
+  if (!field.leading) return { flag: flagOf(option) };
+
+  // **A leading mark that drew nothing falls back to the flag**, which is what makes
+  // a section's leading function able to speak for one value of its field and leave
+  // the rest alone: the language one returns a mark for "no linguistic content" and
+  // null for the thirteen languages, and those still want their flags.
+  const leading = field.leading(option);
+  return leading ? { leading } : { flag: flagOf(option) };
 }
 
 function useValuedSection(props: ValuedSectionProps) {
@@ -778,6 +784,9 @@ const VALUED_SECTIONS: { [name: string]: Omit<ValuedSectionProps, "filter"> } =
       options: visibleOptions,
       search: true,
       adopt: adoptLanguageCriterion,
+      // A flag where a language has one — see decoration, which falls back to it —
+      // and this plugin's own mark for the one value that is not a place.
+      leading: (o) => languageMark(o).leading ?? null,
     },
     censorship: {
       fieldKey: NS.CENSORSHIP_FIELD_NAME,

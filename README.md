@@ -502,6 +502,17 @@ than left live, because an empty box means "nobody has said" and this is not tha
 the row would then be a different shape from the two above it. The button beside
 it is what turns the field back on.
 
+**No language** is the third answer to the same question, and the only value of the
+language field that is not a language of anywhere: `zxx`, ISO 639-2's *no linguistic
+content* — a CG collection, an art book, anything with no text of its own. It is offered
+last in the dropdown whatever the interface would sort its name to, and it is the one
+entry whose `flag` is null; a struck-through speech bubble is drawn where a language
+draws its flag, under the same "Show flags" setting. Choosing it declares the gallery
+the original and takes any translation group away in the same save, and while it is
+selected the group box is disabled and reads *no language (no translation group)* —
+nothing was translated, so there is no group to enter, and the raw mark is on and stuck.
+It has to be enabled like any other language in the plugin's settings.
+
 That sentence is drawn at the form's ordinary foreground colour rather than the
 muted grey the other two dropdowns' placeholders use, and one rule says both
 things. It is not a hint about what to type — it is what the field is saying while

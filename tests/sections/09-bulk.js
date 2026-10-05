@@ -435,6 +435,66 @@ module.exports = () => {
   );
   assert.strictEqual(r14.forwarded.variables.input.photographer, "x");
 
+  // ── No language ────────────────────────────────────────────────────────
+  // The one value of the language field that is not a language. Choosing it says the
+  // work has no language of its own, so there was nothing to translate: the original
+  // is declared and the group goes in the same write.
+  selectOf("manga_tools_language").props.onChange({
+    value: NS.NO_LANGUAGE,
+    label: "No linguistic content",
+    flag: null,
+  });
+  assert.strictEqual(
+    selectOf("manga_tools_translation_group").props.isDisabled,
+    true,
+    "with no language there is no group to enter, so the box is disabled"
+  );
+  assert.strictEqual(
+    selectOf("manga_tools_translation_group").props.placeholder,
+    "无语言（无翻译组）",
+    "…and it says which of the two emptinesses this is"
+  );
+  assert.strictEqual(
+    selectOf("manga_tools_translation_group").props.value,
+    null,
+    "…with nothing in it: any group the selection carried is being taken away"
+  );
+
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(r14.forwarded.variables.input.custom_fields, {
+    partial: {
+      "plugin.mangaTools.language": NS.NO_LANGUAGE,
+      "plugin.mangaTools.original": "true",
+    },
+    remove: ["plugin.mangaTools.translationGroup"],
+  });
+
+  // …and a group typed in the same dialog does not survive it: "no language" is the
+  // reader's own answer to which of the two wins, and it is said last.
+  // Typed rather than picked: picking a group from the menu also declares the
+  // gallery translated, and this block is about what "no language" does, not about
+  // what the group row does.
+  selectOf("manga_tools_translation_group").props.onInputChange("Lily", {
+    action: "input-change",
+  });
+  selectOf("manga_tools_language").props.onChange({
+    value: NS.NO_LANGUAGE,
+    label: "No linguistic content",
+    flag: null,
+  });
+  r14 = runLink(bulkVars());
+  assert.deepStrictEqual(r14.forwarded.variables.input.custom_fields, {
+    partial: {
+      "plugin.mangaTools.language": NS.NO_LANGUAGE,
+      "plugin.mangaTools.original": "true",
+    },
+    remove: ["plugin.mangaTools.translationGroup"],
+  });
+
+  // The group pending is put back the way this block found it — clearing a row means
+  // "leave that field alone" — so the assertions below see the dialog they left.
+  selectOf("manga_tools_translation_group").props.onChange(null);
+
   // Language remove — the one way to empty the field across a whole selection.
   selectOf("manga_tools_language").props.onChange(langRemove);
   r14 = runLink(bulkVars());

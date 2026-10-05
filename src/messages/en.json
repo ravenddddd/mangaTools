@@ -113,6 +113,8 @@
   "mangaTools.translationGroup.originalOn": "Mark as raw: the original text, no translation group",
   "mangaTools.translationGroup.originalOff": "No longer raw — clear the mark",
   "mangaTools.translationGroup.originalOffRestore": "No longer raw — clear the mark and put the translation group back",
+  "mangaTools.translationGroup.noLanguageDetail": "no language (no translation group)",
+  "mangaTools.translationGroup.originalNoLanguage": "No language: there is nothing to translate, so this is the original",
   "mangaTools.translationGroup.originalDetail": "raw (no translation group)",
   "mangaTools.translationGroup.originalInline": " (raw)",
   "mangaTools.translationGroup.originalMixed": "Some of these are raw — click to mark them all",

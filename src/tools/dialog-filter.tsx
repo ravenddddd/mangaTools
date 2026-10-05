@@ -28,7 +28,7 @@ import {
   LanguageRow,
   TAG_MARK,
   TAG_SELECTOR,
-  flagOf,
+  languageMark,
   isLanguageTag,
   matchesQuery,
   selectableOptions,
@@ -656,7 +656,7 @@ export function DialogLanguageFilter(props: { filter: MangaToolsFilterModel }) {
               variant="dialog"
               state="included"
               label={o.label}
-              flag={flagOf(o)}
+              {...languageMark(o)}
               onClick={() => {
                 setChoice(toggleIncluded(choice, o.value));
               }}
@@ -668,7 +668,7 @@ export function DialogLanguageFilter(props: { filter: MangaToolsFilterModel }) {
                 variant="dialog"
                 state="excluded"
                 label={o.label}
-                flag={flagOf(o)}
+                {...languageMark(o)}
                 onClick={() => {
                   setChoice(toggleExcluded(choice, o.value));
                 }}
@@ -705,7 +705,7 @@ export function DialogLanguageFilter(props: { filter: MangaToolsFilterModel }) {
               variant="dialog"
               state="candidate"
               label={o.label}
-              flag={flagOf(o)}
+              {...languageMark(o)}
               canExclude
               onClick={() => {
                 setChoice(toggleIncluded(choice, o.value));

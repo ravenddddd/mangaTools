@@ -240,9 +240,15 @@ module.exports = () => {
     "the Vietnam flag should be vn"
   );
   assert.strictEqual(
-    opts.every((o) => o.flag && o.flag.length === 2),
+    opts.every((o) => !o.flag || o.flag.length === 2),
     true,
-    "every option should have a flag"
+    "every option should have a two-letter flag, or none at all: the one value that " +
+      "is not a place has no country to draw one of"
+  );
+  assert.strictEqual(
+    opts.filter((o) => !o.flag).length,
+    1,
+    "and exactly one option is that value"
   );
 
   // Enabled-languages restriction: the dropdown is limited to the selected set,

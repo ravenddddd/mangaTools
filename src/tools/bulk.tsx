@@ -373,6 +373,28 @@ function applyPendingFields(operation: MangaToolsApolloOperation): boolean {
     if (bulkOriginal === "raw")
       partial[ORIGINAL_FIELD_NAME] = NS.ORIGINAL_VALUE;
     else if (bulkOriginal === "notRaw") remove.push(ORIGINAL_FIELD_NAME);
+
+    // **"No language" has the last word**, and it is said after every other row has
+    // had its turn: a work with no language of its own was not translated, so it is
+    // the original and any group goes. Including one typed in this same dialog —
+    // which of the two answers wins is the reader's call, and this is the one they
+    // made by choosing the value. The key is taken out of `partial` as well as named
+    // in `remove`, or the two would say opposite things about one key in one write.
+    if (bulkLanguage?.kind === "set" && NS.isNoLanguage(bulkLanguage.value)) {
+      partial[ORIGINAL_FIELD_NAME] = NS.ORIGINAL_VALUE;
+      delete partial[TRANSLATION_GROUP_FIELD_NAME];
+
+      // **Both keys are taken out of `remove` before either is said again**, in case a
+      // row above named them: a pending "not raw" would otherwise leave the original in
+      // `partial` and in `remove` at once, which is one write saying "set this" and
+      // "clear this" about one key. The language row and the raw row both write these
+      // two, and this is the one place that has the last word over both.
+      [ORIGINAL_FIELD_NAME, TRANSLATION_GROUP_FIELD_NAME].forEach((name) => {
+        const at = remove.indexOf(name);
+        if (at !== -1) remove.splice(at, 1);
+      });
+      remove.push(TRANSLATION_GROUP_FIELD_NAME);
+    }
   }
 
   if (!Object.keys(partial).length && !remove.length) return false;
@@ -893,6 +915,12 @@ export function BulkFieldsRow() {
             : "mixed";
   const rawShown = showOriginal && rawState === "raw";
 
+  // Whether the language this dialog is about to write is the one that is not a
+  // language. Read from the pending value, which is what makes the two rows below
+  // react to the dropdown above them before Save.
+  const noLanguage =
+    bulkLanguage?.kind === "set" && NS.isNoLanguage(bulkLanguage.value);
+
   // Whether pressing again would put a group back — which the tooltip says, and it
   // is a question about *what would come back* rather than about whether raw took
   // something: a selection with no group of its own has nothing to restore, and
@@ -917,6 +945,10 @@ export function BulkFieldsRow() {
   // undo rather than a second guess, exactly as the edit page remembers the name it
   // took.
   const cycleOriginal = () => {
+    // Disabled above, and said again here: with no language there is nothing that
+    // could have been translated, so this is not a question the reader may answer.
+    if (noLanguage) return;
+
     const aggregate = selectedOriginalAggregate();
     const next: "raw" | "notRaw" | null =
       aggregate === "all"
@@ -1034,18 +1066,23 @@ export function BulkFieldsRow() {
       }
       // A button's third state has a name in ARIA, and `mixed` is it — the same
       // thing the mark's checkbox says with `indeterminate`.
-      aria-pressed={rawState === "mixed" ? "mixed" : rawState === "raw"}
+      aria-pressed={
+        noLanguage ? true : rawState === "mixed" ? "mixed" : rawState === "raw"
+      }
       aria-label={t(intl, "mangaTools.translationGroup.original")}
       title={t(
         intl,
-        rawState === "raw"
-          ? restoresGroup
-            ? "mangaTools.translationGroup.originalOffRestore"
-            : "mangaTools.translationGroup.originalOff"
-          : rawState === "mixed"
-            ? "mangaTools.translationGroup.originalMixed"
-            : "mangaTools.translationGroup.originalOn"
+        noLanguage
+          ? "mangaTools.translationGroup.originalNoLanguage"
+          : rawState === "raw"
+            ? restoresGroup
+              ? "mangaTools.translationGroup.originalOffRestore"
+              : "mangaTools.translationGroup.originalOff"
+            : rawState === "mixed"
+              ? "mangaTools.translationGroup.originalMixed"
+              : "mangaTools.translationGroup.originalOn"
       )}
+      disabled={noLanguage}
       onClick={cycleOriginal}
     >
       {steakIcon}
@@ -1065,13 +1102,15 @@ export function BulkFieldsRow() {
           classNamePrefix="react-select"
           inputId="manga_tools_translation_group"
           isClearable
-          isDisabled={rawShown}
+          isDisabled={rawShown || noLanguage}
           menuPortalTarget={document.body}
           placeholder={t(
             intl,
-            rawShown
-              ? "mangaTools.translationGroup.originalDetail"
-              : "mangaTools.translationGroup.placeholder"
+            noLanguage
+              ? "mangaTools.translationGroup.noLanguageDetail"
+              : rawShown
+                ? "mangaTools.translationGroup.originalDetail"
+                : "mangaTools.translationGroup.placeholder"
           )}
           value={
             groupShown === BULK_REMOVE_VALUE

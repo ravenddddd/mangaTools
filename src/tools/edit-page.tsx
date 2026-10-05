@@ -178,8 +178,20 @@ export function MangaFieldBlock(props: {
   // What it takes away it holds on to, because a button that destroys a name
   // somebody typed is a button that gets destroyed by a mis-click — see
   // originalGroupTaken for why it is held outside the gallery rather than in it.
-  const isOriginal = NS.isOriginal(props.values);
+  // Whether the language in hand is the one that is not a language. Read from the
+  // form's own values rather than from the stored field, which is what lets the rows
+  // below react to the dropdown the moment it is used — the same way Cancel discards
+  // both.
+  const noLanguage = NS.isNoLanguage(pickLanguage(props.values));
+
+  // The raw mark, which a language that is not one implies — see NS.isRaw.
+  const isOriginal = NS.isRaw(props.values);
   const toggleOriginal = () => {
+    // Disabled below, and said again here: "no language" is the one state in which
+    // this is not a question, and a control that cannot be reached is still worth
+    // being unable to fire.
+    if (noLanguage) return;
+
     const galleryId = currentGalleryId();
     let next = props.values;
 
@@ -202,6 +214,19 @@ export function MangaFieldBlock(props: {
       next = NS.setField(next, TRANSLATION_GROUP_FIELD_NAME, "");
     }
 
+    if (props.onChange) props.onChange(next);
+  };
+
+  // Choosing "no language" is three edits in one, for the same reason writing a group
+  // is two: a work with no language of its own was not translated either, so it is
+  // declared the original and any group goes. One onChange, or the two calls would
+  // each be computed from props the other has just made stale.
+  const writeLanguage = (value: string) => {
+    let next = NS.setField(props.values, FIELD_NAME, value);
+    if (NS.isNoLanguage(value)) {
+      next = NS.setField(next, ORIGINAL_FIELD_NAME, NS.ORIGINAL_VALUE);
+      next = NS.setField(next, TRANSLATION_GROUP_FIELD_NAME, "");
+    }
     if (props.onChange) props.onChange(next);
   };
 
@@ -357,7 +382,7 @@ export function MangaFieldBlock(props: {
           // An empty value deletes the field, matching the native
           // onChange("", "") semantics.
           onChange={(opt: MangaToolsOption | null) => {
-            write(FIELD_NAME, opt ? opt.value : "");
+            writeLanguage(opt ? opt.value : "");
           }}
         />
         {languageChip}
@@ -538,12 +563,15 @@ export function MangaFieldBlock(props: {
       aria-label={originalLabel}
       title={t(
         intl,
-        isOriginal
-          ? restoresGroup
-            ? "mangaTools.translationGroup.originalOffRestore"
-            : "mangaTools.translationGroup.originalOff"
-          : "mangaTools.translationGroup.originalOn"
+        noLanguage
+          ? "mangaTools.translationGroup.originalNoLanguage"
+          : isOriginal
+            ? restoresGroup
+              ? "mangaTools.translationGroup.originalOffRestore"
+              : "mangaTools.translationGroup.originalOff"
+            : "mangaTools.translationGroup.originalOn"
       )}
+      disabled={noLanguage}
       onClick={toggleOriginal}
     >
       <SteakIcon raw={isOriginal} />
@@ -573,6 +601,8 @@ export function MangaFieldBlock(props: {
             role="switch"
             id="manga_tools_original"
             checked={isOriginal}
+            disabled={noLanguage}
+            title={t(intl, "mangaTools.translationGroup.originalNoLanguage")}
             onChange={toggleOriginal}
           />
         </div>
@@ -604,12 +634,14 @@ export function MangaFieldBlock(props: {
           // a line of text would say the same thing and leave the row a different
           // shape from the two above it, which is the property the column widths
           // here took the most work to get right.
-          isDisabled={rawShown}
+          isDisabled={rawShown || noLanguage}
           placeholder={t(
             intl,
-            rawShown
-              ? "mangaTools.translationGroup.originalDetail"
-              : "mangaTools.translationGroup.placeholder"
+            noLanguage
+              ? "mangaTools.translationGroup.noLanguageDetail"
+              : rawShown
+                ? "mangaTools.translationGroup.originalDetail"
+                : "mangaTools.translationGroup.placeholder"
           )}
           value={groupRaw ? { value: groupRaw, label: groupName } : null}
           options={groupOptions}

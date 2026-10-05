@@ -74,7 +74,40 @@ NS.LANGUAGES = {
   th: { flag: "th" },
   vi: { flag: "vn" },
   id: { flag: "id" },
+
+  // **The one entry that is not a language of somewhere.** `zxx` is ISO 639-2's
+  // "no linguistic content" — a CG collection, an art book, anything with no text of
+  // its own to be in a language — and it is a *value* of this field like any other:
+  // a gallery carrying it is marked deliberately, which is the difference between it
+  // and an empty field. What it says is that the language question does not apply,
+  // and the plugin acts on that: see NS.isNoLanguage.
+  //
+  // No flag, because there is no country to draw one of; the mark drawn in a flag's
+  // place is in fields-ui.tsx. The name is not here either — Intl.DisplayNames knows
+  // this code, so it reads "No linguistic content" / "无语言内容" / 言語的内容なし
+  // without a string of ours.
+  zxx: { flag: null },
 };
+
+/**
+ * The code for "no linguistic content", named once.
+ *
+ * Asked about in five places — the two editors that set a language, and the three
+ * that draw one — so it is written down here rather than spelled out in each.
+ */
+NS.NO_LANGUAGE = "zxx";
+
+/**
+ * Whether a stored value is that one, and nothing else.
+ *
+ * **A value the table does not recognise is not this.** `describe` calls such a value
+ * unknown, and unknown is treated as no value at all: nothing is declared from it and
+ * nothing is drawn for it. Only a value that resolves to `zxx` means "this work has
+ * no language", which is what makes it safe to act on — a language this plugin cannot
+ * name says nothing about whether the work has one.
+ */
+NS.isNoLanguage = (raw: unknown): boolean =>
+  NS.findCanonical(NS.normalize(raw)) === NS.NO_LANGUAGE;
 
 /**
  * UI language to fall back to when a name is not available in the requested one.
@@ -303,13 +336,26 @@ NS.languageOptions = (locale?: string | null): MangaToolsOption[] => {
   const uiLocale = locale || NS.FALLBACK_LOCALE;
   const collator = collatorFor(uiLocale);
 
-  return Object.keys(NS.LANGUAGES)
-    .map((code) => ({
-      value: code,
-      label: NS.name(code, uiLocale),
-      flag: NS.LANGUAGES[code].flag,
-    }))
-    .sort((a, b) => collator.compare(a.label, b.label));
+  const optionFor = (code: string): MangaToolsOption => ({
+    value: code,
+    label: NS.name(code, uiLocale),
+    flag: NS.LANGUAGES[code].flag,
+  });
+
+  // **"No language" is appended rather than sorted in.** By its name it is an
+  // ordinary option and the collator would drop it among the languages — in Chinese
+  // under 无, in English under N — where it reads as one more language of somewhere.
+  // It is the one value that is not a place, so it keeps the same place in the list
+  // whatever the interface language is: a thing to find at the end rather than a
+  // thing to scan past.
+  const languages = Object.keys(NS.LANGUAGES).filter(
+    (code) => code !== NS.NO_LANGUAGE
+  );
+
+  return languages
+    .map(optionFor)
+    .sort((a, b) => collator.compare(a.label, b.label))
+    .concat([optionFor(NS.NO_LANGUAGE)]);
 };
 
 /**
