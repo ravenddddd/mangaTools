@@ -225,7 +225,16 @@ export function MangaDetailsPanel(props: {
         // title, and there is no separate "no link" state — a shop with no link is
         // simply not drawn.
         <h6 className="manga-tools-detail manga-tools-shops">
-          {t(intl, "mangaTools.shops.heading") + ": "}
+          {/*
+            The label is its own element so the row can be a flex line: the label
+            hangs at the start and the badges are one item after it, which is what
+            makes the lines they wrap onto line up under the first badge rather
+            than under the label. As one inline run, a badge that did not fit the
+            first line took the whole run down with it.
+          */}
+          <span className="manga-tools-shops-label">
+            {t(intl, "mangaTools.shops.heading") + ":"}
+          </span>
           <ShopBadges links={shops} />
         </h6>
       ) : null}

@@ -1153,9 +1153,9 @@ button.minimal.manga-tools-manga-toggle.is-manga {
  * ── Shop links ───────────────────────────────────────────────────────────
  *
  * The head in the edit form's link row, and the badges in the manga info block.
- * The head is a 38px square slot like Stash's own input-group-text, and the icon
- * is a favicon whatever the badge setting says — a wordmark does not fit a
- * square. The badges are the one place the setting chooses.
+ * The head is a 38px square slot like Stash's own input-group-text, and one
+ * favicon per shop is used in both places — a square asset fits both, and a
+ * second icon family for one shop is a choice nobody needs to make.
  */
 .manga-tools-shop-prefix .input-group-text {
   display: flex;
@@ -1182,12 +1182,43 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   display: block;
 }
 
+/*
+ * The label hangs, and the wrapped badges hang with it.
+ *
+ * The row is one flex line — the label, then the badges as a single item — so
+ * the badges always start after the label, and the lines they wrap onto start at
+ * the badges' own left edge, under the first badge rather than under the label.
+ * Left as one inline run, a run too wide for what was left of the line after the
+ * label moved down whole, which put every badge under the label.
+ *
+ * Baseline rather than centre: the badges have a height of their own, and centre
+ * would also re-centre the label against a block of three wrapped lines instead
+ * of keeping it on the first. The gap after the colon is relative to the text,
+ * like the space it replaces.
+ */
+.manga-tools-shops {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+}
+
+.manga-tools-shops-label {
+  flex: none;
+  white-space: nowrap;
+}
+
 .manga-tools-shop-badges {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   vertical-align: middle;
+}
+
+/* The badges take what the label leaves, and wrap there. `min-width: 0` is what
+ * lets a flex item shrink below its content's own width instead of overflowing. */
+.manga-tools-shops .manga-tools-shop-badges {
+  min-width: 0;
 }
 
 .manga-tools-shop-badge {

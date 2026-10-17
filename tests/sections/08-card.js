@@ -2129,6 +2129,25 @@ module.exports = () => {
     "…while a link that is not one of the four stays out"
   );
 
+  // The row's layout depends on this split: the label is an item of its own and
+  // the badges are the item after it, so the lines the badges wrap onto start at
+  // the badges' left edge. Merged back into one text run, the CSS has nothing to
+  // hang the indent from — which is the regression this pins.
+  const shopsRow = find(
+    withShops,
+    (n) => n.props?.className === "manga-tools-detail manga-tools-shops"
+  );
+  assert.strictEqual(
+    shopsRow.props.children[0]?.props?.className,
+    "manga-tools-shops-label",
+    "the label is its own element, first in the row"
+  );
+  assert.strictEqual(
+    shopsRow.props.children[1].type.name,
+    "ShopBadges",
+    "…and the badges are the element after it"
+  );
+
   nav("/galleries/2");
   assert.strictEqual(
     hasText(panelOf(panelValues), "商店:"),
