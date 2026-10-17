@@ -39,10 +39,22 @@ export interface Shop {
   code(raw: string): string;
 }
 
+/**
+ * The first pattern that names a code wins; none means no code.
+ *
+ * More than one because a shop does not keep one URL shape forever — FANZA alone
+ * has the doujin `cid=` page and the book `product/<id>/<code>/` page — and a
+ * shape learned later is one entry here rather than a new branch.
+ */
 const codeIn =
-  (pattern: RegExp) =>
-  (raw: string): string =>
-    pattern.exec(raw)?.[1] || "";
+  (...patterns: RegExp[]) =>
+  (raw: string): string => {
+    for (const pattern of patterns) {
+      const code = pattern.exec(raw)?.[1];
+      if (code) return code;
+    }
+    return "";
+  };
 
 export const SHOPS: Shop[] = [
   {
@@ -57,8 +69,9 @@ export const SHOPS: Shop[] = [
     name: "FANZA",
     // The doujin pages live on dmm.co.jp, not on a fanza host.
     domain: "dmm.co.jp",
-    // /dc/doujin/-/detail/=/cid=d_790745/
-    code: codeIn(/[?&/]cid=([A-Za-z0-9_]+)/),
+    // /dc/doujin/-/detail/=/cid=d_790745/ — and the book shape,
+    // /product/6300672/b915awnmg04612/
+    code: codeIn(/[?&/]cid=([A-Za-z0-9_]+)/, /\/product\/\d+\/([A-Za-z0-9]+)/),
   },
   {
     key: "toranoana",

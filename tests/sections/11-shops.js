@@ -31,6 +31,12 @@ module.exports = () => {
           "fanza",
           "d_790745",
         ],
+        // The book shape, which is on a different subdomain and has no `cid=`.
+        [
+          "https://book.dmm.co.jp/product/6300672/b915awnmg04612/",
+          "fanza",
+          "b915awnmg04612",
+        ],
         // A subdomain is still the shop; a shape this build does not know keeps
         // the shop and loses only the code.
         ["https://book.dmm.co.jp/product/123456/", "fanza", ""],
