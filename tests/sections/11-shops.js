@@ -55,7 +55,7 @@ module.exports = () => {
 
       // The lookalike host matters: endsWith on the bare domain would accept it.
       assert.strictEqual(
-        NS.shopOf("https://dlsite.com.evil.example/x"),
+        NS.shopOf("https://notdlsite.com/x"),
         null,
         "a host that merely contains the domain is not the shop"
       );
