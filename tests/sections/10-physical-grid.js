@@ -46,6 +46,9 @@ const listProps = (over = {}) => ({
     currentPage: 1,
     itemsPerPage: 2,
   },
+  // What this Stash actually passes. `totalCount` is not among ImageList's props
+  // in v0.31.1; it is kept only as a fallback for a build that does pass it.
+  pageCount: 2,
   totalCount: 3,
   selectedIds: new Set(["1001"]),
   images: [],
@@ -56,12 +59,12 @@ const listProps = (over = {}) => ({
 module.exports = () => {
   runSection("15 the physical page plan keeps Stash's page count", () => {
     assert.deepStrictEqual(
-      NS.physicalPagePlan(311, 100, 316),
+      NS.physicalPagePlan(4, 100, 316),
       { pages: 4, perPage: 100 },
       "a few duplicates change neither the page size nor the count"
     );
     assert.deepStrictEqual(
-      NS.physicalPagePlan(311, 100, 511),
+      NS.physicalPagePlan(4, 100, 511),
       { pages: 4, perPage: 128 },
       "a dense gallery widens one page rather than adding pages past the clamp"
     );
@@ -111,6 +114,39 @@ module.exports = () => {
       );
     }
   );
+
+  runSection("15 a page size of one still divides the files", () => {
+    // The bug this pins: the plan used to be derived from `totalCount`, which this
+    // Stash does not pass to ImageList — the count became 1, every file landed on
+    // one page, and `perPage=1` did nothing.
+    const page = NS.expandPhysicalPage(
+      listProps({
+        filter: {
+          sortBy: "path",
+          sortDirection: "ASC",
+          currentPage: 1,
+          itemsPerPage: 1,
+        },
+        pageCount: 3,
+        // Exactly what this Stash passes: no total at all.
+        totalCount: undefined,
+      }),
+      GRID
+    );
+
+    assert.ok(page, "the list is expanded");
+    assert.strictEqual(
+      page.perPage,
+      2,
+      "four files over three Stash pages is two per page"
+    );
+    assert.deepStrictEqual(
+      page.images.map((image) => image.id),
+      ["1001::p1", "1002::p2"],
+      "…not all four on the first page"
+    );
+    assert.strictEqual(page.pages, 2, "and two physical pages");
+  });
 
   runSection("15 only a path-ascending list is expanded", () => {
     assert.strictEqual(

@@ -93,18 +93,23 @@ function load(galleryId: string): Promise<GalleryGrid> {
 }
 
 /**
- * The same page count Stash computed, with the files divided into it.
+ * Stash's page count, with the files divided into it.
+ *
+ * `imagePages` is **Stash's own count**, taken from the `pageCount` prop — not
+ * derived from a total. Stash v0.31.1 does not pass a `totalCount` to
+ * `ImageList` at all, and deriving the count from `undefined` made it 1, which
+ * put every file on one page: the page-size selector did nothing.
  *
  * Published for the smoke test: the arithmetic is where a page that cannot be
  * reached would come from, and it is the cheapest part of this module to pin.
  */
 export function physicalPagePlan(
-  imageCount: number,
+  imagePages: number,
   userPerPage: number,
   fileCount: number
 ): { pages: number; perPage: number } {
-  const imagePages = Math.max(1, Math.ceil(imageCount / userPerPage));
-  const perPage = Math.max(userPerPage, Math.ceil(fileCount / imagePages));
+  const pages = Math.max(1, Math.floor(imagePages) || 1);
+  const perPage = Math.max(userPerPage, Math.ceil(fileCount / pages));
   return { pages: Math.max(1, Math.ceil(fileCount / perPage)), perPage };
 }
 
@@ -217,12 +222,17 @@ export function expandPhysicalPage(
   if (String(filter?.sortDirection || "").toUpperCase() !== "ASC") return null;
   if (!grid || grid.files.length === 0) return null;
 
-  const userPerPage = Number(filter?.itemsPerPage) || 100;
-  const plan = physicalPagePlan(
-    Number(props.totalCount) || 0,
-    userPerPage,
-    grid.total
-  );
+  const userPerPage = Math.max(1, Number(filter?.itemsPerPage) || 100);
+
+  // Stash's page count as it passed it to the list. `totalCount` is only a
+  // fallback: this Stash gives `ImageList` a `pageCount` and no total.
+  const stashedPages = Number(props.pageCount) || 0;
+  const imagePages =
+    stashedPages > 0
+      ? stashedPages
+      : Math.max(1, Math.ceil((Number(props.totalCount) || 0) / userPerPage));
+
+  const plan = physicalPagePlan(imagePages, userPerPage, grid.total);
   const wanted = Number(filter?.currentPage) || 1;
   const page = Math.min(Math.max(1, wanted), plan.pages);
 
