@@ -142,13 +142,72 @@ const client = {
       });
     }
 
+    // The physical file list, and the count question that goes with it: the same
+    // scope filter, answered with `count` alone when only that was asked for.
+    if (variables?.fileFilter !== undefined) {
+      const filter = variables.fileFilter || {};
+      const zipId = filter.zip_file?.value?.[0];
+      const folderId = filter.parent_folder?.value?.[0];
+      const matched = [];
+      Object.keys(state.galleries).forEach((id) => {
+        (state.galleries[id].physicalFiles || []).forEach((file) => {
+          if (zipId !== undefined && String(file.zipFileId) !== String(zipId))
+            return;
+          if (
+            folderId !== undefined &&
+            String(file.folderId) !== String(folderId)
+          )
+            return;
+          matched.push(file);
+        });
+      });
+      matched.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+      if (variables.perPage === undefined) {
+        return Promise.resolve({
+          data: { findFiles: { count: matched.length } },
+        });
+      }
+
+      const files = matched.map((file) => ({
+        __typename: "ImageFile",
+        id: file.id,
+        path: file.path,
+        basename: file.basename,
+        width: file.width,
+        height: file.height,
+        parent_folder: { id: file.folderId || "0" },
+        zip_file: { id: file.zipFileId || null },
+        images: [
+          {
+            id: file.imageId,
+            title: file.title || "",
+            paths: {
+              image:
+                "http://stash.example.com:9998/image/" +
+                file.imageId +
+                "/image",
+              thumbnail: "",
+              preview: "",
+            },
+          },
+        ],
+      }));
+
+      return Promise.resolve({
+        data: { findFiles: { count: files.length, files } },
+      });
+    }
+
     // The reader's revalidation: a gallery's image count, and nothing else. Told
     // apart from a full read by its variables — every full read sends the order it
-    // was asked for, and this one names the gallery and nothing more.
+    // was asked for, and this one names the gallery and nothing more. The physical
+    // gallery query names the gallery *and* `byPath`, which is the tell.
     if (
       variables?.galleryId !== undefined &&
       variables.sort === undefined &&
-      variables.withPathIds === undefined
+      variables.withPathIds === undefined &&
+      variables.byPath === undefined
     ) {
       const answered = () => {
         const gallery = state.galleries[variables.galleryId] || {
@@ -199,10 +258,14 @@ const client = {
         // The gallery itself: this plugin's own custom fields, and Stash's own
         // chapters. A fixture that says nothing about either gets the empty
         // answer, which is a gallery with no chapters at all.
-        findGallery: gallery.gallery || {
+        findGallery: {
           id: variables.galleryId,
+          title: gallery.title || "",
+          folder: gallery.folder || null,
+          files: gallery.files || [],
           custom_fields: {},
           chapters: [],
+          ...(gallery.gallery || {}),
         },
         // The images in path order, for translating Stash's chapter numbers.
         // Answered whatever the fixture is: `@include` is the server's business,
@@ -380,9 +443,9 @@ dom.window.PluginApi = {
     },
   },
   patch: {
-    before: (target, fn) => patched.push({ target, fn }),
-    instead: (target, fn) => patched.push({ target, fn }),
-    after: (target, fn) => patched.push({ target, fn }),
+    before: (target, fn) => patched.push({ target, kind: "before", fn }),
+    instead: (target, fn) => patched.push({ target, kind: "instead", fn }),
+    after: (target, fn) => patched.push({ target, kind: "after", fn }),
   },
   // Stash's own router events, which the tools half reads the path from and the
   // reader listens to for a page change under an open lightbox.
@@ -500,7 +563,7 @@ const pagesOf = (...ids) => ids.map((id) => page(String(id)));
  * A lightbox, built the way Stash's is: a display area holding a carousel, and a
  * header holding the counter that says where it is.
  */
-function buildLightbox(current = 1, total = 5, ids = null) {
+function buildLightbox(current = 1, total = 5, ids = null, fragments = null) {
   const lightbox = dom.makeElement("div");
   lightbox.className = "Lightbox";
 
@@ -536,7 +599,9 @@ function buildLightbox(current = 1, total = 5, ids = null) {
       slide.textContent = "";
       if (!ids || Math.abs(i - (at - 1)) > 1) return;
       const img = dom.makeElement("img");
-      img.src = `/image/${ids[i]}/image?t=1`;
+      img.src =
+        `/image/${ids[i]}/image?t=1` +
+        (fragments?.[i] ? `#${fragments[i]}` : "");
       slide.appendChild(img);
     });
   };
@@ -708,7 +773,11 @@ function buildLightbox(current = 1, total = 5, ids = null) {
  * hands its chapters to.
  */
 const mountBridge = () => {
-  const patch = patched.find((p) => p.target === "ImageList");
+  // `after` specifically: the tools half also patches ImageList now (physical
+  // pages), and its patch is not the bridge.
+  const patch = patched.find(
+    (p) => p.target === "ImageList" && p.kind === "after"
+  );
   assert.ok(
     patch,
     "the plugin should patch the list a gallery's lightbox opens from"
@@ -1109,6 +1178,153 @@ state.galleries["72"] = {
 state.galleries["73"] = {
   images: [image("821", 1000, 1500), image("822", 1000, 1500)],
 };
+// For the sections about physical pages: four files in one zip, one image twice.
+// The gallery's deduped list is three images; the physical list has four pages.
+state.galleries["74"] = {
+  images: [
+    image("901", 1000, 1500),
+    image("902", 1000, 1500),
+    image("903", 1000, 1500),
+  ],
+  gallery: {
+    custom_fields: {
+      "plugin.mangaTools.chapters": JSON.stringify({
+        v: 2,
+        chapters: [{ title: "Second", files: ["f3"], images: ["901"] }],
+      }),
+    },
+    chapters: [],
+  },
+  title: "Physical gallery",
+  folder: null,
+  files: [{ id: "378704" }],
+  physicalFiles: [
+    {
+      id: "f1",
+      path: "/zip/001.jpg",
+      basename: "001.jpg",
+      imageId: "901",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378704",
+    },
+    {
+      id: "f2",
+      path: "/zip/002.jpg",
+      basename: "002.jpg",
+      imageId: "902",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378704",
+    },
+    {
+      id: "f3",
+      path: "/zip/003.jpg",
+      basename: "003.jpg",
+      imageId: "901",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378704",
+    },
+    {
+      id: "f4",
+      path: "/zip/004.jpg",
+      basename: "004.jpg",
+      imageId: "903",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378704",
+    },
+  ],
+};
+// The same shape, with an **image-level** chapter field: reading it in physical
+// mode must put it at the image's first occurrence.
+state.galleries["75"] = {
+  images: [image("911", 1000, 1500), image("912", 1000, 1500)],
+  gallery: {
+    custom_fields: {
+      "plugin.mangaTools.chapters": JSON.stringify({
+        v: 1,
+        chapters: [{ title: "First", images: ["911"] }],
+      }),
+    },
+    chapters: [],
+  },
+  title: "Old chapter",
+  folder: null,
+  files: [{ id: "378705" }],
+  physicalFiles: [
+    {
+      id: "g1",
+      path: "/zip/001.jpg",
+      basename: "001.jpg",
+      imageId: "911",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378705",
+    },
+    {
+      id: "g2",
+      path: "/zip/002.jpg",
+      basename: "002.jpg",
+      imageId: "912",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378705",
+    },
+    {
+      id: "g3",
+      path: "/zip/003.jpg",
+      basename: "003.jpg",
+      imageId: "911",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378705",
+    },
+  ],
+};
+// The same physical shape, for the section about a non-path sort: a gallery no
+// earlier section has read, so the fallback is the fetch this test sees.
+state.galleries["76"] = {
+  images: [
+    image("921", 1000, 1500),
+    image("922", 1000, 1500),
+    image("923", 1000, 1500),
+  ],
+  gallery: { custom_fields: {}, chapters: [] },
+  title: "Sorted by title",
+  folder: null,
+  files: [{ id: "378706" }],
+  physicalFiles: [
+    {
+      id: "h1",
+      path: "/zip/001.jpg",
+      basename: "001.jpg",
+      imageId: "921",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378706",
+    },
+    {
+      id: "h2",
+      path: "/zip/002.jpg",
+      basename: "002.jpg",
+      imageId: "922",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378706",
+    },
+    {
+      id: "h3",
+      path: "/zip/003.jpg",
+      basename: "003.jpg",
+      imageId: "921",
+      width: 1000,
+      height: 1500,
+      zipFileId: "378706",
+    },
+  ],
+};
 // For the sections about the pairing shift, which is remembered per gallery.
 state.galleries["36"] = PLAIN_GALLERY;
 // A gallery this plugin has no business on: marked `manga: false`, which is what keeps
@@ -1140,6 +1356,8 @@ async function startReader(options) {
     counterText,
     search = "",
     ids = null,
+    // Parallel to `ids`: the `#<file id>` a physical occurrence's slide carries.
+    fragments = null,
     mode = null,
     // A page with no gallery, or a gallery this plugin does not touch, has no
     // switch of ours — and a section about that would be asking for the wrong thing.
@@ -1168,7 +1386,7 @@ async function startReader(options) {
         ).map((i) => String(i.id))
       : null);
 
-  const box = buildLightbox(at, total, showing);
+  const box = buildLightbox(at, total, showing, fragments);
   // Some lightboxes have no counter at all — Stash draws it only for more than one
   // image — and that has to be true before the mode is turned on, not after.
   if (counterText !== undefined) box.counter.textContent = counterText;

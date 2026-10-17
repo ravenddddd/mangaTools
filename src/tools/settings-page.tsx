@@ -706,6 +706,28 @@ export function MangaToolsSettings() {
         })}
       />
 
+      {/* ── Physical pages ───────────────────────────────────────────────── */}
+      {/* A feature, not a display setting: it changes what a page *is* — a file
+          occurrence instead of an image — and both halves read it. Off is the
+          behaviour this plugin has always had, so the note says what turning it
+          on does to chapters that are already there. */}
+      <SettingSwitch
+        id="mangaTools-physicalPages"
+        heading={t(intl, "mangaTools.settings.physicalPages.heading")}
+        subHeading={
+          <>
+            {t(intl, "mangaTools.settings.physicalPages.description")}
+            <SettingsNote>
+              {t(intl, "mangaTools.settings.physicalPages.note")}
+            </SettingsNote>
+          </>
+        }
+        checked={NS.physicalPages}
+        onChange={writeFlag((next) => {
+          NS.physicalPages = next;
+        })}
+      />
+
       {/* ── The chapters tab ─────────────────────────────────────────────── */}
       {/* No children, and a boxed note inside the description — the same shape as
           the lightbox above, because it is the same kind of sentence: what this

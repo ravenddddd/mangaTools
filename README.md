@@ -1417,6 +1417,54 @@ Nothing here writes Stash's own chapter rows either. A gallery with no list of t
 plugin's own gets one the first time it is edited — the same import the button above
 does, done for you — and from then on the reader reads this plugin's field.
 
+### Reading by physical pages
+
+Stash **deduplicates content**. The same bytes at two paths are one Image with two
+files (`images_files`, one of them primary), and a gallery's list is
+`SELECT DISTINCT images.id` — so a divider that appears four times in one archive is
+one card, once, at one position, with the primary file's URL. Chapters stored by
+image id cannot tell those four occurrences apart either.
+
+The **Read by physical pages** setting (off by default) makes a page a **file
+occurrence** instead. It is one switch because it changes what a page *is*, and the
+gallery grid and the reader have to agree about that: with it on, the Images tab,
+the wall and the lightbox are all drawn from the files the gallery actually
+contains, each at its own position.
+
+- **The list comes from `findFiles`**, scoped the way the scanner scopes a gallery:
+  a folder gallery's files are those whose parent folder is its folder, a zip
+  gallery's are those whose zip file is its zip file. The order is the server's own
+  path order (`NATURAL_CI`), not a second collation in JavaScript. `src/gallery-files.ts`
+  is shared by both halves.
+- **A page's identity is the file id** in this mode — the only id that can tell two
+  occurrences of one image apart. The image id stays on the page for what is
+  actually the image's: the URL, the bytes, the carousel's name.
+- **The chapter field gains a second version.** `v: 2` stores `files` (the precise
+  set) and `images` (the deduplicated set, derived from it), so a reader with the
+  setting off still draws the list from `images`. A `v: 1` field read with the
+  setting on is converted **in memory** — each image becomes its first occurrence,
+  the only faithful translation — and switching the setting never rewrites anything.
+  A chapter write in physical mode writes `v: 2`; a write with it off writes `v: 1`.
+- **The page count stays Stash's.** `useEnsureValidPage` clamps the page number to
+  the image page count, so physical pages past it would be unreachable. The files
+  are divided into the same number of pages instead, with
+  `perPage = max(chosen size, ceil(files / pages))`; `Pagination` and
+  `PaginationIndex` are patched to draw the physical totals. The cost is that the
+  page-size selector can understate a page that had to grow.
+- **The grid renders Stash's own cards.** The list patch clones each image once per
+  occurrence, gives it a synthetic id for React's keys, and puts the occurrence's
+  file in `visual_files` — so the cards keep their tags, popovers and date. The
+  card patch restores the real image id for its link. Selection is by image: any
+  occurrence selects the image.
+- **The exact occurrence survives Stash's lightbox.** Each handed-over slide's URL
+  carries `#<file id>`; the fragment never reaches the server, makes Stash's React
+  keys unique, and is what the reader reads to open the occurrence that was clicked
+  rather than the first one with that content.
+
+Not changed: a list sorted by anything but path (the positions would mean nothing),
+the image detail page, and the fact that a batch action still operates on the image
+rather than on one occurrence.
+
 ### What is not here yet
 
 - **No pinch or touch panning.** The mouse is back — a drag that pans, a wheel that

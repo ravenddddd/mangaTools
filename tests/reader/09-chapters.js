@@ -86,9 +86,26 @@ module.exports = async () => {
         "an empty list is a gallery whose chapters were cleared, and draws nothing"
       );
       assert.strictEqual(
-        chapters({ v: 2, chapters: [{ images: ["1"] }] }),
+        chapters({ v: 3, chapters: [{ images: ["1"] }] }),
         null,
         "a version this build does not know is unreadable, not best-effort"
+      );
+      assert.deepStrictEqual(
+        chapters({ v: 2, chapters: [{ images: ["1"], files: ["11"] }] }),
+        [{ title: "", images: ["1"] }],
+        "a file-identity list read with physical pages off uses its images, so " +
+          "turning the setting off does not lose the chapters"
+      );
+      assert.deepStrictEqual(
+        NR.parseChapters(
+          JSON.stringify({
+            v: 2,
+            chapters: [{ images: ["1"], files: ["11"] }],
+          }),
+          true
+        ),
+        [{ title: "", images: ["11"] }],
+        "…and with them on it uses the files"
       );
       assert.strictEqual(
         NR.parseChapters(null),

@@ -377,6 +377,7 @@ module.exports = async () => {
         "manageChapters",
         "openDetailsBlock",
         "openEditBlock",
+        "physicalPages",
         "readerSettings",
         "readerTakeover",
         "showCoverBadge",

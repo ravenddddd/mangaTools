@@ -402,6 +402,15 @@ function refresh(): Promise<unknown> {
 const FEATURE_ON_BY_DEFAULT = true;
 
 /**
+ * Whether a gallery is read by physical files rather than by images.
+ *
+ * **Off by default**, unlike the rest: it changes what a page is, and a library
+ * that never asks for it must keep the page list it always had — including not
+ * fetching the file list that the mode is built on.
+ */
+const PHYSICAL_PAGES_BY_DEFAULT = false;
+
+/**
  * Every setting the managing half reads, live, before Stash has answered.
  *
  * The defaults, which are what the plugin did before any of this was configurable, so
@@ -409,6 +418,7 @@ const FEATURE_ON_BY_DEFAULT = true;
  * plugin has always drawn it rather than empty. `refreshSettings` overwrites them.
  */
 NS.readerTakeover = FEATURE_ON_BY_DEFAULT;
+NS.physicalPages = PHYSICAL_PAGES_BY_DEFAULT;
 NS.manageChapters = FEATURE_ON_BY_DEFAULT;
 NS.fields = FEATURE_ON_BY_DEFAULT;
 NS.fieldLanguage = FEATURE_ON_BY_DEFAULT;
@@ -486,6 +496,10 @@ function refreshSettings(): void {
       NS.readerTakeover = NS.parseFlag(
         pluginCfg ? pluginCfg.readerTakeover : null,
         FEATURE_ON_BY_DEFAULT
+      );
+      NS.physicalPages = NS.parseFlag(
+        pluginCfg ? pluginCfg.physicalPages : null,
+        PHYSICAL_PAGES_BY_DEFAULT
       );
       NS.manageChapters = NS.parseFlag(
         pluginCfg ? pluginCfg.manageChapters : null,
@@ -827,6 +841,7 @@ function settingsInput(): { [key: string]: unknown } {
       NS.sidebarFilters || NS.SIDEBAR_FILTERS
     ),
     readerTakeover: NS.readerTakeover,
+    physicalPages: NS.physicalPages,
     manageChapters: NS.manageChapters,
     fields: NS.fields,
     fieldLanguage: NS.fieldLanguage,

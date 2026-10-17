@@ -96,6 +96,7 @@ import { CAN_WRITE, GalleryToolbar } from "./toolbar";
 import { noteFired, registerPatch } from "./patches";
 import { BulkFieldsRow, captureSelection } from "./bulk";
 import { isMarkedNow, setEditForm } from "./mark";
+import { registerPhysicalPagePatches } from "./physical-grid";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
 // load time. Binding the result once gives every reference below a
@@ -603,6 +604,13 @@ registerPatch("after", "RatingSystem", (...args: unknown[]) => {
     </>
   );
 });
+
+// 12. The gallery's Images tab, when it is read by physical pages.
+//
+//     Four patches, and the module says why they are these four: the list both
+//     display modes render from, the card's link, and the two pagination
+//     components. They do nothing at all while the setting is off.
+registerPhysicalPagePatches();
 
 /**
  * Brings the tools half up: the settings refresh, the store's first fetch, the

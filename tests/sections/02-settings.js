@@ -350,6 +350,7 @@ module.exports = () => {
     switches.map((n) => n.props.id),
     [
       "mangaTools-readerTakeover",
+      "mangaTools-physicalPages",
       "mangaTools-manageChapters",
       "mangaTools-fields",
       "mangaTools-fieldLanguage",
@@ -402,6 +403,11 @@ module.exports = () => {
     true,
     "the edit block starts open — it holds the only way to set a language"
   );
+  assert.strictEqual(
+    sw["mangaTools-physicalPages"].props.checked,
+    false,
+    "physical pages is a change to what a page is, so it is off until asked for"
+  );
 
   // ── 7c2. Progressive disclosure ────────────────────────────────────
   // Everything a switch holds is drawn only while it is on, and that is the *only*
@@ -413,6 +419,7 @@ module.exports = () => {
     switchesIn(bare).map((n) => n.props.id),
     [
       "mangaTools-readerTakeover",
+      "mangaTools-physicalPages",
       "mangaTools-manageChapters",
       "mangaTools-fields",
       "mangaTools-confirmUnmark",
@@ -548,6 +555,7 @@ module.exports = () => {
   // which fields it is about.
   const NOTE_ROWS = [
     ["the lightbox", "readerTakeover"],
+    ["physical pages", "physicalPages"],
     ["the chapters tab", "manageChapters"],
     ["the disabled fields", "showDisabledFields"],
   ];
@@ -707,7 +715,7 @@ module.exports = () => {
       "…and each saying it is open, which is the only way anything but an eye knows"
     );
     assert.strictEqual(groupsIn(page), 2, "two groups to start with");
-    assert.strictEqual(switchesIn(page), 16, "…and sixteen switches");
+    assert.strictEqual(switchesIn(page), 17, "…and seventeen switches");
 
     const before = state.capturedConfigWrite;
 
@@ -727,10 +735,10 @@ module.exports = () => {
     };
 
     for (const [what, index, left] of [
-      ["the language field, which folds two switches", 1, 14],
-      ["the display heading, which folds four rows", 2, 12],
-      ["the mark's heading, which folds three rows and no group", 3, 13],
-      ["the fields group, which folds all ten under it", 0, 6],
+      ["the language field, which folds two switches", 1, 15],
+      ["the display heading, which folds four rows", 2, 13],
+      ["the mark's heading, which folds three rows and no group", 3, 14],
+      ["the fields group, which folds all ten under it", 0, 7],
     ]) {
       click(chevronsIn(open())[index]);
       assert.strictEqual(
@@ -741,7 +749,7 @@ module.exports = () => {
       shutEverything();
       assert.strictEqual(
         switchesIn(open()),
-        16,
+        17,
         `…and opening it again should bring them all back (${what})`
       );
     }
@@ -1022,9 +1030,12 @@ module.exports = () => {
       plugin_id: "mangaTools",
       input: {
         enabledLanguages: "ja,zh-Hans",
-        // The ten switches that say what the plugin does at all, and which fields it
-        // manages. All on, which is what the plugin did before they existed.
+        // The switches that say what the plugin does at all, and which fields it
+        // manages. All on — which is what the plugin did before they existed —
+        // except physical pages, which changes what a page is and so starts off.
         readerTakeover: true,
+        // The one feature that starts off: it changes what a page is.
+        physicalPages: false,
         manageChapters: true,
         fields: true,
         fieldLanguage: true,
@@ -1217,9 +1228,10 @@ module.exports = () => {
     plugin_id: "mangaTools",
     input: {
       enabledLanguages: "",
-      // The ten switches that say what the plugin does at all, and which fields it
-      // manages. All on, which is what the plugin did before they existed.
+      // The switches that say what the plugin does at all, and which fields it
+      // manages. All on except physical pages, which starts off.
       readerTakeover: true,
+      physicalPages: false,
       manageChapters: true,
       fields: true,
       fieldLanguage: true,

@@ -22,7 +22,7 @@
  */
 import { requirePluginApi, gqlDoc } from "../plugin-api";
 import { NS } from "../tools/fields";
-import { chaptersFromStash, parseChapters } from "./chapters";
+import { chaptersFromStash, parseChapters, toFileChapters } from "./chapters";
 import { writeChapters } from "./chapters-edit";
 import { NR } from "./namespace";
 import { fetchGallery } from "./stash-lightbox";
@@ -189,15 +189,22 @@ export async function runChapterImports(
       // Path order, which is what Stash's own chapter numbers count in. The tab
       // asks for the same order for the same reason.
       const answer = await fetchGallery(id, { sort: "path", direction: "ASC" });
-      const chapters = chaptersFromStash(
+      // Stash's numbers count the deduplicated images in path order. In physical
+      // mode the pages on screen are file occurrences, so the translation is
+      // against `pathIds` (fetched for exactly this) and the result is moved onto
+      // the first occurrence of each image.
+      const translated = chaptersFromStash(
         answer.stashChapters,
-        answer.pages.map((page) => page.id)
+        answer.pathIds || answer.pages.map((page) => page.imageId || page.id)
       );
+      const chapters = NS.physicalPages
+        ? toFileChapters(translated, answer.pages)
+        : translated;
 
       if (chapters.length === 0) {
         run.skippedEmpty.push(id);
       } else {
-        await writeChapters(id, chapters);
+        await writeChapters(id, chapters, answer.pages);
         run.written.push(id);
       }
     } catch (error) {

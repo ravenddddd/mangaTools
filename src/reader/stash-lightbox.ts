@@ -13,6 +13,7 @@
  * reads the lightbox returns null rather than guessing, and the caller turns the
  * mode off. A reader that cannot tell where it is must not draw anything.
  */
+import { fetchGalleryFiles, type GalleryFileScope } from "../gallery-files";
 import { NS } from "../languages";
 import { gqlDoc, requirePluginApi } from "../plugin-api";
 import { NR, type MangaReaderOrder } from "./namespace";
@@ -364,7 +365,7 @@ let galleryQuery: unknown = null;
  */
 export function carouselImage(
   lightbox: Element
-): { at: number; id: string } | null {
+): { at: number; id: string; fileId: string | null } | null {
   const carousel = lightbox.querySelector(
     SELECTOR_CAROUSEL
   ) as HTMLElement | null;
@@ -382,7 +383,13 @@ export function carouselImage(
   const id = /\/image\/([^/]+)\//.exec(src)?.[1];
   if (!id) return null;
 
-  return { at, id };
+  // The fragment is this plugin's own: when the occurrence list is handed to
+  // Stash, each slide's URL carries `#<file id>` so its React key is unique — and
+  // so the reader can tell which occurrence is on screen, which an image id
+  // cannot when the same content appears more than once. See fetchPhysicalGallery.
+  const fileId = /#([^#\s]+)$/.exec(src)?.[1] || null;
+
+  return { at, id, fileId };
 }
 
 interface GalleryPayload {
@@ -468,6 +475,15 @@ export interface GalleryAnswer {
   /** Stash's own chapters, in the shape its own field has */
   stashChapters: { title?: string; image_index?: number }[];
   /**
+   * The gallery's physical scope and size, when this answer is a file list.
+   *
+   * The scope is what revalidation asks about — a file count says "something
+   * changed", where `image_count` cannot see a duplicate occurrence being added or
+   * removed — and `fileTotal` is the answer it was read with.
+   */
+  fileScope?: GalleryFileScope;
+  fileTotal?: number;
+  /**
    * The gallery's image ids in path order, or null when they were not asked for.
    *
    * Asked for only when the pages themselves are not in path order, because that
@@ -537,6 +553,146 @@ export async function fetchImageCount(
 }
 
 /**
+ * Everything opening a gallery needs when the pages are **file occurrences**.
+ *
+ * Stash's own gallery fields come with it — the plugin's chapter field, Stash's
+ * chapters, the interface language and the gallery's own name for the lightbox's
+ * footer — and `byPath` is the deduped path order its chapter numbers count in.
+ */
+export const PHYSICAL_GALLERY_QUERY_TEXT = [
+  "query MangaReaderPhysicalGallery($galleryId: ID!, $byPath: Boolean!) {",
+  "  configuration {",
+  "    interface {",
+  "      language",
+  "    }",
+  "  }",
+  "  findGallery(id: $galleryId) {",
+  "    id",
+  "    title",
+  "    folder {",
+  "      id",
+  "      path",
+  "    }",
+  "    files {",
+  "      id",
+  "    }",
+  "    custom_fields",
+  "    chapters {",
+  "      title",
+  "      image_index",
+  "    }",
+  "  }",
+  "  byPath: findImages(",
+  "    image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }",
+  '    filter: { per_page: -1, sort: "path", direction: ASC }',
+  "  ) @include(if: $byPath) {",
+  "    images {",
+  "      id",
+  "    }",
+  "  }",
+  "}",
+].join("\n");
+
+let physicalGalleryQuery: unknown = null;
+
+interface PhysicalGalleryPayload {
+  configuration?: { interface?: { language?: string } };
+  findGallery?: {
+    id?: string | number;
+    title?: string | null;
+    folder?: { id?: string | number; path?: string } | null;
+    files?: { id?: string | number }[];
+    custom_fields?: unknown;
+    chapters?: Array<{ title?: string; image_index?: number }>;
+  } | null;
+  byPath?: { images?: Array<{ id?: string | number }> };
+}
+
+/**
+ * The gallery's pages as its files, in path order.
+ *
+ * See gallery-files.ts for what a gallery's physical scope is and why the order is
+ * the server's. Two requests: the gallery's own fields and scope, then the files.
+ */
+async function fetchPhysicalGallery(galleryId: string): Promise<GalleryAnswer> {
+  if (!physicalGalleryQuery) {
+    physicalGalleryQuery = gqlDoc(
+      PHYSICAL_GALLERY_QUERY_TEXT,
+      "build the physical gallery query"
+    );
+  }
+  const query = physicalGalleryQuery;
+  if (!query) throw new Error("[mangaReader] no physical gallery query");
+
+  const data = (await requirePluginApi()
+    .utils.StashService.getClient()
+    .query({
+      query,
+      variables: { galleryId, byPath: true },
+      fetchPolicy: "no-cache",
+    })
+    .then((res) => res?.data)) as PhysicalGalleryPayload | undefined;
+
+  const gallery = data?.findGallery;
+  const scope: GalleryFileScope = {
+    folderId: gallery?.folder?.id ? String(gallery.folder.id) : null,
+    zipFileId: gallery?.files?.[0]?.id ? String(gallery.files[0].id) : null,
+  };
+  const list = await fetchGalleryFiles(scope);
+
+  const pages: MangaReaderPage[] = list.files.map((file) => ({
+    // The file id is the page identity; the image id is what the bytes and the
+    // carousel are keyed by. See MangaReaderPage.
+    id: file.fileId,
+    imageId: file.imageId,
+    width: file.width,
+    height: file.height,
+    url: file.imageUrl,
+  }));
+
+  // Every occurrence links back to this one gallery, and the gallery's own name is
+  // what Stash's footer renders when the image has no title.
+  const back = {
+    id: String(gallery?.id ?? galleryId),
+    title: String(gallery?.title || ""),
+    folder: gallery?.folder?.path
+      ? { path: String(gallery.folder.path) }
+      : null,
+  };
+
+  const images: LightboxImage[] = list.files.map((file) => ({
+    id: file.imageId,
+    title: file.title,
+    // A fragment makes each occurrence a distinct React key in Stash's lightbox
+    // (it keys its slides on this string); it is never sent to the server, so the
+    // request — and its immutable cache entry — is still the image's own.
+    paths: {
+      image: file.imageUrl ? file.imageUrl + "#" + file.fileId : file.imageUrl,
+    },
+    galleries: [back],
+    visual_files: [
+      {
+        __typename: "ImageFile",
+        path: file.path,
+        width: file.width,
+        height: file.height,
+      },
+    ],
+  }));
+
+  return {
+    language: data?.configuration?.interface?.language || null,
+    pages,
+    images,
+    customFields: gallery?.custom_fields,
+    stashChapters: gallery?.chapters || [],
+    pathIds: (data?.byPath?.images || []).map((image) => String(image.id)),
+    fileScope: scope,
+    fileTotal: list.total,
+  };
+}
+
+/**
  * The pages of a gallery, in the order the lightbox shows them.
  *
  * A page's size comes from its first visual file that reported one; a page with
@@ -548,6 +704,14 @@ export async function fetchGallery(
   galleryId: string,
   order: MangaReaderOrder
 ): Promise<GalleryAnswer> {
+  // Physical pages are a question about *which occurrence* an image is, and an
+  // occurrence only has a position in path order — the order Stash's own chapter
+  // numbers count in. Any other sort keeps the deduped list, which is the list the
+  // lightbox's carousel is showing.
+  if (NS.physicalPages && order.sort === "path" && order.direction === "ASC") {
+    return fetchPhysicalGallery(galleryId);
+  }
+
   if (!galleryQuery) {
     galleryQuery = gqlDoc(GALLERY_QUERY_TEXT, "build the gallery query");
   }

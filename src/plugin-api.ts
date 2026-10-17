@@ -290,6 +290,22 @@ export interface MangaToolsNamespace {
    */
   writeChapters(galleryId: string, json: string): Promise<void>;
 
+  /**
+   * The physical page plan: Stash's page count, with the files divided into it.
+   * Published by physical-grid.ts for the smoke test.
+   */
+  physicalPagePlan(
+    imageCount: number,
+    perPage: number,
+    fileCount: number
+  ): { pages: number; perPage: number };
+  /**
+   * One page of a gallery's files as the list's props, or null when the order has
+   * no physical meaning. Published for the smoke test; the list patch is the only
+   * caller otherwise.
+   */
+  expandPhysicalPage(props: unknown, grid: unknown): unknown;
+
   findCanonical(code?: string | null): string;
   normalize(raw: unknown): string;
   name(code: unknown, locale?: string | null): string;
@@ -355,6 +371,17 @@ export interface MangaToolsNamespace {
    * the badges and the panels are all still there.
    */
   readerTakeover: boolean;
+  /**
+   * Whether a gallery is read by its physical files rather than by its images.
+   *
+   * On, a page is a **file occurrence**: content that appears several times in the
+   * same gallery is shown each time, in the gallery's grid and in the reader, and
+   * chapters are stored by file id. Off, every surface behaves exactly as it did
+   * before this setting existed, and no page list is fetched beyond the one it
+   * always fetched. See `CHAPTERS_VERSION` (2) for the field the two identities
+   * share.
+   */
+  physicalPages: boolean;
   /**
    * Whether the Chapters tab's Create and Edit belong to this plugin.
    *

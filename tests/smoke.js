@@ -29,6 +29,7 @@ const SECTIONS = [
 const AFTER_REFRESH = [
   ["11–13d badges, cards, the detail page, the panel", "./sections/08-card.js"],
   ["14 the bulk edit dialog", "./sections/09-bulk.js"],
+  ["15 the physical grid", "./sections/10-physical-grid.js"],
 ];
 
 for (const [name, file] of SECTIONS) runSection(name, require(file));

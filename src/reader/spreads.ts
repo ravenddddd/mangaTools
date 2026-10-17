@@ -17,7 +17,22 @@ import { NR } from "./namespace";
 
 /** One page, as far as pairing cares. Dimensions come from Stash's image rows. */
 export interface MangaReaderPage {
+  /**
+   * The page's identity.
+   *
+   * The image id normally, and the **file id** when "physical pages" is on — the
+   * only id that can tell two occurrences of the same image apart. Chapters,
+   * placement and the reader's own position all key on this.
+   */
   id: string;
+  /**
+   * The image this page draws, when `id` is not it (physical pages).
+   *
+   * The bytes are the image's, so the URL, the carousel check and the lightbox's
+   * own handover all need the image id even when the page is a file occurrence.
+   * Absent in the deduped mode, where `id` is the image id.
+   */
+  imageId?: string;
   width: number;
   height: number;
   /**
@@ -47,7 +62,11 @@ export interface MangaReaderPage {
  */
 export function pageUrl(page: MangaReaderPage): string {
   const query = /\?.*$/.exec(page.url || "");
-  return "/image/" + page.id + "/image" + (query ? query[0] : "");
+  // The image id, not the page id: in physical mode a page is a file occurrence,
+  // and `/image/<file id>/image` is not a route. The bytes are the image's.
+  return (
+    "/image/" + (page.imageId || page.id) + "/image" + (query ? query[0] : "")
+  );
 }
 
 /** One screenful: what the reader puts on screen at once. */

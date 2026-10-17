@@ -25,6 +25,7 @@ const claiming = require("./reader/14-claiming.js");
 const chapters_tab = require("./reader/15-chapters-tab.js");
 const diagnostics = require("./reader/16-diagnostics.js");
 const revalidate = require("./reader/17-revalidate.js");
+const physical = require("./reader/18-physical.js");
 
 // ── Sections ───────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ async function main() {
   await claiming();
   await chapters_tab();
   await revalidate();
+  await physical();
   // Last, because it reloads the bundle twice — a second and third instance of the
   // plugin on one page — which is a state no section after it should have to read.
   await diagnostics();

@@ -265,6 +265,52 @@ const galleryAnswer = (ids) =>
 
 const MANGA_GALLERIES = galleryAnswer([1, 2, 3, 4, 5, 6, 7]);
 
+/**
+ * A gallery with physical files, for the section about physical pages.
+ *
+ * Four files, one image twice — the shape the reader's fixtures use, so the two
+ * halves are tested against the same kind of gallery.
+ */
+const PHYSICAL_FILES = [
+  { id: "p1", path: "/zip/001.jpg", basename: "001.jpg", imageId: "1001" },
+  { id: "p2", path: "/zip/002.jpg", basename: "002.jpg", imageId: "1002" },
+  { id: "p3", path: "/zip/003.jpg", basename: "003.jpg", imageId: "1001" },
+  { id: "p4", path: "/zip/004.jpg", basename: "004.jpg", imageId: "1003" },
+];
+
+/** The image object the grid's cards read, as far as the test needs it. */
+const physicalImage = (id) => ({
+  id,
+  title: "Image " + id,
+  date: "",
+  details: "",
+  rating100: null,
+  organized: false,
+  o_counter: 0,
+  paths: {
+    thumbnail: "/thumb/" + id,
+    preview: "/preview/" + id,
+    image: "/image/" + id + "/image",
+  },
+  galleries: [],
+  studio: null,
+  tags: [],
+  performers: [],
+  visual_files: [],
+});
+
+const physicalFileAnswer = (file) => ({
+  __typename: "ImageFile",
+  id: file.id,
+  path: file.path,
+  basename: file.basename,
+  width: 1000,
+  height: 1500,
+  parent_folder: { id: "0" },
+  zip_file: { id: "9001" },
+  images: [physicalImage(file.imageId)],
+});
+
 const fakeClient = {
   // Stands in for Stash's existing link chain, which setLink must pass through.
   link: { __original: true },
@@ -304,17 +350,47 @@ const fakeClient = {
           data: { galleryUpdate: { id: variables?.input?.id } },
         });
   },
-  query: ({ query, fetchPolicy }) => {
+  query: ({ query, variables, fetchPolicy }) => {
     queryOptions.push({ query: String(query), fetchPolicy });
+    const text = String(query);
+
     // The plugin fires three queries: one gallery map per custom field
     // (findGalleries) and the settings (configuration { plugins }). Branch on
     // the query text — the field name is the only thing that tells the two
     // gallery queries apart.
-    if (/configuration/.test(String(query))) {
+    if (/configuration/.test(text)) {
       return Promise.resolve({
         data: {
           configuration: {
             plugins: { mangaTools: storedPluginConfig },
+          },
+        },
+      });
+    }
+
+    // The physical grid's own reads: the gallery's scope, then its files. The
+    // singular/parenthesis keeps `findGallery(` from matching `findGalleries(`.
+    if (/findGallery\(/.test(text)) {
+      return Promise.resolve({
+        data: {
+          findGallery: {
+            id: "801",
+            folder: null,
+            files: [{ id: "9001" }],
+          },
+        },
+      });
+    }
+
+    if (/findFiles\(/.test(text)) {
+      const countOnly = !variables || variables.perPage === undefined;
+      return Promise.resolve({
+        data: {
+          findFiles: {
+            count: PHYSICAL_FILES.length,
+            files: countOnly
+              ? undefined
+              : PHYSICAL_FILES.map(physicalFileAnswer),
           },
         },
       });
@@ -1231,6 +1307,8 @@ module.exports = {
   FakeDisplayNames,
   MANGA,
   NS,
+  PHYSICAL_FILES,
+  physicalImage,
   PLUGIN,
   PluginApi,
   React,

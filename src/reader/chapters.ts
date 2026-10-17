@@ -44,7 +44,13 @@ export interface MangaReaderChapter {
   /** May be empty — Stash allows a chapter with no name, and so does this. */
   title: string;
   /**
-   * The ids of this chapter's images, as strings.
+   * The ids of this chapter's pages, as strings — in the **identity in use**.
+   *
+   * Image ids when "physical pages" is off, and file ids when it is on: a chapter
+   * is a set of pages, and which id names a page is what that setting decides. The
+   * name is the one the field has always had; in physical mode it holds file ids.
+   * parseChapters and serializeChapters are what translate to and from the stored
+   * `images` / `files` keys.
    *
    * A set, not a sequence: the order they are written in is not read as meaning
    * anything. See the note at the top of the file.
@@ -81,10 +87,28 @@ export interface MangaReaderPlacedChapter extends MangaReaderChapter {
  */
 export const CHAPTERS_VERSION = 1;
 
+/**
+ * The file-identity version, written while "physical pages" is on.
+ *
+ * `v: 2` chapters carry **both** identities: `files` (one id per occurrence, the
+ * precise one) and `images` (the deduplicated set, derived from the files). Keeping
+ * `images` is what lets a reader with the setting off draw a v2 field without
+ * fetching the file list, and what makes turning the setting back off harmless. A
+ * field is only ever written as the version the setting in use asks for.
+ */
+export const CHAPTERS_VERSION_FILES = 2;
+
 /** What a chapters field holds, once it has been read. */
 interface StoredChapters {
   v?: unknown;
   chapters?: unknown;
+}
+
+/** A stored chapter row, as far as either version's keys go. */
+interface StoredChapterRow {
+  title?: unknown;
+  images?: unknown;
+  files?: unknown;
 }
 
 /**
@@ -101,7 +125,10 @@ interface StoredChapters {
  * list, and drawing it is the caller's decision rather than this function's. What
  * is dropped is what cannot be an id at all.
  */
-export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
+export function parseChapters(
+  raw: string | null,
+  physical = false
+): MangaReaderChapter[] | null {
   if (!raw) return null;
 
   let stored: StoredChapters | null = null;
@@ -114,29 +141,117 @@ export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
   }
 
   if (!stored || typeof stored !== "object") return null;
-  if (stored.v !== CHAPTERS_VERSION) return null;
+  const version = stored.v;
+  if (version !== CHAPTERS_VERSION && version !== CHAPTERS_VERSION_FILES) {
+    return null;
+  }
   if (!Array.isArray(stored.chapters)) return null;
 
   const chapters: MangaReaderChapter[] = [];
   for (const entry of stored.chapters) {
     if (!entry || typeof entry !== "object") continue;
-    const row = entry as { title?: unknown; images?: unknown };
-    if (!Array.isArray(row.images)) continue;
+    const row = entry as StoredChapterRow;
 
-    const images: string[] = [];
-    for (const id of row.images) {
+    // Which set names this chapter's pages. A v2 row read in physical mode uses
+    // `files`; every other combination uses `images`, and a v1 row read in
+    // physical mode is converted by readChapters afterwards. A v2 row missing
+    // `files` falls back to `images` rather than losing the chapter.
+    const source =
+      physical && version === CHAPTERS_VERSION_FILES && Array.isArray(row.files)
+        ? row.files
+        : row.images;
+    if (!Array.isArray(source)) continue;
+
+    const ids: string[] = [];
+    for (const id of source) {
       if (typeof id === "string" || typeof id === "number") {
-        images.push(String(id));
+        ids.push(String(id));
       }
     }
 
     chapters.push({
       title: typeof row.title === "string" ? row.title : "",
-      images,
+      images: ids,
     });
   }
 
   return chapters;
+}
+
+/**
+ * The version a stored field declares, or null when it is not one this build reads.
+ *
+ * Separate from parseChapters because *which* ids to convert depends on it: a v1
+ * field read in physical mode is image ids and needs toFileChapters, where a v2
+ * field is already file ids.
+ */
+export function parseChapterFieldVersion(raw: string | null): number | null {
+  if (!raw) return null;
+
+  try {
+    const stored = JSON.parse(raw) as StoredChapters;
+    if (!stored || typeof stored !== "object") return null;
+    if (stored.v === CHAPTERS_VERSION || stored.v === CHAPTERS_VERSION_FILES) {
+      return stored.v;
+    }
+  } catch {
+    // Same as parseChapters: not ours.
+  }
+
+  return null;
+}
+
+/**
+ * A stored chapters field as the current mode reads it, or null when it is unreadable.
+ *
+ * The one entry point the surfaces use, so that "v1 in physical mode" is converted
+ * in exactly one place. `pages` are the pages in the identity in use — file
+ * occurrences when `physical` is true.
+ */
+export function readChapters(
+  raw: string | null,
+  pages: MangaReaderPage[],
+  physical: boolean
+): MangaReaderChapter[] | null {
+  const parsed = parseChapters(raw, physical);
+  if (!parsed) return null;
+
+  if (physical && parseChapterFieldVersion(raw) === CHAPTERS_VERSION) {
+    return toFileChapters(parsed, pages);
+  }
+
+  return parsed;
+}
+
+/**
+ * Image-id chapters as file-id chapters: each image becomes its **first**
+ * occurrence in this gallery's page list.
+ *
+ * That is the only faithful translation. An image-level chapter could only ever
+ * have meant "this image", and Stash's own chapter jump lands on the first
+ * occurrence; there is no information in the old field that could prefer another.
+ * Pages the list does not name are dropped from the membership, because there is
+ * no file to point at — the chapter itself is kept.
+ */
+export function toFileChapters(
+  chapters: MangaReaderChapter[],
+  pages: MangaReaderPage[]
+): MangaReaderChapter[] {
+  const first = new Map<string, string>();
+  for (const page of pages) {
+    const imageId = page.imageId || page.id;
+    if (!first.has(imageId)) first.set(imageId, page.id);
+  }
+
+  return chapters.map((chapter) => {
+    const files: string[] = [];
+    for (const imageId of chapter.images) {
+      const fileId = first.get(imageId);
+      if (fileId !== undefined) files.push(fileId);
+    }
+
+    return { title: chapter.title, images: files };
+  });
 }
 
 /**
@@ -152,13 +267,47 @@ export function parseChapters(raw: string | null): MangaReaderChapter[] | null {
  * half of the pair, and the two are tested against each other rather than each on
  * its own: see the round-trip and fixed-point laws in the reader suite.
  */
-export function serializeChapters(chapters: MangaReaderChapter[]): string {
+export function serializeChapters(
+  chapters: MangaReaderChapter[],
+  physical = false,
+  pages: MangaReaderPage[] = []
+): string {
+  // Callers pass the pages they drew from; a caller with none (or with something
+  // that is not a list) still gets a field written, just without an `images` map.
+  const list = Array.isArray(pages) ? pages : [];
+  const imageOf = new Map<string, string>();
+  for (const page of list) imageOf.set(page.id, page.imageId || page.id);
+
   return JSON.stringify({
-    v: CHAPTERS_VERSION,
-    chapters: chapters.map((chapter) => ({
-      title: typeof chapter.title === "string" ? chapter.title : "",
-      images: chapter.images.map((id) => String(id)),
-    })),
+    v: physical ? CHAPTERS_VERSION_FILES : CHAPTERS_VERSION,
+    chapters: chapters.map((chapter) => {
+      const ids = chapter.images.map((id) => String(id));
+
+      if (!physical) {
+        return {
+          title: typeof chapter.title === "string" ? chapter.title : "",
+          images: ids,
+        };
+      }
+
+      // Both identities are written: `files` is the precise one, `images` is what
+      // a reader with the setting off draws — and what keeps the field usable if
+      // the setting is turned back off. A file the page list does not name has no
+      // image to record, so it contributes none.
+      const images: string[] = [];
+      for (const id of ids) {
+        const imageId = imageOf.get(id);
+        if (imageId !== undefined && !images.includes(imageId)) {
+          images.push(imageId);
+        }
+      }
+
+      return {
+        title: typeof chapter.title === "string" ? chapter.title : "",
+        files: ids,
+        images,
+      };
+    }),
   });
 }
 
@@ -628,8 +777,12 @@ export function chapterAt(
 // Published for the smoke test, which reaches them through the window — see the
 // note on MangaReaderNamespace in plugin-api.ts.
 NR.CHAPTERS_VERSION = CHAPTERS_VERSION;
+NR.CHAPTERS_VERSION_FILES = CHAPTERS_VERSION_FILES;
 NR.chapterAt = chapterAt;
 NR.parseChapters = parseChapters;
+NR.parseChapterFieldVersion = parseChapterFieldVersion;
+NR.readChapters = readChapters;
+NR.toFileChapters = toFileChapters;
 NR.serializeChapters = serializeChapters;
 NR.chaptersFromStash = chaptersFromStash;
 NR.placeChapters = placeChapters;

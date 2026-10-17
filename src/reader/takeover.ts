@@ -73,9 +73,11 @@ import {
   type MangaReaderChapter,
   chapterAt,
   chaptersFromStash,
-  parseChapters,
   placeChapters,
+  readChapters,
+  toFileChapters,
 } from "./chapters";
+import { fetchGalleryFileCount } from "../gallery-files";
 import { NR, type MangaReaderOrder } from "./namespace";
 import type {
   MangaReaderGallery,
@@ -608,6 +610,8 @@ function galleryFrom(id: string, answer: GalleryAnswer): MangaReaderGallery {
     pairedWith: pairingKey(),
     screens: laidOut(answer.pages),
     chapters: placeChapters(chaptersOf(answer), answer.pages),
+    fileScope: answer.fileScope,
+    fileTotal: answer.fileTotal,
   };
 }
 
@@ -629,13 +633,23 @@ function revalidate(id: string): void {
   if (counting === id) return;
   counting = id;
 
-  fetchImageCount(id)
-    .then((count) => {
-      if (counting === id) counting = null;
-      if (count === null) return;
+  const cached = loaded.get(id);
 
-      const cached = loaded.get(id);
-      if (!cached || count === cached.pages.length) return;
+  // The question follows the list: physical pages are revalidated by the file
+  // count, where the deduped list is revalidated by the image count. A duplicate
+  // occurrence added or removed changes the first and not the second.
+  const asked = cached?.fileScope
+    ? fetchGalleryFileCount(cached.fileScope).then((count) =>
+        count === null ? null : { count, was: cached.fileTotal ?? -1 }
+      )
+    : fetchImageCount(id).then((count) =>
+        count === null ? null : { count, was: cached?.pages.length ?? -1 }
+      );
+
+  asked
+    .then((answer) => {
+      if (counting === id) counting = null;
+      if (!answer || answer.count === answer.was) return;
 
       refresh(id);
     })
@@ -753,7 +767,7 @@ async function loadPages(
   const shown = carouselImage(lightbox);
   if (!shown) return answer;
 
-  if (!answer.pages.some((page) => page.id === shown.id)) {
+  if (!answer.pages.some((page) => (page.imageId || page.id) === shown.id)) {
     throw new Error(
       "[mangaReader] the lightbox is showing image " +
         shown.id +
@@ -770,8 +784,19 @@ function placeOf(gallery: MangaReaderGallery, lightbox: Element): number {
   const shown = carouselImage(lightbox);
   if (!shown) return -1;
 
+  // The handed-over list carries the occurrence in the URL's fragment, so a
+  // physical page is found exactly even when its image appears several times.
+  if (shown.fileId) {
+    for (let i = 0; i < gallery.pages.length; i++) {
+      if (gallery.pages[i].id === shown.fileId) return i;
+    }
+  }
+
   for (let i = 0; i < gallery.pages.length; i++) {
-    if (gallery.pages[i].id === shown.id) return i;
+    // Otherwise the carousel names an image, and the first occurrence of it is
+    // where a lightbox opened by Stash lands.
+    if ((gallery.pages[i].imageId || gallery.pages[i].id) === shown.id)
+      return i;
   }
 
   return -1;
@@ -792,15 +817,26 @@ function placeOf(gallery: MangaReaderGallery, lightbox: Element): number {
  * but a sorted list — those ids were not asked for twice; see fetchGallery.
  */
 function chaptersOf(answer: GalleryAnswer): MangaReaderChapter[] {
-  const own = parseChapters(
-    NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null
+  // readChapters converts a v1 field to file ids when physical pages are on; a
+  // v2 field already holds the identity the pages carry.
+  const own = readChapters(
+    NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null,
+    answer.pages,
+    NS.physicalPages
   );
   if (own) return own;
 
   if (answer.stashChapters.length === 0) return [];
 
-  const pathIds = answer.pathIds || answer.pages.map((page) => page.id);
-  return chaptersFromStash(answer.stashChapters, pathIds);
+  // Stash counts deduplicated images in path order. Physical pages are file
+  // occurrences, so the translation is against the deduped ids and then moved onto
+  // each image's first occurrence.
+  const pathIds =
+    answer.pathIds || answer.pages.map((page) => page.imageId || page.id);
+  const translated = chaptersFromStash(answer.stashChapters, pathIds);
+  return NS.physicalPages
+    ? toFileChapters(translated, answer.pages)
+    : translated;
 }
 
 function remember(id: string, gallery: MangaReaderGallery): void {

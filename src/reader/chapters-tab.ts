@@ -44,11 +44,12 @@ import {
   chaptersFromStash,
   moveChapterStart,
   parseChapterList,
-  parseChapters,
   placeChapters,
+  readChapters,
   removeChapterAt,
   renameChapterAt,
   serializeChapters,
+  toFileChapters,
 } from "./chapters";
 import { watchChapters, writeChapters } from "./chapters-edit";
 import { NR } from "./namespace";
@@ -129,6 +130,7 @@ let controlState: "offer" | "confirm" | "busy" | null = null;
 let controlFor: {
   id: string;
   importable: MangaReaderChapter[];
+  pages: MangaReaderPage[];
   own: boolean;
 } | null = null;
 /** A write is in flight: the button says so and refuses a second click */
@@ -216,8 +218,14 @@ export function syncChaptersTab(): void {
         // Another gallery, or another page, while that was in flight.
         if (galleryIdFromPath(window.location.pathname) !== id) return;
 
-        const pageIds = answer.pages.map((page) => page.id);
         const own = chaptersOf(answer);
+        // Stash's rows count in the deduped path order; the pages on screen may be
+        // file occurrences. `pathIds` is that deduped order when it was fetched,
+        // and the pages' image ids are it when it was not.
+        const inherited = chaptersFromStash(
+          answer.stashChapters,
+          answer.pathIds || answer.pages.map((page) => page.imageId || page.id)
+        );
 
         inHand = {
           id,
@@ -229,7 +237,9 @@ export function syncChaptersTab(): void {
           // is showing for a gallery that has no list of this plugin's own.
           // Computed from the rows rather than from what is on screen: it is what
           // would be *written*, so it cannot depend on how the screen is ordered.
-          importable: chaptersFromStash(answer.stashChapters, pageIds),
+          importable: NS.physicalPages
+            ? toFileChapters(inherited, answer.pages)
+            : inherited,
           own: own.own,
           locale: answer.language,
         };
@@ -255,10 +265,15 @@ export function syncChaptersTab(): void {
 function chaptersOf(answer: {
   customFields: unknown;
   stashChapters: { title?: string; image_index?: number }[];
-  pages: { id: string }[];
+  pages: MangaReaderPage[];
+  pathIds?: string[] | null;
 }): { chapters: MangaReaderChapter[]; own: boolean } {
-  const own = parseChapters(
-    NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null
+  // readChapters is the one place that converts a v1 field to file ids when
+  // physical pages are on; a v2 field already holds the right identity.
+  const own = readChapters(
+    NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null,
+    answer.pages,
+    NS.physicalPages
   );
 
   // A list this plugin wrote may be empty on purpose — an empty array is a gallery
@@ -267,11 +282,18 @@ function chaptersOf(answer: {
   // through to Stash's numbers.
   if (own) return { chapters: own, own: true };
 
+  // Stash's numbers count the deduplicated images in path order. In physical mode
+  // the caller fetched that list (`pathIds`); without it the pages themselves are
+  // that list, and their image ids are what to translate against.
+  const translated = chaptersFromStash(
+    answer.stashChapters,
+    answer.pathIds || answer.pages.map((page) => page.imageId || page.id)
+  );
+
   return {
-    chapters: chaptersFromStash(
-      answer.stashChapters,
-      answer.pages.map((page) => page.id)
-    ),
+    chapters: NS.physicalPages
+      ? toFileChapters(translated, answer.pages)
+      : translated,
     own: false,
   };
 }
@@ -990,6 +1012,7 @@ function drawImport(
   gallery: {
     id: string;
     importable: MangaReaderChapter[];
+    pages: MangaReaderPage[];
     own: boolean;
     locale: string | null;
   }
@@ -1013,6 +1036,7 @@ function drawImport(
   controlFor = {
     id: gallery.id,
     importable: gallery.importable,
+    pages: gallery.pages,
     own: gallery.own,
   };
 
@@ -1146,7 +1170,10 @@ function importChapters(): void {
   busy = true;
   redraw();
 
-  NS.writeChapters(target.id, serializeChapters(target.importable)).then(
+  NS.writeChapters(
+    target.id,
+    serializeChapters(target.importable, NS.physicalPages, target.pages)
+  ).then(
     () => {
       busy = false;
       if (inHand?.id === target.id) {
@@ -1475,7 +1502,7 @@ function applyEdit(gallery: ChaptersInHand, next: MangaReaderChapter[]): void {
   busy = true;
   redraw();
 
-  writeChapters(gallery.id, next).then(
+  writeChapters(gallery.id, next, gallery.pages).then(
     () => {
       busy = false;
       closeForm();

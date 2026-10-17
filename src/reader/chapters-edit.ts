@@ -13,6 +13,7 @@
 import { NS } from "../tools/fields";
 import { type MangaReaderChapter, serializeChapters } from "./chapters";
 import { NR } from "./namespace";
+import type { MangaReaderPage } from "./spreads";
 
 /** Who wants to hear that a gallery's chapters have changed, and what to */
 const listeners: ((
@@ -29,9 +30,10 @@ const listeners: ((
  */
 export function writeChapters(
   galleryId: string,
-  next: MangaReaderChapter[]
+  next: MangaReaderChapter[],
+  pages: MangaReaderPage[] = []
 ): Promise<void> {
-  return write(galleryId, next).then(() => {
+  return write(galleryId, next, pages).then(() => {
     announce(galleryId, next);
   });
 }
@@ -62,7 +64,8 @@ export function watchChapters(
 /** The tools half's write, or a rejection naming the half that is missing */
 function write(
   galleryId: string,
-  chapters: MangaReaderChapter[]
+  chapters: MangaReaderChapter[],
+  pages: MangaReaderPage[]
 ): Promise<void> {
   const write = NS.writeChapters;
   if (typeof write !== "function") {
@@ -73,7 +76,10 @@ function write(
     );
   }
 
-  return write(galleryId, serializeChapters(chapters));
+  // The setting decides which identity is written — and with it the version and,
+  // for v2, the `images` derived from the page list. Never the other way round: a
+  // write does not change the setting.
+  return write(galleryId, serializeChapters(chapters, NS.physicalPages, pages));
 }
 
 /** Tells everyone, over a copy of the listeners: one may unsubscribe as it runs */

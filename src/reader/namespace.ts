@@ -12,6 +12,7 @@
  * so a smoke test can reach the functions without a bundler of its own. Nothing
  * at runtime reads it — the plugin ships as one file, with its imports inlined.
  */
+import type { GalleryFileScope } from "../gallery-files";
 import type { MangaReaderChapter, MangaReaderPlacedChapter } from "./chapters";
 import type { MangaReaderPage, MangaReaderScreen } from "./spreads";
 import type { LightboxImage } from "./stash-lightbox";
@@ -183,6 +184,15 @@ export interface MangaReaderGallery {
    * placeChapters.
    */
   chapters: MangaReaderPlacedChapter[];
+  /**
+   * The physical scope this gallery's pages were read from, and how many files the
+   * server counted — present only when the pages are file occurrences.
+   *
+   * Kept so a cached gallery can be revalidated with the right question: a file
+   * count, where the deduped mode asks `image_count`. See revalidate in takeover.ts.
+   */
+  fileScope?: GalleryFileScope;
+  fileTotal?: number;
 }
 
 /**
@@ -244,10 +254,32 @@ export interface MangaReaderNamespace {
   ): MangaReaderScreen[];
   /** The stored shape's version. See chapters.ts. */
   CHAPTERS_VERSION: number;
+  /** The file-identity version — see CHAPTERS_VERSION_FILES in chapters.ts */
+  CHAPTERS_VERSION_FILES: number;
   /** This gallery's stored chapters, or null when there are none to read */
-  parseChapters(raw: string | null): MangaReaderChapter[] | null;
+  parseChapters(
+    raw: string | null,
+    physical?: boolean
+  ): MangaReaderChapter[] | null;
+  /** The version the field declares, or null for one this build does not read */
+  parseChapterFieldVersion(raw: string | null): number | null;
+  /** A stored field as the current mode reads it — the surfaces' entry point */
+  readChapters(
+    raw: string | null,
+    pages: MangaReaderPage[],
+    physical: boolean
+  ): MangaReaderChapter[] | null;
+  /** Image-id chapters as file-id chapters: each image's first occurrence */
+  toFileChapters(
+    chapters: MangaReaderChapter[],
+    pages: MangaReaderPage[]
+  ): MangaReaderChapter[];
   /** A chapter list as the field's JSON string — the inverse of parseChapters */
-  serializeChapters(chapters: MangaReaderChapter[]): string;
+  serializeChapters(
+    chapters: MangaReaderChapter[],
+    physical?: boolean,
+    pages?: MangaReaderPage[]
+  ): string;
   /** Stash's own chapters, translated against the path-ordered image ids */
   chaptersFromStash(
     rows: { title?: unknown; image_index?: unknown }[] | null | undefined,
