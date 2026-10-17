@@ -90,13 +90,13 @@ module.exports = async () => {
       const { box: again } = await startReader({
         galleryId: "72",
         on: false,
-        at: 2,
+        at: 3,
         total: 3,
       });
 
       assert.deepStrictEqual(
         drawn(),
-        ["/image/812/image"],
+        ["/image/813/image"],
         "the cached list draws at once, as it did before the change"
       );
       assert.strictEqual(
@@ -105,16 +105,17 @@ module.exports = async () => {
         "with the count still out"
       );
 
-      // The page the reader is on is the one that goes.
-      state.galleries["72"].images.splice(1, 1);
+      // The page the reader is on is the one that goes — the last of the three, so
+      // the position it held is the end of the list and has to come back a step.
+      state.galleries["72"].images.splice(2, 1);
       state.holdCount();
       state.holdCount = null;
       await settle();
 
       assert.deepStrictEqual(
         drawn(),
-        ["/image/813/image"],
-        "and the page that took its place is drawn, at the position it held"
+        ["/image/812/image"],
+        "and the position it held comes back a step, to the last page there is"
       );
 
       stopReader(again);
