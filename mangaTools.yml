@@ -83,10 +83,6 @@ settings:
     displayName: Shop links
     description: Recognise links to DLsite, FANZA, Toranoana and Melonbooks — an icon in the link field, and a badge with the product code in the Manga info block. The links stay in Stash's own list; nothing is stored or changed.
     type: BOOLEAN
-  shopIconStyle:
-    displayName: Shop badge icons
-    description: What the badges in the Manga info block use — the site's favicon or the shop's logo. The link field's icon is always the favicon.
-    type: STRING
   manageChapters:
     displayName: Take over the Chapters tab
     description: Creating and editing chapters is this plugin's job, and writing them stores this plugin's own chapter field. Stash's existing chapters are brought over quietly, and are never modified.

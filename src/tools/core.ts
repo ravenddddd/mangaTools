@@ -248,6 +248,54 @@ export function stashClient(): MangaToolsApolloClient | null {
   }
 }
 
+/** The client whose `mutate` has been wrapped for the save below. */
+let watchedClient: MangaToolsApolloClient | null = null;
+
+/** A GraphQL document's operation name, or "" when it cannot be read. */
+function operationName(document: unknown): string {
+  const definitions = (
+    document as
+      | { definitions?: Array<{ name?: { value?: string } }> }
+      | null
+      | undefined
+  )?.definitions;
+  return definitions?.[0]?.name?.value || "";
+}
+
+/**
+ * Refetches the store after **Stash saves a gallery**.
+ *
+ * The store has three refresh paths already — startup, navigation, and a minute's
+ * poll — plus one after this plugin's own writes. A save from Stash's edit form is
+ * none of those: the route does not change and no plugin write happens. That is
+ * visible on the manga block, whose shop row reads the gallery's `urls` from the
+ * store: a URL added and saved would leave the badges one poll behind.
+ *
+ * The client's `mutate` is wrapped once. The mutation is recognised by its
+ * **operation name** (`GalleryUpdate`), which is the generated document's own
+ * name, not text Stash has to keep stable. The plugin's own writes go through the
+ * same wrapper and refresh through `refreshAfterWrite` as before; a refresh they
+ * already asked for coalesces onto the same request.
+ */
+function installStoreRefresh(): void {
+  const client = stashClient();
+  if (!client || client === watchedClient) return;
+  watchedClient = client;
+
+  const mutate = client.mutate.bind(client);
+  client.mutate = (options) => {
+    const result = mutate(options);
+    const name = operationName(options?.mutation);
+    if (name === "GalleryUpdate" || name === "GalleriesUpdate") {
+      result.then(
+        () => refreshAfterWrite(),
+        () => {}
+      );
+    }
+    return result;
+  };
+}
+
 /**
  * A Gallery's custom_fields is the GraphQL Map scalar, and a single key cannot
  * be projected out of it. So we filter for galleries that have this plugin's
@@ -449,7 +497,6 @@ const SHOP_LINKS_BY_DEFAULT = false;
 NS.readerTakeover = FEATURE_ON_BY_DEFAULT;
 NS.physicalPages = PHYSICAL_PAGES_BY_DEFAULT;
 NS.shopLinks = SHOP_LINKS_BY_DEFAULT;
-NS.shopIconStyle = "favicon";
 NS.manageChapters = FEATURE_ON_BY_DEFAULT;
 NS.fields = FEATURE_ON_BY_DEFAULT;
 NS.fieldLanguage = FEATURE_ON_BY_DEFAULT;
@@ -536,12 +583,6 @@ function refreshSettings(): void {
         pluginCfg ? pluginCfg.shopLinks : null,
         SHOP_LINKS_BY_DEFAULT
       );
-      // A single value, not a flag: anything that is not the known word is the
-      // default, so a hand-edited setting can never leave the badges iconless.
-      NS.shopIconStyle =
-        pluginCfg && String(pluginCfg.shopIconStyle ?? "") === "logo"
-          ? "logo"
-          : "favicon";
       NS.manageChapters = NS.parseFlag(
         pluginCfg ? pluginCfg.manageChapters : null,
         FEATURE_ON_BY_DEFAULT
@@ -720,6 +761,8 @@ export function start(): void {
 
   refresh();
   refreshSettings();
+  // The store follows Stash's own gallery saves — see installStoreRefresh.
+  installStoreRefresh();
 
   // Saving an edit does not change the route, so a slow poll acts as a
   // backstop. The query only pulls id + custom_fields, so it is small.
@@ -895,7 +938,6 @@ function settingsInput(): { [key: string]: unknown } {
     readerTakeover: NS.readerTakeover,
     physicalPages: NS.physicalPages,
     shopLinks: NS.shopLinks,
-    shopIconStyle: NS.shopIconStyle,
     manageChapters: NS.manageChapters,
     fields: NS.fields,
     fieldLanguage: NS.fieldLanguage,

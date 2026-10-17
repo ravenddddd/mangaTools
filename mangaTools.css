@@ -1217,12 +1217,6 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   display: block;
 }
 
-.manga-tools-shop-badge img.is-logo {
-  height: 12px;
-  width: auto;
-  display: block;
-}
-
 .manga-tools-shop-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.78rem;

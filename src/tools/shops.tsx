@@ -132,25 +132,18 @@ export function shopsIn(urls: string[]): ShopLink[] {
 }
 
 /**
- * Where an icon file is served from.
+ * Where a shop's favicon is served from.
  *
  * `assetBase` is the plugin's own asset root, known once the half has started;
  * before that this is "" and callers draw no image rather than a broken one.
- * Always the **favicon** in the edit form's input head (a square slot), and
- * whichever the reader chose in the info block.
+ * **One icon per shop**, used both at the head of the edit form's link row and in
+ * the manga-info badges: a square favicon is the shape both places can take, and
+ * the wordmarks the earlier design also shipped were dropped — two icon families
+ * for one shop is a choice nobody needs to make.
  */
-export function shopIconUrl(shop: Shop, style: "favicon" | "logo"): string {
+export function shopIconUrl(shop: Shop): string {
   if (!assetBase) return "";
-  const file =
-    style === "logo"
-      ? "logo-" + shop.key + ".svg"
-      : "favicon-" + shop.key + ".ico";
-  return assetBase + "assets/shops/" + file;
-}
-
-/** The icon style the reader chose, sanitised. */
-export function shopIconStyle(): "favicon" | "logo" {
-  return NS.shopIconStyle === "logo" ? "logo" : "favicon";
+  return assetBase + "assets/shops/favicon-" + shop.key + ".ico";
 }
 
 /**
@@ -160,12 +153,10 @@ export function shopIconStyle(): "favicon" | "logo" {
  * needs to find the work there. The name lives in the `title`.
  */
 export function ShopBadges(props: { links: ShopLink[] }) {
-  const style = shopIconStyle();
-
   return (
     <span className="manga-tools-shop-badges">
       {props.links.map((link) => {
-        const src = shopIconUrl(link.shop, style);
+        const src = shopIconUrl(link.shop);
         const title = link.shop.name + (link.code ? " · " + link.code : "");
 
         return (
@@ -178,11 +169,7 @@ export function ShopBadges(props: { links: ShopLink[] }) {
             rel="noreferrer"
           >
             {src ? (
-              <img
-                className={style === "logo" ? "is-logo" : "is-favicon"}
-                src={src}
-                alt={link.shop.name}
-              />
+              <img className="is-favicon" src={src} alt={link.shop.name} />
             ) : null}
             {link.code ? (
               <span className="manga-tools-shop-code">{link.code}</span>

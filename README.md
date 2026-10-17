@@ -661,8 +661,7 @@ registered domain (**DLsite**, **FANZA** on `dmm.co.jp`, **虎穴**, **Melonbook
 reads each one's product code from the URL shape, and does two things:
 
 - in the gallery's **edit form**, a link row whose value points at one of the four
-  gets a shop icon at the head of the input group (a 38px square slot, so always the
-  favicon — a wordmark does not fit);
+  gets the shop's favicon at the head of the input group;
 - in the **Manga info block**, a `商店` row shows the recognised links as badges:
   the icon and the product code, each badge the link itself. A shop with no link is
   simply absent; there is no "checked, not there" state in this version.
@@ -673,20 +672,20 @@ store's next refresh (the same poll the mark rides on) with no migration and no
 second copy to go stale. A URL on a recognised host whose shape this build does not
 know keeps the icon and shows no code — guessing a code is worse than showing none.
 
-The shop-link feature is a switch of its own (off by default). Its child setting
-chooses the **badge** icon: the site's favicon or the shop's logo. The edit form's
-input head is always the favicon; the setting is about the badges. A searched or
-filtered gallery is unaffected — this row is about the gallery's links, not its
-page list.
+The shop-link feature is a switch of its own (off by default). **One icon per shop**
+— its favicon — is used both at the input head and in the badge: one square asset
+fits both places, and a second icon family would be a choice nobody needs to make.
+A searched or filtered gallery is unaffected — this row is about the gallery's
+links, not its page list.
 
 The URL field is Stash's own and is not a patchable component, so the head is DOM
 work: a node mounted inside the form finds the rows by Stash's scrape button and
 decorates them. Rows are added by React (a mutation observer) and the input's value
 changes without a mutation (a capture `input` listener); every write is guarded by
 a comparison so the two cannot answer each other. The icons are **bundled** in
-`assets/shops/` — favicons and the original wordmarks — rather than fetched from
-the shops at runtime, which would depend on the network, the shop's current paths,
-and would tell the shop the page was opened.
+`assets/shops/` — the four favicons — rather than fetched from the shops at
+runtime, which would depend on the network, the shop's current paths, and would
+tell the shop the page was opened.
 
 ### Settings
 

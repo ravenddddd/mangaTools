@@ -9,7 +9,7 @@
  */
 
 const assert = require("node:assert");
-const { NS, makeEl, runSection } = require("../helpers.js");
+const { NS, makeEl, runSection, state } = require("../helpers.js");
 
 module.exports = () => {
   runSection(
@@ -181,4 +181,26 @@ module.exports = () => {
       NS.shopLinks = false;
     }
   );
+
+  runSection("16 a Stash gallery save refreshes the store", () => {
+    // The shop row reads the gallery's urls from the store, so a save from Stash's
+    // own edit form has to reach it. The wrapper on the client recognises the
+    // generated `GalleryUpdate` and refreshes; the count is the store's own query,
+    // which is the refresh. A timer because the wrapper waits for the mutation's
+    // promise, and this section runs before the tally's timer.
+    const before = state.galleryQueryCount;
+    const client = global.window.PluginApi.utils.StashService.getClient();
+
+    client.mutate({
+      mutation: { definitions: [{ name: { value: "GalleryUpdate" } }] },
+      variables: { input: { id: "1" } },
+    });
+
+    setTimeout(() => {
+      assert.ok(
+        state.galleryQueryCount > before,
+        "a gallery save asks the store for its galleries again"
+      );
+    }, 0);
+  });
 };

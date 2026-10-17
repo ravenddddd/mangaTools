@@ -53,7 +53,7 @@ function headFor(input: HTMLInputElement): {
 
   return {
     key: found.shop.key,
-    src: shopIconUrl(found.shop, "favicon"),
+    src: shopIconUrl(found.shop),
     title: found.shop.name + (found.code ? " · " + found.code : ""),
   };
 }

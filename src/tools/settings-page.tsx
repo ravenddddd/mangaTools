@@ -754,9 +754,8 @@ export function MangaToolsSettings() {
       />
 
       {/* ── The four shops a gallery's links may point at ────────────────── */}
-      {/* One child: the badges' icon style. The edit form's input head is a
-          square slot and always uses the favicon, so the choice is about the
-          manga-info badges only — see the description. */}
+      {/* No children: one icon per shop (its favicon) is both the edit form's
+          square head and the manga-info badge, so there is no style to choose. */}
       <SettingSwitch
         id="mangaTools-shopLinks"
         heading={t(intl, "mangaTools.settings.shopLinks.heading")}
@@ -765,51 +764,7 @@ export function MangaToolsSettings() {
         onChange={writeFlag((next) => {
           NS.shopLinks = next;
         })}
-      >
-        <div className="setting manga-tools-settings">
-          <div className="manga-tools-settings-block">
-            <h3>{t(intl, "mangaTools.settings.shopIconStyle.heading")}</h3>
-            <div className="sub-heading">
-              {t(intl, "mangaTools.settings.shopIconStyle.description")}
-            </div>
-            <div className="manga-tools-settings-control">
-              <Select
-                className="manga-tools-settings-select"
-                classNamePrefix="react-select"
-                isClearable={false}
-                isSearchable={false}
-                menuPlacement="auto"
-                options={[
-                  {
-                    value: "favicon",
-                    label: t(intl, "mangaTools.settings.shopIconStyle.favicon"),
-                    flag: null,
-                  },
-                  {
-                    value: "logo",
-                    label: t(intl, "mangaTools.settings.shopIconStyle.logo"),
-                    flag: null,
-                  },
-                ]}
-                value={{
-                  value: NS.shopIconStyle,
-                  label: t(
-                    intl,
-                    "mangaTools.settings.shopIconStyle." + NS.shopIconStyle
-                  ),
-                  flag: null,
-                }}
-                onChange={(selected: MangaToolsOption | null) => {
-                  NS.shopIconStyle =
-                    selected?.value === "logo" ? "logo" : "favicon";
-                  emit();
-                  persist();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </SettingSwitch>
+      />
 
       {/* ── The four fields, and how what they hold is shown ─────────────── */}
       <SettingSwitch

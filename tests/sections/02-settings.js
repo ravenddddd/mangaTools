@@ -763,27 +763,6 @@ module.exports = () => {
       );
     }
 
-    // The shop row's child is a single-select, not a switch, and it appears only
-    // while the master is on — the same progressive disclosure as every group.
-    NS.shopLinks = true;
-    const withShops = open();
-    assert.ok(
-      find(
-        withShops,
-        (n) =>
-          n.type === "Select" &&
-          n.props?.value?.value === "favicon" &&
-          n.props?.isMulti !== true
-      ),
-      "the badge icon style is a single-select under the shop switch"
-    );
-    assert.strictEqual(
-      chevronsIn(withShops).length,
-      6,
-      "…which makes the shop row foldable while it is on"
-    );
-    NS.shopLinks = false;
-
     // Nothing was written, and no setting moved: a fold is a view.
     assert.strictEqual(
       state.capturedConfigWrite,
@@ -1068,7 +1047,6 @@ module.exports = () => {
         // adds marks to the form and the panel.
         physicalPages: false,
         shopLinks: false,
-        shopIconStyle: "favicon",
         manageChapters: true,
         fields: true,
         fieldLanguage: true,
@@ -1266,7 +1244,6 @@ module.exports = () => {
       readerTakeover: true,
       physicalPages: false,
       shopLinks: false,
-      shopIconStyle: "favicon",
       manageChapters: true,
       fields: true,
       fieldLanguage: true,

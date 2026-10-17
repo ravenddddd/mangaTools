@@ -390,8 +390,6 @@ export interface MangaToolsNamespace {
 
   /** Whether links to the four shops are recognised and shown at all. */
   shopLinks: boolean;
-  /** Which icon the manga-info badges use — see shops.tsx. */
-  shopIconStyle: "favicon" | "logo";
   /** The four recognised shops, for the smoke test. */
   SHOPS: Array<{ key: string; name: string; domain: string }>;
   /** The shop a link belongs to and its code, or null for any other link. */

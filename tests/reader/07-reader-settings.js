@@ -380,7 +380,6 @@ module.exports = async () => {
         "physicalPages",
         "readerSettings",
         "readerTakeover",
-        "shopIconStyle",
         "shopLinks",
         "showCoverBadge",
         "showDisabledFields",
