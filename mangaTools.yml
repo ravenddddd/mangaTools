@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.9.106
+version: 0.9.107
 ui:
   javascript:
     - mangaTools.js
@@ -85,7 +85,7 @@ settings:
     type: BOOLEAN
   physicalPages:
     displayName: Read by physical pages
-    description: A gallery's pages are the files it actually contains, so content that appears several times is shown each time it appears — in the grid and in the reader — and chapters are stored by file. Off, everything behaves as before.
+    description: A gallery's pages are the files it actually contains, so content that appears several times is shown each time it appears — in the grid and in the reader — and chapters are stored by file. Only applies while Stash's lightbox is taken over. Off, everything behaves as before.
     type: BOOLEAN
   fields:
     displayName: Custom fields

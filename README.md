@@ -1426,8 +1426,12 @@ one card, once, at one position, with the primary file's URL. Chapters stored by
 image id cannot tell those four occurrences apart either.
 
 The **Read by physical pages** setting (off by default) makes a page a **file
-occurrence** instead. It is one switch because it changes what a page *is*, and the
-gallery grid and the reader have to agree about that: with it on, the Images tab,
+occurrence** instead. It is a child of **Take over Stash's lightbox** and only
+takes effect while that is on — with Stash's own lightbox there is nowhere for an
+occurrence page to be read, and a grid showing four cards beside a lightbox that
+counts one is the confusing state it would otherwise create. The stored choice is
+kept when the takeover is turned off. It changes what a page *is*, and the gallery
+grid and the reader have to agree about that: with it in effect, the Images tab,
 the wall and the lightbox are all drawn from the files the gallery actually
 contains, each at its own position.
 

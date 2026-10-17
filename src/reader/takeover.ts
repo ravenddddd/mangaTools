@@ -822,7 +822,7 @@ function chaptersOf(answer: GalleryAnswer): MangaReaderChapter[] {
   const own = readChapters(
     NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null,
     answer.pages,
-    NS.physicalPages
+    NS.physicalPageMode()
   );
   if (own) return own;
 
@@ -834,7 +834,7 @@ function chaptersOf(answer: GalleryAnswer): MangaReaderChapter[] {
   const pathIds =
     answer.pathIds || answer.pages.map((page) => page.imageId || page.id);
   const translated = chaptersFromStash(answer.stashChapters, pathIds);
-  return NS.physicalPages
+  return NS.physicalPageMode()
     ? toFileChapters(translated, answer.pages)
     : translated;
 }

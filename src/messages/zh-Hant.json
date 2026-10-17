@@ -63,7 +63,7 @@
   "mangaTools.settings.readerTakeover.description": "標記為漫畫的畫廊，燈箱由本外掛重新設計，不會更改原生燈箱設定。",
   "mangaTools.settings.readerTakeover.note": "外掛燈箱相關設定在燈箱頁面設定中調整。",
   "mangaTools.settings.physicalPages.heading": "按物理頁閱讀",
-  "mangaTools.settings.physicalPages.description": "畫廊的頁數是它實際包含的檔案，而不是 Stash 去重後的圖片。重複出現的內容會在畫廊網格和閱讀器中各顯示一次，章節也按檔案儲存。關閉時一切保持原樣。",
+  "mangaTools.settings.physicalPages.description": "畫廊的頁數是它實際包含的檔案，而不是 Stash 去重後的圖片。重複出現的內容會在畫廊網格和閱讀器中各顯示一次，章節也按檔案儲存。僅在接管 Stash 原生燈箱時生效；關閉時一切保持原樣。",
   "mangaTools.settings.physicalPages.note": "已有的按圖片儲存的章節會在讀取時落到第一次出現的位置；只有再次編輯儲存後，才會寫成檔案級。",
   "mangaTools.settings.manageChapters.heading": "接管 Stash 的章節系統",
   "mangaTools.settings.manageChapters.description": "分頁的建立和編輯由外掛接管，寫入外掛自己的章節欄位。已存在的 Stash 原生章節會被靜默匯入，但不會被修改。",

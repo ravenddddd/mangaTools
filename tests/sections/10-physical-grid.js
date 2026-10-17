@@ -216,6 +216,28 @@ module.exports = () => {
     );
   });
 
+  runSection("15 the physical mode belongs to the lightbox takeover", () => {
+    NS.physicalPages = true;
+    NS.readerTakeover = false;
+    assert.strictEqual(
+      NS.physicalPageMode(),
+      false,
+      "with Stash's own lightbox there is nowhere for occurrence pages to be read"
+    );
+
+    NS.readerTakeover = true;
+    assert.strictEqual(NS.physicalPageMode(), true, "both on is the mode");
+
+    NS.physicalPages = false;
+    assert.strictEqual(
+      NS.physicalPageMode(),
+      false,
+      "and the setting alone is off"
+    );
+
+    NS.readerTakeover = true;
+  });
+
   runSection("15 the patches are registered", () => {
     assert.strictEqual(
       typeof patched.ImageList,

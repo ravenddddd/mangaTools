@@ -383,6 +383,11 @@ export interface MangaToolsNamespace {
    */
   physicalPages: boolean;
   /**
+   * Whether the physical-page mode is in effect — the setting **and** the lightbox
+   * takeover it belongs to. See physicalPageMode in fields.ts.
+   */
+  physicalPageMode(): boolean;
+  /**
    * Whether the Chapters tab's Create and Edit belong to this plugin.
    *
    * On, they write this plugin's own chapter field, and Stash's own chapter rows are

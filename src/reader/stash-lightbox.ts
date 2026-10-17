@@ -712,7 +712,11 @@ export async function fetchGallery(
   // occurrence only has a position in path order — the order Stash's own chapter
   // numbers count in. Any other sort keeps the deduped list, which is the list the
   // lightbox's carousel is showing.
-  if (NS.physicalPages && order.sort === "path" && order.direction === "ASC") {
+  if (
+    NS.physicalPageMode() &&
+    order.sort === "path" &&
+    order.direction === "ASC"
+  ) {
     return fetchPhysicalGallery(galleryId);
   }
 

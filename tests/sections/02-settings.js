@@ -643,16 +643,17 @@ module.exports = () => {
   }
 
   // …and none of them goes away with its switch: they are the descriptions, not
-  // sub-settings that appear under one.
+  // sub-settings that appear under one. Physical pages is the one that *is* a
+  // sub-setting — it lives under the lightbox takeover — so its note goes with
+  // the row it belongs to.
   NS.readerTakeover = false;
   NS.manageChapters = false;
   NS.showDisabledFields = false;
   const allOff = call("PluginSettings", { pluginID: "mangaTools" });
   assert.strictEqual(
     withClass(allOff, "manga-tools-settings-note").length,
-    NOTE_ROWS.length,
-    "a note belongs to its description, so turning the switch off leaves it where " +
-      "it is"
+    NOTE_ROWS.length - 1,
+    "a note belongs to its description; the one sub-setting's note goes with it"
   );
   NS.readerTakeover = true;
   NS.manageChapters = true;
@@ -665,11 +666,11 @@ module.exports = () => {
   // off the page and leaves every setting exactly as it was.
   //
   // Which chevron folds what is checked by folding each one and counting the
-  // switches that go, in the order the page draws them: the fields group, the
-  // language field inside it, the display heading inside it, and the mark's
-  // heading. Four, and no more — the lightbox and the chapters rows have nothing
-  // under them since their notes moved into their descriptions, so a chevron there
-  // would open nothing (and a fifth would shift every count below).
+  // switches that go, in the order the page draws them: the lightbox row (which
+  // holds physical pages), the fields group, the language field inside it, the
+  // display heading inside it, and the mark's heading. Five — the chapters row has
+  // nothing under it since its note moved into its description, so a chevron there
+  // would open nothing.
   state.currentLocale = "en";
   {
     const countIn = (el, make) => {
@@ -703,7 +704,7 @@ module.exports = () => {
     const chevrons = chevronsIn(page);
     assert.strictEqual(
       chevrons.length,
-      4,
+      5,
       "one chevron per row that has rows under it, and no row without them"
     );
     assert.ok(
@@ -714,7 +715,7 @@ module.exports = () => {
       chevrons.every((c) => c.props["aria-expanded"] === true),
       "…and each saying it is open, which is the only way anything but an eye knows"
     );
-    assert.strictEqual(groupsIn(page), 2, "two groups to start with");
+    assert.strictEqual(groupsIn(page), 3, "three groups to start with");
     assert.strictEqual(switchesIn(page), 17, "…and seventeen switches");
 
     const before = state.capturedConfigWrite;
@@ -735,10 +736,11 @@ module.exports = () => {
     };
 
     for (const [what, index, left] of [
-      ["the language field, which folds two switches", 1, 15],
-      ["the display heading, which folds four rows", 2, 13],
-      ["the mark's heading, which folds three rows and no group", 3, 14],
-      ["the fields group, which folds all ten under it", 0, 7],
+      ["the lightbox row, which holds physical pages", 0, 16],
+      ["the fields group, which folds all ten under it", 1, 7],
+      ["the language field, which folds two switches", 2, 15],
+      ["the display heading, which folds four rows", 3, 13],
+      ["the mark's heading, which folds three rows and no group", 4, 14],
     ]) {
       click(chevronsIn(open())[index]);
       assert.strictEqual(
@@ -767,8 +769,8 @@ module.exports = () => {
     );
     assert.strictEqual(
       groupsIn(open()),
-      2,
-      "and both groups are where they were"
+      3,
+      "and the three groups are where they were"
     );
     assert.ok(
       chevronsIn(open()).every((c) => c.props["aria-expanded"] === true),

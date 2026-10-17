@@ -237,7 +237,7 @@ export function syncChaptersTab(): void {
           // is showing for a gallery that has no list of this plugin's own.
           // Computed from the rows rather than from what is on screen: it is what
           // would be *written*, so it cannot depend on how the screen is ordered.
-          importable: NS.physicalPages
+          importable: NS.physicalPageMode()
             ? toFileChapters(inherited, answer.pages)
             : inherited,
           own: own.own,
@@ -273,7 +273,7 @@ function chaptersOf(answer: {
   const own = readChapters(
     NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null,
     answer.pages,
-    NS.physicalPages
+    NS.physicalPageMode()
   );
 
   // A list this plugin wrote may be empty on purpose — an empty array is a gallery
@@ -291,7 +291,7 @@ function chaptersOf(answer: {
   );
 
   return {
-    chapters: NS.physicalPages
+    chapters: NS.physicalPageMode()
       ? toFileChapters(translated, answer.pages)
       : translated,
     own: false,
@@ -1172,7 +1172,7 @@ function importChapters(): void {
 
   NS.writeChapters(
     target.id,
-    serializeChapters(target.importable, NS.physicalPages, target.pages)
+    serializeChapters(target.importable, NS.physicalPageMode(), target.pages)
   ).then(
     () => {
       busy = false;

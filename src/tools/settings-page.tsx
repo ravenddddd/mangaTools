@@ -684,11 +684,17 @@ export function MangaToolsSettings() {
 
   return (
     <>
-      {/* ── The lightbox ─────────────────────────────────────────────────── */}
-      {/* No children: where the lightbox's own settings live is not a sub-setting
-          and not a row of its own — it is the second half of this row's
-          description, set off as a note. See the lightbox's own note string, which
-          says "not here" and would otherwise have been a line of grey prose. */}
+      {/* ── The lightbox, and what it reads ──────────────────────────────── */}
+      {/* One child: physical pages. It changes what a page *is* — a file
+          occurrence instead of an image — and it only has anywhere to be read
+          while this half draws the lightbox, which is why it is here and not
+          beside the chapters tab. The stored value is kept when this row is off,
+          so turning this back on restores it; the mode itself is off while the
+          lightbox is Stash's own (see physicalPageMode).
+          Where the lightbox's own reading settings live is the second half of the
+          description, set off as a note — see the lightbox's own note string,
+          which says "not here" and would otherwise have been a line of grey
+          prose. */}
       <SettingSwitch
         id="mangaTools-readerTakeover"
         heading={t(intl, "mangaTools.settings.readerTakeover.heading")}
@@ -704,29 +710,24 @@ export function MangaToolsSettings() {
         onChange={writeFlag((next) => {
           NS.readerTakeover = next;
         })}
-      />
-
-      {/* ── Physical pages ───────────────────────────────────────────────── */}
-      {/* A feature, not a display setting: it changes what a page *is* — a file
-          occurrence instead of an image — and both halves read it. Off is the
-          behaviour this plugin has always had, so the note says what turning it
-          on does to chapters that are already there. */}
-      <SettingSwitch
-        id="mangaTools-physicalPages"
-        heading={t(intl, "mangaTools.settings.physicalPages.heading")}
-        subHeading={
-          <>
-            {t(intl, "mangaTools.settings.physicalPages.description")}
-            <SettingsNote>
-              {t(intl, "mangaTools.settings.physicalPages.note")}
-            </SettingsNote>
-          </>
-        }
-        checked={NS.physicalPages}
-        onChange={writeFlag((next) => {
-          NS.physicalPages = next;
-        })}
-      />
+      >
+        <SettingSwitch
+          id="mangaTools-physicalPages"
+          heading={t(intl, "mangaTools.settings.physicalPages.heading")}
+          subHeading={
+            <>
+              {t(intl, "mangaTools.settings.physicalPages.description")}
+              <SettingsNote>
+                {t(intl, "mangaTools.settings.physicalPages.note")}
+              </SettingsNote>
+            </>
+          }
+          checked={NS.physicalPages}
+          onChange={writeFlag((next) => {
+            NS.physicalPages = next;
+          })}
+        />
+      </SettingSwitch>
 
       {/* ── The chapters tab ─────────────────────────────────────────────── */}
       {/* No children, and a boxed note inside the description — the same shape as

@@ -79,7 +79,10 @@ function write(
   // The setting decides which identity is written — and with it the version and,
   // for v2, the `images` derived from the page list. Never the other way round: a
   // write does not change the setting.
-  return write(galleryId, serializeChapters(chapters, NS.physicalPages, pages));
+  return write(
+    galleryId,
+    serializeChapters(chapters, NS.physicalPageMode(), pages)
+  );
 }
 
 /** Tells everyone, over a copy of the listeners: one may unsubscribe as it runs */

@@ -297,6 +297,22 @@ NS.isRaw = (customFields: unknown): boolean =>
   NS.isNoLanguage(NS.pickField(customFields, NS.FIELD_NAME));
 
 /**
+ * Whether the physical-page mode is **in effect**.
+ *
+ * The stored setting (`physicalPages`) says what the reader chose; this says
+ * whether it applies. It belongs to taking over Stash's lightbox: with the
+ * lightbox left to Stash there is nowhere for a file occurrence to be read, and a
+ * grid showing four cards beside a lightbox that counts one is the confusing state
+ * this guards against. Turning the takeover off turns the mode off; the stored
+ * choice is kept, so turning it back on restores it.
+ *
+ * A function rather than a second boolean: it has to follow both switches as they
+ * move, and every caller already reads the namespace live.
+ */
+NS.physicalPageMode = (): boolean =>
+  NS.readerTakeover === true && NS.physicalPages === true;
+
+/**
  * Where this plugin keeps a gallery's chapters.
  *
  * A JSON string — the only shape a custom field can hold: Stash rejects arrays

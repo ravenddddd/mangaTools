@@ -31,6 +31,7 @@ module.exports = async () => {
   await runSection(
     "a gallery's pages are its files, and the occurrence on screen is found exactly",
     async () => {
+      NS.readerTakeover = true;
       NS.physicalPages = true;
 
       const { box } = await startReader({
@@ -83,6 +84,7 @@ module.exports = async () => {
   await runSection(
     "an image-level chapter is read at the image's first occurrence",
     async () => {
+      NS.readerTakeover = true;
       NS.physicalPages = true;
 
       const { box } = await startReader({
@@ -115,6 +117,7 @@ module.exports = async () => {
   await runSection(
     "a list sorted by something other than path is not expanded",
     async () => {
+      NS.readerTakeover = true;
       NS.physicalPages = true;
 
       const before = state.queries.filter(

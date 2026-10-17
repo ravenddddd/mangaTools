@@ -197,7 +197,7 @@ export async function runChapterImports(
         answer.stashChapters,
         answer.pathIds || answer.pages.map((page) => page.imageId || page.id)
       );
-      const chapters = NS.physicalPages
+      const chapters = NS.physicalPageMode()
         ? toFileChapters(translated, answer.pages)
         : translated;
 

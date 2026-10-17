@@ -63,7 +63,7 @@
   "mangaTools.settings.readerTakeover.description": "标记为漫画的画廊，灯箱由本插件重新设计，不会更改原生灯箱设置。",
   "mangaTools.settings.readerTakeover.note": "插件灯箱相关设置在灯箱页面设置中调整。",
   "mangaTools.settings.physicalPages.heading": "按物理页阅读",
-  "mangaTools.settings.physicalPages.description": "画廊的页数是它实际包含的文件，而不是 Stash 去重后的图片。重复出现的内容会在画廊网格和阅读器中各显示一次，章节也按文件存储。关闭时一切保持原样。",
+  "mangaTools.settings.physicalPages.description": "画廊的页数是它实际包含的文件，而不是 Stash 去重后的图片。重复出现的内容会在画廊网格和阅读器中各显示一次，章节也按文件存储。仅在接管 Stash 原生灯箱时生效；关闭时一切保持原样。",
   "mangaTools.settings.physicalPages.note": "已有的按图片存储的章节会在读取时落到第一次出现的位置；只有再次编辑保存后，才会写成文件级。",
   "mangaTools.settings.manageChapters.heading": "接管 Stash 的章节系统",
   "mangaTools.settings.manageChapters.description": "标签页的创建和编辑由插件接管，写入插件自己的章节字段。已存在的 Stash 原生章节会被静默导入，但不会被修改。",

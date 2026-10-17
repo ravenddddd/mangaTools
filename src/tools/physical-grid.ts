@@ -309,7 +309,7 @@ function registerListPatch(): void {
     const props = args[0] as ImageListProps;
     const next = args[args.length - 1] as (p: ImageListProps) => unknown;
 
-    const galleryId = NS.physicalPages ? currentGalleryId() : "";
+    const galleryId = NS.physicalPageMode() ? currentGalleryId() : "";
     const [, bump] = React.useState(0);
 
     React.useEffect(() => {
@@ -356,7 +356,7 @@ function registerListPatch(): void {
 
     const expanded = React.useMemo(
       () =>
-        NS.physicalPages && grid
+        NS.physicalPageMode() && grid
           ? expandPhysicalPage({ ...props, onSelectChange: change }, grid)
           : null,
       [
