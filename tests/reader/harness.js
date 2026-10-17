@@ -460,6 +460,7 @@ dom.window.PluginApi = {
       return { type, props: next };
     },
     useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+    useMemo: (fn) => fn(),
     useEffect: (fn) => {
       fn();
     },

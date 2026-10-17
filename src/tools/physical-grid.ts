@@ -231,17 +231,36 @@ function occurrenceOf(file: GalleryFileEntry): Occurrence {
   };
 }
 
+/** One physical page, as the list needs it. */
+export interface PhysicalPage {
+  images: Occurrence[];
+  selectedIds: Set<string>;
+  onSelectChange?: (id: string, selected: boolean, shiftKey: boolean) => void;
+  /** Every file in the gallery — the pagination's total */
+  total: number;
+  /** What one page of this gallery holds */
+  perPage: number;
+  /** How many pages the files come to (never more than Stash's) */
+  pages: number;
+  /** The page actually rendered, clamped to `pages` */
+  page: number;
+}
+
 /**
  * The physical list for this render, or null to leave Stash's list alone.
  *
  * Pure on purpose — the gallery comes in as a grid rather than out of the cache —
  * so the smoke test can drive it with a fixture, and so the only thing the patch
  * adds is "is the setting on, and which gallery is this".
+ *
+ * Returns the page's own data rather than a merged props object. The patch memoizes
+ * this, and a merged object would carry every other prop — including ones whose
+ * identity changes every render — back into `ImageList`.
  */
 export function expandPhysicalPage(
   props: ImageListProps,
   grid: GalleryGrid
-): { props: ImageListProps; total: number; perPage: number } | null {
+): PhysicalPage | null {
   const filter = props.filter;
   if (filter?.sortBy !== "path") return null;
   if (String(filter?.sortDirection || "").toUpperCase() !== "ASC") return null;
@@ -279,21 +298,13 @@ export function expandPhysicalPage(
     : undefined;
 
   return {
-    props: {
-      ...props,
-      images,
-      selectedIds: selected,
-      onSelectChange: change,
-      totalCount: grid.total,
-      pageCount: plan.pages,
-      filter: {
-        ...(filter || {}),
-        currentPage: page,
-        itemsPerPage: plan.perPage,
-      },
-    },
+    images,
+    selectedIds: selected,
+    onSelectChange: change,
     total: grid.total,
     perPage: plan.perPage,
+    pages: plan.pages,
+    page,
   };
 }
 
@@ -327,8 +338,35 @@ function registerListPatch(): void {
     }, [galleryId]);
 
     const grid = galleryId ? cache.get(galleryId) : undefined;
-    const expanded =
-      NS.physicalPages && grid ? expandPhysicalPage(props, grid) : null;
+
+    // **Memoized, and this is not an optimisation.** `ImageList` hands its
+    // `images` to `useLightbox`, whose effect calls `setLightboxState` whenever
+    // that array's identity changes — and `ImageList` is a consumer of the
+    // lightbox context, so a fresh array on every render is an update loop that
+    // freezes the page the moment the lightbox opens. The dependencies are the
+    // values the expansion reads, not `props` (whose identity is new each render).
+    const filter = props.filter;
+    const sortBy = filter?.sortBy;
+    const sortDirection = filter?.sortDirection;
+    const currentPage = filter?.currentPage;
+    const itemsPerPage = filter?.itemsPerPage;
+    const totalCount = props.totalCount;
+    const selectedIds = props.selectedIds;
+    const onSelectChange = props.onSelectChange;
+
+    const expanded = React.useMemo(
+      () => (NS.physicalPages && grid ? expandPhysicalPage(props, grid) : null),
+      [
+        grid,
+        sortBy,
+        sortDirection,
+        currentPage,
+        itemsPerPage,
+        totalCount,
+        selectedIds,
+        onSelectChange,
+      ]
+    );
 
     React.useEffect(() => {
       setPageView(
@@ -340,7 +378,21 @@ function registerListPatch(): void {
       // The primitives that make the view, not the object rebuilt each render.
     }, [galleryId, expanded?.total, expanded?.perPage]);
 
-    return next(expanded ? expanded.props : props);
+    if (!expanded) return next(props);
+
+    return next({
+      ...props,
+      images: expanded.images,
+      selectedIds: expanded.selectedIds,
+      onSelectChange: expanded.onSelectChange,
+      totalCount: expanded.total,
+      pageCount: expanded.pages,
+      filter: {
+        ...(props.filter || {}),
+        currentPage: expanded.page,
+        itemsPerPage: expanded.perPage,
+      },
+    });
   });
 }
 

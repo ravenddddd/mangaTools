@@ -1460,7 +1460,11 @@ contains, each at its own position.
   occurrence, gives it a synthetic id for React's keys, and puts the occurrence's
   file in `visual_files` — so the cards keep their tags, popovers and date. The
   card patch restores the real image id for its link. Selection is by image: any
-  occurrence selects the image.
+  occurrence selects the image. The expanded page is **memoized**: `ImageList` hands
+  its `images` to `useLightbox`, whose effect updates the lightbox context whenever
+  that array's identity changes — and the list is a consumer of that context, so a
+  fresh array per render is an update loop that freezes the page as soon as the
+  lightbox opens.
 - **The exact occurrence survives Stash's lightbox.** Each handed-over slide's URL
   carries `#<file id>`; the fragment never reaches the server, makes Stash's React
   keys unique, and is what the reader reads to open the occurrence that was clicked

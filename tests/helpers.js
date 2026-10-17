@@ -102,6 +102,9 @@ const React = {
   // lazy initialiser and gets called, not stored. The setter is inert — nothing
   // in these tests can change state and read the result back.
   useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+  // The factory runs, like an effect: the physical grid's memo is also what keeps
+  // `images` stable, and a stubbed-out memo would hide that.
+  useMemo: (fn) => fn(),
   // Only the experiment's error boundary derives from this. The stub renders
   // nothing, so the lifecycle is never exercised — what matters is only that
   // `class X extends React.Component` is legal when the bundle loads.

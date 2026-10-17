@@ -74,22 +74,22 @@ module.exports = () => {
 
       assert.ok(page, "a path-ordered list is expanded");
       assert.deepStrictEqual(
-        page.props.images.map((image) => image.id),
+        page.images.map((image) => image.id),
         ["1001::p1", "1002::p2"],
         "the first page is the first two files, in path order — occurrence ids unique"
       );
       assert.strictEqual(
-        page.props.images[0].paths.image,
+        page.images[0].paths.image,
         "/image/1001/image#p1",
         "the slide's URL carries the occurrence, so Stash's keys and the reader agree"
       );
       assert.strictEqual(
-        page.props.images[0].visual_files[0].path,
+        page.images[0].visual_files[0].path,
         "/zip/001.jpg",
         "and the card's name is the occurrence's own file"
       );
       assert.deepStrictEqual(
-        [...page.props.selectedIds],
+        [...page.selectedIds],
         ["1001::p1"],
         "selecting the image selects its occurrence on this page"
       );
@@ -103,7 +103,7 @@ module.exports = () => {
         }),
         GRID
       );
-      withSelect.props.onSelectChange("1001::p3", true, false);
+      withSelect.onSelectChange("1001::p3", true, false);
       assert.deepStrictEqual(
         changed,
         ["1001", true, false],
