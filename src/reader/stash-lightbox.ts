@@ -434,7 +434,7 @@ interface GalleryPayload {
 export interface LightboxImage {
   id: string;
   title: string;
-  paths: { image: string };
+  paths: { image: string; thumbnail?: string; preview?: string };
   /**
    * The galleries this image is in, as Stash's own lightbox reads them.
    *
@@ -668,6 +668,10 @@ async function fetchPhysicalGallery(galleryId: string): Promise<GalleryAnswer> {
     // request — and its immutable cache entry — is still the image's own.
     paths: {
       image: file.imageUrl ? file.imageUrl + "#" + file.fileId : file.imageUrl,
+      // Stash's nav strip picks preview-else-thumbnail; a missing key reads as
+      // "not the preview" and leaves the strip asking for an undefined source.
+      thumbnail: file.thumbnail,
+      preview: file.preview,
     },
     galleries: [back],
     visual_files: [

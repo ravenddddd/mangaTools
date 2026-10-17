@@ -108,55 +108,6 @@ export function physicalPagePlan(
   return { pages: Math.max(1, Math.ceil(fileCount / perPage)), perPage };
 }
 
-/** What the grid is showing, for the two pagination components. */
-interface PageView {
-  galleryId: string;
-  total: number;
-  perPage: number;
-}
-
-let pageView: PageView | null = null;
-const viewListeners = new Set<() => void>();
-
-function setPageView(next: PageView | null): void {
-  if (
-    (next === null && pageView === null) ||
-    (next !== null &&
-      pageView !== null &&
-      next.galleryId === pageView.galleryId &&
-      next.total === pageView.total &&
-      next.perPage === pageView.perPage)
-  ) {
-    return;
-  }
-
-  pageView = next;
-  viewListeners.forEach((fn) => {
-    fn();
-  });
-}
-
-/**
- * The view the pagination components should draw, re-rendering when it changes.
- *
- * They are rendered *before* `ImageList` in Stash's tree, so the list cannot hand
- * them the numbers directly; a small store and a subscription are what puts the
- * physical count on the page a tick after the list has computed it.
- */
-function usePageView(): PageView | null {
-  const [, bump] = React.useState(0);
-
-  React.useEffect(() => {
-    const fn = () => bump((n: number) => n + 1);
-    viewListeners.add(fn);
-    return () => {
-      viewListeners.delete(fn);
-    };
-  }, []);
-
-  return pageView;
-}
-
 /** The props this module reads off `ImageList`, which Stash types only as `any`. */
 interface ImageListProps {
   filter?: {
@@ -368,16 +319,6 @@ function registerListPatch(): void {
       ]
     );
 
-    React.useEffect(() => {
-      setPageView(
-        expanded
-          ? { galleryId, total: expanded.total, perPage: expanded.perPage }
-          : null
-      );
-      return () => setPageView(null);
-      // The primitives that make the view, not the object rebuilt each render.
-    }, [galleryId, expanded?.total, expanded?.perPage]);
-
     if (!expanded) return next(props);
 
     return next({
@@ -411,38 +352,10 @@ function registerCardPatch(): void {
   });
 }
 
-/**
- * The two pagination components, drawn from the physical view when there is one.
- *
- * `instead` rather than `before` because of the subscription: the numbers are set
- * by the list, which renders *after* these, so the component has to be able to
- * redraw when they arrive.
- */
-function registerPaginationPatch(
-  target: "Pagination" | "PaginationIndex"
-): void {
-  registerPatch("instead", target, (...args: unknown[]) => {
-    const props = args[0] as {
-      totalItems?: number;
-      itemsPerPage?: number;
-    };
-    const next = args[args.length - 1] as (p: unknown) => unknown;
-    const view = usePageView();
-
-    return next(
-      view
-        ? { ...props, totalItems: view.total, itemsPerPage: view.perPage }
-        : props
-    );
-  });
-}
-
-/** Registers all four patches. Called once, from the entry file. */
+/** Registers the two patches. Called once, from the entry file. */
 export function registerPhysicalPagePatches(): void {
   registerListPatch();
   registerCardPatch();
-  registerPaginationPatch("Pagination");
-  registerPaginationPatch("PaginationIndex");
 }
 
 // Published for the smoke test, the way the reader half publishes its pure

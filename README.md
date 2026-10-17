@@ -1453,9 +1453,12 @@ contains, each at its own position.
 - **The page count stays Stash's.** `useEnsureValidPage` clamps the page number to
   the image page count, so physical pages past it would be unreachable. The files
   are divided into the same number of pages instead, with
-  `perPage = max(chosen size, ceil(files / pages))`; `Pagination` and
-  `PaginationIndex` are patched to draw the physical totals. The cost is that the
-  page-size selector can understate a page that had to grow.
+  `perPage = max(chosen size, ceil(files / pages))`. The toolbar's
+  "N–M of T" line still says **T = the deduplicated image count**: rewriting it
+  through a subscription in Stash's `Pagination`/`PaginationIndex` was tried and
+  removed — it produced an update loop (React error #185). The page buttons match,
+  because the page count does not change; the page-size selector can understate a
+  page that had to grow.
 - **The grid renders Stash's own cards.** The list patch clones each image once per
   occurrence, gives it a synthetic id for React's keys, and puts the occurrence's
   file in `visual_files` — so the cards keep their tags, popovers and date. The

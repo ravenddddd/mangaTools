@@ -149,12 +149,14 @@ module.exports = () => {
       "function",
       "the card, which puts the real image id back in its link"
     );
+    // The pagination components are deliberately *not* patched: the store that
+    // rewrote their numbers was an update loop in Stash's own list (React #185).
+    // The toolbar count therefore keeps Stash's deduplicated number for now.
     assert.strictEqual(
-      typeof patched.Pagination,
-      "function",
-      "and the two pagination components"
+      patched.Pagination,
+      undefined,
+      "the pagination is Stash's own"
     );
-    assert.strictEqual(typeof patched.PaginationIndex, "function", "…both");
     assert.strictEqual(
       NS.physicalPages,
       false,
