@@ -103,6 +103,7 @@ import {
   type GalleryAnswer,
   carouselImage,
   fetchGallery,
+  fetchImageCount,
   lightboxIsLoading,
   galleryIdFromPath,
   galleryIdOfImage,
@@ -270,6 +271,25 @@ let clickRoot: Element | null = null;
  * gallery being fetched is remembered and a second ask for it is dropped.
  */
 let pending: string | null = null;
+
+/**
+ * The gallery whose image count is being asked for, if any.
+ *
+ * A cached page list can outlive the gallery it describes — an image added or
+ * deleted elsewhere has no event of ours — so every opening of a cached gallery
+ * asks the count. One question at a time: passes over the document are frequent,
+ * and a second ask for the same gallery while the first is out would be the same
+ * answer at twice the price.
+ */
+let counting: string | null = null;
+
+/**
+ * Which re-read of a gallery's pages the answer belongs to.
+ *
+ * A lightbox can be closed and opened again while a re-read is still in flight,
+ * and the older answer must not be written over the newer one. See refresh.
+ */
+let refreshing = 0;
 
 /**
  * The lightbox the chapters were last handed to, and the gallery they were.
@@ -524,6 +544,12 @@ function loadGallery(id: string): void {
     galleryId = id;
     shownAt = -1;
     step();
+
+    // The list in hand may be older than the gallery it describes: a page list is
+    // kept for the session, and deleting or adding an image announces itself to
+    // nobody here. Ask the count — the cheapest question that notices — and read
+    // the pages again only if it has moved. See revalidate.
+    revalidate(id);
     return;
   }
 
@@ -547,14 +573,7 @@ function loadGallery(id: string): void {
       // flight, and an answer for the previous one must not be drawn over this one.
       if (root !== forLightbox) return;
 
-      const gallery: MangaReaderGallery = {
-        id,
-        pages: answer.pages,
-        images: answer.images,
-        pairedWith: pairingKey(),
-        screens: laidOut(answer.pages),
-        chapters: placeChapters(chaptersOf(answer), answer.pages),
-      };
+      const gallery = galleryFrom(id, answer);
       remember(id, gallery);
 
       language = answer.language;
@@ -572,6 +591,130 @@ function loadGallery(id: string): void {
       );
       deactivate();
     });
+}
+
+/**
+ * The gallery the reader draws from, out of an answer from Stash.
+ *
+ * One place rather than two: the first read and a re-read (see refresh) have to
+ * build exactly the same thing, or one of them would be missing a chapter, a
+ * pairing, or the layout the settings in hand ask for.
+ */
+function galleryFrom(id: string, answer: GalleryAnswer): MangaReaderGallery {
+  return {
+    id,
+    pages: answer.pages,
+    images: answer.images,
+    pairedWith: pairingKey(),
+    screens: laidOut(answer.pages),
+    chapters: placeChapters(chaptersOf(answer), answer.pages),
+  };
+}
+
+/**
+ * Asks whether a cached gallery still has the pages it was read with.
+ *
+ * The cache is kept because a gallery is opened and closed repeatedly (see
+ * `loaded`), and that is also its fault: deleting or adding an image announces
+ * itself to nothing here — the pages are read from Stash, and a change can be made
+ * on the details page before the lightbox is opened, or in another tab entirely. So
+ * the count is asked again on every opening, and the pages are read again only when
+ * it disagrees.
+ *
+ * A question that could not be answered is silence: the cached list is what the
+ * reader would have had without this check at all, and a background check has no
+ * business turning a reader off.
+ */
+function revalidate(id: string): void {
+  if (counting === id) return;
+  counting = id;
+
+  fetchImageCount(id)
+    .then((count) => {
+      if (counting === id) counting = null;
+      if (count === null) return;
+
+      const cached = loaded.get(id);
+      if (!cached || count === cached.pages.length) return;
+
+      refresh(id);
+    })
+    .catch(() => {
+      if (counting === id) counting = null;
+    });
+}
+
+/**
+ * Reads a cached gallery's pages again, and puts the reader back where it was.
+ *
+ * The place is kept by **image id**, which is the only identity that survives the
+ * two lists — ids are what the chapter field stores, for the same reason. A page
+ * that is gone takes its index with it: the reader lands at the position it held,
+ * clamped to the new list, which is the page that has taken its place.
+ *
+ * Only while that gallery's lightbox is still the one on screen. A re-read for a
+ * lightbox that has closed would cache a list in whatever order the address bar
+ * happened to name, and the next opening would draw it without ever checking that
+ * order against the carousel — that check belongs to `loadPages`.
+ */
+function refresh(id: string): void {
+  const forLightbox = root;
+  if (!forLightbox || galleryId !== id) return;
+
+  const seq = ++refreshing;
+
+  // `fetchGallery` rather than `loadPages`: the pairing check there asks whether
+  // the carousel's image is in the list it just read, and a page deleted while the
+  // reader is on it is exactly an image that is on screen and not in the answer.
+  // That check belongs to the first read, where a wrong guess about the order is
+  // what it is for; a re-read is correcting membership, in the order this opening
+  // already uses.
+  fetchGallery(id, lightboxOrder(window.location.search))
+    .then((answer) => {
+      // A newer re-read, or a lightbox that closed or changed while this one was
+      // out: its answer is not this one's to apply.
+      if (seq !== refreshing) return;
+      if (root !== forLightbox || galleryId !== id) return;
+
+      const old = loaded.get(id);
+      if (!old) return;
+
+      const was = place;
+      const wasId = was >= 0 ? old.pages[was]?.id : undefined;
+
+      remember(id, galleryFrom(id, answer));
+      language = answer.language;
+
+      if (was >= 0) {
+        const at = nextIndex(answer.pages, wasId);
+        place = at >= 0 ? at : Math.min(was, answer.pages.length - 1);
+      }
+
+      // The same screen index can hold different pages now — the one the reader was
+      // on may be gone — so the screen is drawn again even when the place did not
+      // change.
+      shownAt = -1;
+      step();
+    })
+    .catch((e) => {
+      // The pages in hand stand: a re-read that could not answer — a filtered list,
+      // or a server that did not — changes nothing the reader can see.
+      console.error(
+        "[mangaReader] could not re-read this gallery's pages, keeping the ones in hand:",
+        e
+      );
+    });
+}
+
+/** Where an image sits in a list of pages, or -1 when it is in none of them */
+function nextIndex(pages: MangaReaderPage[], id: string | undefined): number {
+  if (!id) return -1;
+
+  for (let i = 0; i < pages.length; i++) {
+    if (pages[i].id === id) return i;
+  }
+
+  return -1;
 }
 
 /**

@@ -50,6 +50,13 @@ const state = {
   /** Set by a test to hold the next gallery query open: see the client below */
   holdGallery: null,
   /**
+   * The same for the count query a cached gallery is revalidated with. Set to
+   * `true` to hold the next one; it is replaced by a function that releases the
+   * answer, which is read from the fixture *then* — a test that changes the
+   * gallery while the question is out needs the answer to be about the changed one.
+   */
+  holdCount: null,
+  /**
    * What the library's copy of the reader's settings holds, or undefined for a library
    * nobody has written to — the state that makes the reader fall back to what this
    * browser remembers. Set by a section that wants the reading half to hear about a
@@ -133,6 +140,37 @@ const client = {
       return Promise.resolve({
         data: { findGalleries: { count: marked.length, galleries: marked } },
       });
+    }
+
+    // The reader's revalidation: a gallery's image count, and nothing else. Told
+    // apart from a full read by its variables — every full read sends the order it
+    // was asked for, and this one names the gallery and nothing more.
+    if (
+      variables?.galleryId !== undefined &&
+      variables.sort === undefined &&
+      variables.withPathIds === undefined
+    ) {
+      const answered = () => {
+        const gallery = state.galleries[variables.galleryId] || {
+          images: [],
+        };
+        return {
+          data: {
+            findGallery: {
+              id: variables.galleryId,
+              image_count: (gallery.images || []).length,
+            },
+          },
+        };
+      };
+
+      if (state.holdCount) {
+        return new Promise((resolve) => {
+          state.holdCount = () => resolve(answered());
+        });
+      }
+
+      return Promise.resolve(answered());
     }
 
     const gallery = state.galleries[variables.galleryId] || { images: [] };
@@ -244,7 +282,22 @@ const client = {
  */
 const imageQueries = () =>
   state.queries.filter(
-    (q) => q.variables && q.variables.galleryId !== undefined
+    (q) =>
+      q.variables &&
+      q.variables.galleryId !== undefined &&
+      // The count revalidation names the gallery too; a full read also sends the
+      // order it wants, which is the difference.
+      q.variables.sort !== undefined
+  );
+
+/** The count questions a cached gallery was revalidated with — see revalidate. */
+const countQueries = () =>
+  state.queries.filter(
+    (q) =>
+      q.variables &&
+      q.variables.galleryId !== undefined &&
+      q.variables.sort === undefined &&
+      q.variables.withPathIds === undefined
   );
 
 global.window = dom.window;
@@ -1036,6 +1089,26 @@ state.galleries["53"] = {
   images: numbered(CHAPTERS_VIEW),
   pathImages: numbered(CHAPTERS_PATH),
 };
+// For the sections about a cached gallery whose pages change under it — the list is
+// kept for the session, so the gallery has to be opened, closed, changed, and
+// opened again. Three ordinary pages each, and no other section uses them.
+state.galleries["71"] = {
+  images: [
+    image("801", 1000, 1500),
+    image("802", 1000, 1500),
+    image("803", 1000, 1500),
+  ],
+};
+state.galleries["72"] = {
+  images: [
+    image("811", 1000, 1500),
+    image("812", 1000, 1500),
+    image("813", 1000, 1500),
+  ],
+};
+state.galleries["73"] = {
+  images: [image("821", 1000, 1500), image("822", 1000, 1500)],
+};
 // For the sections about the pairing shift, which is remembered per gallery.
 state.galleries["36"] = PLAIN_GALLERY;
 // A gallery this plugin has no business on: marked `manga: false`, which is what keeps
@@ -1156,6 +1229,7 @@ module.exports = {
   settingsWrites,
   client,
   imageQueries,
+  countQueries,
   shown,
   patched,
   globalListeners,

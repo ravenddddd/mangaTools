@@ -480,6 +480,63 @@ export interface GalleryAnswer {
 }
 
 /**
+ * How many images a gallery has, and nothing else.
+ *
+ * Asked when a gallery's pages are already in hand — see revalidate in takeover.ts.
+ * The one thing that can make that list stale is the gallery's membership changing,
+ * and the count moves exactly when it does: an image deleted, or one added. It is
+ * cheaper than the pages by orders of magnitude, and unlike the lightbox's own
+ * counter it needs no markup — that counter is absent while the lightbox loads and
+ * for a gallery of one image.
+ */
+export const GALLERY_IMAGE_COUNT_QUERY_TEXT = [
+  "query MangaReaderGalleryImageCount($galleryId: ID!) {",
+  "  findGallery(id: $galleryId) {",
+  "    id",
+  "    image_count",
+  "  }",
+  "}",
+].join("\n");
+
+let galleryImageCountQuery: unknown = null;
+
+/**
+ * The number of images Stash says a gallery has, or null when it did not say.
+ *
+ * Null is the same answer as a server that could not be asked: the caller's cached
+ * pages stand, because they are what the reader would have had anyway and a
+ * background check has no business turning a reader off.
+ */
+export async function fetchImageCount(
+  galleryId: string
+): Promise<number | null> {
+  if (!galleryImageCountQuery) {
+    galleryImageCountQuery = gqlDoc(
+      GALLERY_IMAGE_COUNT_QUERY_TEXT,
+      "build the gallery's image count query"
+    );
+  }
+  const query = galleryImageCountQuery;
+  if (!query) return null;
+
+  const data = (await requirePluginApi()
+    .utils.StashService.getClient()
+    // no-cache, like every query in this half: asked once per opening, and nothing
+    // else in the page wants it in Apollo's normalised cache.
+    .query({
+      query,
+      variables: { galleryId },
+      fetchPolicy: "no-cache",
+    })
+    .then((res) => res?.data)) as
+    | { findGallery?: { image_count?: number | null } }
+    | undefined;
+
+  const count = data?.findGallery?.image_count;
+  return typeof count === "number" ? count : null;
+}
+
+/**
  * The pages of a gallery, in the order the lightbox shows them.
  *
  * A page's size comes from its first visual file that reported one; a page with
