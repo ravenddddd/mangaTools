@@ -1451,14 +1451,15 @@ contains, each at its own position.
   the only faithful translation — and switching the setting never rewrites anything.
   A chapter write in physical mode writes `v: 2`; a write with it off writes `v: 1`.
 - **The page count stays Stash's.** `useEnsureValidPage` clamps the page number to
-  the image page count, so physical pages past it would be unreachable. The files
-  are divided into the same number of pages instead, with
-  `perPage = max(chosen size, ceil(files / pages))`. The toolbar's
-  "N–M of T" line still says **T = the deduplicated image count**: rewriting it
-  through a subscription in Stash's `Pagination`/`PaginationIndex` was tried and
-  removed — it produced an update loop (React error #185). The page buttons match,
-  because the page count does not change; the page-size selector can understate a
-  page that had to grow.
+  the image page count, so physical pages past it would be unreachable. That count
+  is read from the **`pageCount` prop**: Stash v0.31.1 hands `ImageList` a
+  `pageCount` and no `totalCount` at all, and deriving it from the missing total
+  made every file share one page. The chosen page size is kept exactly: pages
+  1 … P−1 hold it, and the **last page takes the remainder** (52 files over 51
+  pages at 1/page is 1, 1, …, 2). The toolbar's "N–M of T" line still says
+  **T = the deduplicated image count**: rewriting it through a subscription in
+  Stash's `Pagination`/`PaginationIndex` was tried and removed — it produced an
+  update loop (React error #185).
 - **The grid renders Stash's own cards.** The list patch clones each image once per
   occurrence, gives it a synthetic id for React's keys, and puts the occurrence's
   file in `visual_files` — so the cards keep their tags, popovers and date. The
@@ -1474,8 +1475,10 @@ contains, each at its own position.
   rather than the first one with that content.
 
 Not changed: a list sorted by anything but path (the positions would mean nothing),
-the image detail page, and the fact that a batch action still operates on the image
-rather than on one occurrence.
+**a searched or filtered list** (the expansion starts from the whole gallery and
+would show files the query excluded, so the deduplicated results stand), the image
+detail page, and the fact that a batch action still operates on the image rather
+than on one occurrence.
 
 ### What is not here yet
 

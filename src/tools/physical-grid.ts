@@ -93,12 +93,17 @@ function load(galleryId: string): Promise<GalleryGrid> {
 }
 
 /**
- * Stash's page count, with the files divided into it.
+ * Stash's page count, with the files laid into it at the chosen page size.
  *
  * `imagePages` is **Stash's own count**, taken from the `pageCount` prop — not
  * derived from a total. Stash v0.31.1 does not pass a `totalCount` to
  * `ImageList` at all, and deriving the count from `undefined` made it 1, which
  * put every file on one page: the page-size selector did nothing.
+ *
+ * The page size is the reader's, exactly: pages 1 … P−1 hold `userPerPage` files
+ * and the **last page takes the remainder**. The page count stays Stash's (P),
+ * because a higher number would be clamped away by `useEnsureValidPage`; the
+ * price is that a gallery with many duplicates can have a long last page.
  *
  * Published for the smoke test: the arithmetic is where a page that cannot be
  * reached would come from, and it is the cheapest part of this module to pin.
@@ -106,11 +111,12 @@ function load(galleryId: string): Promise<GalleryGrid> {
 export function physicalPagePlan(
   imagePages: number,
   userPerPage: number,
-  fileCount: number
+  _fileCount: number
 ): { pages: number; perPage: number } {
-  const pages = Math.max(1, Math.floor(imagePages) || 1);
-  const perPage = Math.max(userPerPage, Math.ceil(fileCount / pages));
-  return { pages: Math.max(1, Math.ceil(fileCount / perPage)), perPage };
+  return {
+    pages: Math.max(1, Math.floor(imagePages) || 1),
+    perPage: Math.max(1, userPerPage),
+  };
 }
 
 /** The props this module reads off `ImageList`, which Stash types only as `any`. */
@@ -121,6 +127,9 @@ interface ImageListProps {
     currentPage?: number;
     itemsPerPage?: number;
     displayMode?: string;
+    /** The search box, and any criterion the reader added. */
+    searchTerm?: string;
+    criteria?: unknown[];
   };
   images?: Occurrence[];
   totalCount?: number;
@@ -220,6 +229,16 @@ export function expandPhysicalPage(
   const filter = props.filter;
   if (filter?.sortBy !== "path") return null;
   if (String(filter?.sortDirection || "").toUpperCase() !== "ASC") return null;
+
+  // **A filtered list keeps Stash's own results.** The expansion starts from the
+  // gallery's whole file list and would ignore the search box and every criterion
+  // — showing a page of images the query did not return. What a *filtered*
+  // occurrence list would mean (only the occurrences of the matched images?) is a
+  // question of its own; until it is answered, the deduplicated results are the
+  // honest ones.
+  if (filter?.searchTerm) return null;
+  if ((filter?.criteria?.length ?? 0) > 0) return null;
+
   if (!grid || grid.files.length === 0) return null;
 
   const userPerPage = Math.max(1, Number(filter?.itemsPerPage) || 100);
@@ -237,7 +256,13 @@ export function expandPhysicalPage(
   const page = Math.min(Math.max(1, wanted), plan.pages);
 
   const start = (page - 1) * plan.perPage;
-  const files = grid.files.slice(start, start + plan.perPage);
+  // The chosen page size everywhere, and everything left on the last page — the
+  // page count is Stash's, so the remainder has to land somewhere.
+  const end =
+    page >= plan.pages
+      ? grid.total
+      : Math.min(start + plan.perPage, grid.total);
+  const files = grid.files.slice(start, end);
   const images = files.map(occurrenceOf);
 
   // Selection is by image: every occurrence of a selected image is selected, and

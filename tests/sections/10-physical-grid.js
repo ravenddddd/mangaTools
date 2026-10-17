@@ -45,6 +45,8 @@ const listProps = (over = {}) => ({
     sortDirection: "ASC",
     currentPage: 1,
     itemsPerPage: 2,
+    searchTerm: "",
+    criteria: [],
   },
   // What this Stash actually passes. `totalCount` is not among ImageList's props
   // in v0.31.1; it is kept only as a fallback for a build that does pass it.
@@ -65,8 +67,8 @@ module.exports = () => {
     );
     assert.deepStrictEqual(
       NS.physicalPagePlan(4, 100, 511),
-      { pages: 4, perPage: 128 },
-      "a dense gallery widens one page rather than adding pages past the clamp"
+      { pages: 4, perPage: 100 },
+      "the chosen page size is kept; the last page takes the remainder"
     );
   });
 
@@ -135,17 +137,57 @@ module.exports = () => {
     );
 
     assert.ok(page, "the list is expanded");
-    assert.strictEqual(
-      page.perPage,
-      2,
-      "four files over three Stash pages is two per page"
-    );
+    assert.strictEqual(page.perPage, 1, "the chosen page size is kept");
     assert.deepStrictEqual(
       page.images.map((image) => image.id),
-      ["1001::p1", "1002::p2"],
-      "…not all four on the first page"
+      ["1001::p1"],
+      "…so one file on the first page, not all four"
     );
-    assert.strictEqual(page.pages, 2, "and two physical pages");
+    assert.strictEqual(page.pages, 3, "and Stash's three pages");
+
+    const last = NS.expandPhysicalPage(
+      listProps({
+        filter: {
+          sortBy: "path",
+          sortDirection: "ASC",
+          currentPage: 3,
+          itemsPerPage: 1,
+          searchTerm: "",
+          criteria: [],
+        },
+        pageCount: 3,
+        totalCount: undefined,
+      }),
+      GRID
+    );
+    assert.deepStrictEqual(
+      last.images.map((image) => image.id),
+      ["1001::p3", "1003::p4"],
+      "the last page takes the remainder"
+    );
+  });
+
+  runSection("15 a filtered or searched list keeps Stash's results", () => {
+    assert.strictEqual(
+      NS.expandPhysicalPage(
+        listProps({
+          filter: { ...listProps().filter, searchTerm: "RJ01133881_003" },
+        }),
+        GRID
+      ),
+      null,
+      "a search is Stash's own list — expanding it would show files it excluded"
+    );
+    assert.strictEqual(
+      NS.expandPhysicalPage(
+        listProps({
+          filter: { ...listProps().filter, criteria: [{ type: "tags" }] },
+        }),
+        GRID
+      ),
+      null,
+      "…and so is any criterion"
+    );
   });
 
   runSection("15 only a path-ascending list is expanded", () => {
