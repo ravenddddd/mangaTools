@@ -82,6 +82,16 @@ export type CustomFieldsMap = MangaToolsCustomFields;
  */
 export let store: Map<string, CustomFieldsMap> | null = null;
 
+/**
+ * The galleries' own links, by id, from the same query as the store.
+ *
+ * Stash's `urls` are plain strings — the shop feature reads them, and **nothing
+ * is written back**: a gallery's links stay Stash's data. Kept beside the store
+ * rather than inside it because every existing reader of the store wants the
+ * custom fields and nothing else.
+ */
+export let galleryUrls: Map<string, string[]> | null = null;
+
 /** Subscribers: re-render when the store or the route changes */
 const listeners: Set<() => void> = new Set();
 
@@ -282,6 +292,7 @@ function getQuery(field: string): unknown {
       "    galleries {",
       "      id",
       "      custom_fields",
+      "      urls",
       "    }",
       "  }",
       "}",
@@ -294,7 +305,11 @@ function getQuery(field: string): unknown {
 
 /** What one query above returns, as far as this plugin cares */
 type GalleriesPayload = {
-  galleries?: Array<{ id: string; custom_fields?: CustomFieldsMap }>;
+  galleries?: Array<{
+    id: string;
+    custom_fields?: CustomFieldsMap;
+    urls?: string[];
+  }>;
 };
 
 /**
@@ -337,6 +352,7 @@ function refresh(): Promise<unknown> {
   )
     .then((results) => {
       const next: Map<string, CustomFieldsMap> = new Map();
+      const urlsNext: Map<string, string[]> = new Map();
       results.forEach((res) => {
         const data = res?.data;
         const result = data
@@ -346,10 +362,15 @@ function refresh(): Promise<unknown> {
 
         galleries.forEach((g) => {
           if (g.custom_fields) next.set(String(g.id), g.custom_fields);
+          urlsNext.set(
+            String(g.id),
+            (g.urls || []).map((url) => String(url))
+          );
         });
       });
 
       store = next;
+      galleryUrls = urlsNext;
       emit();
 
       // Only log when the count changes, so it does not spam every minute.
@@ -411,6 +432,14 @@ const FEATURE_ON_BY_DEFAULT = true;
 const PHYSICAL_PAGES_BY_DEFAULT = false;
 
 /**
+ * Whether links to the four shops are recognised and shown.
+ *
+ * **Off by default**: it adds marks to the link inputs and a row to the manga
+ * info block, and a reader who never asked for it should see neither.
+ */
+const SHOP_LINKS_BY_DEFAULT = false;
+
+/**
  * Every setting the managing half reads, live, before Stash has answered.
  *
  * The defaults, which are what the plugin did before any of this was configurable, so
@@ -419,6 +448,8 @@ const PHYSICAL_PAGES_BY_DEFAULT = false;
  */
 NS.readerTakeover = FEATURE_ON_BY_DEFAULT;
 NS.physicalPages = PHYSICAL_PAGES_BY_DEFAULT;
+NS.shopLinks = SHOP_LINKS_BY_DEFAULT;
+NS.shopIconStyle = "favicon";
 NS.manageChapters = FEATURE_ON_BY_DEFAULT;
 NS.fields = FEATURE_ON_BY_DEFAULT;
 NS.fieldLanguage = FEATURE_ON_BY_DEFAULT;
@@ -501,6 +532,16 @@ function refreshSettings(): void {
         pluginCfg ? pluginCfg.physicalPages : null,
         PHYSICAL_PAGES_BY_DEFAULT
       );
+      NS.shopLinks = NS.parseFlag(
+        pluginCfg ? pluginCfg.shopLinks : null,
+        SHOP_LINKS_BY_DEFAULT
+      );
+      // A single value, not a flag: anything that is not the known word is the
+      // default, so a hand-edited setting can never leave the badges iconless.
+      NS.shopIconStyle =
+        pluginCfg && String(pluginCfg.shopIconStyle ?? "") === "logo"
+          ? "logo"
+          : "favicon";
       NS.manageChapters = NS.parseFlag(
         pluginCfg ? pluginCfg.manageChapters : null,
         FEATURE_ON_BY_DEFAULT
@@ -797,6 +838,17 @@ export function storedIsManga(galleryId: string): boolean {
 }
 
 /**
+ * A matched gallery's links, as Stash holds them.
+ *
+ * Empty before the first answer and for a gallery the query did not return — a
+ * list of nothing is the honest answer for both, and the shop row draws nothing
+ * from it.
+ */
+export function storedUrls(galleryId: string | null | undefined): string[] {
+  return galleryId ? galleryUrls?.get(String(galleryId)) || [] : [];
+}
+
+/**
  * Whether this plugin's store holds a gallery — and, before it has answered, that it
  * does not know.
  *
@@ -842,6 +894,8 @@ function settingsInput(): { [key: string]: unknown } {
     ),
     readerTakeover: NS.readerTakeover,
     physicalPages: NS.physicalPages,
+    shopLinks: NS.shopLinks,
+    shopIconStyle: NS.shopIconStyle,
     manageChapters: NS.manageChapters,
     fields: NS.fields,
     fieldLanguage: NS.fieldLanguage,

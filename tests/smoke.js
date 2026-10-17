@@ -23,6 +23,7 @@ const SECTIONS = [
   ],
   ["10d–10d2 the three sidebar sections", "./sections/06-sidebar.js"],
   ["10e–10f the dialog's card, criterion and tags", "./sections/07-dialog.js"],
+  ["16 the four shops", "./sections/11-shops.js"],
 ];
 
 /** Sections that read what the plugin fetched on load */

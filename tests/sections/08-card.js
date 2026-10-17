@@ -2112,6 +2112,32 @@ module.exports = () => {
       "nothing here to draw beside it and nothing to look up"
   );
 
+  // The shops row, from Stash's own urls: present only for the four shops, and
+  // only while the setting is on. The badges carry the code; the shop's name is
+  // the title, so "pixiv" must not appear anywhere.
+  NS.shopLinks = true;
+  const withShops = panelOf(panelValues);
+  assert.ok(
+    hasText(withShops, "商店:") &&
+      hasText(withShops, "BJ03044888") &&
+      hasText(withShops, "d_790745"),
+    "and the shops its links point at, by code"
+  );
+  assert.strictEqual(
+    hasText(withShops, "pixiv"),
+    false,
+    "…while a link that is not one of the four stays out"
+  );
+
+  nav("/galleries/2");
+  assert.strictEqual(
+    hasText(panelOf(panelValues), "商店:"),
+    false,
+    "a gallery with no shop links has no row"
+  );
+  nav("/galleries/1");
+  NS.shopLinks = false;
+
   // A row with no value is simply absent, and with none of the three there is no
   // panel at all — an unset value stays quiet, as the rest of the plugin keeps
   // it.

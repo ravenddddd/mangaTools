@@ -25,8 +25,14 @@ import { CensorshipIcon } from "./censorship";
 import { Flag, noLanguageMark } from "./fields-ui";
 import { fieldLabel } from "./filter-model";
 import { ensureDetailHost } from "./hosts";
-import { censorshipOf, pickLanguage, useGlobalVersion } from "./core";
+import {
+  censorshipOf,
+  pickLanguage,
+  storedUrls,
+  useGlobalVersion,
+} from "./core";
 import type { CustomFieldsMap } from "./core";
+import { ShopBadges, shopsIn } from "./shops";
 import { requirePluginApi } from "../plugin-api";
 import type { ReactNode } from "react";
 
@@ -104,7 +110,10 @@ export function guardedBlock(): React.ComponentClass<
  * at all the whole panel is dropped, since a fold whose only content is its own
  * heading is not worth a line.
  */
-export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
+export function MangaDetailsPanel(props: {
+  values: CustomFieldsMap;
+  galleryId: string;
+}) {
   useGlobalVersion();
 
   const intl = PluginApi.libraries.Intl.useIntl();
@@ -125,6 +134,10 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
     ? NS.translationGroupOf(props.values)
     : "";
   const original = NS.fieldShowing("original") && NS.isRaw(props.values);
+  // Read from Stash's own links through the store — nothing of the plugin's is
+  // stored for this, so a link added or removed on the edit form shows up at the
+  // store's next refresh (the same poll the mark and the fields ride on).
+  const shops = NS.shopLinks ? shopsIn(storedUrls(props.galleryId)) : [];
   const Solid = PluginApi.libraries.FontAwesomeSolid || {};
   const Icon = PluginApi.components.Icon;
   const Button = PluginApi.libraries.Bootstrap?.Button;
@@ -134,7 +147,9 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
   // is dropped, rather than left as an empty fold with only its heading. The same
   // test answers "are there any fields at all": with every one of them turned off
   // none of the four can be set, so the panel drops without a second question.
-  if (!language && !mark && !group && !original) return null;
+  if (!language && !mark && !group && !original && shops.length === 0) {
+    return null;
+  }
 
   // The same mount point the plain language row used: the end of .gallery-details,
   // which lands after "photographer" and before "details".
@@ -202,6 +217,16 @@ export function MangaDetailsPanel(props: { values: CustomFieldsMap }) {
         <h6 className="manga-tools-detail">
           {t(intl, "mangaTools.translationGroup.heading") + ": "}
           {group}
+        </h6>
+      ) : null}
+      {shops.length > 0 ? (
+        // Last, because it is about where the work can be found rather than about
+        // the text itself. A badge is a link and its code; the shop's name is the
+        // title, and there is no separate "no link" state — a shop with no link is
+        // simply not drawn.
+        <h6 className="manga-tools-detail manga-tools-shops">
+          {t(intl, "mangaTools.shops.heading") + ": "}
+          <ShopBadges links={shops} />
         </h6>
       ) : null}
       {original && !language ? (

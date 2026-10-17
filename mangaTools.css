@@ -1148,3 +1148,71 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   height: 1.15em;
   width: 1.15em;
 }
+
+/*
+ * ── Shop links ───────────────────────────────────────────────────────────
+ *
+ * The head in the edit form's link row, and the badges in the manga info block.
+ * The head is a 38px square slot like Stash's own input-group-text, and the icon
+ * is a favicon whatever the badge setting says — a wordmark does not fit a
+ * square. The badges are the one place the setting chooses.
+ */
+.manga-tools-shop-prefix .input-group-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.45rem;
+}
+
+.manga-tools-shop-prefix img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.manga-tools-shop-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+
+.manga-tools-shop-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px 0 5px;
+  border: 1px solid rgba(138, 155, 168, 0.28);
+  border-radius: 3px;
+  background: rgba(138, 155, 168, 0.1);
+  color: inherit;
+  text-decoration: none;
+  font-weight: 400;
+}
+
+.manga-tools-shop-badge:hover,
+.manga-tools-shop-badge:focus {
+  border-color: #137cbd;
+  color: inherit;
+  text-decoration: none;
+}
+
+.manga-tools-shop-badge img.is-favicon {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.manga-tools-shop-badge img.is-logo {
+  height: 12px;
+  width: auto;
+  display: block;
+}
+
+.manga-tools-shop-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+}

@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.9.107
+version: 0.9.108
 ui:
   javascript:
     - mangaTools.js
@@ -79,6 +79,14 @@ settings:
     displayName: Take over Stash's lightbox
     description: A gallery marked as manga is read in this plugin's own lightbox, redesigned from the ground up. Nothing about Stash's own lightbox settings is changed.
     type: BOOLEAN
+  shopLinks:
+    displayName: Shop links
+    description: Recognise links to DLsite, FANZA, Toranoana and Melonbooks — an icon in the link field, and a badge with the product code in the Manga info block. The links stay in Stash's own list; nothing is stored or changed.
+    type: BOOLEAN
+  shopIconStyle:
+    displayName: Shop badge icons
+    description: What the badges in the Manga info block use — the site's favicon or the shop's logo. The link field's icon is always the favicon.
+    type: STRING
   manageChapters:
     displayName: Take over the Chapters tab
     description: Creating and editing chapters is this plugin's job, and writing them stores this plugin's own chapter field. Stash's existing chapters are brought over quietly, and are never modified.

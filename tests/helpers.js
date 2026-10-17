@@ -264,8 +264,25 @@ const GALLERY_FIELDS = {
  * nobody's answer. Gallery 8 is the case that proves it: it has a language, and
  * the plugin never sees it.
  */
+/**
+ * The galleries' own links, for the shop badges. Gallery 2 is deliberately empty
+ * so the panel's "no links, no row" case has a fixture of its own.
+ */
+const GALLERY_URLS = {
+  1: [
+    "https://www.dlsite.com/books/work/=/product_id/BJ03044888.html",
+    "https://www.dmm.co.jp/dc/doujin/-/detail/=/cid=d_790745/",
+    "https://www.pixiv.net/artworks/12345678",
+  ],
+  3: ["https://ec.toranoana.jp/tora_r/ec/item/040030474993/"],
+};
+
 const galleryAnswer = (ids) =>
-  ids.map((id) => ({ id: String(id), custom_fields: GALLERY_FIELDS[id] }));
+  ids.map((id) => ({
+    id: String(id),
+    custom_fields: GALLERY_FIELDS[id],
+    urls: GALLERY_URLS[id] || [],
+  }));
 
 const MANGA_GALLERIES = galleryAnswer([1, 2, 3, 4, 5, 6, 7]);
 
@@ -541,6 +558,9 @@ function makeEl(tag) {
     removeChild(child) {
       el.detach(child);
       return child;
+    },
+    remove() {
+      if (el.parentNode) el.parentNode.detach(el);
     },
     appendChild(child) {
       if (child.parentNode) child.parentNode.detach(child);

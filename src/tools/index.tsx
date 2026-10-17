@@ -97,6 +97,7 @@ import { noteFired, registerPatch } from "./patches";
 import { BulkFieldsRow, captureSelection } from "./bulk";
 import { isMarkedNow, setEditForm } from "./mark";
 import { registerPhysicalPagePatches } from "./physical-grid";
+import { ShopUrlHeads } from "./shop-urls";
 
 // Throws if Stash has not injected its API, the one thing that can go wrong at
 // load time. Binding the result once gives every reference below a
@@ -275,6 +276,10 @@ registerPatch("instead", "CustomFieldsInput", (...args: unknown[]) => {
       {isMarkedNow(currentGalleryId(), props.values) ? (
         <MangaFieldBlock values={props.values} onChange={props.onChange} />
       ) : null}
+      {/* The shop icons in the link rows belong to every gallery's edit form, not
+          only a marked one: the setting is about the links themselves. It draws
+          nothing unless the setting is on. */}
+      <ShopUrlHeads />
       <Original {...props} />
     </>
   );
@@ -409,7 +414,7 @@ registerPatch("instead", "CustomFields", (...args: unknown[]) => {
       */}
       {galleryId && isMarkedNow(galleryId, values) ? (
         <Guard name="manga panel">
-          <MangaDetailsPanel values={values} />
+          <MangaDetailsPanel values={values} galleryId={galleryId} />
         </Guard>
       ) : null}
       {/*

@@ -387,6 +387,27 @@ export interface MangaToolsNamespace {
    * takeover it belongs to. See physicalPageMode in fields.ts.
    */
   physicalPageMode(): boolean;
+
+  /** Whether links to the four shops are recognised and shown at all. */
+  shopLinks: boolean;
+  /** Which icon the manga-info badges use — see shops.tsx. */
+  shopIconStyle: "favicon" | "logo";
+  /** The four recognised shops, for the smoke test. */
+  SHOPS: Array<{ key: string; name: string; domain: string }>;
+  /** The shop a link belongs to and its code, or null for any other link. */
+  shopOf(raw: string): {
+    shop: { key: string; name: string; domain: string };
+    code: string;
+    url: string;
+  } | null;
+  /** The recognised links among a gallery's urls, in their own order. */
+  shopsIn(urls: string[]): Array<{
+    shop: { key: string; name: string; domain: string };
+    code: string;
+    url: string;
+  }>;
+  /** Puts the shop icon heads into a form's link rows. Published for the test. */
+  decorateShopUrls(form: Element): void;
   /**
    * Whether the Chapters tab's Create and Edit belong to this plugin.
    *

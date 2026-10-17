@@ -352,6 +352,7 @@ module.exports = () => {
       "mangaTools-readerTakeover",
       "mangaTools-physicalPages",
       "mangaTools-manageChapters",
+      "mangaTools-shopLinks",
       "mangaTools-fields",
       "mangaTools-fieldLanguage",
       "mangaTools-showFlags",
@@ -408,6 +409,11 @@ module.exports = () => {
     false,
     "physical pages is a change to what a page is, so it is off until asked for"
   );
+  assert.strictEqual(
+    sw["mangaTools-shopLinks"].props.checked,
+    false,
+    "shop links add marks to the form and the panel, so they are off until asked for"
+  );
 
   // ── 7c2. Progressive disclosure ────────────────────────────────────
   // Everything a switch holds is drawn only while it is on, and that is the *only*
@@ -421,6 +427,7 @@ module.exports = () => {
       "mangaTools-readerTakeover",
       "mangaTools-physicalPages",
       "mangaTools-manageChapters",
+      "mangaTools-shopLinks",
       "mangaTools-fields",
       "mangaTools-confirmUnmark",
       "mangaTools-deleteOnUnmark",
@@ -716,7 +723,7 @@ module.exports = () => {
       "…and each saying it is open, which is the only way anything but an eye knows"
     );
     assert.strictEqual(groupsIn(page), 3, "three groups to start with");
-    assert.strictEqual(switchesIn(page), 17, "…and seventeen switches");
+    assert.strictEqual(switchesIn(page), 18, "…and eighteen switches");
 
     const before = state.capturedConfigWrite;
 
@@ -736,11 +743,11 @@ module.exports = () => {
     };
 
     for (const [what, index, left] of [
-      ["the lightbox row, which holds physical pages", 0, 16],
-      ["the fields group, which folds all ten under it", 1, 7],
-      ["the language field, which folds two switches", 2, 15],
-      ["the display heading, which folds four rows", 3, 13],
-      ["the mark's heading, which folds three rows and no group", 4, 14],
+      ["the lightbox row, which holds physical pages", 0, 17],
+      ["the fields group, which folds all ten under it", 1, 8],
+      ["the language field, which folds two switches", 2, 16],
+      ["the display heading, which folds four rows", 3, 14],
+      ["the mark's heading, which folds three rows and no group", 4, 15],
     ]) {
       click(chevronsIn(open())[index]);
       assert.strictEqual(
@@ -751,10 +758,31 @@ module.exports = () => {
       shutEverything();
       assert.strictEqual(
         switchesIn(open()),
-        17,
+        18,
         `…and opening it again should bring them all back (${what})`
       );
     }
+
+    // The shop row's child is a single-select, not a switch, and it appears only
+    // while the master is on — the same progressive disclosure as every group.
+    NS.shopLinks = true;
+    const withShops = open();
+    assert.ok(
+      find(
+        withShops,
+        (n) =>
+          n.type === "Select" &&
+          n.props?.value?.value === "favicon" &&
+          n.props?.isMulti !== true
+      ),
+      "the badge icon style is a single-select under the shop switch"
+    );
+    assert.strictEqual(
+      chevronsIn(withShops).length,
+      6,
+      "…which makes the shop row foldable while it is on"
+    );
+    NS.shopLinks = false;
 
     // Nothing was written, and no setting moved: a fold is a view.
     assert.strictEqual(
@@ -1036,8 +1064,11 @@ module.exports = () => {
         // manages. All on — which is what the plugin did before they existed —
         // except physical pages, which changes what a page is and so starts off.
         readerTakeover: true,
-        // The one feature that starts off: it changes what a page is.
+        // The two features that start off: one changes what a page is, the other
+        // adds marks to the form and the panel.
         physicalPages: false,
+        shopLinks: false,
+        shopIconStyle: "favicon",
         manageChapters: true,
         fields: true,
         fieldLanguage: true,
@@ -1234,6 +1265,8 @@ module.exports = () => {
       // manages. All on except physical pages, which starts off.
       readerTakeover: true,
       physicalPages: false,
+      shopLinks: false,
+      shopIconStyle: "favicon",
       manageChapters: true,
       fields: true,
       fieldLanguage: true,
