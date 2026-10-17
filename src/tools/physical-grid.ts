@@ -303,10 +303,27 @@ function registerListPatch(): void {
     const itemsPerPage = filter?.itemsPerPage;
     const totalCount = props.totalCount;
     const selectedIds = props.selectedIds;
-    const onSelectChange = props.onSelectChange;
+
+    // **The selection handler is read through a ref, not a dependency.** It is a
+    // plain function in `useListSelect`, so its identity changes whenever the list
+    // around this one re-renders — and a changed dependency would rebuild `images`,
+    // which is the identity the lightbox watches. The wrapper is stable; the
+    // handler it calls is always the current one.
+    const selectRef = React.useRef<ImageListProps["onSelectChange"]>(undefined);
+    selectRef.current = props.onSelectChange;
+
+    const change = React.useCallback(
+      (synthetic: string, chosen: boolean, shiftKey: boolean) => {
+        selectRef.current?.(synthetic.split("::")[0], chosen, shiftKey);
+      },
+      []
+    );
 
     const expanded = React.useMemo(
-      () => (NS.physicalPages && grid ? expandPhysicalPage(props, grid) : null),
+      () =>
+        NS.physicalPages && grid
+          ? expandPhysicalPage({ ...props, onSelectChange: change }, grid)
+          : null,
       [
         grid,
         sortBy,
@@ -315,7 +332,7 @@ function registerListPatch(): void {
         itemsPerPage,
         totalCount,
         selectedIds,
-        onSelectChange,
+        change,
       ]
     );
 

@@ -461,6 +461,7 @@ dom.window.PluginApi = {
     },
     useState: (init) => [typeof init === "function" ? init() : init, () => {}],
     useMemo: (fn) => fn(),
+    useCallback: (fn) => fn,
     useEffect: (fn) => {
       fn();
     },
