@@ -638,7 +638,7 @@ async function fetchPhysicalGallery(galleryId: string): Promise<GalleryAnswer> {
     folderId: gallery?.folder?.id ? String(gallery.folder.id) : null,
     zipFileId: gallery?.files?.[0]?.id ? String(gallery.files[0].id) : null,
   };
-  const list = await fetchGalleryFiles(scope);
+  const list = await fetchGalleryFiles(galleryId, scope);
 
   const pages: MangaReaderPage[] = list.files.map((file) => ({
     // The file id is the page identity; the image id is what the bytes and the

@@ -68,7 +68,9 @@ function load(galleryId: string): Promise<GalleryGrid> {
 
   const promise = fetchGalleryScope(galleryId)
     .then((scope) =>
-      scope ? fetchGalleryFiles(scope, true) : { files: [], total: 0 }
+      scope
+        ? fetchGalleryFiles(galleryId, scope, true)
+        : { files: [], total: 0 }
     )
     .then((list) => {
       const grid: GalleryGrid = { files: list.files, total: list.total };

@@ -382,6 +382,30 @@ const fakeClient = {
       });
     }
 
+    // The physical list itself: the gallery's images with the files that belong
+    // to them. Grouped the way the server holds them — one image, many files.
+    if (/findImages\(/.test(text)) {
+      const ids = [...new Set(PHYSICAL_FILES.map((file) => file.imageId))];
+      const images = ids.map((id) => ({
+        ...physicalImage(id),
+        visual_files: PHYSICAL_FILES.filter((file) => file.imageId === id).map(
+          (file) => ({
+            __typename: "ImageFile",
+            id: file.id,
+            path: file.path,
+            width: 1000,
+            height: 1500,
+            parent_folder: { id: "0" },
+            zip_file: { id: "9001" },
+          })
+        ),
+      }));
+
+      return Promise.resolve({
+        data: { findImages: { images } },
+      });
+    }
+
     if (/findFiles\(/.test(text)) {
       const countOnly = !variables || variables.perPage === undefined;
       return Promise.resolve({

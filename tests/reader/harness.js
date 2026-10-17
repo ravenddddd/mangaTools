@@ -207,7 +207,10 @@ const client = {
       variables?.galleryId !== undefined &&
       variables.sort === undefined &&
       variables.withPathIds === undefined &&
-      variables.byPath === undefined
+      variables.byPath === undefined &&
+      // The physical file list names the gallery and asks for a page size; the
+      // count question names the gallery and nothing else.
+      variables.perPage === undefined
     ) {
       const answered = () => {
         const gallery = state.galleries[variables.galleryId] || {
@@ -241,6 +244,30 @@ const client = {
       variables.sort === "path" && gallery.pathImages
         ? gallery.pathImages
         : gallery.images;
+
+    // The physical list is read by expanding `visual_files`, so the fixture's
+    // images carry the files that belong to them — with the folder/zip the scope
+    // test reads.
+    const withFiles = (pages || []).map((img) => {
+      const files = (gallery.physicalFiles || []).filter(
+        (file) => String(file.imageId) === String(img.id)
+      );
+      if (!files.length) return img;
+
+      return {
+        ...img,
+        visual_files: files.map((file) => ({
+          __typename: "ImageFile",
+          id: file.id,
+          path: file.path,
+          width: file.width,
+          height: file.height,
+          parent_folder: { id: file.folderId || "0" },
+          zip_file: { id: file.zipFileId },
+        })),
+      };
+    });
+
     const answer = {
       data: {
         configuration: {
@@ -254,7 +281,10 @@ const client = {
             },
           },
         },
-        pages: { images: pages },
+        pages: { images: withFiles },
+        // The physical list asks the same images by their own name rather than
+        // through the lightbox's `pages` alias.
+        findImages: { images: withFiles },
         // The gallery itself: this plugin's own custom fields, and Stash's own
         // chapters. A fixture that says nothing about either gets the empty
         // answer, which is a gallery with no chapters at all.

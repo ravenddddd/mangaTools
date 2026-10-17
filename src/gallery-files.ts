@@ -136,6 +136,12 @@ const IMAGE_SLIM_FIELDS = [
   "              path",
   "              width",
   "              height",
+  "              parent_folder {",
+  "                id",
+  "              }",
+  "              zip_file {",
+  "                id",
+  "              }",
   "            }",
   "            ... on VideoFile {",
   "              id",
@@ -144,6 +150,12 @@ const IMAGE_SLIM_FIELDS = [
   "          }",
 ];
 
+/**
+ * The reader's selection: the page needs a name, a URL and the files.
+ *
+ * `visual_files` is the whole point — an image's occurrences live there — and the
+ * file id, folder and zip are what map one to this gallery.
+ */
 const LIGHT_IMAGE_FIELDS = [
   "          id",
   "          title",
@@ -152,45 +164,56 @@ const LIGHT_IMAGE_FIELDS = [
   "            thumbnail",
   "            preview",
   "          }",
+  "          visual_files {",
+  "            __typename",
+  "            ... on ImageFile {",
+  "              id",
+  "              path",
+  "              width",
+  "              height",
+  "              parent_folder {",
+  "                id",
+  "              }",
+  "              zip_file {",
+  "                id",
+  "              }",
+  "            }",
+  "            ... on VideoFile {",
+  "              id",
+  "              path",
+  "            }",
+  "          }",
 ];
 
-function filesQueryText(withImages: boolean): string {
+function imagesQueryText(withImages: boolean): string {
   return [
-    "query MangaToolsGalleryFiles($fileFilter: FileFilterType, $perPage: Int!) {",
-    "  findFiles(",
-    "    file_filter: $fileFilter",
-    '    filter: { per_page: $perPage, sort: "path", direction: ASC }',
+    "query MangaToolsGalleryFiles($galleryId: ID!, $perPage: Int!) {",
+    "  findImages(",
+    "    image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }",
+    "    filter: { per_page: $perPage }",
     "  ) {",
-    "    count",
-    "    files {",
-    "      __typename",
-    "      ... on ImageFile {",
-    "        id",
-    "        path",
-    "        basename",
-    "        width",
-    "        height",
-    "        parent_folder {",
-    "          id",
-    "        }",
-    "        zip_file {",
-    "          id",
-    "        }",
-    "        images {",
+    "    images {",
     ...(withImages ? IMAGE_SLIM_FIELDS : LIGHT_IMAGE_FIELDS),
-    "        }",
-    "      }",
     "    }",
     "  }",
     "}",
   ].join("\n");
 }
 
-/** The plain file list — ids, paths, and just enough image for a page. */
-export const GALLERY_FILES_QUERY_TEXT = filesQueryText(false);
+/**
+ * The gallery's images with their files.
+ *
+ * **Not `findFiles`.** The first version asked `findFiles` for the files and read
+ * `ImageFile.images` to get back to the image — and the Stash this plugin runs
+ * against does not have that field, so the whole query was rejected and the grid
+ * silently kept its deduplicated list. `Image.visual_files` is the direction the
+ * schema does support, and it carries each file's folder and zip, which is
+ * everything the scope test needs.
+ */
+export const GALLERY_FILES_QUERY_TEXT = imagesQueryText(false);
 
-/** The same list with the grid's card fields on each image. */
-export const GALLERY_FILES_WITH_IMAGES_QUERY_TEXT = filesQueryText(true);
+/** The same, with the grid's card fields on each image. */
+export const GALLERY_FILES_WITH_IMAGES_QUERY_TEXT = imagesQueryText(true);
 
 export const GALLERY_FILE_COUNT_QUERY_TEXT = [
   "query MangaToolsGalleryFileCount($fileFilter: FileFilterType) {",
@@ -248,26 +271,40 @@ export async function fetchGalleryScope(
   };
 }
 
-/** The files of a gallery, and the server's count of everything in its scope. */
+/** The files of a gallery, in the gallery's own path order. */
 export interface GalleryFileList {
   files: GalleryFileEntry[];
   /**
-   * Every file in the gallery's scope, video files included — what the server
-   * counted. The reader keeps it for revalidation, where it is the cheapest exact
-   * answer to "has this gallery changed at all" (see revalidate in takeover.ts).
+   * The physical pages — `files.length`.
+   *
+   * Video files are not pages (a page is a file of an Image), so this is the count
+   * of what the reader will walk. Revalidation asks the server for its own count,
+   * which includes a video; a gallery that had one would re-read on every opening
+   * rather than miss a change, which is the safe direction.
    */
   total: number;
 }
 
 /**
- * A gallery's files, in path order, or an empty list when it has no physical scope.
+ * A gallery's files, in the order Stash's own path sort would put them.
  *
- * Video files are dropped from `files`: a file is a page only when it belongs to an
- * Image (`ImageFile.images`), which is the same set the deduped list is made of. A
- * video sitting in a gallery's folder is not a gallery page in Stash's own model
- * either. `total` still counts it, so a membership change of any kind is noticed.
+ * **Reads the images and expands `visual_files`.** The first version asked
+ * `findFiles` and read `ImageFile.images` — a field this plugin's Stash does not
+ * have, so the query was rejected and the grid silently kept its deduplicated
+ * list. `Image.visual_files` is the direction the schema does support, and each
+ * file carries its parent folder and zip file, which is all the scope test needs.
+ *
+ * A file belongs to the gallery when its parent folder is the gallery's folder, or
+ * its zip file is the gallery's zip file — the scanner's own association rule.
+ *
+ * **The order is the basenames.** Every file in one gallery shares its folder or
+ * its zip, so Stash's `COLLATE NATURAL_CI` on `folder || basename` reduces to the
+ * basename; `Intl.Collator` with `numeric` compares the digit runs (`001`, `002`,
+ * `040`, `229`) the same way. Rebuilding SQLite's collation for arbitrary text
+ * would be a second, approximate implementation of it.
  */
 export async function fetchGalleryFiles(
+  galleryId: string,
   scope: GalleryFileScope,
   withImages = false
 ): Promise<GalleryFileList> {
@@ -288,38 +325,32 @@ export async function fetchGalleryFiles(
   const query = withImages ? filesWithImagesQuery : filesQuery;
   if (!query) return { files: [], total: 0 };
 
-  const fileFilter = scope.zipFileId
-    ? { zip_file: { value: [scope.zipFileId], modifier: "INCLUDES" } }
-    : { parent_folder: { value: [scope.folderId], modifier: "INCLUDES" } };
-
   const data = (await requirePluginApi()
     .utils.StashService.getClient()
     .query({
       query,
-      variables: { fileFilter, perPage: -1 },
+      variables: { galleryId, perPage: -1 },
       fetchPolicy: "no-cache",
     })
     .then((res) => res?.data)) as
     | {
-        findFiles?: {
-          count?: number;
-          files?: Array<{
-            __typename?: string;
+        findImages?: {
+          images?: Array<{
             id?: string | number;
-            path?: string;
-            basename?: string;
-            width?: number;
-            height?: number;
-            parent_folder?: { id?: string | number } | null;
-            zip_file?: { id?: string | number } | null;
-            images?: Array<{
+            title?: string | null;
+            paths?: {
+              image?: string;
+              thumbnail?: string;
+              preview?: string;
+            } | null;
+            visual_files?: Array<{
+              __typename?: string;
               id?: string | number;
-              title?: string | null;
-              paths?: {
-                image?: string;
-                thumbnail?: string;
-                preview?: string;
-              } | null;
+              path?: string;
+              width?: number;
+              height?: number;
+              parent_folder?: { id?: string | number } | null;
+              zip_file?: { id?: string | number } | null;
             }>;
           }>;
         };
@@ -328,46 +359,56 @@ export async function fetchGalleryFiles(
 
   const entries: GalleryFileEntry[] = [];
 
-  for (const file of data?.findFiles?.files || []) {
-    if (file.__typename !== "ImageFile") continue;
+  for (const image of data?.findImages?.images || []) {
+    const imageId = image.id ? String(image.id) : "";
+    if (!imageId) continue;
 
-    const image = file.images?.[0];
-    if (!image?.id) continue;
+    for (const file of image.visual_files || []) {
+      if (file.__typename !== "ImageFile") continue;
 
-    const parentFolderId = file.parent_folder?.id
-      ? String(file.parent_folder.id)
-      : null;
-    const zipFileId = file.zip_file?.id ? String(file.zip_file.id) : null;
+      const parentFolderId = file.parent_folder?.id
+        ? String(file.parent_folder.id)
+        : null;
+      const zipFileId = file.zip_file?.id ? String(file.zip_file.id) : null;
 
-    // The filter already scopes this; the exact test keeps a hierarchical
-    // parent-folder filter from pulling in subfolders the scanner never associated.
-    if (scope.zipFileId && zipFileId !== scope.zipFileId) continue;
-    if (scope.folderId && parentFolderId !== scope.folderId) continue;
+      if (scope.zipFileId && zipFileId !== scope.zipFileId) continue;
+      if (scope.folderId && parentFolderId !== scope.folderId) continue;
 
-    entries.push({
-      fileId: String(file.id),
-      imageId: String(image.id),
-      path: String(file.path || ""),
-      basename: String(file.basename || ""),
-      width: typeof file.width === "number" ? file.width : 0,
-      height: typeof file.height === "number" ? file.height : 0,
-      title: String(image.title || ""),
-      imageUrl: String(image.paths?.image || ""),
-      thumbnail: String(image.paths?.thumbnail || ""),
-      preview: String(image.paths?.preview || ""),
-      parentFolderId,
-      zipFileId,
-      image: withImages ? (image as Record<string, unknown>) : undefined,
-    });
+      const path = String(file.path || "");
+
+      entries.push({
+        fileId: String(file.id),
+        imageId,
+        path,
+        basename: path.slice(path.lastIndexOf("/") + 1),
+        width: typeof file.width === "number" ? file.width : 0,
+        height: typeof file.height === "number" ? file.height : 0,
+        title: String(image.title || ""),
+        imageUrl: String(image.paths?.image || ""),
+        thumbnail: String(image.paths?.thumbnail || ""),
+        preview: String(image.paths?.preview || ""),
+        parentFolderId,
+        zipFileId,
+        image: withImages ? (image as Record<string, unknown>) : undefined,
+      });
+    }
   }
 
-  return {
-    files: entries,
-    total:
-      typeof data?.findFiles?.count === "number"
-        ? data.findFiles.count
-        : entries.length,
-  };
+  entries.sort(byPath);
+
+  return { files: entries, total: entries.length };
+}
+
+/** Case-insensitive, digit-run aware: the part of `NATURAL_CI` that matters. */
+const basenameCollator = new Intl.Collator("en", {
+  numeric: true,
+  sensitivity: "base",
+});
+
+function byPath(a: GalleryFileEntry, b: GalleryFileEntry): number {
+  const byName = basenameCollator.compare(a.basename, b.basename);
+  if (byName !== 0) return byName;
+  return a.path < b.path ? -1 : a.path > b.path ? 1 : 0;
 }
 
 /**

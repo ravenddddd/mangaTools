@@ -1431,11 +1431,16 @@ gallery grid and the reader have to agree about that: with it on, the Images tab
 the wall and the lightbox are all drawn from the files the gallery actually
 contains, each at its own position.
 
-- **The list comes from `findFiles`**, scoped the way the scanner scopes a gallery:
-  a folder gallery's files are those whose parent folder is its folder, a zip
-  gallery's are those whose zip file is its zip file. The order is the server's own
-  path order (`NATURAL_CI`), not a second collation in JavaScript. `src/gallery-files.ts`
-  is shared by both halves.
+- **The list comes from the images, expanded through `visual_files`.** A file
+  belongs to a gallery when its parent folder is the gallery's folder, or its zip
+  file is the gallery's zip file — the scanner's own association. (`findFiles` and
+  `ImageFile.images` would be the reverse direction, but this plugin's Stash does
+  not expose `ImageFile.images`; the query was rejected and failed silently, which
+  is why the direction is written down here.) The order is the basenames compared
+  with `Intl.Collator`'s numeric, case-insensitive collation: every file in one
+  gallery shares its folder or zip, so that is Stash's `NATURAL_CI` path order
+  reduced to the part that matters. `src/gallery-files.ts` is shared by both
+  halves.
 - **A page's identity is the file id** in this mode — the only id that can tell two
   occurrences of one image apart. The image id stays on the page for what is
   actually the image's: the URL, the bytes, the carousel's name.
