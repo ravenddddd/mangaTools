@@ -347,5 +347,32 @@ module.exports = () => {
         "a gallery save asks the store for its galleries again"
       );
     }, 0);
+
+    // **The wrapper's decision, on its own.** The live count above proves the
+    // success path is wired; it cannot reliably prove the other two branches,
+    // because a refresh deferred from an earlier section lands in the same
+    // window. The names are Stash's generated ones — a Stash bump is the one
+    // thing this test cannot see — and the settings document is the plugin's own
+    // (`saveSettings`), which must never cost a store query.
+    assert.strictEqual(
+      NS.refreshesStoreAfter("GalleryUpdate"),
+      true,
+      "a single-gallery save refreshes the store"
+    );
+    assert.strictEqual(
+      NS.refreshesStoreAfter("GalleriesUpdate"),
+      true,
+      "and so does a bulk one"
+    );
+    assert.strictEqual(
+      NS.refreshesStoreAfter("MangaToolsSettings"),
+      false,
+      "the plugin's own settings write does not"
+    );
+    assert.strictEqual(
+      NS.refreshesStoreAfter(null),
+      false,
+      "and a document with no operation name never does"
+    );
   });
 };

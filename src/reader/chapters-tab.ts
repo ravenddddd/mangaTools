@@ -70,6 +70,8 @@ const HIDDEN = "data-manga-reader-hidden";
 const IMPORT_ID = "manga-reader-chapters-import";
 /** The class the per-row Edit link carries, so a test can find it */
 const CLASS_EDIT = "manga-reader-chapter-edit";
+/** On a row this plugin drew — the marker the idempotence guard looks for */
+const CLASS_ROW = "manga-reader-chapter-row";
 /** Marks Stash's own button as one this plugin has already taken over */
 const TAKEN = "data-manga-reader-taken";
 /** On Stash's Create button while this plugin's chapter form is open */
@@ -399,16 +401,29 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
         : "list",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
-  // **What must still be there for this pass to be a no-op**, and the whole of the
-  // freeze was getting this wrong: `> 0` asks "is the panel non-empty", which is
-  // false for a gallery with *no chapters* — and a panel that is *supposed* to be
-  // empty then re-renders on every pass, changing something each time, so the
-  // observer answers with another pass. Four hundred thousand of them, and the page
-  // is gone. Asked properly, the answer for an empty list is "yes, nothing to draw
-  // is exactly what I drew", and a panel React has emptied underneath us is still
-  // caught: it holds fewer children than the key says it should.
-  const wanted = bulk || form ? 1 : gallery.chapters.length;
-  if (key === renderedFor && panel.children.length >= wanted) return;
+  // **What must still be there for this pass to be a no-op — and it is not a child
+  // count.** Stash's own panel wraps every chapter row in a single div, so after
+  // React remounts it a 0- or 1-chapter gallery's container holds exactly the
+  // count a `>= chapters.length` test accepted: the plugin's rows, Edit links,
+  // bulk entry and taken Create button were never redrawn, and later passes kept
+  // agreeing with themselves. The markers below are this plugin's own:
+  //   - a form, for either editor;
+  //   - a row we drew (`CLASS_ROW`), for a list;
+  //   - for a list that is *empty*, nothing in the panel plus Stash's Create
+  //     button already taken — an empty draw that must stay a no-op (the freeze
+  //     was this being asked as `> 0`, which never held, so every pass redrew).
+  const formUp = panel.querySelector("form") !== null;
+  const rowsUp = panel.querySelector("." + CLASS_ROW) !== null;
+  const button = stashButtonBefore(panel);
+  const emptyAndOurs =
+    panel.children.length === 0 &&
+    isStashButton(button) &&
+    button.getAttribute(TAKEN) !== null;
+  const ours =
+    bulk || form
+      ? formUp
+      : rowsUp || (gallery.chapters.length === 0 && emptyAndOurs);
+  if (key === renderedFor && ours) return;
   renderedFor = key;
   panelInHand = panel;
 
@@ -1632,6 +1647,11 @@ function row(
   chapter: MangaReaderPlacedChapter
 ): HTMLElement {
   const wrap = document.createElement("div");
+  // **A marker of ours, not of Stash's.** The idempotence guard below has to tell
+  // "the panel holds what this plugin drew" from "React remounted Stash's own
+  // panel", and Stash's panel puts every row inside one wrapper — a child count
+  // cannot tell one of its wrappers from an empty list.
+  wrap.className = CLASS_ROW;
 
   const rule = document.createElement("hr");
   wrap.appendChild(rule);

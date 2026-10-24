@@ -20,7 +20,7 @@
  */
 import { NR } from "./namespace";
 import type { MangaReaderPage } from "./spreads";
-import { VIEW_MAX_ZOOM, VIEW_MIN_ZOOM } from "./zoom";
+import { VIEW_MAX_ZOOM, VIEW_MIN_ZOOM, VIEW_SNAP } from "./zoom";
 
 /**
  * What the container is, while this mode is on.
@@ -112,7 +112,15 @@ export function columnFitted(
  * the three numbers.
  */
 export function zoomedBy(current: number, factor: number): number {
-  return Math.min(Math.max(current * factor, VIEW_MIN_ZOOM), VIEW_MAX_ZOOM);
+  const next = Math.min(
+    Math.max(current * factor, VIEW_MIN_ZOOM),
+    VIEW_MAX_ZOOM
+  );
+  // **The same snap the screen modes apply** (see zoom.ts). A wheel that goes out
+  // and comes back otherwise leaves the pages a fraction of a percent off, and
+  // the header then offers to reset a zoom nobody can see — `zoomedNow` is a
+  // comparison against 1, not against "close enough".
+  return Math.abs(next - 1) < VIEW_SNAP ? 1 : next;
 }
 
 /**

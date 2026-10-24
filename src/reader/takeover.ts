@@ -1219,6 +1219,17 @@ let columnFor: string | null = null;
 let columnIn: Element | null = null;
 
 /**
+ * The column's page rows, in reading order, kept from the build.
+ *
+ * `columnPageAt` runs on every scroll event — one per frame while a scrollbar is
+ * dragged — and used to ask the document for every row and measure all of them.
+ * The rows do not change after a build, so they are collected once; the position
+ * is then found by bisection over them, which reads a handful of rectangles
+ * instead of one per page. Empty when no column is up.
+ */
+let columnRows: HTMLElement[] = [];
+
+/**
  * A page the column is to be scrolled to, or null when nothing has asked.
  *
  * Written only by the things that *move* the reader: a turn, a chapter, the bar, and
@@ -1257,6 +1268,9 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
     buildColumn(container, gallery.pages, (page) => pageUrl(page));
     columnFor = gallery.id;
     columnIn = container;
+    columnRows = Array.from(
+      container.querySelectorAll("." + CLASS_SCROLL_PAGE)
+    ) as HTMLElement[];
     built = true;
     // Nothing to wait for: every row's height comes from the page's own shape, so the
     // column is complete the moment it is built.
@@ -1298,6 +1312,7 @@ function removeColumn(): void {
 
   columnFor = null;
   columnIn = null;
+  columnRows = [];
   scrollTo = null;
   view = fitView();
   setColumnZoom(1);
@@ -1312,14 +1327,30 @@ function removeColumn(): void {
 
 /** Which page the column is showing at its top, from where its rows are */
 function columnPageAt(column: HTMLElement): number {
-  const rows = Array.from(column.querySelectorAll("." + CLASS_SCROLL_PAGE)).map(
-    (row) => (row as HTMLElement).getBoundingClientRect()
-  );
+  if (columnRows.length === 0) return -1;
 
-  return NR.pageAtTop(
-    rows.map((rect) => ({ top: rect.top, bottom: rect.bottom })),
-    column.getBoundingClientRect().top
-  );
+  const edge = column.getBoundingClientRect().top;
+
+  // The rows are in reading order and their tops increase, so the first row whose
+  // bottom is past the edge is found by bisection: a handful of layout reads per
+  // scroll event instead of one for every page. A 400-page column used to measure
+  // all 400 on every frame of a scrollbar drag, and discard all but one answer.
+  let low = 0;
+  let high = columnRows.length - 1;
+  let found = columnRows.length - 1; // every row above the edge: the last page
+
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const rect = columnRows[mid].getBoundingClientRect();
+    if (rect.bottom > edge) {
+      found = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return found;
 }
 
 /**

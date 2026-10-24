@@ -671,6 +671,115 @@ module.exports = async () => {
   });
 
   /**
+   * A zoom round trip comes back to the fit, and the reset button with it.
+   *
+   * The screen modes snap a zoom within VIEW_SNAP of 1 back to exactly 1
+   * (`zoomed` in zoom.ts), because a wheel that goes out and comes back otherwise
+   * leaves the pages a fraction of a percent off and the header offering to reset
+   * a zoom nobody can see. The column's arithmetic was the same gesture without
+   * the snap.
+   */
+  await runSection(
+    "a zoom round trip in the column returns to the fit",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+
+      const container = box.lightbox.querySelector(".manga-reader-spread");
+      const row = container.querySelector(".manga-reader-scroll-page");
+      const zoomButton = () => box.lightbox.querySelector(".manga-reader-zoom");
+      const offered = () =>
+        zoomButton().getAttribute("data-manga-reader-hidden") === null;
+
+      const notch = (deltaY) =>
+        container.dispatch(
+          "wheel",
+          dom.makeEvent("wheel", { deltaY, ctrlKey: true })
+        );
+
+      for (let i = 0; i < 3; i++) notch(-120);
+      assert.notStrictEqual(
+        row.style.width,
+        "100%",
+        "precondition: three notches in is a zoom"
+      );
+
+      for (let i = 0; i < 3; i++) notch(120);
+      assert.strictEqual(
+        row.style.width,
+        "100%",
+        "and three out land exactly on the fit, not a fraction off it"
+      );
+      assert.strictEqual(
+        offered(),
+        false,
+        "so the header withdraws the reset it was still offering"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * A scroll event measures a handful of rows, not every page.
+   *
+   * `columnPageAt` used to build a rect for every row before looking at any of
+   * them, on every scroll event — one per frame while a scrollbar is dragged, on
+   * a gallery that can hold hundreds of pages. The rows are in reading order, so
+   * bisection needs a few probes; the count here is what says so.
+   */
+  await runSection(
+    "a scroll event measures a handful of rows, not every page",
+    async () => {
+      const { box } = await startReader({ galleryId: "8", on: true });
+      dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+
+      const container = box.lightbox.querySelector(".manga-reader-spread");
+      const rows = [...container.querySelectorAll(".manga-reader-scroll-page")];
+      rows.forEach((row, index) => {
+        row.getBoundingClientRect = () => ({
+          top: index * 500,
+          bottom: index * 500 + 480,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 480,
+        });
+      });
+      container.getBoundingClientRect = () => ({
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 0,
+      });
+
+      let measured = 0;
+      rows.forEach((row) => {
+        const rect = row.getBoundingClientRect;
+        row.getBoundingClientRect = () => {
+          measured += 1;
+          return rect();
+        };
+      });
+
+      container.dispatch("scroll");
+      assert.ok(measured > 0, "the scroll asks where the rows are");
+      assert.ok(
+        measured < rows.length,
+        "and asks a handful of them, not one per page (" +
+          measured +
+          " of " +
+          rows.length +
+          ")"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
    * The bar, down the side — and the same bar.
    *
    * One axis swapped, so what is worth pinning is that it is the same bar: the same

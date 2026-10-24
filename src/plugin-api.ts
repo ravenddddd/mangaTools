@@ -185,6 +185,12 @@ export interface MangaToolsNamespace {
   /** Runs a function whenever the store is refreshed; returns the way to stop. */
   watchStore(fn: () => void): () => void;
   /**
+   * Whether a mutation's operation name makes the store refresh. Published for
+   * the smoke test: a live query count cannot tell a rejection from a settings
+   * write from a gallery save without getting noisy.
+   */
+  refreshesStoreAfter(name: string | null): boolean;
+  /**
    * The reading half's own settings, as the JSON string they are stored as — or null
    * before Stash has answered with the plugin's configuration.
    *

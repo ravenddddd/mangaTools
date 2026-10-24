@@ -277,6 +277,18 @@ function operationName(document: unknown): string {
  * same wrapper and refresh through `refreshAfterWrite` as before; a refresh they
  * already asked for coalesces onto the same request.
  */
+/**
+ * Whether a mutation's operation name is one whose success changes the store.
+ *
+ * Extracted so the decision can be pinned without a client: the wrapper's other
+ * two branches — a rejection, and every other document including the plugin's
+ * own settings write — are the ones that must *not* refresh, and a test that can
+ * only count live queries is too noisy to tell them apart.
+ */
+export function refreshesStoreAfter(name: string | null): boolean {
+  return name === "GalleryUpdate" || name === "GalleriesUpdate";
+}
+
 function installStoreRefresh(): void {
   const client = stashClient();
   if (!client || client === watchedClient) return;
@@ -286,9 +298,11 @@ function installStoreRefresh(): void {
   client.mutate = (options) => {
     const result = mutate(options);
     const name = operationName(options?.mutation);
-    if (name === "GalleryUpdate" || name === "GalleriesUpdate") {
+    if (refreshesStoreAfter(name)) {
       result.then(
         () => refreshAfterWrite(),
+        // A rejected save heard nothing from the server; refreshing would ask
+        // about a state that did not change.
         () => {}
       );
     }
@@ -920,6 +934,12 @@ NS.markedInStore = (galleryId: string | null | undefined): boolean | null =>
 
 /** Runs `fn` whenever the store is refreshed, and returns the way to stop. */
 NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
+
+/**
+ * Whether a mutation's operation name makes the store refresh. Published for the
+ * smoke test, which cannot tell the wrapper's branches apart by query counts.
+ */
+NS.refreshesStoreAfter = refreshesStoreAfter;
 
 // ──────────────────────── Writing the settings ────────────────────────
 //

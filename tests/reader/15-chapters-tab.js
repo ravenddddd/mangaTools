@@ -1820,4 +1820,58 @@ module.exports = async () => {
       dom.window.location.pathname = "/";
     }
   );
+
+  /**
+   * A panel React remounted is taken over again, even with one chapter.
+   *
+   * Stash's own panel wraps every chapter row in **one div**, so its child count
+   * for a small list is 1 — exactly the count the plugin's old guard accepted as
+   * "already drawn". After Stash's editor remounted the panel, the plugin's rows,
+   * Edit links and bulk entry were gone, and later passes agreed with themselves.
+   */
+  await runSection("a remounted panel is taken over again", async () => {
+    mountBridge();
+    await NR.writeChapters("35", [
+      {
+        title: "第一話",
+        images: ["708", "707", "706", "705", "704", "703", "702", "701"],
+      },
+    ]);
+    dom.window.location.pathname = "/galleries/35";
+    const tab = buildChaptersTab([{ title: "第一話", image_index: 1 }]);
+    dom.flush();
+    await settle();
+
+    assert.ok(
+      tab.container.querySelector(".manga-reader-chapter-row"),
+      "precondition: the plugin's row is drawn"
+    );
+
+    // What a React remount leaves: one wrapper holding Stash's rows, and none of
+    // the plugin's. The key it renders from has not changed.
+    tab.container.textContent = "";
+    const wrapper = dom.makeElement("div");
+    wrapper.appendChild(dom.makeElement("span"));
+    tab.container.appendChild(wrapper);
+
+    dom.flush();
+    await settle();
+
+    assert.ok(
+      tab.container.querySelector(".manga-reader-chapter-row"),
+      "the plugin's row is drawn again"
+    );
+    assert.ok(
+      tab.container.querySelector(".manga-reader-chapter-edit"),
+      "with the Edit link that owns it"
+    );
+    assert.strictEqual(
+      tab.button.getAttribute("data-manga-reader-taken"),
+      "",
+      "and Stash's Create button is still taken over"
+    );
+
+    stopTab(tab);
+    dom.window.location.pathname = "/";
+  });
 };
