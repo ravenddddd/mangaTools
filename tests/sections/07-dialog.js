@@ -506,6 +506,23 @@ module.exports = () => {
     "re-wording a tag it has already worded should write nothing"
   );
 
+  // **A label that ends with a space is still recognised on the next pass.** An
+  // (Any)/(None) tag is Stash's format string with an empty value, so the space
+  // before that value is the label's last character — and the mark holds the same
+  // label. Comparing the mark raw against a trimmed text missed exactly these: the
+  // card drew the label a second time, and the tag's ✗ was no longer the plugin's.
+  const spacedDialogTag = dialogTagWithText(
+    "plugin.mangaTools.language (custom field) is not null"
+  );
+  state.tagQuery = () => [spacedDialogTag];
+  NS.manageDialogTags(["语言 不为空 "]);
+  assert.deepStrictEqual(
+    NS.ownTagLabels(["语言 不为空 "]),
+    [],
+    "the tag is recognised by its mark, so the card has nothing left to draw"
+  );
+  state.tagQuery = () => [];
+
   // More labels than tags: the extra conditions have nowhere to go, so the card
   // draws them — this is the dialog that had no language at all when it opened
   dialogTag = dialogTagWithText(

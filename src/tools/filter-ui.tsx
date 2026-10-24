@@ -287,7 +287,16 @@ export function isFieldTag(
   if (text?.nodeType !== 3 /* TEXT_NODE */) return false;
 
   const value = String(text.nodeValue).trim();
-  if (tag.getAttribute(mark) === value) return true;
+
+  // **Both sides are trimmed, and that is not cosmetic.** A tag for (Any)/(None)
+  // is Stash's format string with an empty value, so its label ends with the
+  // space before that value — and the mark is written with the same label. The
+  // text was compared trimmed and the mark raw, so the two disagreed on exactly
+  // the tags the mark exists for: the re-worded tag was not recognised on the
+  // next pass, the card drew the label a second time, and its ✗ stopped being
+  // ours. An empty mark still matches nothing.
+  const stamped = tag.getAttribute(mark);
+  if (stamped && stamped.trim() === value) return true;
 
   const prefix = fieldName.toLowerCase() + " ";
   return value.toLowerCase().indexOf(prefix) === 0;
