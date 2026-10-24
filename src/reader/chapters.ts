@@ -635,6 +635,36 @@ export function removeChapterAt(
 }
 
 /**
+ * The same list without the chapter that **begins** at this page, or null when
+ * no chapter begins there.
+ *
+ * The difference from `removeChapterAt` is the whole of this function's reason to
+ * exist, and it is about who is asking. `removeChapterAt` answers "which chapter
+ * holds this page" — the question the lightbox and the header ask. A form names
+ * the chapter it was *opened on*, by that chapter's start, and if the list changed
+ * under the form (another surface moved or deleted it), the old start may now be
+ * in the middle of a different chapter. Removing whatever holds it would delete a
+ * chapter the reader never opened. A start that no longer begins anything is a
+ * stale form, and the answer is null — the caller shows "no chapter begins here".
+ */
+export function removeChapterStartingAt(
+  chapters: MangaReaderChapter[],
+  order: string[],
+  pageId: string
+): MangaReaderChapter[] | null {
+  const position = positionsIn(order);
+  const at = position(pageId);
+  if (at === Number.MAX_SAFE_INTEGER) return null;
+
+  const found = chapters.findIndex(
+    (chapter) => startOf(chapter, position) === at
+  );
+  if (found < 0) return null;
+
+  return chapters.filter((_, index) => index !== found);
+}
+
+/**
  * The chapter an image is in, or null when it is in none.
  *
  * Null is a real answer rather than a failure: a cover, a divider, a page nobody has
@@ -792,3 +822,4 @@ NR.parseChapterList = parseChapterList;
 NR.renameChapterAt = renameChapterAt;
 NR.moveChapterStart = moveChapterStart;
 NR.removeChapterAt = removeChapterAt;
+NR.removeChapterStartingAt = removeChapterStartingAt;

@@ -391,6 +391,16 @@ export interface MangaReaderNamespace {
     order: string[],
     pageId: string
   ): MangaReaderChapter[] | null;
+  /**
+   * The same list without the chapter **beginning** at this page, or null when no
+   * chapter begins there — the form's question, where `removeChapterAt` is the
+   * page's: see the note in chapters.ts.
+   */
+  removeChapterStartingAt(
+    chapters: MangaReaderChapter[],
+    order: string[],
+    pageId: string
+  ): MangaReaderChapter[] | null;
   /** Where each chapter falls in the order on screen */
   placeChapters(
     chapters: MangaReaderChapter[],

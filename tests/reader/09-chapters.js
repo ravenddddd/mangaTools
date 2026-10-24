@@ -392,6 +392,26 @@ module.exports = async () => {
       "and neither is a page in no chapter at all"
     );
 
+    // The form's Delete asks the other question: the chapter that *begins* here,
+    // because that is what the form was opened on. A page that no longer begins a
+    // chapter is a stale form — null — even though B still holds it, and taking B
+    // would delete a chapter the reader never opened.
+    assert.deepStrictEqual(
+      shape(NR.removeChapterStartingAt(list(), order, "4")),
+      ["A:1,2,3", "C:7,8,9,10"],
+      "removing by start takes the chapter that begins here"
+    );
+    assert.strictEqual(
+      NR.removeChapterStartingAt(list(), order, "5"),
+      null,
+      "and a page no chapter begins at is not a chapter to delete, though B holds it"
+    );
+    assert.strictEqual(
+      NR.removeChapterStartingAt(list(), order, "99"),
+      null,
+      "nor is a page this gallery has not got"
+    );
+
     // The one thing no edit may do: throw away a chapter it was not asked to.
     const stranded = [
       { title: "here", images: ["1", "2"] },

@@ -46,7 +46,7 @@ import {
   parseChapterList,
   placeChapters,
   readChapters,
-  removeChapterAt,
+  removeChapterStartingAt,
   renameChapterAt,
   serializeChapters,
   toFileChapters,
@@ -213,6 +213,15 @@ export function syncChaptersTab(): void {
   if (inHand?.id !== id) {
     inHand = null;
     renderedFor = "";
+    // **An editor belongs to the gallery it was opened on.** The form names a
+    // chapter by a start page, and carried across a switch that page belongs to a
+    // different list (see deleteChapter); the bulk table would likewise bring the
+    // previous gallery's page numbers with it. The box's text is already gone
+    // with the DOM, so there is nothing here to preserve.
+    form = null;
+    formError = "";
+    bulk = false;
+    bulkPages = [];
     fetchGallery(id, { sort: "path", direction: "ASC" })
       .then((answer) => {
         // Another gallery, or another page, while that was in flight.
@@ -1495,7 +1504,12 @@ function deleteChapter(): void {
   const current = form;
   if (!gallery || !current?.startPageId) return;
 
-  const next = removeChapterAt(
+  // **By where the chapter begins, not by a page it holds.** The form was opened
+  // on a chapter whose start was this page; if the list changed under it (another
+  // surface moved or deleted that chapter), the page may now sit inside a
+  // different one, and removing by containment would delete a chapter the reader
+  // never opened. A start that begins nothing is a stale form, and says so.
+  const next = removeChapterStartingAt(
     gallery.stored,
     gallery.pages.map((page) => page.id),
     current.startPageId
@@ -1672,4 +1686,6 @@ export function forgetChaptersTab(): void {
   confirming = false;
   form = null;
   formError = "";
+  bulk = false;
+  bulkPages = [];
 }

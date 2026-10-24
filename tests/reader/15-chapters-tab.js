@@ -1569,4 +1569,101 @@ module.exports = async () => {
       dom.window.location.pathname = "/";
     }
   );
+
+  /**
+   * A form outlives the list at its own risk: its Delete names the chapter by
+   * where that chapter began, never by the chapter that now holds the page.
+   *
+   * Another surface can rewrite the chapters while the form stands — the
+   * lightbox's menu, an import, a re-read. Removing by containment would then
+   * delete whichever chapter happened to take the old start's page, which is a
+   * chapter the reader never opened.
+   */
+  await runSection("a stale form's Delete removes no chapter", async () => {
+    mountBridge();
+    // 38 is one of the two editing fixtures, and the section above that edits it
+    // leaves one chapter behind. Put the canonical two-chapter list back before
+    // reading it; this section is last in the file, so nothing here has to be
+    // restored afterwards.
+    await NR.writeChapters("38", [
+      { title: "開幕", images: ["704", "703"] },
+      { title: "中盤", images: ["708", "705", "706", "707"] },
+    ]);
+    dom.window.location.pathname = "/galleries/38";
+    const tab = buildChaptersTab([]);
+    dom.flush();
+    await settle();
+
+    /** The form's fields and its Delete, as this section drew them */
+    const formOf = (container) => {
+      const form = container.querySelector("form");
+      const fields = [...form.querySelectorAll(".form-control")];
+      return { form, fields, remove: form.querySelector(".btn-danger") };
+    };
+
+    // Row 2 is 開幕, which begins at path position 5.
+    dom.click(tab.container.children[1].children[1].children[1]);
+    await settle();
+    const opened = formOf(tab.container);
+    assert.strictEqual(opened.fields[0].value, "開幕");
+    assert.strictEqual(opened.fields[1].value, "5");
+
+    // The list changes under the form: one chapter covering everything, so the
+    // old start (page 5) is now inside it and nothing begins there.
+    await NR.writeChapters("38", [
+      {
+        title: "merged",
+        images: ["708", "707", "706", "705", "704", "703", "702", "701"],
+      },
+    ]);
+    await settle();
+
+    const stale = formOf(tab.container);
+    assert.ok(stale.form, "the form is still open on what it was opened on");
+    const before = mutations.length;
+    dom.click(stale.remove);
+    await settle();
+
+    assert.strictEqual(
+      mutations.length,
+      before,
+      "Delete writes nothing when the chapter it names is gone"
+    );
+    assert.ok(
+      dom.body.querySelector("form") !== null,
+      "and the form stays open to show why"
+    );
+    const refused = formOf(tab.container);
+    assert.strictEqual(
+      refused.fields[1].classList.contains("is-invalid"),
+      true,
+      "the page field is marked"
+    );
+    assert.strictEqual(
+      refused.fields[1].parentNode.querySelector(".invalid-feedback")
+        .textContent,
+      "No chapter begins here",
+      "and says the chapter it was opened on no longer begins there"
+    );
+
+    // A gallery switch closes the form: the next gallery's list is not the one
+    // it was built from.
+    dom.window.location.pathname = "/galleries/35";
+    dom.flush();
+    await settle();
+    assert.strictEqual(
+      dom.body.querySelector("form"),
+      null,
+      "changing gallery closes the form"
+    );
+    assert.deepStrictEqual(
+      drawnRows(tab.container),
+      ["第一話 - #1"],
+      "and the new gallery is drawn as its own list — the chapter an earlier " +
+        "import wrote to it, not the form the previous gallery left open"
+    );
+
+    tab.close();
+    dom.window.location.pathname = "/";
+  });
 };
