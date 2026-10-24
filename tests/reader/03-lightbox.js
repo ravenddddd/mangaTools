@@ -289,6 +289,56 @@ module.exports = async () => {
     }
   );
   await runSection(
+    "a card click does not answer for a lightbox it did not open",
+    async () => {
+      dom.window.location.pathname = "/scenes/11593";
+      for (const child of dom.body.children.slice()) child.remove();
+
+      // A click inside a card, and no lightbox follows: the gallery that card
+      // names is recorded and waits for one.
+      const card = dom.makeElement("div");
+      card.className = "gallery-card";
+      const link = dom.makeElement("a");
+      link.setAttribute("href", "/galleries/7");
+      card.appendChild(link);
+      const cardThumb = dom.makeElement("img");
+      cardThumb.setAttribute(
+        "src",
+        "http://nas.local:9998/image/101/thumbnail?t=1"
+      );
+      card.appendChild(cardThumb);
+      dom.body.appendChild(card);
+      dom.click(cardThumb);
+
+      // Then a click on a bare image — no card above it — opens a lightbox for an
+      // image in gallery 8. Carrying the card's gallery across would take this
+      // lightbox over as gallery 7, whose pages do not contain image 401: the
+      // read fails, the takeover goes off, and Stash's own lightbox stays.
+      const grid = dom.makeElement("div");
+      grid.className = "gallery";
+      const thumb = dom.makeElement("img");
+      thumb.className = "gallery-image";
+      thumb.src = "http://nas.local:9998/image/401/thumbnail?t=1";
+      grid.appendChild(thumb);
+      dom.body.appendChild(grid);
+      dom.click(thumb);
+
+      const box = buildLightbox(1, 5, ["401", "402", "403", "404", "405"]);
+      dom.flush();
+      await settle();
+
+      assert.ok(
+        container(),
+        "the lightbox is taken over by the gallery its image is in, not by the " +
+          "gallery of a card clicked earlier"
+      );
+
+      stopReader(box);
+      dom.window.location.pathname = "/";
+    }
+  );
+
+  await runSection(
     "an image with no card above it is asked about before the click",
     async () => {
       // The user's scene page draws its galleries as bare image grids — the click

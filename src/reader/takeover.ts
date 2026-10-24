@@ -350,7 +350,15 @@ function galleryOf(lightbox: Element): string | null {
   // gallery's card — synchronous, so the takeover happens in this same `step` and
   // Stash's own lightbox is never drawn. See noteClickedCard.
   if (clickedGalleryId) {
-    pageGalleryId = clickedGalleryId;
+    // **One shot.** This answers for the lightbox the click opened, and only that
+    // one: left set, it would decide the gallery of every later lightbox on the
+    // page — including one opened from a bare image on a page the path cannot
+    // place, where it would pin the reader to a gallery the click had nothing to
+    // do with, fail to read, and leave the takeover off. `noteClickedCard` also
+    // clears it on any click that is not inside a card.
+    const clicked = clickedGalleryId;
+    clickedGalleryId = null;
+    pageGalleryId = clicked;
     return pageGalleryId;
   }
 
@@ -1810,9 +1818,11 @@ function arrowsBelongTo(target: HTMLElement | null): boolean {
  * Records the gallery a click was inside, for the lightbox that click may open.
  *
  * Only clicks that land inside a card — the image grids a scene's, a performer's or
- * a tag's page draws — are worth anything here, and a click anywhere else leaves the
- * last one alone: `galleryOf` is only asked once a lightbox is on screen, and the
- * click that opened it is the one whose card is right.
+ * a tag's page draws — are worth anything here. Every other click **clears** it:
+ * the record describes the click that may have opened a lightbox, and a later
+ * click elsewhere ends that. Keeping the last card's answer through unrelated
+ * clicks is how a lightbox opened from a bare image got pinned to it — see
+ * galleryOf, which also spends the answer on the lightbox it does open.
  */
 function noteClickedCard(event: Event): void {
   const target = event.target as Element | null;
@@ -1822,7 +1832,7 @@ function noteClickedCard(event: Event): void {
     .closest(".gallery-card")
     ?.querySelector('a[href^="/galleries/"]');
   const match = /^\/galleries\/(\d+)/.exec(link?.getAttribute("href") || "");
-  if (match) clickedGalleryId = match[1];
+  clickedGalleryId = match ? match[1] : null;
 }
 
 /**
@@ -2562,6 +2572,10 @@ function onLocation(event: unknown): void {
 
   const moved = seenPath !== null && path !== seenPath;
   seenPath = path;
+
+  // A card click answers about the page it was on. A page the reader has left is
+  // not a page whose card opened the next lightbox.
+  if (moved) clickedGalleryId = null;
 
   if (moved && root) pressEscape();
 }
