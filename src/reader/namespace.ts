@@ -220,6 +220,8 @@ export interface MangaReaderNamespace {
   parseIndicator(text: string): { current: number; total: number } | null;
   galleryIdFromPath(pathname: string): string | null;
   IMAGE_GALLERIES_QUERY_TEXT: string;
+  /** The physical-pages gallery query, published so a test can pin its shape. */
+  PHYSICAL_GALLERY_QUERY_TEXT: string;
   galleryIdOfImage(imageId: string): Promise<string | null>;
   /** The order the lightbox is showing its images in, read from the URL */
   lightboxOrder(search: string): MangaReaderOrder;

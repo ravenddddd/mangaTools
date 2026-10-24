@@ -72,6 +72,21 @@ module.exports = () => {
       { pages: 4, perPage: 100 },
       "the chosen page size is kept; the last page takes the remainder"
     );
+
+    // **The other direction: fewer files than images.** Stash offers a page the
+    // files cannot fill — a file outside the gallery's folder, an image added by
+    // hand — and the count is capped to what is actually there rather than
+    // drawing an empty page.
+    assert.deepStrictEqual(
+      NS.physicalPagePlan(2, 2, 2),
+      { pages: 1, perPage: 2 },
+      "a page Stash offers but the files cannot fill is not offered"
+    );
+    assert.deepStrictEqual(
+      NS.physicalPagePlan(2, 2, 3),
+      { pages: 2, perPage: 2 },
+      "and a file list longer than the images does not raise Stash's count"
+    );
   });
 
   runSection(
@@ -115,6 +130,28 @@ module.exports = () => {
         changed,
         ["1001", true, false],
         "and choosing an occurrence chooses the image Stash knows"
+      );
+
+      // A page past what the files can fill lands on the last page that exists,
+      // with its cards — not on an empty one.
+      const short = { total: 2, files: GRID.files.slice(0, 2) };
+      const past = NS.expandPhysicalPage(
+        listProps({
+          pageCount: 2,
+          filter: { ...listProps().filter, currentPage: 2, itemsPerPage: 2 },
+        }),
+        short
+      );
+      assert.ok(past, "the list is still drawn");
+      assert.strictEqual(
+        past.pages,
+        1,
+        "with the page count the file list can actually fill"
+      );
+      assert.deepStrictEqual(
+        past.images.map((image) => image.id),
+        ["1001::p1", "1002::p2"],
+        "and the requested past-the-end page clamped to the one that is there"
       );
     }
   );
@@ -279,6 +316,79 @@ module.exports = () => {
     assert.ok(
       deps.includes(7),
       "and the page count the expansion plans its pages with"
+    );
+  });
+
+  /**
+   * The grid's cache is bounded, like the reader's.
+   *
+   * Each entry keeps a whole image object per occurrence — details, urls, tags,
+   * performers — so an unbounded cache is a browsing session's worth of payload
+   * held for the life of the page, with nothing able to release it but a reload.
+   */
+  runSection("15 the file cache does not keep every gallery", () => {
+    const cache = new Map();
+    for (let i = 0; i < 10; i++) {
+      NS.rememberPhysicalGrid(cache, "g" + i, { files: [], total: 0 });
+    }
+
+    assert.strictEqual(
+      cache.size,
+      8,
+      "the grid cache is capped like the reader's"
+    );
+    assert.strictEqual(cache.has("g0"), false, "the oldest insertions go");
+    assert.strictEqual(cache.has("g1"), false);
+    assert.strictEqual(cache.has("g9"), true, "the newest stays");
+  });
+
+  /**
+   * The physical-pages queries, pinned to the shape a real Stash accepts.
+   *
+   * Both fake clients answer whatever they are asked, so a renamed argument or a
+   * misspelt field passes every other test and fails only in a browser — where the
+   * grid silently keeps the deduplicated list and the reader turns itself off.
+   * `CHAPTERS_QUERY_TEXT` is the precedent.
+   */
+  runSection("15 the physical queries name what Stash accepts", () => {
+    assert.ok(
+      /query MangaToolsGalleryScope\(\$id: ID!\)/.test(
+        NS.GALLERY_SCOPE_QUERY_TEXT
+      ) &&
+        NS.GALLERY_SCOPE_QUERY_TEXT.includes("folder {") &&
+        NS.GALLERY_SCOPE_QUERY_TEXT.includes("files {"),
+      "the scope query asks the gallery for its folder and its files"
+    );
+
+    assert.ok(
+      NS.GALLERY_FILES_WITH_IMAGES_QUERY_TEXT.includes(
+        "image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }"
+      ),
+      "the grid's files query filters by gallery with Stash's own argument name"
+    );
+    assert.ok(
+      NS.GALLERY_FILES_WITH_IMAGES_QUERY_TEXT.includes("visual_files {") &&
+        NS.GALLERY_FILES_WITH_IMAGES_QUERY_TEXT.includes(
+          "... on ImageFile {"
+        ) &&
+        NS.GALLERY_FILES_WITH_IMAGES_QUERY_TEXT.includes("parent_folder {") &&
+        NS.GALLERY_FILES_WITH_IMAGES_QUERY_TEXT.includes("zip_file {"),
+      "…and reaches each image's occurrences through `visual_files` — the " +
+        "direction this Stash's schema supports"
+    );
+
+    assert.ok(
+      NS.GALLERY_FILES_QUERY_TEXT.includes("title") &&
+        NS.GALLERY_FILES_QUERY_TEXT.includes("paths {") &&
+        NS.GALLERY_FILES_QUERY_TEXT.includes("... on VideoFile {"),
+      "the reader's lighter query keeps the name, the URL and both file kinds"
+    );
+
+    assert.ok(
+      NS.GALLERY_FILE_COUNT_QUERY_TEXT.includes(
+        "findFiles(file_filter: $fileFilter"
+      ) && NS.GALLERY_FILE_COUNT_QUERY_TEXT.includes("count"),
+      "the count query names Stash's file filter and asks only for the count"
     );
   });
 

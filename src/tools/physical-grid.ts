@@ -13,12 +13,15 @@
  * *and* the list Stash hands to the lightbox in one place. `ImageCardGrid` would
  * have covered only the grid.
  *
- * **The page numbers stay Stash's.** `FilteredImageList` fetches image pages and
- * `useEnsureValidPage` clamps the page number to the image page count. Adding
- * physical pages beyond that count would make them unreachable, so the files are
- * divided into the *same* number of pages (`Q = max(page size, ceil(files / pages))`)
- * and the same page number is rendered from the file list. The only visible cost is
- * that a page can hold slightly more cards than the page-size selector says.
+ * **The page numbers stay Stash's, capped by the files.** `FilteredImageList`
+ * fetches image pages and `useEnsureValidPage` clamps the page number to the image
+ * page count. Adding physical pages beyond that count would make them unreachable,
+ * so the files are divided into the *same* number of pages
+ * (`Q = max(page size, ceil(files / pages))`) and the same page number is rendered
+ * from the file list. When the file list is shorter than the image list, Stash's
+ * count is capped to what the files can fill — the alternative is an empty page.
+ * The only visible cost in the other direction is that a page can hold slightly
+ * more cards than the page-size selector says.
  *
  * **Rendering is still Stash's.** The occurrence entries are clones of the image
  * objects Stash would have rendered, with a synthetic id (unique React key) and
@@ -53,6 +56,37 @@ const cache = new Map<string, GalleryGrid>();
 const inFlight = new Map<string, Promise<GalleryGrid>>();
 
 /**
+ * How many galleries' file lists are kept, matching the reader's gallery cache
+ * (`CACHE_LIMIT` in takeover.ts).
+ *
+ * Each entry holds one full image object per occurrence — details, urls, tags,
+ * performers, galleries, three paths — so a session over a long series otherwise
+ * keeps every one of them for the life of the page. Oldest insertion goes first;
+ * a gallery read again after eviction costs one query and nothing else.
+ */
+const GRID_CACHE_LIMIT = 8;
+
+/**
+ * Records a grid, evicting the oldest insertions past the cap.
+ *
+ * Exported and published for the smoke test: the cap is otherwise invisible from
+ * outside the module, and a cache with no cap is a leak no assertion would catch.
+ */
+export function rememberPhysicalGrid<T>(
+  into: Map<string, T>,
+  galleryId: string,
+  grid: T,
+  limit = GRID_CACHE_LIMIT
+): void {
+  into.set(galleryId, grid);
+  while (into.size > limit) {
+    const oldest = into.keys().next();
+    if (oldest.done) break;
+    into.delete(oldest.value);
+  }
+}
+
+/**
  * Reads a gallery's physical list, once per gallery per page load.
  *
  * Deliberately not revalidated: the list is the grid's, and the reader is the one
@@ -74,7 +108,7 @@ function load(galleryId: string): Promise<GalleryGrid> {
     )
     .then((list) => {
       const grid: GalleryGrid = { files: list.files, total: list.total };
-      cache.set(galleryId, grid);
+      rememberPhysicalGrid(cache, galleryId, grid);
       inFlight.delete(galleryId);
       return grid;
     })
@@ -101,9 +135,13 @@ function load(galleryId: string): Promise<GalleryGrid> {
  * put every file on one page: the page-size selector did nothing.
  *
  * The page size is the reader's, exactly: pages 1 … P−1 hold `userPerPage` files
- * and the **last page takes the remainder**. The page count stays Stash's (P),
- * because a higher number would be clamped away by `useEnsureValidPage`; the
- * price is that a gallery with many duplicates can have a long last page.
+ * and the **last page takes the remainder**. Stash's count is the ceiling — a
+ * higher number would be clamped away by `useEnsureValidPage` — but it is not
+ * always reachable: when the file list is shorter than the image list (a file
+ * outside the gallery's folder, an image added by hand), Stash offers pages the
+ * files cannot fill, and the old arithmetic drew one of them **empty**. The
+ * files therefore set a floor under the count; a gallery with more files than
+ * images still gets Stash's count, and its last page the long remainder.
  *
  * Published for the smoke test: the arithmetic is where a page that cannot be
  * reached would come from, and it is the cheapest part of this module to pin.
@@ -111,12 +149,12 @@ function load(galleryId: string): Promise<GalleryGrid> {
 export function physicalPagePlan(
   imagePages: number,
   userPerPage: number,
-  _fileCount: number
+  fileCount: number
 ): { pages: number; perPage: number } {
-  return {
-    pages: Math.max(1, Math.floor(imagePages) || 1),
-    perPage: Math.max(1, userPerPage),
-  };
+  const perPage = Math.max(1, userPerPage);
+  const stashed = Math.max(1, Math.floor(imagePages) || 1);
+  const fillable = Math.max(1, Math.ceil(Math.max(0, fileCount) / perPage));
+  return { pages: Math.min(stashed, fillable), perPage };
 }
 
 /** The props this module reads off `ImageList`, which Stash types only as `any`. */
@@ -426,6 +464,7 @@ export function registerPhysicalPagePatches(): void {
 // Published for the smoke test, the way the reader half publishes its pure
 // functions. The cast is only about the list's props, which Stash has no type for.
 NS.physicalPagePlan = physicalPagePlan;
+NS.rememberPhysicalGrid = rememberPhysicalGrid;
 NS.expandPhysicalPage = expandPhysicalPage as unknown as (
   props: unknown,
   grid: unknown

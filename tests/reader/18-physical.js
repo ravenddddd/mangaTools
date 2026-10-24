@@ -168,6 +168,49 @@ module.exports = async () => {
     }
   );
 
+  /**
+   * The physical gallery query, pinned to the shape a real Stash accepts.
+   *
+   * The reader harness's client answers any document, so a renamed argument or a
+   * changed sort passes every test and fails only in the browser — the reader
+   * turns itself off with a console line. `CHAPTERS_QUERY_TEXT` is the precedent.
+   */
+  await runSection(
+    "the physical gallery query is the shape Stash accepts",
+    () => {
+      const text = NR.PHYSICAL_GALLERY_QUERY_TEXT;
+
+      assert.ok(
+        /query MangaReaderPhysicalGallery\(\$galleryId: ID!, \$byPath: Boolean!\)/.test(
+          text
+        ),
+        "the query declares the gallery and the optional path list"
+      );
+      assert.ok(
+        text.includes("findGallery(id: $galleryId)") &&
+          text.includes("custom_fields") &&
+          text.includes("chapters {") &&
+          text.includes("folder {") &&
+          text.includes("files {"),
+        "the gallery is asked for its fields, scope and own chapters"
+      );
+      assert.ok(
+        text.includes(
+          "image_filter: { galleries: { value: [$galleryId], modifier: INCLUDES } }"
+        ),
+        "and the images by gallery, with Stash's own argument name"
+      );
+      assert.ok(
+        text.includes('filter: { per_page: -1, sort: "path", direction: ASC }'),
+        "in path order, all of them — the order chapter numbers count in"
+      );
+      assert.ok(
+        text.includes("@include(if: $byPath)"),
+        "with the path list optional, as the variable says"
+      );
+    }
+  );
+
   await runSection(
     "the chapter field's two identities convert, and v2 writes both",
     async () => {

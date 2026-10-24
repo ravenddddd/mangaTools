@@ -27,6 +27,7 @@
  * Module level, like languages.ts: both halves need this and neither may import the
  * other. See core.ts for the down-never-sideways rule.
  */
+import { NS } from "./languages";
 import { gqlDoc, requirePluginApi } from "./plugin-api";
 
 /** Which association makes a file part of a gallery — see the note above. */
@@ -462,3 +463,13 @@ export function firstFileByImage(
 
   return first;
 }
+
+// Published for the tests. **Both fake clients accept any query text**, so a
+// document a real Stash would reject — a renamed field, a wrong argument, a
+// changed sort — passes every test and fails only in the browser: the grid keeps
+// the deduplicated list and the reader turns itself off, silently. Pinning the
+// load-bearing fragments is the same discipline CHAPTERS_QUERY_TEXT already has.
+NS.GALLERY_SCOPE_QUERY_TEXT = GALLERY_SCOPE_QUERY_TEXT;
+NS.GALLERY_FILES_QUERY_TEXT = GALLERY_FILES_QUERY_TEXT;
+NS.GALLERY_FILES_WITH_IMAGES_QUERY_TEXT = GALLERY_FILES_WITH_IMAGES_QUERY_TEXT;
+NS.GALLERY_FILE_COUNT_QUERY_TEXT = GALLERY_FILE_COUNT_QUERY_TEXT;

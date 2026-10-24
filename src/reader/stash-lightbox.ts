@@ -818,6 +818,7 @@ export async function fetchGallery(
 NR.parseIndicator = parseIndicator;
 NR.galleryIdFromPath = galleryIdFromPath;
 NR.IMAGE_GALLERIES_QUERY_TEXT = IMAGE_GALLERIES_QUERY_TEXT;
+NR.PHYSICAL_GALLERY_QUERY_TEXT = PHYSICAL_GALLERY_QUERY_TEXT;
 NR.galleryIdOfImage = galleryIdOfImage;
 NR.lightboxOrder = lightboxOrder;
 /**

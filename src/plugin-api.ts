@@ -305,6 +305,26 @@ export interface MangaToolsNamespace {
    * caller otherwise.
    */
   expandPhysicalPage(props: unknown, grid: unknown): unknown;
+  /**
+   * Records one gallery's grid, evicting the oldest insertions past the cap.
+   * Published for the smoke test: the cap is otherwise invisible from outside
+   * physical-grid.ts.
+   */
+  rememberPhysicalGrid<T>(
+    into: Map<string, T>,
+    galleryId: string,
+    grid: T,
+    limit?: number
+  ): void;
+  /**
+   * The physical-pages query documents, published so a test can pin the parts a
+   * real Stash would reject. Both fake clients accept any text; see the note in
+   * gallery-files.ts and CHAPTERS_QUERY_TEXT for the precedent.
+   */
+  GALLERY_SCOPE_QUERY_TEXT: string;
+  GALLERY_FILES_QUERY_TEXT: string;
+  GALLERY_FILES_WITH_IMAGES_QUERY_TEXT: string;
+  GALLERY_FILE_COUNT_QUERY_TEXT: string;
 
   findCanonical(code?: string | null): string;
   normalize(raw: unknown): string;
