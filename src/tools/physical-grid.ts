@@ -336,6 +336,16 @@ function registerListPatch(): void {
     const sortDirection = filter?.sortDirection;
     const currentPage = filter?.currentPage;
     const itemsPerPage = filter?.itemsPerPage;
+    // The three values below are read by the expansion and must be dependencies:
+    // a search term or a criterion turns the expansion *off* (Stash's filtered
+    // results are the honest ones), and `pageCount` is the page count it plans
+    // with. Omitted, a filter change leaves every dependency identical and the
+    // memo keeps the answer from the other state — the search is ignored, or a
+    // cleared one stays ignored. This Stash passes `pageCount` but not
+    // `totalCount`, so the latter cannot stand in for it.
+    const searchTerm = filter?.searchTerm;
+    const criteriaCount = filter?.criteria?.length ?? 0;
+    const pageCount = props.pageCount;
     const totalCount = props.totalCount;
     const selectedIds = props.selectedIds;
 
@@ -365,6 +375,9 @@ function registerListPatch(): void {
         sortDirection,
         currentPage,
         itemsPerPage,
+        searchTerm,
+        criteriaCount,
+        pageCount,
         totalCount,
         selectedIds,
         change,

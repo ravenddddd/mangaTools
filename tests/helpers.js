@@ -104,7 +104,14 @@ const React = {
   useState: (init) => [typeof init === "function" ? init() : init, () => {}],
   // The factory runs, like an effect: the physical grid's memo is also what keeps
   // `images` stable, and a stubbed-out memo would hide that.
-  useMemo: (fn) => fn(),
+  // The callback runs every time, as memoization would not matter to a stub with
+  // no re-render — but the **dependency array is kept**, because a memo that omits
+  // a value it reads is invisible here and a frozen screen in a browser. One
+  // section reads it (the physical grid's filter values; see 10-physical-grid).
+  useMemo: (fn, deps) => {
+    state.lastMemoDeps = deps;
+    return fn();
+  },
   useCallback: (fn) => fn,
   // Only the experiment's error boundary derives from this. The stub renders
   // nothing, so the lifecycle is never exercised — what matters is only that

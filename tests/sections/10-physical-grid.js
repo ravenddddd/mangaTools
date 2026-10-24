@@ -13,10 +13,12 @@ const assert = require("node:assert");
 const {
   PHYSICAL_FILES,
   NS,
+  call,
   patched,
   patchedBefore,
   physicalImage,
   runSection,
+  state,
 } = require("../helpers.js");
 
 /** The four files as the shared module hands them to the grid. */
@@ -236,6 +238,48 @@ module.exports = () => {
     );
 
     NS.readerTakeover = true;
+  });
+
+  /**
+   * The expansion is memoised on the values it reads — and three of them are the
+   * filter's. Missing them is invisible to this world (the stub runs a memo on
+   * every call) and a frozen list in a browser: React keeps the answer from before
+   * the search, so a search is ignored, and a cleared search stays ignored.
+   *
+   * Read out of the dependency array rather than through a re-render, for that
+   * reason. Distinct values, so an `includes` cannot pass on a coincidence.
+   */
+  runSection("15 the expansion's memo names the filter it reads", () => {
+    call(
+      "ImageList",
+      listProps({
+        filter: {
+          sortBy: "path",
+          sortDirection: "ASC",
+          currentPage: 1,
+          itemsPerPage: 2,
+          searchTerm: "RJ01133881_003",
+          criteria: [{}, {}, {}],
+        },
+        pageCount: 7,
+        totalCount: 11,
+      })
+    );
+
+    const deps = state.lastMemoDeps;
+    assert.ok(Array.isArray(deps), "the list memoises its expansion");
+    assert.ok(
+      deps.includes("RJ01133881_003"),
+      "the search term is a dependency: a filtered list is Stash's own"
+    );
+    assert.ok(
+      deps.includes(3),
+      "so is the number of criteria, for the same reason"
+    );
+    assert.ok(
+      deps.includes(7),
+      "and the page count the expansion plans its pages with"
+    );
   });
 
   runSection("15 the patches are registered", () => {
