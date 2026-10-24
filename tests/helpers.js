@@ -101,7 +101,15 @@ const React = {
   // Matches React in the one way that matters here: a function argument is a
   // lazy initialiser and gets called, not stored. The setter is inert — nothing
   // in these tests can change state and read the result back.
-  useState: (init) => [typeof init === "function" ? init() : init, () => {}],
+  // Counted, not because the value matters (the setter is inert), but because a
+  // patch that asks to be re-rendered by the store does so by taking a state
+  // hook. One section uses the count to pin that the card's patches subscribe:
+  // see 08-card. A patch that read the store once would pass every rendering
+  // assertion here and never update in a browser.
+  useState: (init) => {
+    state.stateCalls = (state.stateCalls || 0) + 1;
+    return [typeof init === "function" ? init() : init, () => {}];
+  },
   // The factory runs, like an effect: the physical grid's memo is also what keeps
   // `images` stable, and a stubbed-out memo would hide that.
   // The callback runs every time, as memoization would not matter to a stub with

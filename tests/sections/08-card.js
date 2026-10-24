@@ -48,6 +48,29 @@ module.exports = () => {
   const card = (id) =>
     callAfter("GalleryCard.Overlays", { gallery: { id } }, overlaysResult);
 
+  // **The card's patches ask to be redrawn by the store.** The store is filled by
+  // the plugin's own query, not by the cache these cards are built from, so a card
+  // can render before it has an answer. The stub has no re-render to observe, and
+  // its state setter is inert, so what is pinned is the subscription itself: an
+  // `after` patch that reads the store once takes no state hook, and in a browser
+  // that card would keep the answerless output until something else re-rendered
+  // it. `useGlobalVersion` is that hook.
+  {
+    const badgeCalls = state.stateCalls || 0;
+    card("1");
+    assert.ok(
+      (state.stateCalls || 0) > badgeCalls,
+      "the badge patch subscribes to the store rather than reading it once"
+    );
+
+    const markCalls = state.stateCalls || 0;
+    callAfter("GalleryCard.Popovers", { gallery: { id: "1" } }, overlaysResult);
+    assert.ok(
+      (state.stateCalls || 0) > markCalls,
+      "and so does the popover mark's"
+    );
+  }
+
   // The badge wraps a Flag component, so one more render is needed to reach the span
   const badgeOf = (id) => {
     const el = card(id);

@@ -188,6 +188,15 @@ registerPatch("after", "GalleryCard.Overlays", (...args: unknown[]) => {
   const result = resultFrom(args);
   noteFired("GalleryCard.Overlays");
 
+  // **The store can answer after this card's first render.** It is filled by the
+  // plugin's own query, not by the cache Stash's cards are built from, so the
+  // first pass sees `store === null` and draws nothing — and without a
+  // subscription nothing would come back to draw the badge when the answer
+  // lands. Stash's `after` patch runs inside the card component's render, so
+  // this asks that card to be drawn again; the details panel subscribes for the
+  // same reason.
+  useGlobalVersion();
+
   const id = props.gallery?.id;
   const value = id ? pickLanguage(store?.get(String(id))) : "";
 
@@ -221,6 +230,11 @@ registerPatch("after", "GalleryCard.Popovers", (...args: unknown[]) => {
   const props = args[0] as { gallery?: { id?: string } };
   const result = resultFrom(args);
   noteFired("GalleryCard.Popovers");
+
+  // Subscribed for the same reason as the badge above: the store can be empty on
+  // the first pass, and the mark appears when its answer lands rather than on the
+  // next navigation.
+  useGlobalVersion();
 
   const id = props.gallery?.id;
   if (!id || !storedIsManga(String(id))) return result;
