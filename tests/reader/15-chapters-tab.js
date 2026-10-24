@@ -1264,6 +1264,34 @@ module.exports = async () => {
     third.value = "3";
     third.dispatchEvent({ type: "input" });
 
+    // A page that is not a whole number is not a page. `2.5` is finite and in
+    // range, so it used to pass: the row went green, Create came alive, and the
+    // write indexed `order[1.5]` (nothing) while the preview threw on
+    // `pages[1.5]`. Row 3's peek has not been hovered yet, so "no box" means this
+    // hover drew none.
+    const decimal = page(3);
+    decimal.value = "2.5";
+    decimal.dispatchEvent({ type: "input" });
+    assert.strictEqual(
+      mark(3).getAttribute("data-why"),
+      "That is not one of this gallery's pages",
+      "a fractional page is refused like one out of range"
+    );
+    assert.strictEqual(create.disabled, true);
+    peek(3).dispatch("mouseenter");
+    assert.strictEqual(
+      shown[3].querySelector(".manga-reader-page-peek-box"),
+      null,
+      "…and the preview draws nothing for it, rather than throwing"
+    );
+    decimal.value = "4";
+    decimal.dispatchEvent({ type: "input" });
+    assert.strictEqual(
+      create.disabled,
+      false,
+      "restored: the table is whole again"
+    );
+
     // ── one write, one undo ────────────────────────────────────────────────
     const at = mutations.length;
     dom.click(create);

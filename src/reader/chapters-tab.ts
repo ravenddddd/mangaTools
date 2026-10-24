@@ -557,7 +557,11 @@ function closeBulk(): void {
  */
 function pageAt(input: HTMLInputElement, gallery: ChaptersInHand): number {
   const n = Number(input.value);
-  return Number.isFinite(n) && n >= 1 && n <= gallery.pages.length ? n - 1 : -1;
+  // Whole numbers only: `2.5` is in range and finite, and would index
+  // `pages[1.5]` — undefined — in every caller that trusts this answer.
+  return Number.isInteger(n) && n >= 1 && n <= gallery.pages.length
+    ? n - 1
+    : -1;
 }
 
 /**
@@ -600,8 +604,12 @@ function pagePreview(
     const at = pageAt(input, gallery);
     // **The reader's own URL for the page**, not the one the API handed over whole:
     // the same picture, the same version stamp, the same cache entry as the lightbox —
-    // see pageUrl. A number pointing nowhere shows nothing rather than an empty frame.
-    const src = at < 0 ? "" : pageUrl(gallery.pages[at]);
+    // see pageUrl. A number pointing nowhere shows nothing rather than an empty
+    // frame, and the page itself is checked rather than assumed to exist: `pageAt`
+    // is the only thing standing between a number and this lookup, and a preview
+    // must not be able to throw on the way in.
+    const page = at < 0 ? undefined : gallery.pages[at];
+    const src = page ? pageUrl(page) : "";
     if (!src) return;
 
     if (!box) {
@@ -739,7 +747,10 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
     if (!row.page) return "mangaReader.bulkNoPage";
 
     const page = Number(row.page);
-    if (!Number.isFinite(page) || page < 1 || page > gallery.pages.length) {
+    // Whole numbers only. A finite `2.5` passes a range test and then indexes
+    // nothing (`order[1.5]`), so Create would write nothing while looking valid —
+    // and the preview would index `pages[1.5]` and throw.
+    if (!Number.isInteger(page) || page < 1 || page > gallery.pages.length) {
       return "mangaReader.bulkPageRange";
     }
     for (let i = 0; i < all.length; i++) {
