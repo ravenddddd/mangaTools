@@ -1666,4 +1666,65 @@ module.exports = async () => {
     tab.close();
     dom.window.location.pathname = "/";
   });
+
+  /**
+   * A write that fails leaves the form open, the typing intact, and says so.
+   *
+   * `busy` is in the render key, so the form is rebuilt the moment a Save starts.
+   * The draft exists nowhere but the inputs, and the old failure path redrew from
+   * the values the form opened with: the reader's title and page were replaced by
+   * the old ones, with only a console line to say why.
+   */
+  await runSection(
+    "a failed chapter write keeps the draft and says so",
+    async () => {
+      mountBridge();
+      dom.window.location.pathname = "/galleries/39";
+      const tab = buildChaptersTab([]);
+      dom.flush();
+      await settle();
+
+      // Any row: this section is about the form, not the list.
+      dom.click(tab.container.children[0].children[1].children[1]);
+      await settle();
+
+      const formNode = () => tab.container.querySelector("form");
+      const fields = () => [...formNode().querySelectorAll(".form-control")];
+      fields()[0].value = "a draft";
+      fields()[1].value = "2";
+
+      const before = mutations.length;
+      state.galleryWriteFails = true;
+      dom.click(formNode().querySelector(".btn-primary"));
+      await settle();
+      state.galleryWriteFails = false;
+
+      assert.ok(mutations.length > before, "the write was attempted");
+      assert.ok(formNode(), "the form stays open");
+      assert.strictEqual(
+        fields()[0].value,
+        "a draft",
+        "the title the reader typed survives the redraw"
+      );
+      assert.strictEqual(fields()[1].value, "2", "and the page");
+      assert.ok(
+        /not written/.test(formNode().textContent),
+        "…and the form says the write did not happen, rather than only the console"
+      );
+
+      // The draft is the live form's, so the same click retries it.
+      const retry = mutations.length;
+      dom.click(formNode().querySelector(".btn-primary"));
+      await settle();
+      assert.strictEqual(mutations.length, retry + 1, "a second click writes");
+      assert.strictEqual(
+        tab.container.querySelector("form"),
+        null,
+        "and closes the form on success"
+      );
+
+      tab.close();
+      dom.window.location.pathname = "/";
+    }
+  );
 };

@@ -40,6 +40,7 @@
   "mangaReader.chapterStartTaken": "A chapter already begins here",
   "mangaReader.chapterIndexRange": "That is not one of this gallery's pages",
   "mangaReader.chapterNoSuch": "No chapter begins here",
+  "mangaReader.chapterWriteFailed": "The chapter was not written — try again",
   "mangaReader.undoChapters": "Chapters changed — undo",
   "mangaReader.chaptersFromList": "Bulk create",
   "mangaReader.bulkPaste": "One title per line",

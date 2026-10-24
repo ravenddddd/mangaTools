@@ -119,9 +119,24 @@ let form: {
   /** What the fields said when the form opened, which is what "changed" means */
   initialTitle: string;
   initialIndex: string;
+  /**
+   * What the last Save tried to write — kept while it is in flight and after it
+   * failed. The fields are rebuilt from here rather than from `initial*`, or a
+   * `busy` redraw would replace the reader's typing with the values the form
+   * opened with: the draft exists nowhere else (see the note on form).
+   */
+  draftTitle?: string;
+  draftIndex?: string;
 } | null = null;
 /** What was wrong with the last Save, or "" — read only when a form is drawn */
 let formError = "";
+/**
+ * Why the last Save did not reach the server, or "".
+ *
+ * Separate from formError, which is about a field: this is about the write, so it
+ * is drawn as a line of its own and leaves the fields saying what was typed.
+ */
+let formFailure = "";
 
 /** The import control, kept between passes, and what it was last built as */
 let control: HTMLElement | null = null;
@@ -220,6 +235,7 @@ export function syncChaptersTab(): void {
     // with the DOM, so there is nothing here to preserve.
     form = null;
     formError = "";
+    formFailure = "";
     bulk = false;
     bulkPages = [];
     fetchGallery(id, { sort: "path", direction: "ASC" })
@@ -377,7 +393,10 @@ function render(panel: HTMLElement, gallery: ChaptersInHand): void {
     bulk
       ? "bulk"
       : form
-        ? "form:" + (form.startPageId ?? "new") + (formError ? ":bad" : "")
+        ? "form:" +
+          (form.startPageId ?? "new") +
+          (formError ? ":bad" : "") +
+          (formFailure ? ":failed" : "")
         : "list",
     ...gallery.chapters.map((c) => c.title + "@" + c.at),
   ].join("|");
@@ -1283,13 +1302,16 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
   const container = document.createElement("div");
   container.className = "form-container px-3";
 
+  // The draft when there is one: a form rebuilt while a write is in flight, or
+  // after it failed, must not replace what the reader typed with what the form
+  // opened with. The draft is dropped with the form.
   const titleField = field(
     container,
     gallery.locale,
     "mangaReader.chapterTitle",
     "title",
     "text",
-    form?.initialTitle ?? ""
+    form?.draftTitle ?? form?.initialTitle ?? ""
   );
   const indexField = field(
     container,
@@ -1297,7 +1319,7 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
     "mangaReader.chapterIndex",
     "image_index",
     "number",
-    form?.initialIndex ?? "1"
+    form?.draftIndex ?? form?.initialIndex ?? "1"
   );
 
   node.appendChild(container);
@@ -1340,7 +1362,7 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
   index.addEventListener("input", settle);
   settle();
   save.addEventListener("click", () =>
-    submitForm(title.value, Number(index.value))
+    submitForm(title.value, Number(index.value), index.value)
   );
   buttonsRow.appendChild(save);
 
@@ -1358,6 +1380,16 @@ function drawForm(panel: HTMLElement, gallery: ChaptersInHand): void {
     remove.textContent = stringFor(gallery.locale, "mangaReader.delete");
     remove.addEventListener("click", deleteChapter);
     buttonsRow.appendChild(remove);
+  }
+
+  // A write that did not reach the server is not about either field, so it gets
+  // its own line rather than marking one of them: the draft is still what the
+  // reader typed, and the words say what happened.
+  if (formFailure) {
+    const failed = document.createElement("div");
+    failed.className = "invalid-feedback d-block";
+    failed.textContent = stringFor(gallery.locale, formFailure);
+    buttons.appendChild(failed);
   }
 
   buttons.appendChild(buttonsRow);
@@ -1448,7 +1480,7 @@ function refuse(error: HTMLElement | null, message: string): void {
  * shown in the form rather than written: "already a chapter there" is something the
  * reader can fix, and a field written with the value it already had is noise.
  */
-function submitForm(title: string, index: number): void {
+function submitForm(title: string, index: number, rawIndex: string): void {
   const gallery = inHand;
   const current = form;
   if (!gallery || !current) return;
@@ -1470,7 +1502,7 @@ function submitForm(title: string, index: number): void {
       return;
     }
 
-    applyEdit(gallery, next);
+    applyEdit(gallery, next, { title, index: rawIndex });
     return;
   }
 
@@ -1495,7 +1527,7 @@ function submitForm(title: string, index: number): void {
     return;
   }
 
-  applyEdit(gallery, next);
+  applyEdit(gallery, next, { title, index: rawIndex });
 }
 
 /** Delete, which takes the chapter away and leaves its pages owned by nobody */
@@ -1533,8 +1565,21 @@ function deleteChapter(): void {
  * own copy here. It did, while the only write was its own import; a list that two
  * surfaces can change is a list worth reading back.
  */
-function applyEdit(gallery: ChaptersInHand, next: MangaReaderChapter[]): void {
+function applyEdit(
+  gallery: ChaptersInHand,
+  next: MangaReaderChapter[],
+  draft?: { title: string; index: string }
+): void {
   busy = true;
+  formFailure = "";
+  // **The typing is in the inputs, and `busy` is in the render key** — so the
+  // redraw below rebuilds this form, and without a record of the draft it would
+  // rebuild it from the values the form opened with. The write may then fail,
+  // and the reader would be looking at their typing replaced by the old words
+  // with nothing saying why.
+  if (draft && form) {
+    form = { ...form, draftTitle: draft.title, draftIndex: draft.index };
+  }
   redraw();
 
   writeChapters(gallery.id, next, gallery.pages).then(
@@ -1544,6 +1589,8 @@ function applyEdit(gallery: ChaptersInHand, next: MangaReaderChapter[]): void {
     },
     (e: unknown) => {
       busy = false;
+      // The form stays open, with the draft, and says the write did not happen.
+      formFailure = "mangaReader.chapterWriteFailed";
       console.error(
         "[mangaReader] could not write this gallery's chapters:",
         e
@@ -1557,6 +1604,7 @@ function applyEdit(gallery: ChaptersInHand, next: MangaReaderChapter[]): void {
 function closeForm(): void {
   form = null;
   formError = "";
+  formFailure = "";
   redraw();
 }
 
@@ -1661,6 +1709,7 @@ function openForm(chapter: MangaReaderPlacedChapter | null): void {
       : String(indexOfReadingPage(gallery)),
   };
   formError = "";
+  formFailure = "";
   redraw();
 }
 
@@ -1686,6 +1735,7 @@ export function forgetChaptersTab(): void {
   confirming = false;
   form = null;
   formError = "";
+  formFailure = "";
   bulk = false;
   bulkPages = [];
 }

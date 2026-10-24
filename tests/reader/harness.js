@@ -47,6 +47,12 @@ const state = {
   galleries: {},
   queries: [],
   failing: false,
+  /**
+   * Set by a test to make the next gallery writes reject. The attempt is still
+   * recorded in `mutations`; the fixture is not changed, as a server that
+   * refused the write would leave it.
+   */
+  galleryWriteFails: false,
   /** Set by a test to hold the next gallery query open: see the client below */
   holdGallery: null,
   /**
@@ -338,6 +344,10 @@ const client = {
     }
 
     mutations.push(options);
+
+    if (state.galleryWriteFails) {
+      return Promise.reject(new Error("the write was refused"));
+    }
 
     // **Applied to the fixture, the way a server would.** This used to record the
     // write and change nothing, which made every test of writing a test of the stub:

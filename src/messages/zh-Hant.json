@@ -40,6 +40,7 @@
   "mangaReader.chapterStartTaken": "這一頁已經是某一章的開頭",
   "mangaReader.chapterIndexRange": "這不是這本畫廊的頁碼",
   "mangaReader.chapterNoSuch": "這裡沒有章節開頭",
+  "mangaReader.chapterWriteFailed": "章節沒有寫入成功，請重試",
   "mangaReader.undoChapters": "章節已改動 — 撤銷",
   "mangaReader.chaptersFromList": "批次建立",
   "mangaReader.bulkPaste": "一行一個標題",
