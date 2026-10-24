@@ -74,6 +74,55 @@ module.exports = async () => {
     }
   );
 
+  /**
+   * A lightbox reopened while the first read is still out gets its own read.
+   *
+   * `pending` is what stops a second pass from asking twice for one opening, and
+   * it outlived the lightbox it belonged to: closing mid-read and reopening the
+   * same gallery neither started a read (the gallery was "already pending") nor
+   * received the old one (its answer belongs to the old element) — leaving a
+   * claimed, empty lightbox, which is the state this half must never leave.
+   */
+  await runSection(
+    "reopening while the first read is out draws the new lightbox",
+    async () => {
+      state.holdGallery = true;
+      const first = await startReader({
+        galleryId: "54",
+        on: true,
+        total: 8,
+        ids: CHAPTERS_VIEW.map(String),
+        expectSwitch: false,
+      });
+
+      // Close it before the answer: that answer is for a lightbox that is gone.
+      stopReader(first.box);
+      const release = state.holdGallery;
+      state.holdGallery = null;
+
+      const again = await startReader({
+        galleryId: "54",
+        on: true,
+        total: 8,
+        ids: CHAPTERS_VIEW.map(String),
+      });
+
+      // The old answer lands after the new lightbox is up. It must neither draw
+      // nor consume the new read's marker.
+      release();
+      await settle();
+
+      assert.ok(container(), "the reopened lightbox is this plugin's");
+      assert.strictEqual(
+        again.box.lightbox.querySelector(".manga-reader-spread") !== null,
+        true,
+        "and its pages are drawn, rather than left on a claimed blank screen"
+      );
+
+      stopReader(again.box);
+    }
+  );
+
   await runSection(
     "a busy lightbox is waited out, not given up on",
     async () => {

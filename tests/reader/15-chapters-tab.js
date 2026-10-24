@@ -889,6 +889,71 @@ module.exports = async () => {
     stopTab(tab);
   });
 
+  /**
+   * An import reaches a reader that is already caching the gallery.
+   *
+   * `NS.writeChapters` is the write; the reader's `writeChapters` is the write
+   * **and the announcement**, and the cached gallery updates from announcements.
+   * A tab that calls the former patches only its own copy, so a lightbox open on
+   * the gallery — or reopened from the cache — keeps the list it read before.
+   */
+  await runSection(
+    "an import reaches a reader caching this gallery",
+    async () => {
+      mountBridge();
+      // The section above imported into 35; put its empty list back, which is
+      // the state an import exists for.
+      state.galleries["35"].gallery.custom_fields[
+        "plugin.mangaTools.chapters"
+      ] = JSON.stringify({ v: 1, chapters: [] });
+
+      dom.window.location.pathname = "/galleries/35";
+      const { box } = await startReader({
+        galleryId: "35",
+        on: true,
+        total: 8,
+        ids: CHAPTERS_VIEW.map(String),
+      });
+      assert.deepStrictEqual(
+        chapterMenu(box),
+        [],
+        "precondition: this reader read an empty list"
+      );
+
+      const tab = buildChaptersTab([{ title: "第一話", image_index: 1 }]);
+      dom.flush();
+      await settle();
+
+      const control = () =>
+        dom.body.querySelector("#manga-reader-chapters-import");
+      const heard = [];
+      const stop = NR.watchChapters((id, chapters) =>
+        heard.push([id, chapters.map((chapter) => chapter.title)])
+      );
+
+      dom.click(control().children[0]);
+      await settle();
+      dom.click(control().children[1]);
+      await settle();
+      stop();
+
+      assert.deepStrictEqual(
+        heard,
+        [["35", ["第一話"]]],
+        "the import announces the list it wrote"
+      );
+      assert.deepStrictEqual(
+        chapterMenu(box),
+        ["第一話"],
+        "…and the reader already on this gallery hears it, with no reopen"
+      );
+
+      stopReader(box);
+      stopTab(tab);
+      dom.window.location.pathname = "/";
+    }
+  );
+
   await runSection(
     "a chapter in the tab opens the lightbox there",
     async () => {

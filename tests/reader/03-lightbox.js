@@ -338,6 +338,59 @@ module.exports = async () => {
     }
   );
 
+  /**
+   * An answer for a lightbox that is gone does not decide the next one.
+   *
+   * `pageGalleryId` is module-wide and `galleryOf` checks it before asking about
+   * the image now on screen. A slow `findImage` for a closed lightbox therefore
+   * pins the next lightbox to the closed one's gallery — and never recovers,
+   * because the pinned answer is the first thing every later pass reads.
+   */
+  await runSection(
+    "a slow answer for a closed lightbox does not pin the next one",
+    async () => {
+      dom.window.location.pathname = "/scenes/11593";
+      for (const child of dom.body.children.slice()) child.remove();
+
+      // A: image 105, gallery 7 — its answer is held.
+      state.holdImage = true;
+      const first = buildLightbox(1, 3, ["105", "104", "103"]);
+      dom.flush();
+      await settle();
+      assert.strictEqual(
+        typeof state.holdImage,
+        "function",
+        "precondition: the image's galleries are still being asked for"
+      );
+      const release = state.holdImage;
+      state.holdImage = null;
+      stopReader(first);
+
+      // B: image 401, gallery 8 — its answer is not held, so the takeover happens.
+      const second = buildLightbox(1, 3, ["401", "402", "403"]);
+      dom.flush();
+      await settle();
+      assert.ok(
+        container(),
+        "the second lightbox is taken over by the gallery its image is in"
+      );
+
+      // A's answer lands now, for a lightbox that is gone.
+      release();
+      await settle();
+
+      assert.ok(container(), "and the second lightbox stays taken over");
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/401/image"],
+        "on its own gallery's page, not the closed one's"
+      );
+
+      stopReader(second);
+      dom.window.location.pathname = "/";
+    }
+  );
+
   await runSection(
     "an image with no card above it is asked about before the click",
     async () => {

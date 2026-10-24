@@ -271,8 +271,14 @@ let clickRoot: Element | null = null;
  * a round trip — during which any DOM change runs another pass, finds no gallery
  * in hand, and asks again. One fetch per opening is what it should be, so the
  * gallery being fetched is remembered and a second ask for it is dropped.
+ *
+ * **The lightbox is part of the record, not just the gallery.** A lightbox closed
+ * while its read is in flight and reopened for the same gallery would otherwise
+ * take the first read for its own, then watch that answer discard itself because
+ * it belongs to the old element — leaving a claimed lightbox with nothing in it.
+ * Both the id and the element have to match for an answer to be this opening's.
  */
-let pending: string | null = null;
+let pending: { id: string; lightbox: Element } | null = null;
 
 /**
  * The gallery whose image count is being asked for, if any.
@@ -373,6 +379,14 @@ function galleryOf(lightbox: Element): string | null {
   }
 
   askAboutImage(image.id, () => {
+    // **The answer is for the lightbox that asked.** It can land after that one is
+    // closed and another is open, and `pageGalleryId` is module-wide: applying it
+    // then would pin the new lightbox to this one's gallery, and because
+    // `galleryOf` checks `pageGalleryId` first, it would never ask about its own
+    // image. The cached answer is still kept per image, so the next lightbox on
+    // this image gets it synchronously.
+    if (root !== lightbox) return;
+
     pageGalleryId = galleriesOfImage[image.id];
     // The answer moved what this lightbox is, so everything downstream has to be
     // looked at again — the chapters, the takeover, the drawing.
@@ -563,20 +577,26 @@ function loadGallery(id: string): void {
     return;
   }
 
-  if (pending === id) return;
-
   const forLightbox = root;
   if (!forLightbox) return;
-  pending = id;
+  // One read per opening: a second pass over the same lightbox drops the ask. A
+  // *different* lightbox asking for the same gallery is a new opening — its read
+  // must start even while the old one is still out.
+  if (pending?.id === id && pending.lightbox === forLightbox) return;
+  pending = { id, lightbox: forLightbox };
 
   // Read here rather than remembered: the order belongs to the list the lightbox
   // was opened from, and opening another gallery — or the same one after changing
   // the list's sort — is a different order. See lightboxOrder.
   loadPages(id, lightboxOrder(window.location.search), forLightbox)
     .then((answer) => {
-      // Another gallery was asked for while this was in flight: its answer is the
-      // one that matters, and this one must not be drawn over it.
-      if (pending !== id) return;
+      // Another opening was asked for while this was in flight: its answer is the
+      // one that matters, and this one must not be drawn over it. Matching the
+      // lightbox as well as the gallery is what keeps an old answer from consuming
+      // — and so silencing — a new read for the same gallery.
+      if (!pending || pending.id !== id || pending.lightbox !== forLightbox) {
+        return;
+      }
       pending = null;
 
       // The lightbox can have been closed — or another opened — while that was in
@@ -593,7 +613,11 @@ function loadGallery(id: string): void {
       step();
     })
     .catch((e) => {
-      if (pending === id) pending = null;
+      if (pending && pending.id === id && pending.lightbox === forLightbox) {
+        pending = null;
+      }
+      // A failure for a lightbox that is gone must not turn the new one off.
+      if (root !== forLightbox) return;
       console.error(
         "[mangaReader] could not read this gallery's pages, turning the spread " +
           "view off:",
@@ -1625,6 +1649,9 @@ function deactivate(): void {
 function closeLightbox(): void {
   handedFor = null;
   place = -1;
+  // Any read in flight belongs to the element being closed; a reopen starts its
+  // own. The answer still checks the element, so this is a tidy-up, not the guard.
+  pending = null;
   forgetOpenMenu();
 
   if (clickRoot) {

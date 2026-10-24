@@ -56,6 +56,11 @@ const state = {
   /** Set by a test to hold the next gallery query open: see the client below */
   holdGallery: null,
   /**
+   * The same for the next "which galleries is this image in" query. Set to
+   * `true`; the client replaces it with a function that releases the answer.
+   */
+  holdImage: null,
+  /**
    * The same for the count query a cached gallery is revalidated with. Set to
    * `true` to hold the next one; it is replaced by a function that releases the
    * answer, which is read from the fixture *then* — a test that changes the
@@ -100,9 +105,15 @@ const client = {
         )
         .map((galleryId) => ({ id: galleryId }));
 
-      return Promise.resolve({
+      const answer = {
         data: { findImage: { id: variables.id, galleries } },
-      });
+      };
+      if (state.holdImage) {
+        return new Promise((resolve) => {
+          state.holdImage = () => resolve(answer);
+        });
+      }
+      return Promise.resolve(answer);
     }
 
     // The tools half's gallery map, told apart by having no variables at all: it bakes
@@ -1197,6 +1208,12 @@ state.galleries["51"] = NAMED_GALLERY;
 // other section has opened, since a gallery already read answers from the cache and
 // there would be nothing in flight to look at.
 state.galleries["53"] = {
+  images: numbered(CHAPTERS_VIEW),
+  pathImages: numbered(CHAPTERS_PATH),
+};
+// The same shape, for the section that closes a lightbox while its read is in
+// flight and reopens it: the first open must not consume the second's read.
+state.galleries["54"] = {
   images: numbered(CHAPTERS_VIEW),
   pathImages: numbered(CHAPTERS_PATH),
 };

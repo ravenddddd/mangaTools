@@ -48,7 +48,6 @@ import {
   readChapters,
   removeChapterStartingAt,
   renameChapterAt,
-  serializeChapters,
   toFileChapters,
 } from "./chapters";
 import { watchChapters, writeChapters } from "./chapters-edit";
@@ -1203,44 +1202,24 @@ function askToImport(): void {
 /**
  * Writes Stash's chapters into this plugin's own field.
  *
- * The write is the tools half's — the same quiet mutation the mark uses, with the
- * store and Stash's own form told first — and this half hands over a *string*: the
- * format is its own, and the half that writes does not have to know what a chapter
- * is. Nothing is read back afterwards: what was written is the value in hand, so
- * this gallery has a list of its own from here on, which is a fact rather than a
- * guess. The server is asked again the next time the tab is opened, which is where
- * the list on screen was read from.
+ * **Through `writeChapters`, not `NS.writeChapters`.** The former is the one that
+ * writes *and announces* (see chapters-edit.ts), and the announcement is what
+ * tells every surface drawing this gallery — the reader's own cached list
+ * included, which otherwise keeps the chapters it read when the lightbox was
+ * opened. A write that bypasses it is a write only the tab knows about.
  */
 function importChapters(): void {
   const target = controlFor;
   if (!target || busy) return;
 
-  // The tools half publishes the write. It cannot be *hidden* for the case where
-  // that half did not start: whether this gallery is manga comes from the same
-  // half, so the tab this control is in would not exist either — the check is a
-  // guard against the impossible, and it says so rather than throwing.
-  if (typeof NS.writeChapters !== "function") {
-    console.error(
-      "[mangaReader] the tools half is not running, so this gallery's chapters " +
-        "cannot be written"
-    );
-    return;
-  }
-
   busy = true;
   redraw();
 
-  NS.writeChapters(
-    target.id,
-    serializeChapters(target.importable, NS.physicalPageMode(), target.pages)
-  ).then(
+  writeChapters(target.id, target.importable, target.pages).then(
     () => {
       busy = false;
-      if (inHand?.id === target.id) {
-        inHand.own = true;
-        inHand.importable = target.importable;
-      }
-
+      // The announce listener updates the copy in hand (stored/chapters/own);
+      // this is only the control's own state.
       confirming = false;
       redraw();
     },
