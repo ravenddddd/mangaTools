@@ -336,7 +336,16 @@ export function GalleryToolbar(props: {
   };
 
   const onConfirmUnmark = () => {
-    write({ remove: NS.fieldsToClear(props.values) });
+    // **The list comes from the store, not from Stash's cached values.** The
+    // quiet mutation asks for nothing back, so anything written during this page
+    // view — a chapter list from the reader above all — is in the plugin's store
+    // and *not* in the cached custom fields this component was handed. A list
+    // built from the cache would leave that value on a gallery the plugin no
+    // longer manages, and re-marking would bring it back. The fallback is the
+    // window before the store has answered; `mark` reads it the same way.
+    write({
+      remove: NS.fieldsToClear(store?.get(props.galleryId) ?? props.values),
+    });
   };
 
   return PluginApi.ReactDOM.createPortal(

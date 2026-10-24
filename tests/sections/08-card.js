@@ -1232,6 +1232,42 @@ module.exports = () => {
   );
   assert.deepStrictEqual(NS.fieldsToClear(null), [NS.MANGA_FIELD_NAME]);
 
+  // …and the list is built from the **store**, not from the values Stash handed
+  // in. A chapter list written during this page view is in the store and not in
+  // Apollo's cache — that is what asking for nothing back costs — so a list from
+  // the cache would leave the chapter JSON on a gallery the plugin no longer
+  // manages. Gallery 9994 is no other section's fixture.
+  {
+    nav("/galleries/9994");
+    const unmarkToggle = () =>
+      toolbarMark(detailValues("censored")).drawn.node.props.children[0];
+
+    // Mark it, so the store has an entry, then write chapters into it.
+    unmarkToggle().props.onClick();
+    NS.writeChapters(
+      "9994",
+      '{"v":1,"chapters":[{"title":"x","images":["1"]}]}'
+    );
+
+    const confirmBefore = NS.confirmUnmark;
+    NS.confirmUnmark = false;
+    const beforeUnmark = mutationWrites.length;
+    unmarkToggle().props.onClick();
+    NS.confirmUnmark = confirmBefore;
+
+    const removed =
+      mutationWrites[beforeUnmark].variables.input.custom_fields.remove;
+    assert.ok(
+      removed.includes(NS.CHAPTER_FIELD_NAME),
+      "unmarking removes the chapter key the store knows about, though Stash's " +
+        "cached values never held it"
+    );
+    assert.ok(
+      removed.includes(NS.MANGA_FIELD_NAME),
+      "…and the mark, which the same quiet write put in the store"
+    );
+  }
+
   // The map the edit form is put into, which has to say the same thing as that
   // list: every one of this plugin's keys gone, by the spelling it has, and
   // everybody else's left exactly as it was.
