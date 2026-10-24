@@ -191,6 +191,11 @@ export interface MangaToolsNamespace {
    */
   refreshesStoreAfter(name: string | null): boolean;
   /**
+   * Whether a mutation's operation name is an image deletion, which changes the
+   * files a gallery's physical grid was built from.
+   */
+  forgetsGridAfter(name: string | null): boolean;
+  /**
    * The reading half's own settings, as the JSON string they are stored as — or null
    * before Stash has answered with the plugin's configuration.
    *
@@ -322,6 +327,15 @@ export interface MangaToolsNamespace {
     grid: T,
     limit?: number
   ): void;
+  /**
+   * Forgets every gallery's file list and tells the Images tab to read again.
+   * Called from the client wrapper when Stash destroys images: the deletion
+   * evicts them from Apollo and the list refetches, but this cache holds the
+   * files that list was built from.
+   */
+  forgetPhysicalGrids(): void;
+  /** Runs `fn` when the file lists are forgotten; returns the way to stop. */
+  watchPhysicalGrids(fn: () => void): () => void;
   /**
    * The physical-pages query documents, published so a test can pin the parts a
    * real Stash would reject. Both fake clients accept any text; see the note in

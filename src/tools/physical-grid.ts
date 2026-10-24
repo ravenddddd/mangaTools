@@ -54,6 +54,38 @@ export interface GalleryGrid {
 
 const cache = new Map<string, GalleryGrid>();
 const inFlight = new Map<string, Promise<GalleryGrid>>();
+/** Bumped by an invalidation, so a load that started before it cannot re-cache. */
+let cacheGeneration = 0;
+/** The ImageList patch, told that its list is gone and it has to read again. */
+const listeners = new Set<() => void>();
+
+/**
+ * Forgets every gallery's file list, and tells whatever is drawing one.
+ *
+ * **Stash's own image deletion is the caller.** Deleting images evicts them from
+ * Apollo and the list refetches — but this module's cache holds the gallery's
+ * *files*, keyed by gallery, and nothing in that refetch touches it: the list was
+ * expanded from the stale files and the deleted pages stayed on screen until a
+ * full page reload. The cache is not revalidated on its own (see load), so a
+ * mutation that changes membership is its invalidation.
+ */
+export function forgetPhysicalGrids(): void {
+  cacheGeneration += 1;
+  cache.clear();
+  inFlight.clear();
+  listeners.forEach((fn) => {
+    fn();
+  });
+}
+
+/** Runs `fn` whenever the file lists are forgotten; returns the way to stop. */
+export function watchPhysicalGrids(fn: () => void): () => void {
+  listeners.add(fn);
+
+  return () => {
+    listeners.delete(fn);
+  };
+}
 
 /**
  * How many galleries' file lists are kept, matching the reader's gallery cache
@@ -87,11 +119,12 @@ export function rememberPhysicalGrid<T>(
 }
 
 /**
- * Reads a gallery's physical list, once per gallery per page load.
+ * Reads a gallery's physical list, once per gallery until it is invalidated.
  *
- * Deliberately not revalidated: the list is the grid's, and the reader is the one
- * with a cache worth keeping correct — a change made elsewhere shows up when the
- * page is reloaded, which is the same thing Stash's own deduped list would do.
+ * Not revalidated on its own: the list changes only when image membership does,
+ * and that is a mutation — see forgetPhysicalGrids, which Stash's image deletion
+ * calls. A load already in flight when that happens must not put the pre-deletion
+ * list back, hence the generation.
  */
 function load(galleryId: string): Promise<GalleryGrid> {
   const cached = cache.get(galleryId);
@@ -100,7 +133,9 @@ function load(galleryId: string): Promise<GalleryGrid> {
   const waiting = inFlight.get(galleryId);
   if (waiting) return waiting;
 
-  const promise = fetchGalleryScope(galleryId)
+  const generation = cacheGeneration;
+  let promise: Promise<GalleryGrid>;
+  promise = fetchGalleryScope(galleryId)
     .then((scope) =>
       scope
         ? fetchGalleryFiles(galleryId, scope, true)
@@ -108,12 +143,16 @@ function load(galleryId: string): Promise<GalleryGrid> {
     )
     .then((list) => {
       const grid: GalleryGrid = { files: list.files, total: list.total };
-      rememberPhysicalGrid(cache, galleryId, grid);
-      inFlight.delete(galleryId);
+      if (generation === cacheGeneration) {
+        rememberPhysicalGrid(cache, galleryId, grid);
+      }
+      // Only this load's own entry: an invalidation may already have cleared it
+      // and a newer load put its own promise there.
+      if (inFlight.get(galleryId) === promise) inFlight.delete(galleryId);
       return grid;
     })
     .catch((error: unknown) => {
-      inFlight.delete(galleryId);
+      if (inFlight.get(galleryId) === promise) inFlight.delete(galleryId);
       console.error(
         "[mangaTools] could not read this gallery's files, so its grid keeps " +
           "the deduplicated list:",
@@ -349,6 +388,15 @@ function registerListPatch(): void {
 
     const galleryId = NS.physicalPageMode() ? currentGalleryId() : "";
     const [, bump] = React.useState(0);
+    // A value to re-run the load effect, not one the render reads: an
+    // invalidation (an image deletion) has to fetch the file list again, and the
+    // completion bump above must not re-run it — that would be a fetch loop.
+    const [invalidated, setInvalidated] = React.useState(0);
+
+    React.useEffect(
+      () => watchPhysicalGrids(() => setInvalidated((n) => n + 1)),
+      []
+    );
 
     React.useEffect(() => {
       if (!galleryId) return;
@@ -359,7 +407,7 @@ function registerListPatch(): void {
       return () => {
         live = false;
       };
-    }, [galleryId]);
+    }, [galleryId, invalidated]);
 
     const grid = galleryId ? cache.get(galleryId) : undefined;
 
@@ -465,6 +513,8 @@ export function registerPhysicalPagePatches(): void {
 // functions. The cast is only about the list's props, which Stash has no type for.
 NS.physicalPagePlan = physicalPagePlan;
 NS.rememberPhysicalGrid = rememberPhysicalGrid;
+NS.forgetPhysicalGrids = forgetPhysicalGrids;
+NS.watchPhysicalGrids = watchPhysicalGrids;
 NS.expandPhysicalPage = expandPhysicalPage as unknown as (
   props: unknown,
   grid: unknown

@@ -289,6 +289,19 @@ export function refreshesStoreAfter(name: string | null): boolean {
   return name === "GalleryUpdate" || name === "GalleriesUpdate";
 }
 
+/**
+ * Whether a mutation's operation name changes what images a gallery holds.
+ *
+ * A deletion is the one Stash mutation that can make the Images tab's file list
+ * wrong: the list refetches from Apollo without the deleted images, but the
+ * physical grid was expanded from files this plugin cached, and nothing in that
+ * refetch touches the cache. Published for the smoke test, like the predicate
+ * above — the wrapper's branches cannot be told apart by counting queries.
+ */
+export function forgetsGridAfter(name: string | null): boolean {
+  return name === "ImageDestroy" || name === "ImagesDestroy";
+}
+
 function installStoreRefresh(): void {
   const client = stashClient();
   if (!client || client === watchedClient) return;
@@ -303,6 +316,15 @@ function installStoreRefresh(): void {
         () => refreshAfterWrite(),
         // A rejected save heard nothing from the server; refreshing would ask
         // about a state that did not change.
+        () => {}
+      );
+    }
+    // An image deletion changes the gallery's files, which the physical grid
+    // cached: the list refetches without the images, but the grid would keep
+    // expanding the old file list until a full page reload.
+    if (forgetsGridAfter(name)) {
+      result.then(
+        () => NS.forgetPhysicalGrids(),
         () => {}
       );
     }
@@ -940,6 +962,7 @@ NS.watchStore = (fn: () => void): (() => void) => subscribe(fn);
  * smoke test, which cannot tell the wrapper's branches apart by query counts.
  */
 NS.refreshesStoreAfter = refreshesStoreAfter;
+NS.forgetsGridAfter = forgetsGridAfter;
 
 // ──────────────────────── Writing the settings ────────────────────────
 //

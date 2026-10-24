@@ -392,6 +392,88 @@ module.exports = () => {
     );
   });
 
+  /**
+   * Stash's image deletion invalidates the cached file lists.
+   *
+   * The Images tab's list refetches from Apollo without the deleted images, but
+   * the physical grid was expanded from this module's file cache — which that
+   * refetch does not touch. Without the invalidation the deleted pages stay on
+   * screen until a full page reload. This is on every gallery: the physical-page
+   * setting is global, not part of the manga mark.
+   */
+  runSection("15 an image deletion invalidates the file lists", () => {
+    assert.strictEqual(
+      NS.forgetsGridAfter("ImageDestroy"),
+      true,
+      "a single image deletion changes the files"
+    );
+    assert.strictEqual(
+      NS.forgetsGridAfter("ImagesDestroy"),
+      true,
+      "and so does a bulk one"
+    );
+    assert.strictEqual(
+      NS.forgetsGridAfter("GalleryUpdate"),
+      false,
+      "a gallery save does not"
+    );
+    assert.strictEqual(
+      NS.forgetsGridAfter("ImageUpdate"),
+      false,
+      "nor an image edit that leaves membership alone"
+    );
+
+    // The listener the ImageList patch installs is what fetches again.
+    let heard = 0;
+    const stop = NS.watchPhysicalGrids(() => {
+      heard += 1;
+    });
+    NS.forgetPhysicalGrids();
+    stop();
+    assert.strictEqual(heard, 1, "forgetting tells the grid to read again");
+    NS.forgetPhysicalGrids();
+    assert.strictEqual(heard, 1, "and a stopped watcher hears nothing");
+
+    // The wiring itself: a successful destroy through the client wrapper
+    // invalidates; a rejected one does not.
+    const client = global.window.PluginApi.utils.StashService.getClient();
+    let wired = 0;
+    const stopWired = NS.watchPhysicalGrids(() => {
+      wired += 1;
+    });
+
+    client.mutate({
+      mutation: { definitions: [{ name: { value: "ImageDestroy" } }] },
+      variables: { input: { id: "1" } },
+    });
+
+    setTimeout(() => {
+      assert.strictEqual(
+        wired,
+        1,
+        "a successful image delete invalidates the cached lists"
+      );
+
+      state.galleryWriteResult = new Error("nope");
+      client
+        .mutate({
+          mutation: { definitions: [{ name: { value: "ImagesDestroy" } }] },
+          variables: { input: { ids: ["1"] } },
+        })
+        .catch(() => {});
+      state.galleryWriteResult = null;
+
+      setTimeout(() => {
+        stopWired();
+        assert.strictEqual(
+          wired,
+          1,
+          "a delete that failed changed nothing, so nothing is invalidated"
+        );
+      }, 0);
+    }, 0);
+  });
+
   runSection("15 the patches are registered", () => {
     assert.strictEqual(
       typeof patched.ImageList,

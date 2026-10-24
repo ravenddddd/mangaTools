@@ -347,6 +347,12 @@ const physicalFileAnswer = (file) => ({
   images: [physicalImage(file.imageId)],
 });
 
+// Kept so the reload below can put the client's own `mutate` back: the faulted
+// load starts the tools half, whose store wrapper replaces it on this object. A
+// second bundle instance would then wrap *that* wrapper, and every mutation would
+// refresh twice — which is exactly what the sections' query counts saw.
+let originalMutate = null;
+
 const fakeClient = {
   // Stands in for Stash's existing link chain, which setLink must pass through.
   link: { __original: true },
@@ -468,6 +474,9 @@ const fakeClient = {
     });
   },
 };
+
+// The client's own `mutate`, before any bundle wraps it — see the reload below.
+originalMutate = fakeClient.mutate;
 
 // ── Minimal DOM stub: only the methods the mount points actually use ──
 
@@ -1179,6 +1188,11 @@ for (const map of [patched, patchedBefore, patchedAfter]) {
 // sections that count fetches would be counting a test world's mistake rather than
 // the plugin's behaviour.
 forgetEventListeners();
+// …and the client's own `mutate`, for the same reason: the faulted load started
+// the tools half, which replaced it with its store wrapper. The clean load is a
+// second module instance with its own `watchedClient`, so without this it would
+// wrap the first instance's wrapper and every mutation would refresh twice.
+fakeClient.mutate = originalMutate;
 delete require.cache[BUNDLE];
 require(BUNDLE);
 
