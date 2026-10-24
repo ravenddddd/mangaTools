@@ -507,6 +507,14 @@ NS.coverIcon = FEATURE_ON_BY_DEFAULT;
 NS.confirmUnmark = FEATURE_ON_BY_DEFAULT;
 NS.deleteOnUnmark = FEATURE_ON_BY_DEFAULT;
 
+/**
+ * Whether a successful configuration read has happened yet. See the namespace
+ * declaration for why a save is gated on it.
+ */
+NS.settingsLoaded = false;
+/** Whether the refusal has already been said — it is one line, not one per click. */
+let settingsSaveRefused = false;
+
 let SETTINGS_QUERY: unknown = null;
 
 function getSettingsQuery(): unknown {
@@ -651,6 +659,11 @@ function refreshSettings(): void {
         pluginCfg.readerSettings
           ? pluginCfg.readerSettings
           : null;
+      // The whole map is now known, so it is safe to write back. Set after the
+      // values above, never before: a save during this handler would otherwise
+      // read a map that is half old and half new.
+      NS.settingsLoaded = true;
+      settingsSaveRefused = false;
       emit();
     })
     .catch((e) => {
@@ -960,6 +973,24 @@ function settingsInput(): { [key: string]: unknown } {
 }
 
 export function saveSettings(): void {
+  // Before the first successful read the values in force are the module defaults
+  // (see the defaults above). `configurePlugin` replaces the plugin's whole input,
+  // so saving then would write those defaults over the stored map — one toggle
+  // resetting enabled languages, every switch and both reading profiles. Refuse,
+  // and say it once: a click that silently does nothing is worse than a click that
+  // says why, but the settings page calls this on every move of a slider.
+  if (!NS.settingsLoaded) {
+    if (!settingsSaveRefused) {
+      settingsSaveRefused = true;
+      console.error(
+        "[mangaTools] the settings have not been read from Stash yet, so they " +
+          "were not saved: writing the defaults over the stored map would reset " +
+          "every setting."
+      );
+    }
+    return;
+  }
+
   const client = stashClient();
   if (!client) {
     console.error("[mangaTools] no Apollo client, the settings were not saved");

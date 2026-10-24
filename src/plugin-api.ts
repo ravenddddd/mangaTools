@@ -461,6 +461,16 @@ export interface MangaToolsNamespace {
    * the same comma-separated storage the languages use.
    */
   sidebarFilters: Set<string> | null;
+  /**
+   * Whether the plugin's settings have been read from Stash at least once.
+   *
+   * False until the first successful configuration read, and never set back: a
+   * failed re-read leaves the last values in force, which are safe to save. A save
+   * while it is false is refused — the values then are the module defaults, and
+   * `configurePlugin` replaces the whole map, so one toggle in that window would
+   * reset every setting the library holds.
+   */
+  settingsLoaded: boolean;
   /** The four names the setting holds, in the fields' own order */
   SIDEBAR_FILTERS: readonly string[];
   parseSidebarFilters(raw: unknown): Set<string> | null;

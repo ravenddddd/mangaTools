@@ -10,6 +10,7 @@ const {
   call,
   capturedQueries,
   find,
+  loggedErrors,
   makeFilterModel,
   original,
   patched,
@@ -1030,6 +1031,13 @@ module.exports = () => {
 
   state.currentLocale = localeBefore;
 
+  // These sections run synchronously from the bundle's load, before the
+  // configuration response has been handled — which is why the save path below
+  // is allowed to run. Stand in for a page opened after that response; the flag
+  // is put back to false at the end of this section, so the real response is
+  // what section 11 sees.
+  NS.settingsLoaded = true;
+
   // Selecting a new set writes it back through configurePlugin and updates the
   // shared NS.enabledLanguages immediately.
   settingsSelect.props.onChange([{ value: "ja" }, { value: "zh-Hans" }]);
@@ -1283,6 +1291,55 @@ module.exports = () => {
     "…and is written with the others"
   );
   NS.hidePerformers = true;
+
+  // A save made before the configuration has been read is refused. The live
+  // values at that moment are the module defaults, and `configurePlugin`
+  // replaces the whole map — one toggle would reset every setting the library
+  // holds. The window is simulated by clearing the flag the response sets; this
+  // section turned it on above to stand in for a page whose read has settled.
+  {
+    const before = state.capturedConfigWrite;
+    const errorsBefore = loggedErrors.length;
+    NS.settingsLoaded = false;
+
+    sw["mangaTools-showDisabledFields"].props.onChange();
+    assert.strictEqual(
+      state.capturedConfigWrite,
+      before,
+      "no configurePlugin write is sent before the settings have been read"
+    );
+    assert.strictEqual(
+      NS.showDisabledFields,
+      true,
+      "the live value still follows the switch — only the write is refused"
+    );
+    assert.strictEqual(
+      loggedErrors
+        .slice(errorsBefore)
+        .filter((line) => /have not been read from Stash yet/.test(line))
+        .length,
+      1,
+      "and the refusal says why, once"
+    );
+
+    // A second click in the same window says nothing again.
+    sw["mangaTools-showDisabledFields"].props.onChange();
+    assert.strictEqual(
+      loggedErrors
+        .slice(errorsBefore)
+        .filter((line) => /have not been read from Stash yet/.test(line))
+        .length,
+      1,
+      "a second click does not repeat it"
+    );
+
+    // Put the live value back, and the flag with it: this section stands in for
+    // a page whose read has settled. The end of the section clears it again, so
+    // the assertion in section 11 is about the real response.
+    NS.showDisabledFields = false;
+    NS.settingsLoaded = true;
+  }
+
   console.log(
     "✓ settings UI (multiselect + switches write configurePlugin, update shared state)"
   );
@@ -1408,6 +1465,12 @@ module.exports = () => {
         "would ever be read"
     );
   }
+
+  // Back to the state the load left: the configuration response has not been
+  // handled yet, so the save guard is still in force. Section 11 asserts that
+  // handling it is what clears the flag — and that is the real response, not
+  // this test's stand-in.
+  NS.settingsLoaded = false;
 
   state.currentLocale = "zh-CN";
   console.log(

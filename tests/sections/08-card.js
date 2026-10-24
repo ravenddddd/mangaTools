@@ -31,6 +31,15 @@ const {
 const { detail, editField } = require("../renders.js");
 
 module.exports = () => {
+  // The configuration response has been handled by the time this section runs
+  // (it is one of the ones scheduled after the load's promises), and handling it
+  // is what tells the save path that the whole map is known.
+  assert.strictEqual(
+    NS.settingsLoaded,
+    true,
+    "the first successful configuration read marks the settings as loaded"
+  );
+
   // ── 11. Badges (after the refresh promise settles) ───────────────
   // Stands in for Stash's own Overlays — the studio overlay. An `after` patch is
   // handed it and returns it, so handing back the *same object* is how "the

@@ -942,6 +942,13 @@ part of the published API. The settings page is not the only writer: the lightbo
 writes the reading half's JSON into its own key of the same map, and both go through
 one function that builds the whole of it, so neither can take the other's with it.
 
+**Nothing is written before that map has been read once.** Until the first
+successful configuration read, the values in force are the module defaults; saving
+then would replace every stored setting with them. A save in that window is
+refused, and the refusal is logged once rather than on every movement of a slider.
+A failed *re*-read is harmless by contrast: the values left in force are the last
+ones read, and they are safe to write back.
+
 It is a *custom* UI rather than Stash's stock per-setting inputs. Stash
 can only render STRING/NUMBER/BOOLEAN settings one plain input each, so "which
 languages are enabled" would otherwise be a comma-separated text box. The plugin
