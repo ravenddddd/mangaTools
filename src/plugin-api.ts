@@ -407,6 +407,11 @@ export interface MangaToolsNamespace {
   /** Puts the shop icon heads into a form's link rows. Published for the test. */
   decorateShopUrls(form: Element): void;
   /**
+   * Watches a form's link rows — mutation, in-place value rewrites, and drag
+   * reorders — and returns the cleanup that removes every watcher.
+   */
+  watchShopUrls(form: Element, run: () => void): () => void;
+  /**
    * Whether the Chapters tab's Create and Edit belong to this plugin.
    *
    * On, they write this plugin's own chapter field, and Stash's own chapter rows are

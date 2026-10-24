@@ -106,7 +106,10 @@ export function shopOf(raw: string): ShopLink | null {
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
 
-  const host = url.hostname.toLowerCase();
+  // A trailing dot is the dotted-FQDN spelling of the same host, and WHATWG's
+  // URL keeps it: `www.dlsite.com.` is the same site to a browser. Left on, it
+  // fails both the equality and the `.dlsite.com` test below.
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
   const shop = SHOPS.find(
     (candidate) =>
       host === candidate.domain || host.endsWith("." + candidate.domain)

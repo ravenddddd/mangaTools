@@ -613,6 +613,9 @@ function makeEl(tag) {
     addEventListener(name, fn) {
       el.listeners[name] = fn;
     },
+    removeEventListener(name, fn) {
+      if (el.listeners[name] === fn) delete el.listeners[name];
+    },
     // Enough of an event for the plugin's preventDefault guard, which checks for
     // it because a listener can be handed a non-event in a test.
     click() {

@@ -84,14 +84,29 @@ export function decorateShopUrls(form: Element): void {
     }
 
     if (current) {
-      if (current.getAttribute("data-shop") === want.key) continue;
-      const img = current.querySelector("img") as HTMLImageElement | null;
-      if (img && img.getAttribute("src") !== want.src) img.src = want.src;
-      if (img && img.alt !== want.title) img.alt = want.title;
+      // **The whole head's state is compared, not the shop alone.** The title
+      // carries the product code, so a link changed to another product of the
+      // same shop changes nothing in `data-shop` and everything the reader sees
+      // on hover. The early `continue` this replaced left that code stale.
       current.setAttribute("data-shop", want.key);
       const text = current.querySelector(".input-group-text");
       if (text && text.getAttribute("title") !== want.title) {
         text.setAttribute("title", want.title);
+      }
+
+      let img = current.querySelector("img") as HTMLImageElement | null;
+      if (want.src) {
+        if (!img) {
+          img = iconFor(want.src, want.title);
+          text?.appendChild(img);
+        } else {
+          if (img.getAttribute("src") !== want.src) img.src = want.src;
+          if (img.alt !== want.title) img.alt = want.title;
+        }
+      } else if (img) {
+        // The asset base is unknown: `shopIconUrl`'s contract is no image rather
+        // than a broken one, and `src=""` resolves to the document itself.
+        img.remove();
       }
       continue;
     }
@@ -103,14 +118,49 @@ export function decorateShopUrls(form: Element): void {
     const text = document.createElement("span");
     text.className = "input-group-text";
     text.setAttribute("title", want.title);
-
-    const img = document.createElement("img");
-    img.src = want.src;
-    img.alt = want.title;
-    text.appendChild(img);
+    // Only when there is somewhere to point it: an empty `src` is an image
+    // pointing at the page, which is a broken icon rather than no icon.
+    if (want.src) text.appendChild(iconFor(want.src, want.title));
     prepend.appendChild(text);
     group.insertBefore(prepend, group.children[0] || null);
   }
+}
+
+/** The head's icon, with the shop and code as its alternative text */
+function iconFor(src: string, title: string): HTMLImageElement {
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = title;
+  return img;
+}
+
+/**
+ * Watches a form for the three ways its link rows can change, and calls `run`.
+ *
+ * - rows added or removed: React, a child-list mutation — the observer;
+ * - the input's value rewritten in place: React writes the property, which
+ *   dispatches no native event — the capture `input` (and `change`, for a
+ *   rewrite that lands on blur);
+ * - **a drag-reorder**: Stash's `StringListInput` keys its rows by index, so a
+ *   dragged row swaps its input's value with its neighbour's, in place. That is
+ *   neither a child-list mutation nor an `input` event — `dragend`/`drop` are
+ *   what bring the decorator back. Without them both rows keep the head of the
+ *   URL that used to be there.
+ *
+ * Published for the test; `ShopUrlHeads` is the only production caller.
+ */
+export function watchShopUrls(form: Element, run: () => void): () => void {
+  const observer =
+    typeof MutationObserver === "function" ? new MutationObserver(run) : null;
+  observer?.observe(form, { childList: true, subtree: true });
+
+  const events = ["input", "change", "drop", "dragend"];
+  for (const name of events) form.addEventListener(name, run, true);
+
+  return () => {
+    observer?.disconnect();
+    for (const name of events) form.removeEventListener(name, run, true);
+  };
 }
 
 /**
@@ -130,14 +180,10 @@ export function ShopUrlHeads() {
     const run = () => decorateShopUrls(form);
     run();
 
-    const observer =
-      typeof MutationObserver === "function" ? new MutationObserver(run) : null;
-    observer?.observe(form, { childList: true, subtree: true });
-    form.addEventListener("input", run, true);
+    const stop = watchShopUrls(form, run);
 
     return () => {
-      observer?.disconnect();
-      form.removeEventListener("input", run, true);
+      stop();
       // The form is going away with us; taking our heads out keeps a form that
       // somehow outlives the block from carrying stale icons.
       const heads = form.querySelectorAll("." + PREFIX);
@@ -148,5 +194,6 @@ export function ShopUrlHeads() {
   return <span ref={ref} hidden />;
 }
 
-// Published for the smoke test, which drives it against the DOM stub.
+// Published for the smoke test, which drives them against the DOM stub.
 NS.decorateShopUrls = decorateShopUrls;
+NS.watchShopUrls = watchShopUrls;

@@ -9,7 +9,7 @@
  */
 
 const assert = require("node:assert");
-const { NS, makeEl, runSection, state } = require("../helpers.js");
+const { NS, makeEl, observed, runSection, state } = require("../helpers.js");
 
 module.exports = () => {
   runSection(
@@ -23,6 +23,26 @@ module.exports = () => {
         ],
         [
           "https://www.dlsite.com/maniax/work/=/product_id/RJ01668994.html",
+          "dlsite",
+          "RJ01668994",
+        ],
+        // The `product_id=RJ…` spelling the same regex reads.
+        [
+          "https://www.dlsite.com/maniax/work/=/product_id=RJ01668994.html",
+          "dlsite",
+          "RJ01668994",
+        ],
+        // A dotted-FQDN host: the trailing dot is the same site to a browser,
+        // and WHATWG's URL keeps it.
+        [
+          "https://www.dlsite.com./books/work/=/product_id/BJ03044888.html",
+          "dlsite",
+          "BJ03044888",
+        ],
+        // Case and a default port are already normalised by the URL parser; the
+        // table says so rather than assuming it.
+        [
+          "HTTPS://WWW.DLsite.com:443/maniax/work/=/product_id/RJ01668994.html",
           "dlsite",
           "RJ01668994",
         ],
@@ -139,7 +159,21 @@ module.exports = () => {
         "dlsite",
         "…carrying the shop it recognised"
       );
-      assert.ok(head.querySelector("img"), "…with the icon");
+      // **No icon in this world, and that is the contract.** `assetBase` is
+      // unknown here (the real plugin logs it), so `shopIconUrl` is ""; the head
+      // still names the shop and the code, and an `<img src="">` — which resolves
+      // to the document and draws a broken icon — is exactly what must not be
+      // made.
+      assert.strictEqual(
+        head.querySelector("img"),
+        null,
+        "…with no image when the asset base is unknown"
+      );
+      assert.strictEqual(
+        head.querySelector(".input-group-text").getAttribute("title"),
+        "DLsite · BJ03044888",
+        "…but with the shop and the code still named"
+      );
       assert.strictEqual(
         group.children[0],
         head,
@@ -155,6 +189,23 @@ module.exports = () => {
         "a second pass writes nothing"
       );
 
+      // **The same shop, another product.** `data-shop` does not change, so a
+      // guard keyed on the shop alone would skip the title — and the title
+      // carries the code the reader hovers for.
+      input.value =
+        "https://www.dlsite.com/books/work/=/product_id/RJ01668994.html";
+      NS.decorateShopUrls(form);
+      assert.strictEqual(
+        head.getAttribute("data-shop"),
+        "dlsite",
+        "the shop is unchanged"
+      );
+      assert.strictEqual(
+        head.querySelector(".input-group-text").getAttribute("title"),
+        "DLsite · RJ01668994",
+        "…and the code in the head follows the link anyway"
+      );
+
       // The same row, another shop: the head is updated, not duplicated.
       input.value = "https://ec.toranoana.jp/tora_r/ec/item/040030474993/";
       NS.decorateShopUrls(form);
@@ -162,6 +213,11 @@ module.exports = () => {
         head.getAttribute("data-shop"),
         "toranoana",
         "changing the link changes the head in place"
+      );
+      assert.strictEqual(
+        head.querySelector(".input-group-text").getAttribute("title"),
+        "虎穴 · 040030474993",
+        "…title and all"
       );
       assert.strictEqual(
         all(".manga-tools-shop-prefix").length,
@@ -181,6 +237,95 @@ module.exports = () => {
       NS.shopLinks = false;
     }
   );
+
+  /**
+   * A row whose value React rewrote in place is decorated again.
+   *
+   * This is the drag-reorder case: Stash's `StringListInput` keys its rows by
+   * index, so dragging one swaps two inputs' values without adding or removing a
+   * node and without a native `input` event. `dragend` and `drop` are the only
+   * signals, and the observer + listeners are installed by `watchShopUrls`, not
+   * by the decorator — so what this drives is the installation itself.
+   */
+  runSection("16 a row React rewrote in place is decorated again", () => {
+    const form = makeEl("form");
+    const all = (selector) => {
+      const out = [];
+      const name = selector.slice(1);
+      const walk = (node) => {
+        node.children.forEach((child) => {
+          if (child.classList.contains(name)) out.push(child);
+          walk(child);
+        });
+      };
+      walk(form);
+      return out;
+    };
+    form.querySelectorAll = all;
+
+    const group = makeEl("div");
+    group.className = "input-group";
+    const input = makeEl("input");
+    input.value =
+      "https://www.dlsite.com/books/work/=/product_id/BJ03044888.html";
+    const append = makeEl("div");
+    append.className = "input-group-append";
+    const scrape = makeEl("button");
+    scrape.className = "scrape-url-button";
+    append.appendChild(scrape);
+    group.appendChild(input);
+    group.appendChild(append);
+    form.appendChild(group);
+
+    NS.shopLinks = true;
+    const run = () => NS.decorateShopUrls(form);
+    run();
+    const stop = NS.watchShopUrls(form, run);
+
+    const head = () => all(".manga-tools-shop-prefix")[0];
+
+    // The drag path: the value is rewritten in place, then the drag ends.
+    assert.strictEqual(
+      typeof form.listeners.dragend,
+      "function",
+      "a drag-reorder is watched — it is neither a mutation nor an input event"
+    );
+    input.value = "https://ec.toranoana.jp/tora_r/ec/item/040030474993/";
+    form.listeners.dragend();
+    assert.strictEqual(
+      head().getAttribute("data-shop"),
+      "toranoana",
+      "dragend re-decorates the row React rewrote"
+    );
+
+    // A rewrite that lands on blur: `change` is the other rewrite signal.
+    input.value = "https://www.dmm.co.jp/dc/doujin/-/detail/=/cid=d_790745/";
+    form.listeners.change();
+    assert.strictEqual(
+      head().getAttribute("data-shop"),
+      "fanza",
+      "change does too"
+    );
+
+    // Rows added or removed are the observer's business.
+    input.value =
+      "https://www.melonbooks.co.jp/detail/detail.php?product_id=2500562";
+    observed[observed.length - 1].callback();
+    assert.strictEqual(
+      head().getAttribute("data-shop"),
+      "melonbooks",
+      "and the observer still watches the form"
+    );
+
+    stop();
+    assert.strictEqual(
+      form.listeners.dragend,
+      undefined,
+      "the cleanup removes every listener it installed"
+    );
+
+    NS.shopLinks = false;
+  });
 
   runSection("16 a Stash gallery save refreshes the store", () => {
     // The shop row reads the gallery's urls from the store, so a save from Stash's
