@@ -1455,4 +1455,118 @@ module.exports = async () => {
       dom.window.location.pathname = "/";
     }
   );
+
+  /**
+   * A paste past BULK_LIMIT empties the table, and empties what Create reads.
+   *
+   * The table was cleared but the list behind it was not, so a paste of more than
+   * 64 lines left Create saying "Create N chapters" for the *previous* paste and
+   * writing those pages over the gallery's chapter list. The note about the limit
+   * was also inserted afresh on every keystroke, and nothing removed the earlier
+   * ones.
+   */
+  await runSection(
+    "a paste over the limit leaves nothing Create can write",
+    async () => {
+      mountBridge();
+      // 39 rather than 32: 32's fixture is shared with a section that writes
+      // chapters to it, and the writes are applied — by this point its list has
+      // chapter starts on the pages this test types.
+      dom.window.location.pathname = "/galleries/39";
+      const tab = buildChaptersTab([]);
+      dom.flush();
+      await settle();
+
+      dom.click(dom.body.querySelector("#manga-reader-chapters-bulk"));
+      const area = dom.body.querySelector("#chapter_list");
+      const table = dom.body.querySelector(".manga-reader-bulk-table");
+      const create = dom.body.querySelector("#manga-reader-bulk-create");
+      const pages = () =>
+        table
+          .querySelectorAll("tr")
+          .slice(1)
+          .map((tr) => tr.querySelectorAll("input")[1]);
+
+      // A table that would write if the list behind it survived the paste.
+      area.value = ["A", "B"].join("\n");
+      area.dispatchEvent({ type: "input" });
+      [2, 3].forEach((n, at) => {
+        const field = pages()[at];
+        field.value = String(n);
+        field.dispatchEvent({ type: "input" });
+      });
+      assert.strictEqual(
+        create.disabled,
+        false,
+        "precondition: two valid rows, and Create is live"
+      );
+      assert.strictEqual(create.textContent, "Create 2 chapters");
+
+      const notes = () => dom.body.querySelectorAll(".manga-reader-bulk-empty");
+      assert.strictEqual(
+        notes().length,
+        1,
+        "the note is one node from the start"
+      );
+      assert.strictEqual(
+        notes()[0].hidden,
+        true,
+        "…hidden while the list fits"
+      );
+
+      const tooMany = Array.from(
+        { length: 65 },
+        (_, at) => "line " + (at + 1)
+      ).join("\n");
+      area.value = tooMany;
+      area.dispatchEvent({ type: "input" });
+
+      assert.strictEqual(
+        table.querySelectorAll("tr").length,
+        0,
+        "the table is emptied"
+      );
+      assert.strictEqual(notes()[0].hidden, false, "the note says why");
+      assert.strictEqual(create.disabled, true, "and Create is off");
+
+      // The button is disabled, but the handler is its own guard: a click that
+      // arrives anyway must not write the previous rows.
+      const at = mutations.length;
+      dom.click(create);
+      await settle();
+      assert.strictEqual(
+        mutations.length,
+        at,
+        "a click on Create writes nothing while the table is empty"
+      );
+
+      // The next keystroke over the limit does not add a second note.
+      area.dispatchEvent({ type: "input" });
+      assert.strictEqual(
+        notes().length,
+        1,
+        "a second over-limit keystroke leaves the one note"
+      );
+
+      // Back under the limit: the table returns, and so do the numbers, which
+      // are kept by line rather than by the rows' positions.
+      area.value = ["A", "B"].join("\n");
+      area.dispatchEvent({ type: "input" });
+      assert.strictEqual(notes()[0].hidden, true, "the note goes when it fits");
+      assert.strictEqual(
+        table.querySelectorAll("tr").length,
+        3,
+        "the rows come back from the box"
+      );
+      assert.strictEqual(create.disabled, false, "and Create with them");
+      assert.strictEqual(
+        create.textContent,
+        "Create 2 chapters",
+        "with the numbers the same lines had — the paste did not spend them"
+      );
+
+      tab.close();
+      dom.window.location.pathname = "/";
+    }
+  );
 };

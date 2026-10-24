@@ -659,6 +659,15 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
   table.className = "manga-reader-bulk-table";
   container.appendChild(table);
 
+  // **One note, shown and hidden**, rather than one inserted per keystroke: the
+  // message used to be added before the table every time the list went over the
+  // limit, and nothing took the earlier ones away, so a long paste left a stack
+  // of identical lines.
+  const over = document.createElement("div");
+  over.className = "manga-reader-bulk-empty";
+  over.hidden = true;
+  container.insertBefore(over, table);
+
   const create = document.createElement("button");
   create.type = "button";
   create.id = BULK_CREATE_ID;
@@ -772,12 +781,19 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
 
     if (titles.length > BULK_LIMIT) {
       // A table is a thing a person edits by hand; past this it wants cutting up.
-      const over = document.createElement("div");
-      over.className = "manga-reader-bulk-empty";
+      //
+      // **`built` goes with the table.** The table was emptied just above, but
+      // `validate` and Create read the rows through this list — and a list left
+      // over from the previous paste is a Create that writes *those* rows' pages,
+      // against a box the reader has since replaced. The pages typed by line are
+      // kept (see bulkPages): a paste over the limit and Ctrl+Z back should return
+      // the table it had, numbers and all.
+      built = [];
       over.textContent = stringFor(gallery.locale, "mangaReader.bulkTooMany");
-      container.insertBefore(over, table);
+      over.hidden = false;
       return;
     }
+    over.hidden = true;
 
     const head = document.createElement("tr");
     head.setAttribute("data-head", "");
@@ -933,6 +949,11 @@ function drawBulk(panel: HTMLElement, gallery: ChaptersInHand): void {
 
   create.addEventListener("click", () => {
     const all = rows();
+    // An empty table has nothing to cut. The button is disabled in that state,
+    // but a disabled button is the browser's guard, not this handler's: a list
+    // over the limit empties the table, and "write no chapters" must never turn
+    // into a write of whatever the last list held.
+    if (all.length === 0) return;
     if (all.some((r, i) => wrongWith(r, all, i))) return;
     createFromList(
       gallery,
