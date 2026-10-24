@@ -56,6 +56,118 @@ export function editFormFor(galleryId: string): typeof editForm {
 }
 
 /**
+ * Fields written quietly while no edit form was open, by gallery.
+ *
+ * The quiet mutation asks for nothing but the id (see MARK_QUERY_TEXT), so it
+ * leaves Apollo's cached gallery alone — deliberately, because writing that cache
+ * reinitialises Stash's edit form and throws away whatever is typed in it. The
+ * form, however, is *built* from that same cache: a mark or a chapter list
+ * written while it was closed is therefore missing from the map its Save sends
+ * back in full, and saving the form silently drops what the toolbar just wrote.
+ *
+ * What this holds is merged into the form's own map once, when the form is
+ * published — the one moment the form has no unsaved typing to lose. A quiet
+ * write made while the form *is* open still goes to the form directly (see
+ * mark, write and NS.writeChapters), so nothing is recorded for it.
+ *
+ * Values use the same convention as the form's map: a key with "" is one to
+ * remove.
+ */
+type PendingFields = Record<string, string>;
+
+const pendingFields = new Map<string, PendingFields>();
+
+/**
+ * Calls `fn` for each of this plugin's fields named in a quiet mutation's
+ * `custom_fields` input.
+ *
+ * `partial` and `remove` are what every caller uses. `full` is read key by key
+ * rather than as a replacement: nothing writes it quietly today, and treating a
+ * whole-map write as a merge would be wrong for a key the map left out. If one
+ * ever appears, this is the place to give it replacement semantics.
+ */
+function eachQuietField(
+  fields: unknown,
+  fn: (name: string, value: string) => void
+): void {
+  const input = (fields || {}) as {
+    partial?: Record<string, unknown>;
+    full?: Record<string, unknown>;
+    remove?: unknown;
+  };
+  const visit = (name: string, value: unknown) => {
+    const key = NS.ownField(name);
+    if (key)
+      fn(key, value === null || value === undefined ? "" : String(value));
+  };
+
+  if (input.partial && typeof input.partial === "object") {
+    Object.keys(input.partial).forEach((name) => {
+      visit(name, input.partial?.[name]);
+    });
+  }
+  if (input.full && typeof input.full === "object") {
+    Object.keys(input.full).forEach((name) => {
+      visit(name, input.full?.[name]);
+    });
+  }
+  if (Array.isArray(input.remove)) {
+    input.remove.forEach((name) => {
+      visit(String(name), "");
+    });
+  }
+}
+
+/** Records a quiet write the open form will not see, for the form it later gets. */
+function rememberQuietly(galleryId: string, fields: unknown): void {
+  // The form is told directly by the caller in this case (mark, write,
+  // NS.writeChapters), so recording it again would apply it twice.
+  if (editFormFor(galleryId)) return;
+
+  // Plain assignment, not NS.setField: "" is a removal to *remember*, and
+  // setField would delete the key from this record instead of recording that the
+  // form must delete it. The names are already canonical — eachQuietField asks
+  // ownField — so a later write replaces the entry rather than adding a variant.
+  const next = { ...(pendingFields.get(galleryId) ?? {}) };
+  eachQuietField(fields, (name, value) => {
+    next[name] = value;
+  });
+  pendingFields.set(galleryId, next);
+}
+
+/**
+ * Drops the record of a quiet write that did not reach the server.
+ *
+ * Only the keys still holding what this write put there are removed, so a write
+ * that failed does not take a later successful one with it.
+ */
+function forgetQuietly(galleryId: string, fields: unknown): void {
+  const pending = pendingFields.get(galleryId);
+  if (!pending) return;
+
+  const next = { ...pending };
+  eachQuietField(fields, (name, value) => {
+    if (next[name] === value) delete next[name];
+  });
+  if (Object.keys(next).length) pendingFields.set(galleryId, next);
+  else pendingFields.delete(galleryId);
+}
+
+/**
+ * Takes the fields a closed form missed, for the form being published now.
+ *
+ * Taking rather than reading is what makes this once-only: the effect that
+ * publishes the form runs on every render, and a merge that still had the record
+ * after the first one would keep replacing whatever the reader typed next.
+ */
+export function takePendingFields(galleryId: string): PendingFields | null {
+  const pending = pendingFields.get(galleryId);
+  if (!pending) return null;
+  pendingFields.delete(galleryId);
+  return pending;
+}
+
+/**
  * Whether this gallery is manga, as far as anything on screen is concerned.
  *
  * Once the store has an answer it *is* the answer, and a gallery missing from it
@@ -171,10 +283,27 @@ export function writeQuietly(
     );
   }
 
-  return client.mutate({
+  // Recorded before the request, not after: the reader can open the edit tab
+  // while it is still in flight, and a form published in that window would be
+  // built from the cache this write leaves alone. A rejection takes the record
+  // back — the server never heard the write, so the form must not be handed it.
+  rememberQuietly(galleryId, fields);
+
+  const result = client.mutate({
     mutation,
     variables: { input: { id: galleryId, custom_fields: fields } },
   });
+
+  // A side listener rather than a `catch` in the chain: the caller gets the
+  // original promise, so its own failure handling runs on the same tick it did
+  // before — the deferred refetch that follows a failed write is counted by
+  // tests downstream, and one extra microtask is enough to move it into their
+  // window.
+  result.then(undefined, () => {
+    forgetQuietly(galleryId, fields);
+  });
+
+  return result;
 }
 
 /**

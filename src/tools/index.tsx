@@ -95,7 +95,7 @@ import { LanguageBadge, MangaPopoverMark } from "./cards";
 import { CAN_WRITE, GalleryToolbar } from "./toolbar";
 import { noteFired, registerPatch } from "./patches";
 import { BulkFieldsRow, captureSelection } from "./bulk";
-import { isMarkedNow, setEditForm } from "./mark";
+import { isMarkedNow, setEditForm, takePendingFields } from "./mark";
 import { registerPhysicalPagePatches } from "./physical-grid";
 import { ShopUrlHeads } from "./shop-urls";
 
@@ -263,6 +263,25 @@ registerPatch("instead", "CustomFieldsInput", (...args: unknown[]) => {
         values: props.values ?? {},
         onChange: props.onChange,
       });
+
+      // What a quiet write did while this form was closed — a mark from the
+      // toolbar, a chapter list from the reader — is missing from the map the
+      // form was built from, because that write leaves Apollo's cache alone (see
+      // MARK_QUERY_TEXT). Hand the form those fields now, before it can be
+      // saved: its Save sends the whole map, and a copy without them drops what
+      // the other surface just wrote.
+      //
+      // Taken rather than read, and this effect runs on every render: the record
+      // is spent on this one merge, so a re-render cannot overwrite whatever the
+      // reader types next.
+      const pending = takePendingFields(galleryId);
+      if (pending) {
+        let next = props.values ?? {};
+        Object.keys(pending).forEach((name) => {
+          next = NS.setField(next, name, pending[name]);
+        });
+        props.onChange(next);
+      }
     }
     return () => {
       setEditForm(null);

@@ -379,6 +379,39 @@ module.exports = () => {
     );
   }
 
+  // The same write with the edit tab closed. The quiet mutation asks for only
+  // the id, so Apollo's cached gallery — the map the form is built from — does
+  // not change. Without a record of the write, the form opens without the
+  // chapter key and its Save, which sends the whole map, deletes what the reader
+  // just imported. The record is merged once, when the form is published.
+  {
+    const json = '{"v":1,"chapters":[{"title":"開幕","images":["1","2"]}]}';
+    nav("/galleries/9990");
+    NS.writeChapters("9990", json);
+
+    const pushes = [];
+    call("CustomFieldsInput", {
+      values: { [NS.FIELD_NAME]: "ja" },
+      onChange: (next) => pushes.push(next),
+    });
+    assert.deepStrictEqual(
+      pushes[0],
+      { [NS.FIELD_NAME]: "ja", [NS.CHAPTER_FIELD_NAME]: json },
+      "a form opened after a quiet write is handed what it missed"
+    );
+
+    call("CustomFieldsInput", {
+      values: pushes[0],
+      onChange: (next) => pushes.push(next),
+    });
+    assert.strictEqual(
+      pushes.length,
+      1,
+      "…once, when it is published — not on every render, which would overwrite " +
+        "whatever the reader typed next"
+    );
+  }
+
   // A write that fails is the batch importer's business to count, so the rejection
   // has to reach its caller and the console has to say which write it was. Deferred
   // because the promise settles a microtask later and a section here is
@@ -393,7 +426,11 @@ module.exports = () => {
   const chaptersCaught = [];
   const chaptersErrors = loggedErrors.length;
   state.galleryWriteResult = chaptersFailed;
-  NS.writeChapters("997", '{"v":1,"chapters":[]}').catch((e) =>
+  // A gallery of its own: the pending record this write makes is still present
+  // until its rejection settles, and the form the mark test publishes for 997
+  // below runs before that microtask. Sharing the id would hand that form a
+  // chapter list the write never wrote.
+  NS.writeChapters("9992", '{"v":1,"chapters":[]}').catch((e) =>
     chaptersCaught.push(e)
   );
   state.galleryWriteResult = null;
@@ -411,6 +448,28 @@ module.exports = () => {
           .some((line) => /could not write this gallery's chapters/.test(line)),
         "and the console says which write it was"
       );
+
+      // And the failed write must not be handed to a form that opens later: the
+      // server never heard it, so a form carrying it would persist something the
+      // write failed to persist.
+      // The path is poked rather than navigated: this runs inside the window
+      // section 14 counts the store's fetches in, and a `nav` would fire the
+      // route refresh and add a query that has nothing to do with that section.
+      // The form takes its gallery id from the address bar either way.
+      const before = global.window.location.pathname;
+      global.window.location.pathname = "/galleries/9992";
+      const pushes = [];
+      call("CustomFieldsInput", {
+        values: { [NS.FIELD_NAME]: "ja" },
+        onChange: (next) => pushes.push(next),
+      });
+      global.window.location.pathname = before;
+      assert.strictEqual(
+        pushes.length,
+        0,
+        "a quiet write that failed leaves the form it opens later untouched"
+      );
+
       console.log("✓ 11d2 a failed chapter write is reported");
     });
   }, 0);
@@ -1084,6 +1143,34 @@ module.exports = () => {
     "the form's own map gets the mark too"
   );
 
+  // The mirror case, with the form closed when the toolbar takes the mark off.
+  // The removal is recorded the same way, and a form opened afterwards has the
+  // stale keys taken out of its map; its Save would otherwise put them all back.
+  nav("/galleries/9991");
+  const removeValues = {
+    [NS.FIELD_NAME]: "ja",
+    [NS.MANGA_FIELD_NAME]: "true",
+    other: "x",
+  };
+  // Mark it first, so the second click has something to take off. Both clicks
+  // run with no form published for this gallery.
+  toolbarMark(removeValues).drawn.node.props.children[0].props.onClick();
+  const confirmBefore = NS.confirmUnmark;
+  NS.confirmUnmark = false;
+  toolbarMark(removeValues).drawn.node.props.children[0].props.onClick();
+  NS.confirmUnmark = confirmBefore;
+
+  const removePushes = [];
+  call("CustomFieldsInput", {
+    values: removeValues,
+    onChange: (next) => removePushes.push(next),
+  });
+  assert.deepStrictEqual(
+    removePushes[0],
+    { other: "x" },
+    "a form opened after a quiet removal has this plugin's fields taken out"
+  );
+
   // …and the store's query is no-cache for the same reason MARK_QUERY_TEXT asks for
   // nothing: these are Gallery objects, and a copy landing in Apollo's cache is
   // what resets an open edit form.
@@ -1172,12 +1259,19 @@ module.exports = () => {
   // taken back by the refresh that follows. On a gallery the store does not
   // know, which is the one a click marks — and one no other section uses, for
   // the reason given above.
-  nav("/galleries/998");
+  nav("/galleries/9993");
   state.galleryWriteResult = new Error("nope");
   toolbarMark(
     detailValues("censored")
   ).drawn.node.props.children[0].props.onClick();
   state.galleryWriteResult = null;
+
+  // The edit block below is drawn on a gallery the store already lists, rather
+  // than on the one the rejected write named: that write's pending record is
+  // still there when this synchronous section reaches the form — a rejection
+  // settles a microtask later — and a form for the same gallery would be handed
+  // a mark the server refused. Gallery 1 is marked in the fixtures.
+  nav("/galleries/1");
 
   // (A Stash with no client at all — the write that cannot even be attempted —
   // is 14c, in the next section. Nothing here can tell it apart from a write that
