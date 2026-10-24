@@ -1316,14 +1316,24 @@ state.galleries["75"] = {
   ],
 };
 // The same physical shape, for the section about a non-path sort: a gallery no
-// earlier section has read, so the fallback is the fetch this test sees.
+// earlier section has read, so the fallback is the fetch this test sees. Its field
+// is a v2 list — the identity that would be lost if the reader chose "files" from
+// the setting rather than from the deduplicated pages it was handed.
 state.galleries["76"] = {
   images: [
     image("921", 1000, 1500),
     image("922", 1000, 1500),
     image("923", 1000, 1500),
   ],
-  gallery: { custom_fields: {}, chapters: [] },
+  gallery: {
+    custom_fields: {
+      "plugin.mangaTools.chapters": JSON.stringify({
+        v: 2,
+        chapters: [{ title: "Title order", files: ["h1"], images: ["921"] }],
+      }),
+    },
+    chapters: [],
+  },
   title: "Sorted by title",
   folder: null,
   files: [{ id: "378706" }],

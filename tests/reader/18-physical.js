@@ -147,6 +147,22 @@ module.exports = async () => {
         "and the deduplicated list is drawn"
       );
 
+      // **The chapters follow the pages, not the setting.** This gallery carries a
+      // v2 field naming file ids; read on the deduplicated list those ids match no
+      // page, every chapter is dropped, and the empty list suppresses the fallback
+      // to Stash's rows. The identity the pages carry is what decides — see
+      // answer.fileScope — so the chapter is still here, read by its images.
+      assert.strictEqual(
+        box.lightbox.querySelector(".manga-reader-counter").textContent,
+        "1 / 3",
+        "this order draws the deduplicated list, not the file occurrences"
+      );
+      assert.strictEqual(
+        box.lightbox.querySelector(".manga-reader-chapter").textContent,
+        "Title order",
+        "and the v2 chapter is read by its images, so it is still here"
+      );
+
       stopReader(box);
       NS.physicalPages = false;
     }

@@ -817,12 +817,22 @@ function placeOf(gallery: MangaReaderGallery, lightbox: Element): number {
  * but a sorted list — those ids were not asked for twice; see fetchGallery.
  */
 function chaptersOf(answer: GalleryAnswer): MangaReaderChapter[] {
-  // readChapters converts a v1 field to file ids when physical pages are on; a
-  // v2 field already holds the identity the pages carry.
+  // **The identity is a property of the pages in hand, not of the setting.** The
+  // setting decides whether `fetchGallery` *asks* for file occurrences, and it only
+  // does so for a path-ascending list; opened from any other sort, the pages are
+  // the deduplicated images. Reading a v2 field as "files" against those would
+  // match no page and drop every chapter — and because `readChapters` returns an
+  // empty list rather than null, the fallback to Stash's own rows below would not
+  // run either. `fileScope` is set exactly when the answer is a file list (see
+  // fetchGallery), which is the fact this needs.
+  const physicalPages = answer.fileScope !== undefined;
+
+  // readChapters converts a v1 field to file ids when the pages are file
+  // occurrences; a v2 field read against deduplicated pages uses `images`.
   const own = readChapters(
     NS.pickField(answer.customFields, NS.CHAPTER_FIELD_NAME) || null,
     answer.pages,
-    NS.physicalPageMode()
+    physicalPages
   );
   if (own) return own;
 
@@ -834,9 +844,7 @@ function chaptersOf(answer: GalleryAnswer): MangaReaderChapter[] {
   const pathIds =
     answer.pathIds || answer.pages.map((page) => page.imageId || page.id);
   const translated = chaptersFromStash(answer.stashChapters, pathIds);
-  return NS.physicalPageMode()
-    ? toFileChapters(translated, answer.pages)
-    : translated;
+  return physicalPages ? toFileChapters(translated, answer.pages) : translated;
 }
 
 function remember(id: string, gallery: MangaReaderGallery): void {
