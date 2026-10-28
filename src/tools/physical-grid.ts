@@ -38,7 +38,7 @@ import {
   fetchGalleryScope,
 } from "../gallery-files";
 import { NS } from "../languages";
-import { requirePluginApi } from "../plugin-api";
+import { type MangaToolsIntl, requirePluginApi } from "../plugin-api";
 import { currentGalleryId } from "./core";
 import { noteFired, registerPatch } from "./patches";
 
@@ -119,6 +119,19 @@ export function rememberPhysicalGrid<T>(
 }
 
 /**
+ * Puts a gallery's files in the cache without reading them.
+ *
+ * **The smoke test's way in, and its only caller.** The list's file read is
+ * asynchronous, and a test that had to wait for it would be scheduling timers
+ * against every other section's; a seeded grid lets the list render expanded on
+ * its first pass, which is what the count line's assertions need. `load` is what
+ * fills this cache in a browser.
+ */
+export function primePhysicalGrid(galleryId: string, grid: GalleryGrid): void {
+  rememberPhysicalGrid(cache, galleryId, grid);
+}
+
+/**
  * Reads a gallery's physical list, once per gallery until it is invalidated.
  *
  * Not revalidated on its own: the list changes only when image membership does,
@@ -194,6 +207,139 @@ export function physicalPagePlan(
   const stashed = Math.max(1, Math.floor(imagePages) || 1);
   const fillable = Math.max(1, Math.ceil(Math.max(0, fileCount) / perPage));
   return { pages: Math.min(stashed, fillable), perPage };
+}
+
+/**
+ * The first and last numbers of one physical page's "N–M of T" line.
+ *
+ * Stash's own arithmetic (`PaginationIndex` in `List/Pagination.tsx`) with the
+ * file total in place of the deduplicated one. Kept beside the plan because the
+ * two have to agree: a page the plan clamps to must not report another page's
+ * range, and the last page's M is the file total.
+ */
+export function physicalIndexRange(
+  page: number,
+  perPage: number,
+  total: number
+): { first: number; last: number } {
+  const size = Math.max(1, Math.floor(perPage) || 1);
+  const count = Math.max(0, Math.floor(total) || 0);
+  const at = Math.max(1, Math.floor(page) || 1);
+  const first = Math.min((at - 1) * size + 1, count);
+  return { first, last: Math.min(first + size - 1, count) };
+}
+
+/**
+ * The line's text, formatted the way Stash formats it.
+ *
+ * `formatNumber` is react-intl's own formatter, which the interface did not need
+ * until this line: the plugin's catalogs are plain lookups with no number
+ * formatting. Falls back to the bare digits where an older React Intl has none —
+ * the same text with no thousands separator.
+ */
+export function physicalIndexText(
+  intl: MangaToolsIntl,
+  page: number,
+  perPage: number,
+  total: number
+): string {
+  const range = physicalIndexRange(page, perPage, total);
+  const number = (value: number) =>
+    typeof intl.formatNumber === "function"
+      ? intl.formatNumber(value)
+      : String(value);
+  return (
+    number(range.first) +
+    "-" +
+    number(range.last) +
+    " of " +
+    number(Math.max(0, Math.floor(total) || 0))
+  );
+}
+
+/**
+ * The line above an image list. Stash draws it in `ImageList`'s own render, one
+ * level above the component this module patches, from the query's deduplicated
+ * total — which is why it cannot be fixed through props.
+ */
+const INDEX_SELECTOR = ".pagination-index-container .paginationIndex";
+
+/** The text this module last put in the line, or null when the line is Stash's. */
+let indexOwned: string | null = null;
+/** What the line said before this module took it over, for putting it back. */
+let indexStashed = "";
+
+/** The line's own text: its first child is the text node React draws. */
+function indexTextOf(span: Element): string {
+  const first = span.firstChild;
+  if (first && first.nodeType === 3 && first.nodeValue != null) {
+    return first.nodeValue;
+  }
+  return span.textContent || "";
+}
+
+/**
+ * Replaces the line's own text and nothing else.
+ *
+ * The span is `{text}<br/>{byline}`, so the whole span must not be rewritten:
+ * setting `textContent` would take the `<br>` and the byline with it, and React
+ * would go on believing both were there. The fallback is for the smoke test's
+ * DOM stub, which has no text nodes.
+ */
+function writeIndexText(span: Element, text: string): void {
+  const first = span.firstChild;
+  if (first && first.nodeType === 3) {
+    first.nodeValue = text;
+  } else {
+    span.textContent = text;
+  }
+}
+
+/**
+ * Writes the physical numbers into the "N–M of T" line, keeping Stash's.
+ *
+ * Returns whether there was a line to write: it is drawn only once the list's
+ * cached result has loaded, and the caller runs this on every render because
+ * *when* it appears is not a change in the list's own values.
+ *
+ * **The line is Stash's until this module writes it, and the text found there is
+ * remembered.** React rewrites that text node itself on a page turn or a filter
+ * change (this module only ever writes after the commit), so a text that is not
+ * the one written here is Stash's current answer and becomes the new one to go
+ * back to.
+ */
+export function rewritePhysicalIndex(text: string): boolean {
+  const span = document.querySelector(INDEX_SELECTOR);
+  if (!span) return false;
+
+  const current = indexTextOf(span);
+  if (indexOwned === null || current !== indexOwned) indexStashed = current;
+
+  writeIndexText(span, text);
+  indexOwned = text;
+  return true;
+}
+
+/**
+ * Puts Stash's own line back once the expansion no longer applies — a sort that
+ * has no physical order, a search, the setting turned off.
+ *
+ * Only if the line still says what this module wrote: React may already have
+ * rewritten it with fresh numbers, and those are the ones to keep.
+ */
+export function restorePhysicalIndex(): boolean {
+  const span = document.querySelector(INDEX_SELECTOR);
+  if (!span) return false;
+
+  const current = indexTextOf(span);
+  if (indexOwned === null || current !== indexOwned) {
+    indexOwned = null;
+    return false;
+  }
+
+  writeIndexText(span, indexStashed);
+  indexOwned = null;
+  return true;
 }
 
 /** The props this module reads off `ImageList`, which Stash types only as `any`. */
@@ -386,7 +532,10 @@ function registerListPatch(): void {
     const props = args[0] as ImageListProps;
     const next = args[args.length - 1] as (p: ImageListProps) => unknown;
 
-    const galleryId = NS.physicalPageMode() ? currentGalleryId() : "";
+    // The route's gallery whether or not the expansion is in force: a mode turned
+    // off while the tab is open still has to hand the count line back.
+    const routeGalleryId = currentGalleryId();
+    const galleryId = NS.physicalPageMode() ? routeGalleryId : "";
     const [, bump] = React.useState(0);
     // A value to re-run the load effect, not one the render reads: an
     // invalidation (an image deletion) has to fetch the file list again, and the
@@ -470,6 +619,36 @@ function registerListPatch(): void {
       ]
     );
 
+    /**
+     * **The "N–M of T" line, which no prop reaches.** Stash draws it in
+     * `ImageList`'s own render above this component, from the query's
+     * deduplicated total; the list is handed `totalCount`/`pageCount` but the
+     * line is computed before it. So it is one text node in the DOM, and this is
+     * the module that knows the file total.
+     *
+     * **No dependency array on purpose.** The line appears only once the list's
+     * cached result has loaded, and that is not a change in this list's values:
+     * an effect keyed on the numbers would miss the first appearance and leave
+     * Stash's total until the page turned. React draws its own numbers during the
+     * commit and this runs after it, so the physical ones are what paint.
+     */
+    const intl = PluginApi.libraries.Intl.useIntl();
+    React.useLayoutEffect(() => {
+      if (!routeGalleryId) return;
+      if (expanded) {
+        rewritePhysicalIndex(
+          physicalIndexText(
+            intl,
+            expanded.page,
+            expanded.perPage,
+            expanded.total
+          )
+        );
+      } else {
+        restorePhysicalIndex();
+      }
+    });
+
     if (!expanded) return next(props);
 
     return next({
@@ -512,6 +691,11 @@ export function registerPhysicalPagePatches(): void {
 // Published for the smoke test, the way the reader half publishes its pure
 // functions. The cast is only about the list's props, which Stash has no type for.
 NS.physicalPagePlan = physicalPagePlan;
+NS.physicalIndexRange = physicalIndexRange;
+NS.physicalIndexText = physicalIndexText;
+NS.rewritePhysicalIndex = rewritePhysicalIndex;
+NS.restorePhysicalIndex = restorePhysicalIndex;
+NS.primePhysicalGrid = primePhysicalGrid;
 NS.rememberPhysicalGrid = rememberPhysicalGrid;
 NS.forgetPhysicalGrids = forgetPhysicalGrids;
 NS.watchPhysicalGrids = watchPhysicalGrids;

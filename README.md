@@ -1512,10 +1512,13 @@ contains, each at its own position.
   `pageCount` and no `totalCount` at all, and deriving it from the missing total
   made every file share one page. The chosen page size is kept exactly: pages
   1 … P−1 hold it, and the **last page takes the remainder** (52 files over 51
-  pages at 1/page is 1, 1, …, 2). The toolbar's "N–M of T" line still says
-  **T = the deduplicated image count**: rewriting it through a subscription in
-  Stash's `Pagination`/`PaginationIndex` was tried and removed — it produced an
-  update loop (React error #185).
+  pages at 1/page is 1, 1, …, 2). The "N–M of T" line says **the files'** numbers.
+  Stash draws that line in `ImageList`'s own render, above the list, so a
+  subscription in `Pagination`/`PaginationIndex` was tried first and removed: it
+  produced an update loop (React error #185). The list patch instead rewrites the
+  line's own text node after each commit — the `<br>` and the byline after it are
+  left alone — and puts Stash's text back when the expansion stops applying (a sort
+  with no physical order, a search, the setting turned off).
 - **The grid renders Stash's own cards.** The list patch clones each image once per
   occurrence, gives it a synthetic id for React's keys, and puts the occurrence's
   file in `visual_files` — so the cards keep their tags, popovers and date. The

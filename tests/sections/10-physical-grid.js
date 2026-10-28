@@ -14,6 +14,8 @@ const {
   PHYSICAL_FILES,
   NS,
   call,
+  documentRoot,
+  makeEl,
   patched,
   patchedBefore,
   physicalImage,
@@ -320,6 +322,176 @@ module.exports = () => {
   });
 
   /**
+   * The "N–M of T" line above the grid.
+   *
+   * Stash computes it in `ImageList`'s own render, above the component this
+   * module patches, from the query's deduplicated total — so it cannot be fixed
+   * with props, and this is the line whose T used to be the image count. What is
+   * pinned here is the arithmetic (Stash's, with the files' total), the wording,
+   * and that only the line's own text node is replaced: the span also holds a
+   * `<br>` and the byline, and taking those away would leave React believing
+   * they were still there.
+   */
+  runSection("15 the count line carries the files' numbers", () => {
+    assert.deepStrictEqual(
+      NS.physicalIndexRange(1, 100, 316),
+      { first: 1, last: 100 },
+      "the first page starts at 1"
+    );
+    assert.deepStrictEqual(
+      NS.physicalIndexRange(4, 100, 316),
+      { first: 301, last: 316 },
+      "and the last one ends at the file total, not the image count"
+    );
+    assert.deepStrictEqual(
+      NS.physicalIndexRange(2, 2, 3),
+      { first: 3, last: 3 },
+      "a page with one file left reports it"
+    );
+    assert.deepStrictEqual(
+      NS.physicalIndexRange(9, 2, 4),
+      { first: 4, last: 4 },
+      "a page past the files reports the last one, which is Stash's clamp"
+    );
+
+    assert.strictEqual(
+      NS.physicalIndexText({}, 4, 100, 316),
+      "301-316 of 316",
+      "without react-intl's formatter the bare digits are written"
+    );
+    assert.strictEqual(
+      NS.physicalIndexText({ formatNumber: (n) => "[" + n + "]" }, 1, 2, 4),
+      "[1]-[2] of [4]",
+      "with it, every number goes through the locale's own formatting"
+    );
+
+    const container = makeEl("div");
+    container.className = "pagination-index-container";
+    const span = makeEl("span");
+    span.className = "paginationIndex";
+    span.textContent = "1-2 of 3";
+    container.appendChild(span);
+    documentRoot.appendChild(container);
+
+    assert.strictEqual(
+      NS.rewritePhysicalIndex("1-2 of 4"),
+      true,
+      "the line is found under Stash's own container"
+    );
+    assert.strictEqual(span.textContent, "1-2 of 4", "and says the files");
+
+    assert.strictEqual(
+      NS.restorePhysicalIndex(),
+      true,
+      "the line can be handed back"
+    );
+    assert.strictEqual(
+      span.textContent,
+      "1-2 of 3",
+      "to the text Stash had put there"
+    );
+
+    // A line React has redrawn is Stash's again: its newer numbers are the ones
+    // that stay, whatever was remembered before.
+    NS.rewritePhysicalIndex("3-4 of 4");
+    span.textContent = "3-3 of 3";
+    assert.strictEqual(
+      NS.restorePhysicalIndex(),
+      false,
+      "fresh numbers are not a line to restore"
+    );
+    assert.strictEqual(
+      span.textContent,
+      "3-3 of 3",
+      "Stash's newer text stands"
+    );
+
+    container.remove();
+    assert.strictEqual(
+      NS.rewritePhysicalIndex("1-2 of 4"),
+      false,
+      "with no line on screen nothing is written"
+    );
+  });
+
+  /**
+   * The wiring: the list's own render is where the line is written.
+   *
+   * The file read is asynchronous in a browser, and the seeded grid is what makes
+   * this synchronous here — the list renders expanded on its first pass, exactly
+   * as it does one re-render after the fetch. `GRID` is the same four files the
+   * expansion tests use, and the count line's Stash side is the fixture's
+   * `totalCount` of 3: the deduplicated images.
+   */
+  runSection("15 the list writes the line, and hands it back", () => {
+    const wasPhysical = NS.physicalPages;
+    const wasTakeover = NS.readerTakeover;
+    const wasPath = global.window.location.pathname;
+    NS.physicalPages = true;
+    NS.readerTakeover = true;
+    global.window.location.pathname = "/galleries/801";
+    NS.primePhysicalGrid("801", GRID);
+
+    const container = makeEl("div");
+    container.className = "pagination-index-container";
+    const span = makeEl("span");
+    span.className = "paginationIndex";
+    span.textContent = "1-2 of 3";
+    container.appendChild(span);
+    documentRoot.appendChild(container);
+
+    call("ImageList", listProps());
+    assert.strictEqual(
+      span.textContent,
+      "1-2 of 4",
+      "the four files, not the three deduplicated images"
+    );
+
+    // The expansion is off for a search, so the line is Stash's again — and
+    // without a redraw in between, the text remembered from before is the one
+    // that goes back.
+    call(
+      "ImageList",
+      listProps({ filter: { ...listProps().filter, searchTerm: "RJ01133881" } })
+    );
+    assert.strictEqual(
+      span.textContent,
+      "1-2 of 3",
+      "a searched list hands the line back"
+    );
+
+    call("ImageList", listProps());
+    call(
+      "ImageList",
+      listProps({ filter: { ...listProps().filter, currentPage: 2 } })
+    );
+    assert.strictEqual(
+      span.textContent,
+      "3-4 of 4",
+      "and the last page's range ends at the file total"
+    );
+
+    // A sort with no physical order: React redraws its own numbers first, and
+    // those are the ones that stay.
+    span.textContent = "3-3 of 3";
+    call(
+      "ImageList",
+      listProps({ filter: { ...listProps().filter, sortBy: "title" } })
+    );
+    assert.strictEqual(
+      span.textContent,
+      "3-3 of 3",
+      "an order with no physical positions keeps Stash's line"
+    );
+
+    container.remove();
+    global.window.location.pathname = wasPath;
+    NS.physicalPages = wasPhysical;
+    NS.readerTakeover = wasTakeover;
+    NS.forgetPhysicalGrids();
+  });
+
+  /**
    * The grid's cache is bounded, like the reader's.
    *
    * Each entry keeps a whole image object per occurrence — details, urls, tags,
@@ -487,11 +659,17 @@ module.exports = () => {
     );
     // The pagination components are deliberately *not* patched: the store that
     // rewrote their numbers was an update loop in Stash's own list (React #185).
-    // The toolbar count therefore keeps Stash's deduplicated number for now.
+    // The count line above the grid is fixed from the list's own render instead,
+    // as one text node — see "the list writes the line" above.
     assert.strictEqual(
       patched.Pagination,
       undefined,
       "the pagination is Stash's own"
+    );
+    assert.strictEqual(
+      patched.PaginationIndex,
+      undefined,
+      "…including the line, which is corrected as text rather than re-rendered"
     );
     assert.strictEqual(
       NS.physicalPages,

@@ -311,6 +311,34 @@ export interface MangaToolsNamespace {
     fileCount: number
   ): { pages: number; perPage: number };
   /**
+   * One physical page's first and last numbers for the "N–M of T" line, by
+   * Stash's own arithmetic. Published for the smoke test.
+   */
+  physicalIndexRange(
+    page: number,
+    perPage: number,
+    total: number
+  ): { first: number; last: number };
+  /** That line's text, formatted through react-intl when it can. */
+  physicalIndexText(
+    intl: MangaToolsIntl,
+    page: number,
+    perPage: number,
+    total: number
+  ): string;
+  /**
+   * Writes the physical numbers into the line Stash draws above the grid, or
+   * puts Stash's own back. Both answer whether there was a line to write.
+   */
+  rewritePhysicalIndex(text: string): boolean;
+  restorePhysicalIndex(): boolean;
+  /**
+   * Seeds the physical grid's cache for one gallery. Published for the smoke
+   * test: the list's file read is asynchronous, and this is the only way to have
+   * a grid in hand on the first render.
+   */
+  primePhysicalGrid(galleryId: string, grid: unknown): void;
+  /**
    * One page of a gallery's files as the list's props, or null when the order has
    * no physical meaning. Published for the smoke test; the list patch is the only
    * caller otherwise.
@@ -720,6 +748,12 @@ export interface MangaToolsIntl {
     descriptor: { id: string; defaultMessage?: string },
     values?: { [name: string]: unknown }
   ): string;
+  /**
+   * The line above an image list is worded with the locale's own digits and
+   * separators, because Stash's is. Optional: an engine without it writes the
+   * bare digits rather than failing.
+   */
+  formatNumber?(value: number): string;
 }
 
 /** The slice of the Apollo client this plugin uses */
