@@ -729,8 +729,9 @@ function unwrapped(line: string): string {
  * wrapped in go, over and over until neither is there — and that is the whole of it.
  * Nothing here decides what a title is, drops a line for looking odd, or reads
  * anything out of what follows the title; the reader's own list is what makes this
- * workable, and the block it comes from is not something this plugin can parse (see
- * `doc/mock/bulk-chapters.html` for the measurements).
+ * workable, and the block it comes from is not something this plugin can parse: over
+ * 244 galleries the heading line took a dozen shapes, the items three prefixes, and
+ * a block ran straight on into prose.
  *
  * Blank lines are dropped, which is what makes a pasted block with air in it behave
  * like one without. A line left empty by the unwrapping — a pair of brackets with

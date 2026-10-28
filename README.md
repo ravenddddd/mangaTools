@@ -1446,8 +1446,12 @@ what it would write. The parsing takes off the decoration and nothing else: a le
 `・` goes, and so do the brackets a line is wholly wrapped in, while `(RJ242738)` and
 `(10P)` stay, because they are content. The heading line and any prose pasted with the
 list arrive as rows like any other, have no page, and are deleted from the table with
-the red ✕ — this plugin does not try to tell a title from a sentence, and the
-measurements behind that are in `doc/mock/bulk-chapters.html`.
+the red ✕ — this plugin does not try to tell a title from a sentence. That is a
+measured choice: across 244 galleries of one library whose descriptions carry
+収録作品, the heading line takes a dozen shapes (`【収録作品】` 88 times, `＜…＞` 36,
+`〈…〉` 21, bare 15, `<…>` 9, `■…` 8, and more), the items carry only three
+prefixes (`・`, `■`, none), a block runs straight on into prose, and `(RJ242738)`
+appears on 10 of the 244 while a page count appears on 4 — rare, and still content.
 
 Nothing is written until every row has a title, a page within the gallery, and a
 position no other row or existing chapter has taken; the ✕ on a row carries the reason
