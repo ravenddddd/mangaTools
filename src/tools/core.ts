@@ -21,7 +21,7 @@
  * spellings from drifting apart.
  */
 import "./fields";
-import { NS } from "../languages";
+import { NS, collatorFor } from "../languages";
 import { gqlDoc, requirePluginApi } from "../plugin-api";
 import type {
   MangaToolsApolloClient,
@@ -542,6 +542,9 @@ NS.fieldOriginal = FEATURE_ON_BY_DEFAULT;
 NS.coverIcon = FEATURE_ON_BY_DEFAULT;
 NS.confirmUnmark = FEATURE_ON_BY_DEFAULT;
 NS.deleteOnUnmark = FEATURE_ON_BY_DEFAULT;
+// The order every list has always used. See `groupOrder` in the namespace: the
+// edit form is the only list that ever departs from it.
+NS.groupOrder = "name";
 
 /**
  * Whether a successful configuration read has happened yet. See the namespace
@@ -663,6 +666,12 @@ function refreshSettings(): void {
         pluginCfg ? pluginCfg.deleteOnUnmark : null,
         FEATURE_ON_BY_DEFAULT
       );
+      // A value this build does not know reads as the default, the way every other
+      // setting's unknown value does: "name" is what every list used before this
+      // setting existed, so an install that predates it, or a map hand-edited to
+      // something surprising, is drawn exactly as it was.
+      NS.groupOrder =
+        pluginCfg && pluginCfg.groupOrder === "use" ? "use" : "name";
 
       NS.showFlags = NS.parseFlag(pluginCfg ? pluginCfg.showFlags : null, true);
       NS.showCoverBadge = NS.parseFlag(
@@ -879,7 +888,12 @@ export function refreshForSuggestions(): void {
  * everything). So the function is published, not the map. The other thing that
  * filter needs, `NS.usualLanguagesOf`, is published the same way from fields.ts.
  */
-NS.translationGroups = (): string[] => knownTranslationGroups();
+NS.translationGroups = (locale?: string): string[] =>
+  knownTranslationGroups(locale);
+NS.translationGroupsByUse = (locale?: string): string[] =>
+  knownTranslationGroupsByUse(locale);
+NS.orderGroupNames = orderGroupNames;
+NS.orderGroupNamesByUse = orderGroupNamesByUse;
 
 /**
  * The translation groups already in use, in the order the edit field offers them.
@@ -900,17 +914,82 @@ NS.translationGroups = (): string[] => knownTranslationGroups();
  * Case is left alone. Two groups whose names differ only in case are two names as
  * far as this is concerned, and folding them here would mean deciding which
  * spelling to offer somebody who typed the other one.
+ *
+ * **The order is the reader's collation, not the default sort.** A group is a free
+ * text name, and most of this library's are Japanese; `Array.sort()` compares UTF-16
+ * code units, which puts every kana and kanji somewhere no reader of Japanese would
+ * look for it. `locale` is the UI locale the caller has in hand; without one the
+ * plugin's fallback is used, which is still a collation.
  */
-export function knownTranslationGroups(): string[] {
-  if (!store) return [];
+export function knownTranslationGroups(locale?: string): string[] {
+  const tally = translationGroupTally();
+  if (!tally) return [];
 
-  const seen: { [name: string]: true } = {};
+  return orderGroupNames(Object.keys(tally), locale);
+}
+
+/**
+ * The same names, most-used first, ties in the same collation.
+ *
+ * What "used" counts is a marked gallery carrying the name — the store's own set,
+ * the one these options come from. Recomputed per call for the reason above.
+ */
+export function knownTranslationGroupsByUse(locale?: string): string[] {
+  const tally = translationGroupTally();
+  if (!tally) return [];
+
+  return orderGroupNamesByUse(Object.keys(tally), tally, locale);
+}
+
+/**
+ * A set of group names in the reader's collation.
+ *
+ * Pure and published for the smoke test: this is the rule that replaced the default
+ * `Array.sort()`, and a test that only saw the fixture's two names could not tell
+ * the two orders apart. See knownTranslationGroups for why collation and not code
+ * units.
+ */
+export function orderGroupNames(names: string[], locale?: string): string[] {
+  const collator = collatorFor(locale || NS.FALLBACK_LOCALE);
+  return names.slice().sort((a, b) => collator.compare(a, b));
+}
+
+/**
+ * The same, most-used first, ties in the same collation.
+ *
+ * `tally` is what translationGroupTally returns; a name it does not hold counts as
+ * none, so a caller can pass the list it wants ordered without a second rule.
+ */
+export function orderGroupNamesByUse(
+  names: string[],
+  tally: { [name: string]: number },
+  locale?: string
+): string[] {
+  const collator = collatorFor(locale || NS.FALLBACK_LOCALE);
+  return names
+    .slice()
+    .sort(
+      (a, b) => (tally[b] || 0) - (tally[a] || 0) || collator.compare(a, b)
+    );
+}
+
+/**
+ * Name -> how many marked galleries carry it, or null before the store answers.
+ *
+ * One walk for both orders. Split out because the two answers differ only in what
+ * they do with it, and a second walk would be a second place for the counting rule
+ * to live.
+ */
+function translationGroupTally(): { [name: string]: number } | null {
+  if (!store) return null;
+
+  const tally: { [name: string]: number } = {};
   store.forEach((fields) => {
     const name = NS.translationGroupOf(fields);
-    if (name) seen[name] = true;
+    if (name) tally[name] = (tally[name] || 0) + 1;
   });
 
-  return Object.keys(seen).sort();
+  return tally;
 }
 
 /**
@@ -1003,6 +1082,7 @@ function settingsInput(): { [key: string]: unknown } {
     coverIcon: NS.coverIcon,
     confirmUnmark: NS.confirmUnmark,
     deleteOnUnmark: NS.deleteOnUnmark,
+    groupOrder: NS.groupOrder,
     showFlags: NS.showFlags,
     showCoverBadge: NS.showCoverBadge,
     openDetailsBlock: NS.openDetailsBlock,

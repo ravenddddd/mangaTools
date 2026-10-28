@@ -373,6 +373,7 @@ module.exports = async () => {
         "fieldOriginal",
         "fieldTranslationGroup",
         "fields",
+        "groupOrder",
         "hidePerformers",
         "manageChapters",
         "openDetailsBlock",

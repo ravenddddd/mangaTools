@@ -807,7 +807,7 @@ const VALUED_SECTIONS: { [name: string]: Omit<ValuedSectionProps, "filter"> } =
       read: readGroupFilter,
       apply: applyGroup,
       relabel: relabelGroupTags,
-      options: (_intl, selection) => translationGroupOptions(selection),
+      options: (intl, selection) => translationGroupOptions(intl, selection),
       search: true,
       plainCandidates: true,
     },
@@ -1033,13 +1033,19 @@ export function SidebarOriginalFilter(props: {
  * nobody can read.
  */
 function translationGroupOptions(
+  intl: MangaToolsIntl,
   selection: MangaToolsLanguageSelection
 ): MangaToolsOption[] {
-  const options: MangaToolsOption[] = NS.translationGroups().map((name) => ({
-    value: name,
-    label: name,
-    flag: null,
-  }));
+  // Name order, in the reader's collation — the same order the bulk row uses. The
+  // edit form can be ordered by use instead (`NS.groupOrder`); a filter is a list to
+  // scan and search, so it stays where the last look left it.
+  const options: MangaToolsOption[] = NS.translationGroups(intl.locale).map(
+    (name) => ({
+      value: name,
+      label: name,
+      flag: null,
+    })
+  );
 
   const known: { [value: string]: true } = {};
   options.forEach((o) => {

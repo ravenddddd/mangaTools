@@ -1884,6 +1884,50 @@ module.exports = () => {
   );
   NS.showFlags = true;
 
+  // ── The order the reader chose ───────────────────────────────────
+  //
+  // The edit form's list can be ordered by use instead of by name. The fixtures
+  // hold two groups — one with two galleries, one with a single gallery — so the
+  // two orders differ. Only this list follows the setting: it is the one a reader
+  // picks a group from, while the bulk row and the sidebar's candidates are lists
+  // to find a name in and keep the name order.
+  NS.groupOrder = "use";
+  assert.deepStrictEqual(
+    optionValues(groupField({ other: "x" })),
+    ["Lily Manga", "Aozora"],
+    "ordered by use, the group the library holds most galleries of comes first"
+  );
+  NS.groupOrder = "name";
+  assert.deepStrictEqual(
+    optionValues(groupField({ other: "x" })),
+    ["Aozora", "Lily Manga"],
+    "and with the setting off it is the name order every list has always used"
+  );
+
+  // **The order is the reader's collation, not the default sort.** `Array.sort()`
+  // compares UTF-16 code units, which puts "Zebra" before "apple" — no reader's
+  // order does that. The fixture's two names cannot tell the two apart, so the rule
+  // is asked directly.
+  assert.deepStrictEqual(
+    NS.orderGroupNames(["Zebra", "apple"], "en"),
+    ["apple", "Zebra"],
+    "names are collated the way a reader reads them"
+  );
+  assert.deepStrictEqual(
+    NS.orderGroupNamesByUse(
+      ["Aozora", "Lily Manga"],
+      { "Lily Manga": 3, Aozora: 1 },
+      "en"
+    ),
+    ["Lily Manga", "Aozora"],
+    "by use, the group with more galleries comes first"
+  );
+  assert.deepStrictEqual(
+    NS.orderGroupNamesByUse(["b", "a"], { a: 1, b: 1 }, "en"),
+    ["a", "b"],
+    "…and a tie is broken the same way the name order is"
+  );
+
   // ── The language row's suggestion button ─────────────────────────
   //
   // The button offers the language a group's galleries usually carry, and it

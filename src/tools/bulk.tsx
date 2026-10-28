@@ -981,7 +981,12 @@ export function BulkFieldsRow() {
   };
 
   const groupValue = groupShown === BULK_REMOVE_VALUE ? "" : groupShown;
-  const known = knownTranslationGroups();
+  // **Name order, always.** The edit form's list can be ordered by use
+  // (`NS.groupOrder`); this one is not, because a bulk row is about finding the name
+  // you mean across a selection, and an order that moves with the library would make
+  // the list different every time it is opened. The language grouping below still
+  // puts the selection's agreed language first.
+  const known = knownTranslationGroups(intl.locale);
   // The create entry, by the edit page's rule: only while the typed text is not a
   // group this Stash already knows, so the menu never spells one name twice.
   const namesANewGroup =

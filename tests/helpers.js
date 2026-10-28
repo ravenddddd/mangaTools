@@ -831,7 +831,14 @@ const PluginApi = {
     Bootstrap: {
       // A marker rather than a component, so the tests can find the switches and
       // read their props without rendering anything.
-      Form: { Label: () => null, Group: "FormGroup", Switch: "Switch" },
+      Form: {
+        Label: () => null,
+        Group: "FormGroup",
+        Switch: "Switch",
+        // The single-choice setting's control. A marker string like the switch, so
+        // a section can find the row by its type and read `as` / `value` off it.
+        Control: "Control",
+      },
       Button: "Button",
       Collapse: "Collapse",
       // The dialog, with the two static sub-components the plugin uses. An object

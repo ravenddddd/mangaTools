@@ -601,6 +601,16 @@ front of it carries — and offering a group that only that gallery ever used, n
 that it no longer does. Nothing waits on the answer: the menu opens with what is
 in hand and is redrawn when the fetch lands.
 
+**The order is a collation, not a code-unit sort** (0.9.133). A group is a name in
+whatever the translator wrote, and the default `Array.sort()` puts `Zebra` before
+`apple` and every kana somewhere no reader would look; the list is ordered with
+`Intl.Collator` on the UI locale, the same helper the language dropdown uses. That is
+the order **by name**; **by use** counts the marked galleries carrying each name
+first and uses the same collation for ties, so two groups with the same number of
+galleries do not swap places between openings. The typed-name "create" entry still
+comes first, and a group whose usual language matches the gallery still comes before
+the rest under either order — the count only orders the list, it does not filter it.
+
 
 **Its sidebar section arrived in 0.9.54**, and the design question the note that
 used to stand here raised — "that would have to be a free-text search rather than
@@ -817,6 +827,15 @@ nothing else:
 
 An empty language list shows an "All languages" placeholder rather than every
 tag; only a chosen subset renders tags.
+
+**The translation group has one setting of its own**, under its switch: the order the
+edit form's list is offered in. A choice rather than a switch, because "on" would not
+say which order — a `<select>` in the same right-hand column as the switches, drawn
+with Stash's own `input-control` so it lines up with them. **By name** is the default
+and the order every list used before it existed; **by use** puts the groups this
+library holds most marked galleries of first. Only the edit form follows it: the bulk
+row and the sidebar's candidates keep the name order, because they are lists to find a
+name in rather than lists to pick one from.
 
 **The two display switches are deliberately independent**, so all four combinations are
 available:

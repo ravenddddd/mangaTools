@@ -343,9 +343,10 @@ module.exports = () => {
   });
   assert.strictEqual(
     rowCount,
-    switches.length,
-    "every switch should be in a `.setting` row carrying the class the stylesheet " +
-      "uses to keep the switch beside its text"
+    switches.length + 1,
+    "every row carries the class the stylesheet uses to keep its control beside " +
+      "its text — the switches' rows, and the one single-choice row, which has a " +
+      "select where they have a switch and needs the same rule for the same reason"
   );
   assert.deepStrictEqual(
     switches.map((n) => n.props.id),
@@ -712,8 +713,10 @@ module.exports = () => {
     const chevrons = chevronsIn(page);
     assert.strictEqual(
       chevrons.length,
-      5,
-      "one chevron per row that has rows under it, and no row without them"
+      6,
+      "one chevron per row that has rows under it, and no row without them — " +
+        "the translation group's switch is one of them now, since its list order " +
+        "is a row under it"
     );
     assert.ok(
       chevrons.every((c) => c.type === "button"),
@@ -723,7 +726,11 @@ module.exports = () => {
       chevrons.every((c) => c.props["aria-expanded"] === true),
       "…and each saying it is open, which is the only way anything but an eye knows"
     );
-    assert.strictEqual(groupsIn(page), 3, "three groups to start with");
+    assert.strictEqual(
+      groupsIn(page),
+      4,
+      "four groups to start with — the translation group's own rows are one"
+    );
     assert.strictEqual(switchesIn(page), 18, "…and eighteen switches");
 
     const before = state.capturedConfigWrite;
@@ -747,8 +754,13 @@ module.exports = () => {
       ["the lightbox row, which holds physical pages", 0, 17],
       ["the fields group, which folds all ten under it", 1, 8],
       ["the language field, which folds two switches", 2, 16],
-      ["the display heading, which folds four rows", 3, 14],
-      ["the mark's heading, which folds three rows and no group", 4, 15],
+      [
+        "the translation group's field, which folds one choice and no switch",
+        3,
+        18,
+      ],
+      ["the display heading, which folds four rows", 4, 14],
+      ["the mark's heading, which folds three rows and no group", 5, 15],
     ]) {
       click(chevronsIn(open())[index]);
       assert.strictEqual(
@@ -777,8 +789,8 @@ module.exports = () => {
     );
     assert.strictEqual(
       groupsIn(open()),
-      3,
-      "and the three groups are where they were"
+      4,
+      "and the four groups are where they were"
     );
     assert.ok(
       chevronsIn(open()).every((c) => c.props["aria-expanded"] === true),
@@ -1070,6 +1082,10 @@ module.exports = () => {
         openEditBlock: true,
         hidePerformers: true,
         showDisabledFields: false,
+        // The one setting that is a choice rather than a switch: how the edit
+        // form's list of translation groups is ordered. "name" is the order every
+        // list used before it existed.
+        groupOrder: "name",
         // Which filters the sidebar offers, as the comma string it is stored as.
         // Written as an explicit list even when nothing has chosen one: absent
         // would mean the same thing, but only a written list round-trips through
@@ -1267,6 +1283,7 @@ module.exports = () => {
       openEditBlock: true,
       hidePerformers: true,
       showDisabledFields: false,
+      groupOrder: "name",
       sidebarFilters: "censorship,language,original,translationGroup",
       // The reading half's own settings ride along, as the string the library holds
       // them as. Empty here because this library has never been written to — see
@@ -1338,6 +1355,59 @@ module.exports = () => {
     // the assertion in section 11 is about the real response.
     NS.showDisabledFields = false;
     NS.settingsLoaded = true;
+  }
+
+  // ── The one setting that is a choice, not a switch ────────────────
+  // The translation group's field owns one row under it: the order its list is
+  // offered in. A `<select>` where the other rows carry a switch, in the same
+  // right-hand column — one more row of the page, not a control bolted onto it.
+  {
+    const page = call("PluginSettings", { pluginID: "mangaTools" });
+    const controls = [];
+    find(page, (n) => {
+      if (n.type === "Control") controls.push(n);
+      return false;
+    });
+    assert.strictEqual(controls.length, 1, "one single-choice row on the page");
+
+    const control = controls[0];
+    const answers = [];
+    find(control, (n) => {
+      if (n.type === "option") answers.push(n.props.value);
+      return false;
+    });
+    assert.strictEqual(control.props.as, "select", "drawn as a select");
+    assert.deepStrictEqual(
+      answers,
+      ["name", "use"],
+      "two answers, in the order the setting names them"
+    );
+    assert.strictEqual(
+      control.props.value,
+      "name",
+      "showing the order every list used before it existed"
+    );
+
+    state.capturedConfigWrite = null;
+    control.props.onChange({ currentTarget: { value: "use" } });
+    assert.strictEqual(NS.groupOrder, "use", "the choice is live state");
+    assert.strictEqual(
+      state.capturedConfigWrite.input.groupOrder,
+      "use",
+      "and is written with the rest of the map"
+    );
+
+    // The stored value is free text: anything this build does not know reads as
+    // the default, so a hand-edited map cannot leave the list in an order nobody
+    // asked for.
+    control.props.onChange({ currentTarget: { value: "nonsense" } });
+    assert.strictEqual(
+      NS.groupOrder,
+      "name",
+      "a value this build does not know is the default, not a broken order"
+    );
+    NS.groupOrder = "name";
+    state.capturedConfigWrite = null;
   }
 
   console.log(

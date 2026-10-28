@@ -19,7 +19,11 @@ import { fieldLabel } from "./filter-model";
 import { MangaIcon } from "./icons";
 import { requirePluginApi } from "../plugin-api";
 import type { ReactNode } from "react";
-import type { MangaToolsFieldName, MangaToolsOption } from "../plugin-api";
+import type {
+  MangaToolsFieldName,
+  MangaToolsGroupOrder,
+  MangaToolsOption,
+} from "../plugin-api";
 
 const PluginApi = requirePluginApi();
 
@@ -460,6 +464,63 @@ function BooleanSetting(props: {
 }
 
 /**
+ * One single-choice setting, laid out exactly like a BooleanSetting: the heading on
+ * the left, and the control where the switch sits in the row beside it.
+ *
+ * A `<select>` rather than a pair of buttons: Stash's own single-choice settings are
+ * drawn this way (`SelectSetting` in Settings/Inputs.tsx), with the same
+ * `input-control` class, and the row's right-hand column is already where a control
+ * goes — so this reads as one more row of the page rather than as a control bolted
+ * onto it. The class is Stash's, not this plugin's: the box has to look like every
+ * other control on the page, including its focus ring.
+ */
+function SelectSetting(props: {
+  id: string;
+  heading: string;
+  subHeading?: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (next: string) => void;
+}) {
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+  if (!Bootstrap?.Form?.Control) {
+    console.error(
+      "[mangaTools] react-bootstrap has no Form.Control, so the group order " +
+        "setting is not drawn"
+    );
+    return null;
+  }
+
+  return (
+    <div className="setting manga-tools-setting">
+      <div>
+        <h3>{props.heading}</h3>
+        {props.subHeading ? (
+          <div className="sub-heading">{props.subHeading}</div>
+        ) : null}
+      </div>
+      <div>
+        <Bootstrap.Form.Control
+          id={props.id}
+          className="input-control"
+          as="select"
+          value={props.value}
+          onChange={(e: { currentTarget: { value: string } }) => {
+            props.onChange(e.currentTarget.value);
+          }}
+        >
+          {props.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Bootstrap.Form.Control>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Which groups the reader has folded shut, by the id of the row that opens them.
  *
  * View state, and nothing else: it is not a setting, it never reaches Stash's
@@ -651,6 +712,15 @@ export function MangaToolsSettings() {
   function writeFlag(into: (next: boolean) => void) {
     return (next: boolean) => {
       into(next);
+      emit();
+      persist();
+    };
+  }
+
+  /** The same for the one setting that is a choice rather than a switch. */
+  function writeOrder(into: (next: MangaToolsGroupOrder) => void) {
+    return (next: string) => {
+      into(next === "use" ? "use" : "name");
       emit();
       persist();
     };
@@ -860,14 +930,38 @@ export function MangaToolsSettings() {
           }
         )}
 
-        {field(
-          "mangaTools-fieldTranslationGroup",
-          t(intl, "mangaTools.translationGroup.heading"),
-          () => NS.fieldTranslationGroup,
-          (next) => {
+        {/* The translation group's own switch owns one row under it: the order its
+            list is offered in. Only this field asks the question — the bulk row and
+            the sidebar's candidates are lists to find a name in, not lists to pick
+            one from, and they keep the name order. */}
+        <SettingSwitch
+          id="mangaTools-fieldTranslationGroup"
+          heading={t(intl, "mangaTools.translationGroup.heading")}
+          checked={NS.fieldTranslationGroup}
+          onChange={writeFlag((next) => {
             NS.fieldTranslationGroup = next;
-          }
-        )}
+          })}
+        >
+          <SelectSetting
+            id="mangaTools-groupOrder"
+            heading={t(intl, "mangaTools.settings.groupOrder.heading")}
+            subHeading={t(intl, "mangaTools.settings.groupOrder.description")}
+            value={NS.groupOrder}
+            options={[
+              {
+                value: "name",
+                label: t(intl, "mangaTools.settings.groupOrder.name"),
+              },
+              {
+                value: "use",
+                label: t(intl, "mangaTools.settings.groupOrder.use"),
+              },
+            ]}
+            onChange={writeOrder((next) => {
+              NS.groupOrder = next;
+            })}
+          />
+        </SettingSwitch>
 
         {field(
           "mangaTools-fieldOriginal",

@@ -148,7 +148,7 @@ const collatorCache: { [locale: string]: Intl.Collator } = {};
  * locale rather than an exception in the middle of a render. Stash supports
  * user-supplied custom locales, so an unusual tag is not hypothetical.
  */
-function collatorFor(locale: string): Intl.Collator {
+export function collatorFor(locale: string): Intl.Collator {
   if (!(locale in collatorCache)) {
     try {
       collatorCache[locale] = new Intl.Collator(locale);

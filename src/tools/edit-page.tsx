@@ -37,6 +37,7 @@ import {
   currentGalleryId,
   isGalleryContext,
   knownTranslationGroups,
+  knownTranslationGroupsByUse,
   pickLanguage,
   refreshForSuggestions,
   store,
@@ -465,7 +466,16 @@ export function MangaFieldBlock(props: {
   const groupRaw = NS.pickField(props.values, TRANSLATION_GROUP_FIELD_NAME);
   const groupName = NS.translationGroupOf(props.values);
 
-  const known = knownTranslationGroups();
+  // **The order the list is offered in, and the one place the setting applies.**
+  // By name is what every list has always used; by use puts the groups this library
+  // holds most galleries of first, so a two-book circle that happens to start early
+  // in the collation is not the first thing under every menu. The bulk row and the
+  // sidebar's candidates keep the name order: both are about finding a name in a
+  // list, not picking one for the gallery in front of the reader.
+  const known =
+    NS.groupOrder === "use"
+      ? knownTranslationGroupsByUse(intl.locale)
+      : knownTranslationGroups(intl.locale);
   // Offered only when the text is not a group this Stash knows: otherwise the menu
   // would spell the same name twice, in whatever case it was typed.
   const namesANewGroup =

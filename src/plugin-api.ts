@@ -259,7 +259,27 @@ export interface MangaToolsNamespace {
    * more is not in it; the filter keeps such a value visible from the *filter*
    * instead, see visibleOptions.
    */
-  translationGroups(): string[];
+  translationGroups(locale?: string): string[];
+  /**
+   * The same names ordered by how many marked galleries carry each, most first,
+   * ties in the locale's collation.
+   *
+   * The edit form's list uses this when the reader has asked for it
+   * (`groupOrder`); the count is the store's own, so it is over the marked
+   * gallery set and nothing else. One walk, like translationGroups.
+   */
+  translationGroupsByUse(locale?: string): string[];
+  /**
+   * The ordering rules themselves, on names the caller has: the reader's collation,
+   * and most-used-first with collation for ties. Published for the smoke test —
+   * the fixture's two names cannot tell a collation from a code-unit sort.
+   */
+  orderGroupNames(names: string[], locale?: string): string[];
+  orderGroupNamesByUse(
+    names: string[],
+    tally: { [name: string]: number },
+    locale?: string
+  ): string[];
   /**
    * Which of this plugin's fields a key names — the canonical name, or "" for a
    * key that is not ours. The one list every recogniser asks.
@@ -505,6 +525,19 @@ export interface MangaToolsNamespace {
   confirmUnmark: boolean;
   deleteOnUnmark: boolean;
 
+  /**
+   * How the edit form orders the translation groups it offers.
+   *
+   * `name` is the order every list has always used; `use` puts the groups the
+   * library holds most galleries of first, which is what a reader picking a group
+   * for the gallery in front of them wants — a two-book circle starting with an
+   * early character otherwise sits at the top of the menu. The groups whose usual
+   * language matches this gallery's still come first either way. Only the edit
+   * form's list follows it; the bulk row and the sidebar's candidates stay in name
+   * order.
+   */
+  groupOrder: MangaToolsGroupOrder;
+
   /** Whether flags are drawn. Populated by mangaTools.tsx from the plugin settings. */
   showFlags: boolean;
   /** Whether the cover badge is drawn. Independent of showFlags. */
@@ -747,6 +780,12 @@ export interface MangaToolsLanguageSelection {
  */
 export type MangaToolsMangaState = "" | "marked" | "unmarked";
 
+/**
+ * How the edit form orders the translation groups: by name, or by how many of the
+ * library's marked galleries carry each. See `groupOrder`.
+ */
+export type MangaToolsGroupOrder = "name" | "use";
+
 /** What react-intl's useIntl() gives us — only the fields this plugin touches */
 export interface MangaToolsIntl {
   locale: string;
@@ -986,7 +1025,15 @@ export interface IPluginApi {
     };
     /** react-bootstrap: settings switches, the sidebar's button/collapse, the modal */
     Bootstrap?: {
-      Form: { Switch: ComponentType<Record<string, unknown>> };
+      Form: {
+        Switch: ComponentType<Record<string, unknown>>;
+        /**
+         * The form control, used `as="select"` for the one single-choice setting.
+         * Optional because only that row needs it — Stash's own SelectSetting draws
+         * the same thing, so a Stash that has one has both.
+         */
+        Control?: ComponentType<Record<string, unknown>>;
+      };
       Button: ComponentType<Record<string, unknown>>;
       Collapse: ComponentType<Record<string, unknown>>;
       /**
