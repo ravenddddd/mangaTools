@@ -480,6 +480,12 @@ export interface MangaToolsNamespace {
    */
   watchShopUrls(form: Element, run: () => void): () => void;
   /**
+   * The component that mounts the decorator into a form. Published for the smoke
+   * test: *where* it is mounted is a render decision, and an element in the tree
+   * is the only place that answer is visible.
+   */
+  shopUrlHeads: unknown;
+  /**
    * Whether the Chapters tab's Create and Edit belong to this plugin.
    *
    * On, they write this plugin's own chapter field, and Stash's own chapter rows are

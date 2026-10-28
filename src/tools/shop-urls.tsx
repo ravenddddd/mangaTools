@@ -166,8 +166,10 @@ export function watchShopUrls(form: Element, run: () => void): () => void {
 /**
  * Mounts the decorator for the form it is rendered into.
  *
- * Rendered inside Stash's edit form (from the CustomFieldsInput patch), whatever
- * the four fields are set to: the shop setting is its own feature.
+ * Rendered from the `CustomFieldsInput` patch, **only on a gallery marked as
+ * manga** — that component is Stash's shared one, and every entity's edit form
+ * renders it, so the gate is at the mount (see the patch). Whether anything is
+ * drawn at all is the shop setting's.
  */
 export function ShopUrlHeads() {
   const ref = React.useRef<HTMLSpanElement | null>(null);
@@ -194,6 +196,9 @@ export function ShopUrlHeads() {
   return <span ref={ref} hidden />;
 }
 
-// Published for the smoke test, which drives them against the DOM stub.
+// Published for the smoke test, which drives them against the DOM stub — and the
+// component itself, because where it is mounted is a render decision, visible
+// only as an element in the tree.
 NS.decorateShopUrls = decorateShopUrls;
 NS.watchShopUrls = watchShopUrls;
+NS.shopUrlHeads = ShopUrlHeads;

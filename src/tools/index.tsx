@@ -269,8 +269,20 @@ registerPatch("instead", "CustomFieldsInput", (...args: unknown[]) => {
   // publishing it from the edit block instead would cover only galleries that are
   // already manga, and marking a gallery that is not is exactly the case this is
   // for. Cleared when the form goes, so nothing writes into one that is not there.
+  //
+  // **`CustomFieldsInput` is Stash's shared component**: every entity's edit form
+  // renders it — a scene's, a performer's, a studio's. `galleryId` is what tells
+  // this one apart, and it is read once here for everything below.
+  const galleryId = currentGalleryId();
+  // Two questions with one answer, for the shop heads: the route says this is a
+  // gallery's form, the store says the gallery is manga. The block below asks its
+  // own route question inside (`MangaFieldBlock` returns null off a gallery page),
+  // so it keeps the mark-only gate it has always had — that is what its tests
+  // drive.
+  const markedGallery =
+    galleryId !== "" && isMarkedNow(galleryId, props.values);
+
   React.useEffect(() => {
-    const galleryId = currentGalleryId();
     if (props.onChange && galleryId) {
       setEditForm({
         galleryId,
@@ -306,13 +318,15 @@ registerPatch("instead", "CustomFieldsInput", (...args: unknown[]) => {
     <>
       {/* Only on a gallery that is manga. An unmarked gallery's edit form is
           Stash's own, unchanged — the plugin is not there at all. */}
-      {isMarkedNow(currentGalleryId(), props.values) ? (
+      {isMarkedNow(galleryId, props.values) ? (
         <MangaFieldBlock values={props.values} onChange={props.onChange} />
       ) : null}
-      {/* The shop icons in the link rows belong to every gallery's edit form, not
-          only a marked one: the setting is about the links themselves. It draws
-          nothing unless the setting is on. */}
-      <ShopUrlHeads />
+      {/* **The shop icons are on a manga gallery's form and nowhere else.** The
+          route has to be asked here, unlike the block above: `CustomFieldsInput`
+          is rendered by every entity's edit form, so without it a scene whose link
+          is a FANZA product got the shop's icon on its own link row. The setting
+          still decides whether anything is drawn at all. */}
+      {markedGallery ? <ShopUrlHeads /> : null}
       <Original {...props} />
     </>
   );

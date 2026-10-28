@@ -667,8 +667,10 @@ this feature derives everything from them. It recognises four shops by their
 registered domain (**DLsite**, **FANZA** on `dmm.co.jp`, **虎穴**, **Melonbooks**),
 reads each one's product code from the URL shape, and does two things:
 
-- in the gallery's **edit form**, a link row whose value points at one of the four
-  gets the shop's favicon at the head of the input group;
+- in a **manga gallery's edit form**, a link row whose value points at one of the
+  four gets the shop's favicon at the head of the input group. The plugin is on
+  marked galleries and nowhere else: a scene's, an image's or a performer's edit
+  form is Stash's own and its links are left alone;
 - in the **Manga info block**, a `商店` row shows the recognised links as badges:
   the icon and the product code, each badge the link itself. A shop with no link is
   simply absent; there is no "checked, not there" state in this version.
@@ -687,7 +689,11 @@ links, not its page list.
 
 The URL field is Stash's own and is not a patchable component, so the head is DOM
 work: a node mounted inside the form finds the rows by Stash's scrape button and
-decorates them. Rows are added by React (a mutation observer) and the input's value
+decorates them. **The node is mounted only on a marked gallery's form.** Stash's
+`CustomFieldsInput` is the shared custom-fields component — every entity's edit
+form renders it — so the mount is where the gallery gate has to be; without it a
+scene whose link was a FANZA product wore the shop's icon on its own link row.
+Rows are added by React (a mutation observer) and the input's value
 changes without a mutation (a capture `input` listener); every write is guarded by
 a comparison so the two cannot answer each other. The icons are **bundled** in
 `assets/shops/` — the four favicons — rather than fetched from the shops at

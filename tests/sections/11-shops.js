@@ -9,7 +9,16 @@
  */
 
 const assert = require("node:assert");
-const { NS, makeEl, observed, runSection, state } = require("../helpers.js");
+const {
+  NS,
+  asManga,
+  globalListeners,
+  makeEl,
+  observed,
+  runSection,
+  state,
+  call,
+} = require("../helpers.js");
 
 module.exports = () => {
   runSection(
@@ -375,4 +384,68 @@ module.exports = () => {
       "and a document with no operation name never does"
     );
   });
+
+  /**
+   * **Where the heads are mounted.** The decorator itself takes a form and works
+   * on it; this is the gate above it. `CustomFieldsInput` is Stash's shared
+   * custom-fields component — every entity's edit form renders it — so the plugin
+   * has to ask two questions before mounting: is this a gallery's form, and is
+   * that gallery manga. Reported on a scene page (2026-10-28), where the FANZA
+   * icon appeared on the scene's own link row.
+   *
+   * The mount's gate is a render decision, so what is read here is the returned
+   * element tree: the mount component itself (`NS.shopUrlHeads`, published for
+   * this) is present or it is not. The DOM stub has no refs, so the decorator's
+   * own effect never runs in this world; that is the section above's job.
+   */
+  runSection(
+    "16 the shop head is mounted only on a manga gallery's form",
+    () => {
+      const mounted = (node) => {
+        if (!node || typeof node !== "object") return false;
+        if (Array.isArray(node)) return node.some(mounted);
+        if (node.type === NS.shopUrlHeads) return true;
+        return mounted(node.props?.children);
+      };
+      const nav = (pathname) =>
+        globalListeners["stash:location"]({
+          detail: { data: { location: { pathname } } },
+        });
+      const render = (values) =>
+        call("CustomFieldsInput", { values, onChange: () => {} });
+
+      // A scene's form, whatever its custom fields happen to carry: the route is
+      // what says this is not a gallery.
+      nav("/scenes/10269");
+      assert.strictEqual(
+        mounted(render(asManga({}))),
+        false,
+        "a scene's edit form is Stash's own"
+      );
+
+      nav("/performers/3");
+      assert.strictEqual(
+        mounted(render(asManga({}))),
+        false,
+        "…and so is a performer's"
+      );
+
+      // A gallery Stash knows, but the plugin has not marked. (The store has not
+      // been read yet in this part of the run, so the values are the answer —
+      // see isMarkedNow.)
+      nav("/galleries/999");
+      assert.strictEqual(
+        mounted(render({})),
+        false,
+        "an unmarked gallery's link rows are left alone too"
+      );
+
+      nav("/galleries/1");
+      assert.strictEqual(
+        mounted(render(asManga({}))),
+        true,
+        "a manga gallery's form is the one that gets the heads"
+      );
+    }
+  );
 };
