@@ -181,7 +181,11 @@ export function LanguageRow(props: {
     <li
       className={
         (selected ? "selected-object" : "unselected-object") +
-        (props.modifier ? " modifier-object" : "")
+        (props.modifier ? " modifier-object" : "") +
+        // This plugin's own rows, for the stylesheet: `.label-group` is a flex box
+        // Stash's own rows use too, and the one rule that goes with it here (the
+        // icon does not shrink; see mangaTools.css) must not restyle their list.
+        " manga-tools-row"
       }
     >
       <a

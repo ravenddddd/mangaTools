@@ -81,6 +81,23 @@ module.exports = () => {
     ),
     "the flag in a list row should be spaced from the icon and the name"
   );
+  // A row's icon and flag must not shrink when its name is clipped. The label is
+  // the item that gives way — `.TruncatedText` clips, so its automatic minimum is
+  // 0 — but the icon is an SVG with the default `flex-shrink`, and in a browser a
+  // row whose name truncated drew its plus 30% narrower than a row whose name
+  // fitted (the flag: 38%), so the two rows' names stopped lining up. A layout
+  // engine's answer is not visible to the DOM stub, so the check is on the
+  // stylesheet, and on the class the plugin's rows actually wear.
+  assert.ok(
+    /\.manga-tools-row \.label-group \.fa-icon\s*\{[^}]*flex-shrink:\s*0/.test(
+      css
+    ),
+    "a row's icon must not shrink when its label truncates"
+  );
+  assert.ok(
+    /\.manga-tools-row-flag\s*\{[^}]*flex-shrink:\s*0/.test(css),
+    "nor the flag standing in for it"
+  );
   // Stash's `.setting-section .setting > div:last-child { text-align: right }`
   // right-aligns the heading and description of this full-width settings block
   // unless it is explicitly undone. The selector is written twice — once for the

@@ -1056,9 +1056,34 @@
  * Deliberately not a rule on `.fi` itself: that class is flag-icons', the
  * stylesheet is loaded by Stash for its own use, and a plugin reaching into it
  * would be restyling somebody else's furniture everywhere on the page.
+ *
+ * `flex-shrink: 0` is the same fix the row's icon gets below: a truncated label
+ * would otherwise squash this 1.333em-wide span with it (measured: to 38% of its
+ * width in a narrow sidebar).
  */
 .manga-tools-row-flag {
+  flex-shrink: 0;
   margin-right: 0.4rem;
+}
+
+/*
+ * **The plus in one of this plugin's own rows does not shrink.**
+ *
+ * `.label-group` is a flex box, and when a name is longer than the column the
+ * item that has to give way is the label: it is the one with an automatic minimum
+ * of 0, because `.TruncatedText` clips and so sets `overflow: hidden`. The icon is
+ * an SVG with the default `flex-shrink: 1`, so it gave way with it — measured in a
+ * browser, a row whose name truncated drew its plus 30% narrower than a row whose
+ * name fitted, and the two rows' labels no longer lined up. The fixed width is the
+ * whole reason it is a `fa-fw` icon.
+ *
+ * Scoped to the rows this plugin draws (`manga-tools-row`, on every one of them)
+ * rather than to `.label-group` or to Stash's `.sidebar-list-filter`: Stash's own
+ * rows have the same latent shrink, and its list is not this stylesheet's to
+ * restyle.
+ */
+.manga-tools-row .label-group .fa-icon {
+  flex-shrink: 0;
 }
 
 /*

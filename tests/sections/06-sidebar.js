@@ -372,8 +372,12 @@ module.exports = () => {
   );
   assert.deepStrictEqual(
     candidateItems.slice(0, 2).map((i) => i.props.className),
-    ["unselected-object modifier-object", "unselected-object modifier-object"],
-    "and carry modifier-object, as Stash marks them"
+    [
+      "unselected-object modifier-object manga-tools-row",
+      "unselected-object modifier-object manga-tools-row",
+    ],
+    "and carry modifier-object, as Stash marks them — plus this plugin's own " +
+      "row marker, which is what keeps the icon from shrinking on a clipped name"
   );
   assert.strictEqual(
     candidateItems.some((i) => labelOf(i) === "日语"),
