@@ -18,6 +18,7 @@ const {
   imageQueries,
   countQueries,
   drawn,
+  CHAPTERS_VIEW,
 } = require("./harness.js");
 
 module.exports = async () => {
@@ -40,7 +41,13 @@ module.exports = async () => {
 
       // What the details page did while the lightbox was closed. Stash's own list
       // is what the next lightbox opens with, so the carousel is given the new one.
-      state.galleries["71"].images.splice(1, 1);
+      //
+      // The **last** page goes, not the one the reader is on: the slides either side
+      // of the page the lightbox is showing still line up, so the order check has
+      // nothing to say about it — which is exactly the change the count question is
+      // there for. (A change that does move the slides is noticed without it; see
+      // the section below.)
+      state.galleries["71"].images.splice(2, 1);
 
       const before = imageQueries().length;
       const counted = countQueries().length;
@@ -49,7 +56,7 @@ module.exports = async () => {
         on: false,
         at: 2,
         total: 2,
-        ids: ["801", "803"],
+        ids: ["801", "802"],
       });
 
       assert.strictEqual(
@@ -66,7 +73,7 @@ module.exports = async () => {
       );
       assert.deepStrictEqual(
         drawn(),
-        ["/image/803/image"],
+        ["/image/802/image"],
         "the page the reader is on is still the one the lightbox is showing"
       );
 
@@ -146,6 +153,72 @@ module.exports = async () => {
         drawn(),
         ["/image/821/image"],
         "the pages in hand are what is drawn"
+      );
+
+      stopReader(again);
+    }
+  );
+
+  /**
+   * **A cached list in another order is not the list on screen.**
+   *
+   * The reported bug: a gallery opened from a list sorted some other way — the
+   * server handed back that order, and the reader cached it — then opened again from
+   * the gallery's own lightbox, which is always path. The cache said "already read"
+   * and the count said "nothing changed", so the reader drew its scrambled list onto
+   * a path-ordered lightbox: the first page right and every page after it wrong.
+   *
+   * What notices is the carousel's own neighbours (see orderAgrees): a cached list
+   * that disagrees with the slides next to the page on show is a list in another
+   * order, and it is read again rather than drawn.
+   */
+  await runSection(
+    "a cached list in another order is read again, not drawn",
+    async () => {
+      const first = await startReader({
+        galleryId: "77",
+        on: false,
+        total: 8,
+        search: "?sortby=title&perPage=500",
+        ids: CHAPTERS_VIEW.map(String),
+      });
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(-1)
+          .map((q) => q.variables.sort),
+        ["title"],
+        "the first opening reads the order the list it came from shows"
+      );
+      assert.deepStrictEqual(drawn(), ["/image/701/image"], "…and draws it");
+      stopReader(first.box);
+
+      // The same gallery, opened from its own lightbox: no list in the address bar,
+      // and a carousel in path order — which is what Stash's gallery lightbox is.
+      const before = imageQueries().length;
+      const counted = countQueries().length;
+      const { box: again } = await startReader({
+        galleryId: "77",
+        on: false,
+        total: 8,
+      });
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(before)
+          .map((q) => q.variables.sort),
+        ["path"],
+        "the cached list is thrown away and read again in the lightbox's own order"
+      );
+      assert.strictEqual(
+        countQueries().length,
+        counted,
+        "and the count is not even asked: the slides already said so"
+      );
+      assert.deepStrictEqual(
+        drawn(),
+        ["/image/708/image"],
+        "so the pages drawn are the ones the lightbox is showing, in its order"
       );
 
       stopReader(again);

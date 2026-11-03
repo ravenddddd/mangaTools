@@ -250,6 +250,14 @@ export function pressEscape(): void {
  * see, and they fail the check the caller already makes: the lightbox's own count
  * of how many images it is showing no longer matches the pages fetched here, so
  * nothing is drawn.
+ *
+ * **This is a guess and only a guess.** The address bar can be describing another
+ * list entirely — the **galleries** list's sort travels with the reader into a
+ * gallery they opened from it, and `random_<seed>` is a sort the server applies to
+ * images without complaining — so the caller verifies the answer against the
+ * lightbox's own slides and falls back to path when it does not match (see
+ * orderAgrees in takeover.ts). Nothing here should be trusted with the question
+ * "what order is this lightbox in".
  */
 export function lightboxOrder(search: string): MangaReaderOrder {
   const params = new URLSearchParams(search || "");
@@ -352,12 +360,10 @@ let galleryQuery: unknown = null;
  * image at it are readable — the child at that offset is the one that was given an
  * `<img>` (only the current image and its neighbours are rendered).
  *
- * This is what makes it possible to check that a list fetched from a *guess* about
- * the order is the order actually on screen. The guess comes from the URL, and the
- * URL is not always right: Stash's gallery page keeps its inner tabs in component
- * state, so switching from the Images tab to the Chapters tab leaves
- * `?sortby=title` in the address bar while the lightbox that tab opens is Stash's
- * own, and always path.
+ * It is also where the reader starts from: the place is found by *which image* is
+ * showing rather than by counting to it, so nothing has to agree about the order
+ * first. Whether the list is in the lightbox's order at all is the next question,
+ * and it is answered by the slides either side of this one — see carouselSlides.
  *
  * Null when any of it cannot be read — no carousel, a `left` that is not the shape
  * expected, nothing rendered where the offset points. A reader that cannot tell
@@ -366,18 +372,10 @@ let galleryQuery: unknown = null;
 export function carouselImage(
   lightbox: Element
 ): { at: number; id: string; fileId: string | null } | null {
-  const carousel = lightbox.querySelector(
-    SELECTOR_CAROUSEL
-  ) as HTMLElement | null;
+  const carousel = carouselOf(lightbox);
   if (!carousel) return null;
 
-  const offset = /^(-?\d+(?:\.\d+)?)vw$/.exec(carousel.style?.left || "");
-  if (!offset) return null;
-
-  const at = Math.round(-Number(offset[1]) / 100);
-  if (!Number.isFinite(at) || at < 0) return null;
-
-  const slide = carousel.children[at];
+  const slide = carousel.element.children[carousel.at];
   const media = slide?.querySelector("img") || slide?.querySelector("video");
   const src = (media as HTMLImageElement | HTMLVideoElement | null)?.src || "";
   const id = /\/image\/([^/]+)\//.exec(src)?.[1];
@@ -389,7 +387,61 @@ export function carouselImage(
   // cannot when the same content appears more than once. See fetchPhysicalGallery.
   const fileId = /#([^#\s]+)$/.exec(src)?.[1] || null;
 
-  return { at, id, fileId };
+  return { at: carousel.at, id, fileId };
+}
+
+/** The carousel, and the index its own `left` says is on screen */
+function carouselOf(
+  lightbox: Element
+): { element: HTMLElement; at: number } | null {
+  const element = lightbox.querySelector(
+    SELECTOR_CAROUSEL
+  ) as HTMLElement | null;
+  if (!element) return null;
+
+  const offset = /^(-?\d+(?:\.\d+)?)vw$/.exec(element.style?.left || "");
+  if (!offset) return null;
+
+  const at = Math.round(-Number(offset[1]) / 100);
+  if (!Number.isFinite(at) || at < 0) return null;
+
+  return { element, at };
+}
+
+/**
+ * The slides the carousel has actually drawn, by index.
+ *
+ * Stash renders the current slide and one either side of it, and nothing else
+ * (`i >= currentIndex - 1 && i <= currentIndex + 1` in Lightbox.tsx), which is
+ * enough to answer a question the address bar cannot: **is the list in hand in the
+ * order this lightbox is showing?** A list that disagrees at a neighbour disagrees
+ * everywhere after the first page, and a reader drawn from it turns to pages the
+ * gallery does not have there.
+ *
+ * The index is the carousel's own — the same one `carouselImage` reports — so a
+ * caller compares them against the same list position for position.
+ *
+ * Null when the carousel cannot be read, or has drawn nothing: a reader that cannot
+ * tell does not get to conclude anything, which is the rule this whole file follows.
+ */
+export function carouselSlides(
+  lightbox: Element
+): Array<{ at: number; id: string }> | null {
+  const carousel = carouselOf(lightbox);
+  if (!carousel) return null;
+
+  const slides: Array<{ at: number; id: string }> = [];
+
+  for (let at = carousel.at - 1; at <= carousel.at + 1; at++) {
+    const slide = carousel.element.children[at];
+    const media = slide?.querySelector("img") || slide?.querySelector("video");
+    const src =
+      (media as HTMLImageElement | HTMLVideoElement | null)?.src || "";
+    const id = /\/image\/([^/]+)\//.exec(src)?.[1];
+    if (id) slides.push({ at, id });
+  }
+
+  return slides.length > 0 ? slides : null;
 }
 
 interface GalleryPayload {
@@ -834,4 +886,5 @@ export function lightboxIsLoading(lightbox: Element): boolean {
 }
 
 NR.carouselImage = carouselImage;
+NR.carouselSlides = carouselSlides;
 NR.lightboxIsLoading = lightboxIsLoading;

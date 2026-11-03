@@ -77,7 +77,7 @@ import {
   readChapters,
   toFileChapters,
 } from "./chapters";
-import { fetchGalleryFileCount } from "../gallery-files";
+import { type GalleryFileScope, fetchGalleryFileCount } from "../gallery-files";
 import { NR, type MangaReaderOrder } from "./namespace";
 import type {
   MangaReaderGallery,
@@ -106,6 +106,7 @@ import {
   SELECTOR_LIGHTBOX,
   type GalleryAnswer,
   carouselImage,
+  carouselSlides,
   fetchGallery,
   fetchImageCount,
   lightboxIsLoading,
@@ -575,8 +576,15 @@ function pairingKey(): string {
 
 /** Asks Stash for the gallery's pages, unless they are already in hand */
 function loadGallery(id: string): void {
+  const forLightbox = root;
   const already = loaded.get(id);
-  if (already) {
+  // **A cached list is only good in the order the lightbox is showing.** It was
+  // read for one list — one sort, one page of a gallery somebody opened from
+  // somewhere else — and the same gallery opened from another list is another
+  // order, drawn from the same pages. Checking it here is also what keeps a list
+  // that was read wrongly once from staying wrong for the whole session: this is
+  // the only place a cached gallery is taken out again.
+  if (already && (!forLightbox || orderAgrees(already, forLightbox))) {
     galleryId = id;
     shownAt = -1;
     step();
@@ -589,7 +597,8 @@ function loadGallery(id: string): void {
     return;
   }
 
-  const forLightbox = root;
+  if (already) loaded.delete(id);
+
   if (!forLightbox) return;
   // One read per opening: a second pass over the same lightbox drops the ask. A
   // *different* lightbox asking for the same gallery is a new opening — its read
@@ -601,7 +610,7 @@ function loadGallery(id: string): void {
   // was opened from, and opening another gallery — or the same one after changing
   // the list's sort — is a different order. See lightboxOrder.
   loadPages(id, lightboxOrder(window.location.search), forLightbox)
-    .then((answer) => {
+    .then(({ answer, order }) => {
       // Another opening was asked for while this was in flight: its answer is the
       // one that matters, and this one must not be drawn over it. Matching the
       // lightbox as well as the gallery is what keeps an old answer from consuming
@@ -615,7 +624,7 @@ function loadGallery(id: string): void {
       // flight, and an answer for the previous one must not be drawn over this one.
       if (root !== forLightbox) return;
 
-      const gallery = galleryFrom(id, answer);
+      const gallery = galleryFrom(id, answer, order);
       remember(id, gallery);
 
       language = answer.language;
@@ -646,11 +655,19 @@ function loadGallery(id: string): void {
  * build exactly the same thing, or one of them would be missing a chapter, a
  * pairing, or the layout the settings in hand ask for.
  */
-function galleryFrom(id: string, answer: GalleryAnswer): MangaReaderGallery {
+function galleryFrom(
+  id: string,
+  answer: GalleryAnswer,
+  order: MangaReaderOrder
+): MangaReaderGallery {
   return {
     id,
     pages: answer.pages,
     images: answer.images,
+    // The order these pages were read in, kept because a re-read has to be in the
+    // same one: `refresh` corrects membership, and asking again in whatever the
+    // address bar says at that moment would be a different list.
+    order,
     pairedWith: pairingKey(),
     screens: laidOut(answer.pages),
     chapters: placeChapters(chaptersOf(answer), answer.pages),
@@ -721,26 +738,28 @@ function refresh(id: string): void {
 
   const seq = ++refreshing;
 
-  // `fetchGallery` rather than `loadPages`: the pairing check there asks whether
-  // the carousel's image is in the list it just read, and a page deleted while the
-  // reader is on it is exactly an image that is on screen and not in the answer.
-  // That check belongs to the first read, where a wrong guess about the order is
-  // what it is for; a re-read is correcting membership, in the order this opening
-  // already uses.
-  fetchGallery(id, lightboxOrder(window.location.search))
+  const old = loaded.get(id);
+  if (!old) return;
+
+  // `fetchGallery` rather than `loadPages`: the pairing checks there ask whether
+  // the carousel is showing this list, and a page deleted while the reader is on it
+  // is exactly an image that is on screen and not in the answer. That question
+  // belongs to the first read; a re-read is correcting membership, **in the order
+  // this opening already uses** — asking again in whatever the address bar says now
+  // would be a different list, drawn under a reader who is halfway through this one.
+  const order = old.order;
+
+  fetchGallery(id, order)
     .then((answer) => {
       // A newer re-read, or a lightbox that closed or changed while this one was
       // out: its answer is not this one's to apply.
       if (seq !== refreshing) return;
       if (root !== forLightbox || galleryId !== id) return;
 
-      const old = loaded.get(id);
-      if (!old) return;
-
       const was = place;
       const wasId = was >= 0 ? old.pages[was]?.id : undefined;
 
-      remember(id, galleryFrom(id, answer));
+      remember(id, galleryFrom(id, answer, order));
       language = answer.language;
 
       if (was >= 0) {
@@ -781,15 +800,18 @@ function nextIndex(pages: MangaReaderPage[], id: string | undefined): number {
  * The order is *guessed* from the URL, and the URL is not always right: Stash's
  * gallery page keeps its inner tabs in component state, so switching from the
  * Images tab to the Chapters tab leaves `?sortby=title` in the address bar while
- * the lightbox that tab opens is Stash's own, and always path. Fetching a
- * title-ordered list for a path-ordered lightbox pairs the wrong pages and puts
- * every index this plugin computes off by however much the two orders disagree.
+ * the lightbox that tab opens is Stash's own, and always path. Worse, the address
+ * bar of the **galleries list** carries that list's sort — `random_<seed>`, `date` —
+ * and the server applies it to *images* without complaint, so the guess comes back
+ * as a real list in an order no lightbox is showing. Fetching one for a path-ordered
+ * lightbox pairs the wrong pages and puts every index this plugin computes off by
+ * however much the two orders disagree.
  *
- * So the guess is checked against the one thing that cannot be wrong — the image
- * actually on screen — and a list that disagrees is thrown away and asked for
- * again in path order, which is what the lightbox is in when the URL's order is
- * not it. If that disagrees too, nothing here fits and the caller is told so
- * rather than drawing pages that do not match the lightbox.
+ * So the guess is checked against the lightbox itself: the image on screen **and the
+ * slides either side of it** (see orderAgrees). A list that disagrees is thrown away
+ * and asked for again in path order, which is what every one of Stash's own gallery
+ * lightboxes is in. If that disagrees too, nothing here fits and the caller is told
+ * so rather than drawing pages that do not match the lightbox.
  *
  * A lightbox whose carousel cannot be read concludes nothing: the check is skipped
  * and the guess stands, because a reader that cannot verify an assumption is not
@@ -799,7 +821,7 @@ async function loadPages(
   id: string,
   order: MangaReaderOrder,
   lightbox: Element
-): Promise<GalleryAnswer> {
+): Promise<{ answer: GalleryAnswer; order: MangaReaderOrder }> {
   const answer = await fetchGallery(id, order);
 
   // Where the reader is, found by *which image* the lightbox is showing rather than by
@@ -809,7 +831,7 @@ async function loadPages(
   //
   // A carousel that cannot be read concludes nothing, and the list stands as fetched.
   const shown = carouselImage(lightbox);
-  if (!shown) return answer;
+  if (!shown) return { answer, order };
 
   if (!answer.pages.some((page) => (page.imageId || page.id) === shown.id)) {
     throw new Error(
@@ -820,7 +842,68 @@ async function loadPages(
     );
   }
 
-  return answer;
+  // **Holding the image on screen is not the same as being in its order.** The
+  // address bar names a list — the list the reader came from — and that list is not
+  // always the one the lightbox is showing: a gallery opened from the galleries
+  // list carries that list's sort (a `random_<seed>`, a `date`), which the server
+  // will happily apply to *images*, and the lightbox itself is Stash's own and
+  // always path. A list that only agrees about the image on screen puts every page
+  // after it in the wrong place, which is a reader turning to a page the gallery
+  // does not have there.
+  if (orderAgrees(answer, lightbox)) return { answer, order };
+
+  // Stash's own gallery lightbox is path — a card's preview, the chapters tab, the
+  // header button — so that is the order to ask for when the URL's is not it. Any
+  // other order cannot be reproduced from here, and a reader with no pages is
+  // better than one reading the wrong ones.
+  const byPath: MangaReaderOrder = { sort: "path", direction: "ASC" };
+  if (order.sort === byPath.sort && order.direction === byPath.direction) {
+    throw new Error(
+      "[mangaReader] the lightbox is showing this gallery's images in an order " +
+        "that is not path order, so they cannot be paired — the list behind it is " +
+        "filtered or sorted some other way"
+    );
+  }
+
+  const again = await fetchGallery(id, byPath);
+  if (orderAgrees(again, lightbox)) return { answer: again, order: byPath };
+
+  throw new Error(
+    "[mangaReader] the lightbox is showing this gallery's images in an order " +
+      "that neither the address bar's sort nor path order reproduces, so they " +
+      "cannot be paired"
+  );
+}
+
+/**
+ * Whether a list is the one the carousel is showing, **in order**.
+ *
+ * The two neighbouring slides are what makes this a question about order rather
+ * than about membership: Stash draws the current slide and one either side of it,
+ * so a list that has the right images at the wrong places disagrees at one of them.
+ *
+ * Physical pages are the exception, and not a gap: they are file *occurrences* of
+ * images, so the two lists are not index for index the same once an image repeats,
+ * and their order is not a guess at all — it is the server's own path order, which
+ * is what Stash's lightbox is in too. See gallery-files.ts.
+ *
+ * A carousel that cannot be read answers yes: the check exists to catch a list the
+ * lightbox is not showing, and a reader that cannot tell is not entitled to
+ * conclude against the list it has.
+ */
+function orderAgrees(
+  list: { pages: MangaReaderPage[]; fileScope?: GalleryFileScope },
+  lightbox: Element
+): boolean {
+  if (list.fileScope) return true;
+
+  const slides = carouselSlides(lightbox);
+  if (!slides) return true;
+
+  return slides.every((slide) => {
+    const page = list.pages[slide.at];
+    return page !== undefined && (page.imageId || page.id) === slide.id;
+  });
 }
 
 /** Where the image the lightbox is showing sits in a gallery's pages, or -1 */

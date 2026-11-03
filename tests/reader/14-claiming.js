@@ -15,6 +15,7 @@ const {
   container,
   drawn,
   CHAPTERS_VIEW,
+  CHAPTERS_PATH,
   startReader,
   stopReader,
 } = require("./harness.js");
@@ -43,7 +44,9 @@ module.exports = async () => {
         galleryId: "53",
         on: true,
         total: 8,
-        ids: CHAPTERS_VIEW.map(String),
+        // The carousel is path order because the address bar says nothing about a
+        // list — and path is what Stash's own gallery lightbox is in.
+        ids: CHAPTERS_PATH.map(String),
         expectSwitch: false,
       });
 
@@ -91,7 +94,7 @@ module.exports = async () => {
         galleryId: "54",
         on: true,
         total: 8,
-        ids: CHAPTERS_VIEW.map(String),
+        ids: CHAPTERS_PATH.map(String),
         expectSwitch: false,
       });
 
@@ -104,7 +107,7 @@ module.exports = async () => {
         galleryId: "54",
         on: true,
         total: 8,
-        ids: CHAPTERS_VIEW.map(String),
+        ids: CHAPTERS_PATH.map(String),
       });
 
       // The old answer lands after the new lightbox is up. It must neither draw

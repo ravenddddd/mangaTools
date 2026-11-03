@@ -161,6 +161,15 @@ export interface MangaReaderGallery {
    * already read, and every one of those is a lightbox to hand the chapters to.
    */
   images: LightboxImage[];
+  /**
+   * The order these pages were read in.
+   *
+   * Kept because a re-read has to be in the same one: `refresh` corrects membership,
+   * and a list asked for again in whatever the address bar says at that moment would
+   * be another order drawn under a reader who is halfway through this one. Also the
+   * record of a read that fell back to path because the URL named another list.
+   */
+  order: MangaReaderOrder;
   screens: MangaReaderScreen[];
   /**
    * Whether those screens were laid out with two pages a screen.
@@ -231,6 +240,12 @@ export interface MangaReaderNamespace {
    * screen.
    */
   carouselImage(lightbox: Element): { at: number; id: string } | null;
+  /**
+   * The slides the carousel has drawn, by index — see carouselSlides, which is what
+   * says whether a fetched list is *in the order on screen* rather than merely
+   * holding the images on screen.
+   */
+  carouselSlides(lightbox: Element): Array<{ at: number; id: string }> | null;
   /**
    * Whether the lightbox is busy fetching or swapping. It renders a spinner in place
    * of everything while it is — see lightboxIsLoading, which is the difference between

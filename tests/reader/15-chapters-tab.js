@@ -15,6 +15,7 @@ const {
   chapterMenu,
   drawnRows,
   CHAPTERS_VIEW,
+  CHAPTERS_PATH,
   NR,
   NS,
   startReader,
@@ -912,7 +913,9 @@ module.exports = async () => {
         galleryId: "35",
         on: true,
         total: 8,
-        ids: CHAPTERS_VIEW.map(String),
+        // Path order, because the address bar names no list and that is what Stash's
+        // own gallery lightbox is in.
+        ids: CHAPTERS_PATH.map(String),
       });
       assert.deepStrictEqual(
         chapterMenu(box),

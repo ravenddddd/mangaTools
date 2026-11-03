@@ -650,7 +650,12 @@ function buildLightbox(current = 1, total = 5, ids = null, fragments = null) {
     carousel.style.left = `${(at - 1) * -100}vw`;
     slides.forEach((slide, i) => {
       slide.textContent = "";
-      if (!ids || Math.abs(i - (at - 1)) > 1) return;
+      // A slide past the end of the ids a section gave is a counter the stub was
+      // handed, not an image: Stash's carousel has one child per image it holds, so
+      // there is nothing to draw there. (The reader checks the neighbours it can see
+      // against its own list — see orderAgrees — and a made-up id would be a list
+      // disagreement the fixture invented.)
+      if (!ids || i >= ids.length || Math.abs(i - (at - 1)) > 1) return;
       const img = dom.makeElement("img");
       img.src =
         `/image/${ids[i]}/image?t=1` +
@@ -1259,6 +1264,13 @@ state.galleries["72"] = {
 };
 state.galleries["73"] = {
   images: [image("821", 1000, 1500), image("822", 1000, 1500)],
+};
+// For the section about a *cached list in another order*: two orders of one
+// gallery, so a reader that opened it from one list and then from another has a
+// list that is not the one the lightbox is showing.
+state.galleries["77"] = {
+  images: numbered(CHAPTERS_VIEW),
+  pathImages: numbered(CHAPTERS_PATH),
 };
 // For the sections about physical pages: four files in one zip, one image twice.
 // The gallery's deduped list is three images; the physical list has four pages.

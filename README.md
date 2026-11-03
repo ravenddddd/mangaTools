@@ -1349,6 +1349,19 @@ Stash's own rules for them — including that an absent direction means descendi
 for `date` and nothing else, and that a seeded `random_…` is a sort name to hand
 back rather than a shuffle to roll again.
 
+**The URL is only a guess, and it is checked.** The address bar can be describing
+another list entirely: a gallery opened from the **galleries** list carries that
+list's sort — `date`, `name`, a `random_<seed>` — and the server applies it to
+*images* without complaint, while the lightbox the reader lands in is Stash's own
+gallery lightbox and **always path**. (That was a real bug: a gallery read from a
+random-sorted list showed page 1 correctly and every page after it wrong.) So the
+list that comes back is verified against the lightbox itself — the image on screen,
+and the two slides Stash renders either side of it — and a list that disagrees is
+thrown away and asked for again in path order. If that disagrees too, the reader
+stands down rather than draw pages that are not where the lightbox has them. A
+cached gallery is checked the same way on every opening, which is also what keeps a
+list read in one order from being reused for another.
+
 What remains is genuinely cold: the first screen, a jump, a slow disk. For those,
 the screen is built **detached** and shown in one step — the reader keeps whatever
 is already on screen until both images can be painted (the browser is asked with

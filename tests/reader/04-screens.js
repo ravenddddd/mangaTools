@@ -217,10 +217,12 @@ module.exports = async () => {
    * not match.
    */
   /**
-   * The place is found by *which image* is showing, not by counting or by trusting the
-   * order a URL named. The same image is the same image in any order, so this is the
-   * one thing that cannot be wrong — and the reason nothing here has to agree with
-   * Stash about how a gallery is sorted.
+   * The place is found by *which image* is showing, not by counting to it — and the
+   * list is then checked against the slides either side of that image, because a list
+   * that only agrees about the image on screen is a list in another order, and every
+   * page after the first would come from the wrong place. The URL's order is a guess
+   * about a list the reader came from; the carousel's neighbours are the lightbox
+   * itself.
    */
   await runSection("the place is found by which image is showing", async () => {
     const before = imageQueries().length;
@@ -229,8 +231,7 @@ module.exports = async () => {
       on: true,
       total: 8,
       // The URL names title order while the carousel is showing path order — the case
-      // that used to cost a second fetch, and now costs nothing, because where the
-      // reader is has nothing to do with either order.
+      // the gallery's own lightbox is always in, whatever list the reader came from.
       search: "?sortby=title&perPage=500",
       ids: CHAPTERS_PATH.map(String),
     });
@@ -239,8 +240,9 @@ module.exports = async () => {
       imageQueries()
         .slice(before)
         .map((q) => q.variables.sort),
-      ["title"],
-      "the list is fetched in the order the URL names, and that is all it is used for"
+      ["title", "path"],
+      "the list the URL names is fetched, and thrown away for path order when the " +
+        "lightbox is not showing it"
     );
     assert.deepStrictEqual(
       drawn(),
