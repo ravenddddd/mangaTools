@@ -534,7 +534,7 @@ module.exports = async () => {
       // defaulted to its first image, so a gallery opened twice stayed on page one
       // however far down the grid the reader clicked.
       assert.strictEqual(
-        Object.prototype.hasOwnProperty.call(props, "initialIndex"),
+        Object.hasOwn(props, "initialIndex"),
         false,
         "a handover leaves Stash's place alone rather than clearing it"
       );
