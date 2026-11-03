@@ -491,6 +491,23 @@ export interface MangaReaderNamespace {
    */
   columnFitted(width: number, height: number, reserved?: number): number;
   /**
+   * The pages' heights and where each begins, at zoom 1, from the fit — or null when
+   * the column cannot be planned (an unmeasured box, a page with no size of its own).
+   * Published for the smoke test: the whole windowed column is arithmetic on this.
+   */
+  columnPlan(
+    pages: import("./spreads").MangaReaderPage[],
+    fitted: number
+  ): { heights: number[]; offsets: number[] } | null;
+  /** The page at an offset in the column, from columnPlan's offsets */
+  pageAtOffset(offsets: number[], at: number): number;
+  /** The rows to draw for a page, `[start, end)` */
+  columnWindow(
+    count: number,
+    page: number,
+    size?: number
+  ): { start: number; end: number };
+  /**
    * How far a menu has to move sideways to be inside the window — see chrome.ts.
    *
    * Here rather than reached through the DOM for the same reason as the bar's

@@ -12,6 +12,7 @@ const {
   CHAPTERS_VIEW,
   NR,
   NS,
+  settle,
   startReader,
   stopReader,
 } = require("./harness.js");
@@ -1178,6 +1179,220 @@ module.exports = async () => {
             ? "#manga-reader-double-page"
             : "#manga-reader-single-page"
       )
+    );
+
+    stopReader(box);
+  });
+
+  /**
+   * **A thousand pages are not a thousand rows.**
+   *
+   * The column used to hold a row — an element and an `<img>` — for every page of the
+   * gallery. It now draws a window around the reader's place and puts two padding boxes
+   * where the rest of the book would be, so the scroll range, the scrollbar, the
+   * progress bar and every jump stay those of the whole book. What decides is arithmetic
+   * on the pages' own shapes (see columnPlan), which is why the plan, the offset and the
+   * window are pinned as pure functions as well as through the DOM.
+   */
+  await runSection(
+    "the column draws a window, and pads carry the rest",
+    async () => {
+      // The plan: each row is the fitted width capped by the page's own pixels, times the
+      // page's own ratio. Zoom is not in it — every height scales with it.
+      const plan = NR.columnPlan(
+        [
+          { id: "a", width: 1000, height: 1500 },
+          { id: "b", width: 1000, height: 2000 },
+          { id: "c", width: 400, height: 1000 },
+        ],
+        600
+      );
+      assert.deepStrictEqual(
+        plan.heights,
+        [900, 1200, 1000],
+        "a fitted page is its own ratio at the fit; a page narrower than the fit keeps " +
+          "its own width"
+      );
+      assert.deepStrictEqual(
+        plan.offsets,
+        [0, 900, 2100, 3100],
+        "…and the offsets are where each of those begins"
+      );
+      assert.strictEqual(
+        NR.columnPlan([{ id: "x", width: 0, height: 0 }], 600),
+        null,
+        "a page Stash never measured cannot be planned"
+      );
+      assert.strictEqual(
+        NR.columnPlan([{ id: "x", width: 10, height: 10 }], 0),
+        null,
+        "…nor can a column whose box has not been measured"
+      );
+
+      assert.strictEqual(
+        NR.pageAtOffset(plan.offsets, 899),
+        0,
+        "the page being looked into is the one at the top, as pageAtTop says"
+      );
+      assert.strictEqual(
+        NR.pageAtOffset(plan.offsets, 900),
+        1,
+        "…and the next one"
+      );
+      assert.strictEqual(
+        NR.pageAtOffset(plan.offsets, 99999),
+        2,
+        "past the end is the last page rather than none"
+      );
+
+      assert.deepStrictEqual(
+        NR.columnWindow(30, 0),
+        { start: 0, end: 12 },
+        "the window starts at the first page, with no room to lead into"
+      );
+      assert.deepStrictEqual(
+        NR.columnWindow(30, 10),
+        { start: 7, end: 19 },
+        "…and slides with the page at the top, three rows of lead above it"
+      );
+      assert.deepStrictEqual(
+        NR.columnWindow(30, 29),
+        { start: 18, end: 30 },
+        "…stopping at the end rather than shrinking, so the range does not move"
+      );
+
+      // The DOM: a measured picture area is what lets the column be planned. The mode is
+      // turned off and on again with the box measured — the stub has no layout, so the
+      // build that first happened had nothing to measure. A real browser's first pass
+      // measures, and needs none of this.
+      const { box } = await startReader({
+        galleryId: "81",
+        at: 1,
+        total: 30,
+        mode: "scroll",
+      });
+      const view = box.lightbox.querySelector(".manga-reader-spread");
+      const counter = () =>
+        box.lightbox.querySelector(".manga-reader-counter").textContent;
+
+      view.rect = { left: 0, top: 0, width: 800, height: 600 };
+      dom.click(box.lightbox.querySelector("#manga-reader-single-page"));
+      await settle();
+      dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+      await settle();
+
+      const rows = () => [
+        ...view.querySelectorAll(".manga-reader-scroll-page"),
+      ];
+      const pads = () => [...view.querySelectorAll(".manga-reader-scroll-pad")];
+
+      assert.strictEqual(
+        rows().length,
+        12,
+        "only a window of the thirty pages is drawn"
+      );
+      assert.strictEqual(pads().length, 2, "two boxes stand in for the rest");
+      assert.strictEqual(
+        rows()[0].style.width,
+        "600px",
+        "a row is the fit (the smaller side), capped by the page's own pixels"
+      );
+      assert.strictEqual(
+        pads()[0].style.height,
+        "0px",
+        "nothing above the first window"
+      );
+      assert.strictEqual(
+        pads()[1].style.height,
+        "16200px",
+        "…and eighteen pages of height below it: the column is the whole book's"
+      );
+
+      // Scrolling is the reader moving, and the window follows near its edge. The pads do
+      // not move, so the offset under the reader's hand does not either.
+      view.scrollTop = 18000;
+      view.dispatch("scroll");
+      assert.strictEqual(
+        counter(),
+        "21 / 30",
+        "the page at the top is where they are"
+      );
+      assert.strictEqual(rows().length, 12, "still a window");
+      assert.strictEqual(
+        pads()[0].style.height,
+        "15300px",
+        "…now seventeen pages above it"
+      );
+      assert.strictEqual(pads()[1].style.height, "900px", "…and one below");
+
+      // A jump — the arrow key in this mode asks for the next page — scrolls to the
+      // planned offset and draws the window around it before it gets there.
+      press("ArrowLeft");
+      assert.strictEqual(counter(), "20 / 30", "one page back");
+      assert.strictEqual(
+        view.scrollTop,
+        17100,
+        "…to where nineteen pages of nine hundred pixels begin"
+      );
+      assert.strictEqual(
+        pads()[0].style.height,
+        "14400px",
+        "and the window with it"
+      );
+
+      // A zoom multiplies every height by the same factor: the page stays under the
+      // reader's eyes, the window stays the same, and the rows are drawn wider rather
+      // than re-created.
+      const zooming = dom.makeEvent("wheel", { deltaY: -120, ctrlKey: true });
+      view.dispatch("wheel", zooming);
+      assert.strictEqual(counter(), "20 / 30", "the same page, zoomed");
+      assert.ok(
+        Math.abs(view.scrollTop - 17100 * 1.1) < 1,
+        "…with the scroll position scaled by the zoom, as the full build does"
+      );
+      assert.ok(
+        Math.abs(parseFloat(rows()[0].style.width) - 660) < 0.01,
+        "and the rows a tenth wider"
+      );
+      assert.ok(
+        Math.abs(parseFloat(pads()[0].style.height) - 15840) < 0.01,
+        "…the stands-in with them, so the range still holds the whole book"
+      );
+
+      stopReader(box);
+    }
+  );
+
+  /**
+   * **A page with no size of its own puts the whole column back.** A row whose height
+   * is unknown until its picture lands has no offset that can be trusted: the pads, the
+   * scrollbar and every jump would inherit a guess. The plan says null, and the column
+   * draws every row, which is what it always did.
+   */
+  await runSection("an unmeasured page means every row is drawn", async () => {
+    const { box } = await startReader({
+      galleryId: "82",
+      at: 1,
+      total: 30,
+      mode: "scroll",
+    });
+    const view = box.lightbox.querySelector(".manga-reader-spread");
+
+    view.rect = { left: 0, top: 0, width: 800, height: 600 };
+    dom.click(box.lightbox.querySelector("#manga-reader-single-page"));
+    await settle();
+    dom.click(box.lightbox.querySelector("#manga-reader-scroll"));
+    await settle();
+
+    assert.strictEqual(
+      view.querySelectorAll(".manga-reader-scroll-page").length,
+      30,
+      "every page of the gallery is a row: there is no plan to draw a window from"
+    );
+    assert.strictEqual(
+      view.querySelectorAll(".manga-reader-scroll-pad").length,
+      0,
+      "…and nothing stands in for anything"
     );
 
     stopReader(box);

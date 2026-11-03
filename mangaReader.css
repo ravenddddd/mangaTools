@@ -147,6 +147,18 @@
   background: #000;
 }
 
+/*
+ * The box standing in for the pages outside the drawn window (see scroll.ts).
+ * Height only, set inline; `flex-shrink: 0` for the reason the rows have it — a
+ * column flex box with a definite height would otherwise shrink it, and the scroll
+ * range would come up short by however much it gave up.
+ */
+.manga-reader-scroll-pad {
+  width: 100%;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 .manga-reader-scroll-page img {
   width: 100%;
   height: auto;

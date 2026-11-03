@@ -1102,6 +1102,18 @@ depends on where the column is. What the two share is the place itself — a pag
 that is what lets the header, the counter, the chapter menu and the bar go on meaning
 the same thing in all three.
 
+**It draws a window, not the whole book** (0.10.2). A row per page is memory and first
+paint paid for pages nobody is looking at — a thousand-page gallery built a thousand
+rows. The column now lays the book out as arithmetic: each row's height is its fitted
+width times the page's own ratio, so every offset is known before a single picture
+arrives, and only the rows around the reader's place are drawn. Two boxes stand in
+above and below for the height of what is not — the scroll range, the scrollbar, the
+bar's seek and every jump are still the whole book's, because the boxes carry exactly
+the pages that are missing. The window slides as the reader scrolls near its edge, and
+a zoom re-fits it rather than rebuilding the book. **A page Stash did not measure has
+no height to reserve**, so a gallery holding one falls back to drawing every row: a
+scrollbar that lies about where a page is would be worse than the first paint it saves.
+
 **The bar's width is a measurement, and it belongs to the lightbox that made it.**
 Measured from the pages on show and kept between two screens of one lightbox — a page
 still on its way does not shrink it, because the reader turned a page rather than

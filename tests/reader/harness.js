@@ -1161,6 +1161,29 @@ state.galleries["8"] = PLAIN_GALLERY;
 state.galleries["11"] = TWO_PAGES;
 state.galleries["12"] = ONE_PAGE;
 state.galleries["13"] = STAMPED_GALLERY;
+// The column's window: more pages than it draws at once, and one gallery with a page
+// Stash never measured — which is the column that cannot be planned and falls back to
+// drawing every row.
+const withUrls = (images) =>
+  images.map((img) => ({
+    ...img,
+    paths: {
+      image:
+        "http://stash.example.com:9998/image/" + img.id + "/image?t=1" + img.id,
+    },
+  }));
+state.galleries["81"] = {
+  images: withUrls(
+    numbered(Array.from({ length: 30 }, (_, i) => String(1001 + i)))
+  ),
+};
+state.galleries["82"] = {
+  images: withUrls([
+    ...numbered(Array.from({ length: 15 }, (_, i) => String(2001 + i))),
+    image("2100", 0, 0),
+    ...numbered(Array.from({ length: 14 }, (_, i) => String(2101 + i))),
+  ]),
+};
 // Registered so it is a gallery this plugin reads, with the failure injected instead
 // of its answer — which is what that section is about.
 state.galleries["9"] = PLAIN_GALLERY;

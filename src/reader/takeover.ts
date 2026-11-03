@@ -89,10 +89,12 @@ import { FADE_MS, readSettings, writeSettings } from "./settings";
 import {
   CLASS_SCROLL,
   CLASS_SCROLLING,
-  CLASS_SCROLL_PAGE,
   buildColumn,
+  forgetColumn,
+  columnPageAt,
+  columnScrolled,
   columnZoom,
-  rowOffset,
+  scrollColumnTo,
   setColumnZoom,
   zoomedBy,
 } from "./scroll";
@@ -1217,17 +1219,8 @@ let columnFor: string | null = null;
  * back.
  */
 let columnIn: Element | null = null;
-
-/**
- * The column's page rows, in reading order, kept from the build.
- *
- * `columnPageAt` runs on every scroll event — one per frame while a scrollbar is
- * dragged — and used to ask the document for every row and measure all of them.
- * The rows do not change after a build, so they are collected once; the position
- * is then found by bisection over them, which reads a handful of rectangles
- * instead of one per page. Empty when no column is up.
- */
-let columnRows: HTMLElement[] = [];
+/** The page list the column was built from, so a revalidated one rebuilds it */
+let columnPagesOf: MangaReaderPage[] | null = null;
 
 /**
  * A page the column is to be scrolled to, or null when nothing has asked.
@@ -1264,13 +1257,19 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
   view = fitView();
 
   let built = false;
-  if (columnFor !== gallery.id || columnIn !== container) {
+  // **The pages, not only the gallery.** A revalidated gallery is rebuilt from a
+  // fresh answer: same id and same container, a different list — and the column's
+  // window and its offsets are that list's, so it is built again. A pass over a
+  // cached gallery hands the same array back and changes nothing.
+  if (
+    columnFor !== gallery.id ||
+    columnIn !== container ||
+    columnPagesOf !== gallery.pages
+  ) {
     buildColumn(container, gallery.pages, (page) => pageUrl(page));
     columnFor = gallery.id;
     columnIn = container;
-    columnRows = Array.from(
-      container.querySelectorAll("." + CLASS_SCROLL_PAGE)
-    ) as HTMLElement[];
+    columnPagesOf = gallery.pages;
     built = true;
     // Nothing to wait for: every row's height comes from the page's own shape, so the
     // column is complete the moment it is built.
@@ -1291,13 +1290,14 @@ function ensureColumn(lightbox: Element, gallery: MangaReaderGallery): void {
 
   // Where the reader is, in the column's own coordinates. On a fresh column that is
   // the page they were on — the mode was switched, and the place did not move — and
-  // otherwise only when something asked.
+  // otherwise only when something asked. scrollColumnTo draws the window around the
+  // page first: a scroll to an offset no drawn row covers would be clamped by whatever
+  // the padding boxes happen to say.
   const to = built ? place : scrollTo;
   scrollTo = null;
   if (to === null || to < 0) return;
 
-  const offset = rowOffset(container, to);
-  if (offset !== null) container.scrollTop = offset;
+  scrollColumnTo(container, to);
 }
 
 /**
@@ -1312,7 +1312,8 @@ function removeColumn(): void {
 
   columnFor = null;
   columnIn = null;
-  columnRows = [];
+  columnPagesOf = null;
+  forgetColumn();
   scrollTo = null;
   view = fitView();
   setColumnZoom(1);
@@ -1325,34 +1326,6 @@ function removeColumn(): void {
   root?.classList.remove(CLASS_SCROLLING);
 }
 
-/** Which page the column is showing at its top, from where its rows are */
-function columnPageAt(column: HTMLElement): number {
-  if (columnRows.length === 0) return -1;
-
-  const edge = column.getBoundingClientRect().top;
-
-  // The rows are in reading order and their tops increase, so the first row whose
-  // bottom is past the edge is found by bisection: a handful of layout reads per
-  // scroll event instead of one for every page. A 400-page column used to measure
-  // all 400 on every frame of a scrollbar drag, and discard all but one answer.
-  let low = 0;
-  let high = columnRows.length - 1;
-  let found = columnRows.length - 1; // every row above the edge: the last page
-
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    const rect = columnRows[mid].getBoundingClientRect();
-    if (rect.bottom > edge) {
-      found = mid;
-      high = mid - 1;
-    } else {
-      low = mid + 1;
-    }
-  }
-
-  return found;
-}
-
 /**
  * The reader scrolled the column, so the page at the top is where they are now.
  *
@@ -1361,6 +1334,10 @@ function columnPageAt(column: HTMLElement): number {
  * for a scroll as well, the reader's own scrolling would be undone by the answer to
  * it. It does not: only a turn, a chapter, the bar, or the mode being entered puts a
  * request in `scrollTo`, and this is none of those.
+ *
+ * The window the column draws is slid here as well — a scroll that has nearly left it
+ * would otherwise run off the drawn rows. That is drawing, not moving: the padding
+ * boxes keep every offset where it was.
  */
 function onColumnScroll(): void {
   const lightbox = root;
@@ -1368,7 +1345,11 @@ function onColumnScroll(): void {
   if (settings.readingMode !== "scroll" || !wanted()) return;
 
   const at = columnPageAt(container);
-  if (at < 0 || at === place) return;
+  if (at < 0) return;
+
+  columnScrolled(container);
+
+  if (at === place) return;
 
   place = at;
   sync(lightbox);
