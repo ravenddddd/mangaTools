@@ -839,6 +839,25 @@ module.exports = () => {
     "…and no thumbnail strip under the pages"
   );
 
+  // **A drag must not turn into a selection.** A finger on the bar travels across the
+  // pages and the footer, and a long press starts selecting both underneath the drag
+  // that is supposed to be scrubbing. The whole lightbox in takeover mode gives
+  // selection up — iOS's callout with it — and no image can be dragged as a file.
+  // `user-select` is inherited, so the lightbox alone is enough: every row, the
+  // pages and Stash's footer under them follow it.
+  assert.ok(
+    /\.Lightbox\.manga-reader-takeover\s*\{[^}]*-webkit-user-select:\s*none/.test(
+      readerCss
+    ),
+    "nothing in the reader may be selectable — a scrubbing finger crosses the pages"
+  );
+  assert.ok(
+    /\.manga-reader-page img\s*\{[^}]*-webkit-user-drag:\s*none/.test(
+      readerCss
+    ),
+    "…and no image may be dragged as a file"
+  );
+
   // **Stash 0.32's lightbox delete button, hidden in takeover mode.** The button
   // opens a delete dialog on the image Stash's own carousel is on (#7022) — and the
   // reader never moves that carousel, so in takeover mode it is not the page on

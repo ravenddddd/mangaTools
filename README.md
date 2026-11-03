@@ -1607,6 +1607,12 @@ double-tap zoom would claim the gestures first — and `pan-y` over the column, 
 reading it *is* the browser's scrolling. The bar's own line says `none` for the same
 reason a drag needs the events.
 
+**And nothing in the reader is selectable.** A finger that lands on the bar and
+travels crosses the pages and the footer, and a long press would start selecting them
+— the images, the gallery's title — underneath the drag that is supposed to be
+scrubbing. The takeover gives selection up for the whole lightbox, and iOS's
+"save image" callout with it: none of it is text a reader copies.
+
 ### What is not here yet
 
 - **No touch gestures beyond the ones listed below.** Swipes, taps, pinch and the

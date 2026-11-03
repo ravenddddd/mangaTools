@@ -7,6 +7,29 @@
  */
 
 /*
+ * **Nothing in the reader is selectable.**
+ *
+ * A finger that lands on the progress bar and travels crosses the pages and the
+ * footer, and a long press starts selecting whatever it is over — the images and the
+ * words under them — underneath the drag that is supposed to be scrubbing. So it is
+ * the whole lightbox in takeover mode rather than the bar: the gesture is allowed to
+ * wander, and what it wanders over must not turn into a selection.
+ *
+ * `-webkit-touch-callout` is the same thing one step later on iOS: the menu that
+ * offers to save the image. Nothing behind either is text a reader copies — the
+ * plugin's own words and, in the reader, Stash's footer alike.
+ *
+ * At the top of the file rather than with the touch rules below: a blanket that
+ * came after the particular rules it applies to would be the cascade's last word
+ * on every one of them, and the linter is right to want the general rule first.
+ */
+.Lightbox.manga-reader-takeover {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/*
  * The carousel is hidden, not removed. It is what holds the lightbox's idea of
  * which page it is on, and React goes on updating it — that is how the header, the
  * keyboard and the nav strip all keep working while this plugin draws instead.
@@ -79,6 +102,9 @@
 .manga-reader-page img {
   max-width: 100%;
   max-height: 100%;
+  /* A dragged image is a drag *of the file*, and it would be the gesture a bar's own
+     drag loses to. (The pages also say `draggable="false"`.) */
+  -webkit-user-drag: none;
   object-fit: contain;
   /* The cursor a click that turns the page deserves, as Stash's own images have */
   cursor: pointer;
@@ -164,6 +190,7 @@
   height: auto;
   display: block;
   cursor: pointer;
+  -webkit-user-drag: none;
 }
 
 /*
