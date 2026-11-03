@@ -141,8 +141,8 @@
   "mangaTools.settings.sidebarFilters.heading": "侧栏筛选",
   "mangaTools.settings.sidebarFilters.description": "画廊列表的侧栏里显示哪些筛选。字段关掉的筛选显示不出来，隐藏期间也不记状态——重新打开字段，它的筛选就回来。",
   "mangaTools.settings.sidebarFilters.placeholder": "不显示任何筛选",
-  "mangaTools.physicalButton.on": "物理页视图：路径排序、无筛选",
+  "mangaTools.physicalButton.on": "物理页视图",
   "mangaTools.physicalButton.repeats": "重复 {n} 页",
-  "mangaTools.physicalButton.off": "切换到物理页视图：路径升序、无筛选。这会清除搜索词和筛选条件。",
+  "mangaTools.physicalButton.off": "切换到物理页视图。这会清除搜索词和筛选条件。",
   "mangaTools.physicalButton.repeatsOne": "重复 1 页"
 }

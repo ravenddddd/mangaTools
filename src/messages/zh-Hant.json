@@ -141,8 +141,8 @@
   "mangaTools.settings.sidebarFilters.heading": "側欄篩選",
   "mangaTools.settings.sidebarFilters.description": "畫廊列表的側欄裡顯示哪些篩選。欄位關掉的篩選顯示不出來，隱藏期間也不記狀態——重新打開欄位，它的篩選就回來。",
   "mangaTools.settings.sidebarFilters.placeholder": "不顯示任何篩選",
-  "mangaTools.physicalButton.on": "物理頁視圖：路徑排序、無篩選",
+  "mangaTools.physicalButton.on": "物理頁視圖",
   "mangaTools.physicalButton.repeats": "重複 {n} 頁",
-  "mangaTools.physicalButton.off": "切換到物理頁視圖：路徑升序、無篩選。這會清除搜尋字串和篩選條件。",
+  "mangaTools.physicalButton.off": "切換到物理頁視圖。這會清除搜尋字串和篩選條件。",
   "mangaTools.physicalButton.repeatsOne": "重複 1 頁"
 }

@@ -141,8 +141,8 @@
   "mangaTools.settings.sidebarFilters.heading": "Sidebar filters",
   "mangaTools.settings.sidebarFilters.description": "Which of this plugin's filters the gallery list's sidebar offers. A filter whose field is switched off cannot be shown, and is not remembered while it is hidden — turning the field back on brings its filter back.",
   "mangaTools.settings.sidebarFilters.placeholder": "No filters",
-  "mangaTools.physicalButton.on": "Physical pages: path order, no filter",
+  "mangaTools.physicalButton.on": "Physical pages",
   "mangaTools.physicalButton.repeats": "{n} pages repeat an image",
-  "mangaTools.physicalButton.off": "Switch to physical pages: path order, ascending, no filter. This clears the search term and the filters.",
+  "mangaTools.physicalButton.off": "Switch to physical pages. This clears the search term and the filters.",
   "mangaTools.physicalButton.repeatsOne": "1 page repeats an image"
 }

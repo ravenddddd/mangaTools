@@ -762,7 +762,7 @@ module.exports = () => {
     );
     assert.strictEqual(
       pressed.props.title,
-      "Physical pages: path order, no filter · 1 page repeats an image",
+      "Physical pages · 1 page repeats an image",
       "its tooltip names the state and how many pages repeat an image"
     );
     assert.strictEqual(
