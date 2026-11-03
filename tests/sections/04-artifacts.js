@@ -387,61 +387,65 @@ module.exports = () => {
   );
 
   // ── Where the lines between rows go ────────────────────────────────
-  // Stash draws one under every row that is not its parent's last child, which on
-  // a page of nested groups is a line between every pair of rows and another at
-  // every group boundary. This plugin's rows carry none of their own, and a line is
-  // drawn only where it means something — the four cases are read here as the five
-  // selectors that draw them, because "which of these is missing" is the whole of
-  // the check. Five and not four: a group's last row is a row in one shape and a
-  // heading's wrapper in the other, and the page is drawn in the second — the
-  // fields' group ends with the display group's rows, and the page ends with the
-  // mark's, so a page with no `.manga-tools-settings-body` rule in it draws neither
-  // of the two lines it is supposed to end with.
+  // **The lines on this page mean "a new block starts here", and they are drawn
+  // above it.** Stash puts `border-bottom` under every row that is not its parent's
+  // last child — `.setting-section .setting:not(:last-child)`, three class
+  // selectors — so a reset has to carry `.setting-section` too or it loses the
+  // cascade. It did, once: the two-class version matched nothing, and the page showed
+  // Stash's line under every row plus the plugin's own additions. The assertions
+  // below are about that pair, because a silently-losing reset is invisible in the
+  // DOM stub and is exactly the bug that shipped.
   assert.ok(
-    /\.setting\.manga-tools-setting,\s*\.setting\.manga-tools-settings\s*\{[^}]*border-bottom:\s*none/.test(
+    /\.setting-section\s+\.setting\.manga-tools-setting,\s*[\s\S]*?\.setting-section\s+\.setting\.manga-tools-settings\s*\{[^}]*border-bottom:\s*none/.test(
       css
     ),
-    "this plugin's rows should carry no line of their own"
+    "the no-line reset must carry `.setting-section`, or it loses to Stash's own " +
+      "three-class rule"
   );
+  // …and Stash's `.setting-group:not(:last-child)` line, which would cut across a
+  // block at a width no row has.
+  assert.ok(
+    /\.setting-section\s+\.setting-group\.manga-tools-settings-group\s*\{[^}]*border-bottom:\s*none/.test(
+      css
+    ),
+    "the plugin's own groups must not draw Stash's full-width group line"
+  );
+  // The line itself: on top of the row that opens a block, in its two shapes.
   const lineRule =
-    /\.setting\.manga-tools-setting-head,[\s\S]*?\n\}\n/.exec(css)?.[0] || "";
-  for (const [what, sel] of [
-    [
-      "the row that is a section of the page",
-      /\.setting\.manga-tools-setting-head/,
-    ],
-    [
-      "a group's last row",
-      /\.manga-tools-settings-group\s*>\s*\.setting:last-child/,
-    ],
-    [
-      "a group's last row when the group ends in a heading's rows — which is how both " +
-        "the fields' group and the page itself end",
-      /\.manga-tools-settings-body\s*>\s*\.setting:last-child/,
-    ],
-    [
-      "the page's last row",
-      /\.collapsible-section\s*>\s*\.setting\.manga-tools-setting:last-child/,
-    ],
-    ["a heading that is not a switch", /^\.manga-tools-settings-heading/m],
+    /\.setting-section\s+\.setting\.manga-tools-setting-head,[\s\S]*?\}/.exec(
+      css
+    )?.[0] || "";
+  assert.ok(
+    /\.setting\.manga-tools-setting-head/.test(lineRule),
+    "a switch's row opens a block"
+  );
+  assert.ok(
+    /\.manga-tools-settings-heading/.test(lineRule),
+    "…and so does a heading that is not a switch"
+  );
+  assert.ok(
+    /border-top:\s*1px solid #000/.test(lineRule),
+    "…with the line above the block, not under the one before it"
+  );
+  assert.ok(
+    /\.collapsible-section\s*>\s*\.setting\.manga-tools-setting-head:first-child\s*\{[^}]*border-top:\s*none/.test(
+      css
+    ),
+    "the page's first block follows the plugin's header row, so it has no line " +
+      "above it"
+  );
+  // The old scheme's bottom lines are gone, all of them: a rule left behind would
+  // draw a line somebody already decided against.
+  for (const gone of [
+    /\.manga-tools-settings-group\s*>\s*\.setting:last-child/,
+    /\.manga-tools-settings-body\s*>\s*\.setting:last-child/,
+    /\.collapsible-section\s*>\s*\.setting\.manga-tools-setting:last-child/,
   ]) {
     assert.ok(
-      sel.test(lineRule),
-      `a line should be drawn under ${what} — ${String(sel)}`
+      !gone.test(css),
+      "no bottom-line rule of the old scheme may remain — " + String(gone)
     );
   }
-  assert.ok(
-    /border-bottom:\s*1px solid #000/.test(lineRule),
-    "…and that is the line"
-  );
-  // The page's last row is a direct child of Stash's collapse box, not of
-  // `div.plugin-settings`: that div belongs to Stash's own PluginSettings, and this
-  // plugin replaces that component rather than adding to it. A rule written against
-  // it would silently match nothing.
-  assert.ok(
-    !/\.plugin-settings\s*>\s*\.setting/.test(css),
-    "no rule may be scoped to div.plugin-settings: our page is not inside one"
-  );
 
   // The lightbox's note, inside that row's description. Boxed so it is not read as
   // the next grey sentence of the description — and a flex row, which is the part
