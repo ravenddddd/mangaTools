@@ -858,6 +858,28 @@ module.exports = () => {
     "…and no image may be dragged as a file"
   );
 
+  // **The header's line on a phone.** Stash's 100px margin on the right-hand group
+  // and a flexible left spacer left the chapter's name a few characters wide — four
+  // lines of a Japanese title, with the counter shoved down beside it.
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*\.Lightbox-header-options\s*\{[^}]*margin-left:\s*0/.test(
+      readerCss
+    ),
+    "…the header's right group stops reserving a desktop's margin"
+  );
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*\.manga-reader-chapter\s*\{[^}]*text-overflow:\s*ellipsis/.test(
+      readerCss
+    ),
+    "…and the chapter's name is one line with an ellipsis"
+  );
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*\.manga-reader-menu-item\s*\{[^}]*min-height:\s*44px/.test(
+      readerCss
+    ),
+    "…and a chapter row is a finger's height"
+  );
+
   // **Stash 0.32's lightbox delete button, hidden in takeover mode.** The button
   // opens a delete dialog on the image Stash's own carousel is on (#7022) — and the
   // reader never moves that carousel, so in takeover mode it is not the page on

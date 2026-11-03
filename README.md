@@ -1593,7 +1593,7 @@ why a desktop reader's clicks, drags and wheel are exactly what they were.
 | **Double tap** | The fit and 2.5×, about the place tapped; again to put it back |
 | **A drag while zoomed** | The pages, exactly as a mouse drag moves them. In the column a finger's drag is the browser's own scrolling — the column is read by scrolling, not panned |
 | **The progress bar** | A finger presses and drags it as a mouse does; on a phone the bar's box is taller (or wider, down the side) so a thumb can find the line |
-| **The controls** | On a coarse pointer every header button gets a 44 px box around its icon; the options panel is capped to the screen's width; the footer leaves room for a home indicator, its file name and gallery title are each one line with an ellipsis, and the row grows with them rather than clipping a long title; and Stash's thumbnail strip is hidden — a finger has the swipe and the bar, and the strip is a fifth of the screen |
+| **The controls** | On a coarse pointer every header button gets a 44 px box around its icon; the options panel is capped to the screen's width; the footer leaves room for a home indicator, its file name and gallery title are each one line with an ellipsis, and the row grows with them rather than clipping a long title; and Stash's thumbnail strip is hidden — a finger has the swipe and the bar, and the strip is a fifth of the screen; the chapter's name in the header is one line with an ellipsis, where a long Japanese title used to wrap to four |
 
 **One touch, one page.** The browser sends a click after every tap and swipe, and the
 gesture has already turned the page: the click handler swallows the one that follows,

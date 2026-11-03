@@ -1362,6 +1362,36 @@
     max-width: calc(100vw - 24px);
   }
 
+  /* **The header's own line, which had no room on a phone.** Stash's indicator is a
+     column — the chapter's name over the counter — sitting between two flexible
+     halves; its own stylesheet gives the right-hand group a 100px left margin, which
+     is a desktop's spacing and, with a 44px close button beside it, left the name a
+     few characters wide. A long Japanese title wrapped to four lines and shoved the
+     counter down beside it. The margin goes, the left spacer stops taking half the
+     row, and the name is one line with an ellipsis — the full name is in the chapter
+     menu, one tap away. */
+  .manga-reader-chrome .Lightbox-header-options {
+    margin-left: 0;
+  }
+  .manga-reader-chrome .Lightbox-header-left-spacer {
+    flex: 0 0 auto;
+  }
+  .manga-reader-chrome .Lightbox-header-indicator {
+    min-width: 0;
+  }
+  .manga-reader-chrome .manga-reader-chapter {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* A row of the chapter menu is a control a finger taps, not a line to aim at. */
+  .manga-reader-chrome .manga-reader-menu-chapters .manga-reader-menu-item {
+    min-height: 44px;
+  }
+
   /* A phone's own furniture: the notch at the top, the home indicator at the bottom.
      `env()` is 0 wherever there is no such inset, so the rule costs nothing on a
      desktop that happens to report a coarse pointer. */
