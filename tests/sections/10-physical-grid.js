@@ -52,8 +52,9 @@ const listProps = (over = {}) => ({
     searchTerm: "",
     criteria: [],
   },
-  // What this Stash actually passes. `totalCount` is not among ImageList's props
-  // in v0.31.1; it is kept only as a fallback for a build that does pass it.
+  // What Stash passes. `pageCount` is the one count 0.31.1 and 0.32 both give
+  // (`totalCount` arrived in 0.32; the expansion keeps it only as a fallback and
+  // rewrites it for the lightbox's counter).
   pageCount: 2,
   totalCount: 3,
   selectedIds: new Set(["1001"]),

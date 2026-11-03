@@ -1831,7 +1831,7 @@ function handOverChapters(
  * chrome.ts.
  */
 
-function arrowsBelongTo(target: HTMLElement | null): boolean {
+function keysBelongTo(target: HTMLElement | null): boolean {
   if (!target) return false;
   if (target.isContentEditable) return true;
 
@@ -1964,6 +1964,23 @@ function onKeyDown(event: KeyboardEvent): void {
     return;
   }
 
+  // **Stash 0.32 gives its lightbox a `d d` delete shortcut.** In takeover mode
+  // Stash's carousel is not what is on screen: its index stays where the plugin
+  // handed the list over while the reader advances its own `place`, so the second
+  // `d` would open Stash's delete dialog on a different image from the one being
+  // read — and the dialog deletes what it names. The plugin has no delete of its
+  // own, so the key is swallowed rather than misdirected; a reader who wants it can
+  // read with Stash's lightbox. Nothing is bound to `d` on 0.31.1, so this is inert
+  // there, and a focused text control keeps its own keys.
+  if (
+    (event.key === "d" || event.key === "D") &&
+    !keysBelongTo(event.target as HTMLElement | null)
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+
   if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
 
   // Holding an arrow down repeats, and Stash's own handler ignores repeats for the
@@ -1971,7 +1988,11 @@ function onKeyDown(event: KeyboardEvent): void {
   // plugin is not going to start.
   if (event.repeat) return;
 
-  if (arrowsBelongTo(event.target as HTMLElement | null)) return;
+  // **The focused control owns the keys typed into it.** A checkbox is not one of
+  // these — Stash itself leaves the arrows for a text field and takes them from
+  // everything else — but a text field or a slider is, and the reader has no
+  // business turning a page while somebody is typing.
+  if (keysBelongTo(event.target as HTMLElement | null)) return;
 
   // Nothing that way: leave the event to Stash, which will do exactly as much,
   // which is nothing. Consuming it here would only be a lie about having moved.

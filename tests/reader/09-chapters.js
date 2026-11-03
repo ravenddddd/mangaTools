@@ -514,6 +514,20 @@ module.exports = async () => {
         8,
         "the images are the ones the reader drew"
       );
+      // **A still carousel.** 0.32 can open the lightbox with the slideshow already
+      // running (a gallery card's preview); its timer advances Stash's own carousel,
+      // which the reader has replaced, and crossing a page boundary unmounts the
+      // display the reader's container lives in. Every handover says both are off.
+      assert.strictEqual(
+        props.slideshowEnabled,
+        false,
+        "the takeover stops the slideshow it replaces"
+      );
+      assert.strictEqual(
+        props.slideshowAutostart,
+        false,
+        "…including the autostart 0.32 adds"
+      );
       assert.deepStrictEqual(
         props.images.map((i) => i.id),
         CHAPTERS_VIEW.map(String),

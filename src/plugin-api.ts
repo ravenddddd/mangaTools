@@ -987,6 +987,20 @@ export type MangaToolsLightboxShow = (props: {
   totalCount?: number;
   initialIndex?: number;
   showNavigation?: boolean;
+  /**
+   * **The slideshow is stopped on the way in.** Stash 0.32 lets a gallery card open
+   * the lightbox with the slideshow already running (`autostartGallerySlideshow`,
+   * opened straight from the galleries page, #7035): its provider keeps advancing
+   * Stash's own carousel under whatever a plugin drew. The reader replaces the
+   * carousel, so that timer is a hidden thing moving underneath it — and when it
+   * crosses a page boundary Stash unmounts the display the reader's container lives
+   * in. Sending both false is the takeover asking for a still carousel. 0.31.1 has
+   * the same `slideshowEnabled` in its state and its own timer, so it stops there
+   * too; `slideshowAutostart` is merged into a state that has no such field, which
+   * is harmless.
+   */
+  slideshowEnabled?: boolean;
+  slideshowAutostart?: boolean;
 }) => void;
 
 export interface IPluginApi {
@@ -1011,8 +1025,23 @@ export interface IPluginApi {
      * plugin that draws DOM of its own can put a React component from
      * `components.Icon` inside it. Optional because only one caller needs it, and a
      * Stash that did not have it would be one missing an icon rather than a header.
+     *
+     * **Deprecated in React 18 and gone in 19**: Stash 0.32 draws its own tree with
+     * `createRoot`, so the icon goes through ReactDOMClient when it is there — see
+     * ReactDOMClient below — and this is the 0.31.1 path.
      */
     render?: (element: ReactElement, container: Element) => unknown;
+  };
+  /**
+   * `react-dom/client`, which Stash 0.32 hands over and 0.31.1 (React 17) has
+   * nothing of. Only `createRoot` is used: the reader draws Stash's own icon into
+   * hosts of its own, and one root per host is what React 18 wants.
+   */
+  ReactDOMClient?: {
+    createRoot(container: Element): {
+      render(node: ReactNode): void;
+      unmount(): void;
+    };
   };
 
   /** Used as a fallback source for `gql` if libraries.Apollo has none */

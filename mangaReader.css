@@ -1026,6 +1026,19 @@
 }
 
 /*
+ * Stash 0.32 puts a delete button beside the image's name in that centre column
+ * (#7022), and a `d d` shortcut with it. In takeover mode there is no image it can
+ * name: Stash's carousel index stays where the plugin handed the list over while the
+ * reader draws its own `place`, so the button — and the shortcut, which the key
+ * handler swallows — would open Stash's delete dialog on a different image from the
+ * one under the reader's eyes. Hidden rather than removed: it is Stash's node and
+ * React owns it. The class does not exist before 0.32, so the rule is a no-op there.
+ */
+.Lightbox.manga-reader-takeover .Lightbox-footer-center .delete-button {
+  display: none;
+}
+
+/*
  * Stash's own controls that this plugin stands in for.
  *
  * The chapters tab's Create button: this plugin is what will edit chapters, and its

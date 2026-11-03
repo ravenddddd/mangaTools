@@ -107,6 +107,13 @@ function LightboxBridge(): null {
           // Only read when the lightbox mounts, which is how a chapter clicked on the
           // gallery's own page opens one — see the chapters tab.
           initialIndex: request.at,
+          // **A still carousel.** 0.32 can open the lightbox with its slideshow
+          // already running (a gallery card's preview, #7035), and that timer moves
+          // Stash's own carousel — which the reader has replaced — underneath the
+          // reader's screens. Sent false on every handover; 0.31.1 has the same
+          // `slideshowEnabled` state and its own timer, and no autostart at all.
+          slideshowEnabled: false,
+          slideshowAutostart: false,
         });
       },
     };

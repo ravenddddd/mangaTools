@@ -1242,19 +1242,43 @@ function panel(opens: Menu, extra: string): HTMLElement {
  * Stash's FontAwesome icon, through Stash's own component.
  *
  * This half is DOM work and has no React of its own, but the plugin API hands both
- * React and ReactDOM over, and `components.Icon` is the one thing that draws an icon
- * the way every other icon on the page is drawn. A glyph typed as text would be a
- * different font in a different size, and would look like a plugin.
+ * React and ReactDOM over, and `components.Icon` is the one thing that draws an
+ * icon the way every other icon on the page is drawn. A glyph typed as text would be
+ * a different font in a different size, and would look like a plugin.
+ *
+ * **Two renderers, because Stash has had two.** 0.32 moved Stash to React 18 and
+ * draws its own tree with `createRoot`; it also hands plugins `ReactDOMClient`.
+ * `ReactDOM.render` still exists there but is deprecated (removed in React 19), so
+ * the client is used where it is offered and the old call kept for 0.31.1 (React
+ * 17, no `react-dom/client` at all). One root per host: calling `createRoot`
+ * twice on one container is an error, and these hosts are re-rendered whenever the
+ * header is rebuilt, not rebuilt with it.
  */
+const iconRoots = new WeakMap<Element, { render(node: unknown): void }>();
+
 export function drawIcon(host: HTMLElement, name: string): void {
   const api = requirePluginApi();
   const Solid = api.libraries.FontAwesomeSolid || {};
   const Icon = api.components.Icon;
   const icon = Solid[name];
-  const render = api.ReactDOM?.render;
-  if (!Icon || !icon || !render) return;
+  if (!Icon || !icon) return;
 
-  render(api.React.createElement(Icon, { icon }), host);
+  const element = api.React.createElement(Icon, { icon });
+
+  const client = api.ReactDOMClient;
+  if (client && typeof client.createRoot === "function") {
+    let root = iconRoots.get(host);
+    if (!root) {
+      root = client.createRoot(host);
+      iconRoots.set(host, root);
+    }
+    root.render(element);
+    return;
+  }
+
+  const render = api.ReactDOM?.render;
+  if (!render) return;
+  render(element, host);
 }
 
 /**
@@ -1332,3 +1356,6 @@ export function forgetOpenMenu(): void {
 // Published for the tests, which reach the reader's own logic through the window —
 // see the note on MangaReaderNamespace in plugin-api.ts.
 NR.fitShift = fitShift;
+// The icon painter, so the test can show that Stash 0.32's React 18 root is used
+// where the API offers one and the old renderer where it does not.
+NR.drawIcon = drawIcon;

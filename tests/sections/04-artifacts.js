@@ -773,6 +773,18 @@ module.exports = () => {
       "the chapters tab's own button is marked, and a mark with no rule behind it hides nothing"
   );
 
+  // **Stash 0.32's lightbox delete button, hidden in takeover mode.** The button
+  // opens a delete dialog on the image Stash's own carousel is on (#7022) — and the
+  // reader never moves that carousel, so in takeover mode it is not the page on
+  // screen. The class does not exist before 0.32, so the rule is inert on 0.31.1.
+  assert.ok(
+    /\.Lightbox\.manga-reader-takeover\s+\.Lightbox-footer-center\s+\.delete-button\s*\{[^}]*display:\s*none/.test(
+      readerCss
+    ),
+    "the takeover should hide Stash's lightbox delete button: it deletes the image " +
+      "its stale carousel index names, not the page the reader is looking at"
+  );
+
   // The header's options popover, which this plugin places itself: Stash renders its
   // own into the lightbox and moves it there with a library, and this header has no
   // library. So it is positioned from the box it is drawn in, and that box has to be

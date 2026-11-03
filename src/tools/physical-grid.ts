@@ -182,9 +182,10 @@ function load(galleryId: string): Promise<GalleryGrid> {
  * Stash's page count, with the files laid into it at the chosen page size.
  *
  * `imagePages` is **Stash's own count**, taken from the `pageCount` prop — not
- * derived from a total. Stash v0.31.1 does not pass a `totalCount` to
- * `ImageList` at all, and deriving the count from `undefined` made it 1, which
- * put every file on one page: the page-size selector did nothing.
+ * derived from a total. **0.31.1 does not pass a `totalCount` to `ImageList` at
+ * all** (0.32 does), and deriving the count from `undefined` made it 1, which put
+ * every file on one page: the page-size selector did nothing. `pageCount` is the
+ * one prop both versions give, so it is what this plans with.
  *
  * The page size is the reader's, exactly: pages 1 … P−1 hold `userPerPage` files
  * and the **last page takes the remainder**. Stash's count is the ceiling — a
@@ -576,8 +577,8 @@ function registerListPatch(): void {
     // results are the honest ones), and `pageCount` is the page count it plans
     // with. Omitted, a filter change leaves every dependency identical and the
     // memo keeps the answer from the other state — the search is ignored, or a
-    // cleared one stays ignored. This Stash passes `pageCount` but not
-    // `totalCount`, so the latter cannot stand in for it.
+    // cleared one stays ignored. `pageCount` is the one count 0.31.1 and 0.32 both
+    // pass, so `totalCount` (0.32 only) cannot stand in for it.
     const searchTerm = filter?.searchTerm;
     const criteriaCount = filter?.criteria?.length ?? 0;
     const pageCount = props.pageCount;

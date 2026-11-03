@@ -176,6 +176,28 @@ module.exports = async () => {
         "…and nothing is sent for it either: the lightbox is not what moves"
       );
 
+      // **The same rule for Stash 0.32's delete shortcut.** `d d` opens Stash's
+      // delete dialog on the image its carousel is on — which in takeover mode is
+      // not the page being read, because the reader never moves Stash's index. A
+      // plain press is swallowed, so the first `d` never reaches Stash and the
+      // second can never arm the dialog; a text field keeps the letter it types.
+      const beforeD = drawn();
+      const onD = press("d");
+      assert.strictEqual(
+        onD.defaultPrevented,
+        true,
+        "a plain d is the reader's: Stash's delete shortcut never arms"
+      );
+      assert.strictEqual(onD.propagationStopped, true);
+      assert.deepStrictEqual(drawn(), beforeD, "…and it turns nothing");
+
+      const typing = keyTo(field, "d");
+      assert.strictEqual(
+        typing.defaultPrevented,
+        false,
+        "a text field keeps the letter it is typing"
+      );
+
       stopReader(box);
     }
   );

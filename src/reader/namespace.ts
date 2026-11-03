@@ -503,6 +503,13 @@ export interface MangaReaderNamespace {
     viewport: number,
     margin: number
   ): number;
+  /**
+   * Paints one of Stash's icons into a host of this plugin's own — see drawIcon in
+   * chrome.ts. Published for the smoke test: which renderer it uses depends on the
+   * Stash version (React 18's `createRoot` where the API offers it, the legacy
+   * `ReactDOM.render` where it does not), and that choice is otherwise invisible.
+   */
+  drawIcon(host: HTMLElement, name: string): void;
 }
 
 /** The one namespace object, created here because this module is the types' home */
