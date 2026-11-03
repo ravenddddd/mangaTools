@@ -2633,13 +2633,21 @@ type LocationEvent = {
 };
 
 /**
- * Back closes the lightbox.
+ * **Leaving the page closes the lightbox.**
  *
- * Stash's lightbox is in its own state and not in the route: nothing about a route
- * change takes it away, so a reader who presses Back leaves the gallery page and
- * finds the pages still over whatever they landed on — and the lightbox's own images
- * belong to the page they came from. So a route change under an open lightbox is
- * that lightbox's cue to close, through the same Escape Stash's own close runs.
+ * Stash's lightbox is in its own state and not in the route, so a route change does
+ * not take it away: a footer link, a chapter link or any other navigation would
+ * leave the pages over whatever the reader landed on, and those images belong to the
+ * gallery they came from. So a path change under an open lightbox is that lightbox's
+ * cue to close, through the same Escape Stash's own close runs.
+ *
+ * **Back is no longer this one's business (0.32).** Stash now gives its lightbox a
+ * history entry of its own and closes it on `popstate`; Back pops that entry without
+ * changing the pathname, so this handler never sees it and the overlay goes with the
+ * lightbox Stash closed. On 0.31.1 Back *did* move the page, and this was the close
+ * that stopped the lightbox being left behind — it is still needed on 0.32 for
+ * navigation, which Stash does not close (a router push fires no `popstate`, and the
+ * provider sits above the routes).
  *
  * A change of *query* is not a move: the Images list re-sorts by writing `sortby`
  * into the URL with the lightbox open, and closing it there would be closing it for
