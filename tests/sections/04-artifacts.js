@@ -98,6 +98,15 @@ module.exports = () => {
     /\.manga-tools-row-flag\s*\{[^}]*flex-shrink:\s*0/.test(css),
     "nor the flag standing in for it"
   );
+  // The physical-pages button's mount point sits directly in Stash's toolbar, and
+  // Stash spaces a toolbar's *children*. A span with a box of its own would take
+  // that spacing and push the button off the rhythm of the controls beside it, so
+  // the host has to be invisible to layout — `display: contents`, like the edit
+  // page's field host. A layout engine's answer, hence the stylesheet.
+  assert.ok(
+    /\.manga-tools-physical-host\s*\{[^}]*display:\s*contents/.test(css),
+    "the toolbar host must not take a box of its own"
+  );
   // Stash's `.setting-section .setting > div:last-child { text-align: right }`
   // right-aligns the heading and description of this full-width settings block
   // unless it is explicitly undone. The selector is written twice — once for the

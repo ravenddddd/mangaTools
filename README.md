@@ -1585,6 +1585,21 @@ contains, each at its own position.
   keys unique, and is what the reader reads to open the occurrence that was clicked
   rather than the first one with that content.
 
+**The toolbar's end says whether it is in force, and puts it there.** The mode only
+applies to an **unfiltered** list sorted by path, **ascending** — three conditions a
+reader can break without noticing, each of which silently hands the grid back to
+Stash's deduplicated list. So the Images tab's toolbar carries one button of this
+plugin's own, after the zoom slider: **pressed** when the list is in that state,
+unpressed when it is not. Pressing it writes the URL — the search term and every
+criterion go, the sort becomes path ascending, and the page size, display mode and
+zoom stay where the reader put them — which is how Stash's own `useFilterURL` reads
+a filter change back. Its tooltip is where the numbers live: what state the list is
+in, and how many of the gallery's pages repeat an image (the count the "N–M of T"
+line cannot say, because its total is the files' and its byline is Stash's). The
+direction is fixed rather than offered: two occurrences of one image share every
+sort key they could be given, so any other order would need an invented rule for
+which of them comes first.
+
 Not changed: a list sorted by anything but path (the positions would mean nothing),
 **a searched or filtered list** (the expansion starts from the whole gallery and
 would show files the query excluded, so the deduplicated results stand), the image

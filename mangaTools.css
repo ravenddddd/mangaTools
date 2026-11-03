@@ -287,6 +287,18 @@
 }
 
 /*
+ * The physical-pages button's mount point in the Images tab's toolbar.
+ *
+ * `display: contents`, for the same reason as the field host above and a sharper
+ * one: Stash spaces a toolbar's children with a direct-child rule, so a span
+ * between the toolbar and the button would take the spacing onto itself and the
+ * button would sit at a different offset from every control beside it.
+ */
+.manga-tools-physical-host {
+  display: contents;
+}
+
+/*
  * A manga gallery's edit page leaves Stash's performers field out, when the
  * setting asks it to: the mount point is inserted directly after the studio row,
  * which is the row before the performers one, so one sibling selector is enough.

@@ -365,6 +365,23 @@ export interface MangaToolsNamespace {
    */
   expandPhysicalPage(props: unknown, grid: unknown): unknown;
   /**
+   * Whether a list is in the state physical pages need — path, ascending, no
+   * search term, no criteria. Published by physical-button.tsx, whose toolbar
+   * button is pressed exactly when this says yes.
+   */
+  isPhysicalView(filter: unknown): boolean;
+  /**
+   * The URL that puts a list into that state: the filter cleared, the sort set to
+   * path ascending, and the display options left alone. Published for the smoke
+   * test, which can check the query without a browser to navigate.
+   */
+  physicalQuery(search: string | undefined): string;
+  /**
+   * How many of a gallery's files are an image the gallery already showed.
+   * Published for the smoke test and read by the button's tooltip.
+   */
+  repeatingPages(files: unknown): number;
+  /**
    * Records one gallery's grid, evicting the oldest insertions past the cap.
    * Published for the smoke test: the cap is otherwise invisible from outside
    * physical-grid.ts.

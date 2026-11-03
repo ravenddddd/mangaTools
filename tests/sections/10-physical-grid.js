@@ -15,6 +15,8 @@ const {
   NS,
   call,
   documentRoot,
+  find,
+  historyReplaces,
   makeEl,
   patched,
   patchedBefore,
@@ -645,6 +647,177 @@ module.exports = () => {
         );
       }, 0);
     }, 0);
+  });
+
+  /**
+   * The toolbar's button: what it says the state is, and the one click that puts
+   * the list in it.
+   *
+   * The three conditions are the same rule the expansion applies — a button
+   * pressed while the grid showed Stash's deduplicated list would be worse than
+   * no button — so the truth table is pinned here, and the query it writes is
+   * checked as a whole: the filter goes, the sort is set, and the display
+   * options are left where the reader put them.
+   */
+  runSection("15 the physical-pages button's state and query", () => {
+    const view = (over) =>
+      NS.isPhysicalView({
+        sortBy: "path",
+        sortDirection: "ASC",
+        searchTerm: "",
+        criteria: [],
+        ...over,
+      });
+
+    assert.strictEqual(view({}), true, "path, ascending and unfiltered is on");
+    assert.strictEqual(view({ sortBy: "title" }), false, "another sort is off");
+    assert.strictEqual(
+      view({ sortDirection: "DESC" }),
+      false,
+      "and so is the other direction"
+    );
+    assert.strictEqual(
+      view({ searchTerm: "RJ01133881" }),
+      false,
+      "a search term is off"
+    );
+    assert.strictEqual(view({ criteria: [{}] }), false, "a criterion is off");
+    assert.strictEqual(
+      view({ sortDirection: undefined }),
+      false,
+      "no direction is off"
+    );
+    assert.strictEqual(NS.isPhysicalView(null), false, "and no filter is off");
+
+    const query = NS.physicalQuery(
+      "?sortby=title&sortdir=desc&q=abc&c=%28%22x%22%29&c=%28%22y%22%29&p=3&perPage=40&disp=2&z=3"
+    );
+    const params = new URLSearchParams(query.slice(1));
+    assert.strictEqual(params.get("sortby"), "path", "the sort becomes path");
+    assert.strictEqual(
+      params.get("sortdir"),
+      null,
+      "and the direction goes, so Stash's own rule answers ascending"
+    );
+    assert.strictEqual(params.get("q"), null, "the search term goes");
+    assert.deepStrictEqual(params.getAll("c"), [], "and every criterion");
+    assert.strictEqual(
+      params.get("p"),
+      null,
+      "the page resets, since the list does"
+    );
+    assert.strictEqual(params.get("perPage"), "40", "the page size stays");
+    assert.strictEqual(params.get("disp"), "2", "so does the display mode");
+    assert.strictEqual(params.get("z"), "3", "and the zoom");
+
+    assert.strictEqual(
+      NS.repeatingPages([{ imageId: "1" }, { imageId: "1" }, { imageId: "2" }]),
+      1,
+      "one page repeats an image the gallery already showed"
+    );
+    assert.strictEqual(NS.repeatingPages([]), 0, "a gallery with no files");
+    assert.strictEqual(NS.repeatingPages(null), 0, "and one not read yet");
+  });
+
+  /**
+   * The button in the toolbar, mounted where Stash's own list controls end.
+   *
+   * The world has no layout, so what is pinned is the portal existing at the
+   * anchor the plugin picked (one sibling after the zoom slider), and the two
+   * states: pressed with the mode in force, unpressed with a filter — and the
+   * click that writes the URL Stash reads back into its filter.
+   */
+  runSection("15 the toolbar button says the mode's state", () => {
+    const wasPath = global.window.location.pathname;
+    const wasPages = NS.physicalPages;
+    const wasTakeover = NS.readerTakeover;
+    // The tooltip's wording is asserted below, so the language is pinned rather
+    // than inherited: the rest of the suite leaves the reader in Chinese.
+    const wasLocale = state.currentLocale;
+    state.currentLocale = "en";
+
+    global.window.location.pathname = "/galleries/801";
+    NS.physicalPages = true;
+    NS.readerTakeover = true;
+    NS.primePhysicalGrid("801", GRID);
+
+    const slider = makeEl("input");
+    slider.className = "zoom-slider-container";
+    documentRoot.appendChild(slider);
+
+    const button = () => {
+      const tree = call("ImageList", listProps());
+      return find(
+        tree,
+        (n) => n.props?.className === "manga-tools-physical-button"
+      );
+    };
+
+    const pressed = button();
+    assert.ok(pressed, "the button is drawn in a gallery's Images tab");
+    assert.strictEqual(
+      pressed.props.active,
+      true,
+      "pressed while the list is in the state the mode needs"
+    );
+    assert.strictEqual(
+      pressed.props.title,
+      "Physical pages: path order, no filter · 1 page repeats an image",
+      "its tooltip names the state and how many pages repeat an image"
+    );
+    assert.strictEqual(
+      document.querySelector(".manga-tools-physical-host")
+        ?.previousElementSibling,
+      slider,
+      "and it sits directly after the toolbar's last control"
+    );
+
+    historyReplaces.length = 0;
+    pressed.props.onClick();
+    assert.strictEqual(historyReplaces.length, 1, "a click writes the URL");
+    const written = new URLSearchParams(historyReplaces[0].search.slice(1));
+    assert.strictEqual(
+      written.get("sortby"),
+      "path",
+      "which puts the list in it"
+    );
+
+    const off = find(
+      call(
+        "ImageList",
+        listProps({
+          filter: { ...listProps().filter, searchTerm: "RJ01133881" },
+        })
+      ),
+      (n) => n.props?.className === "manga-tools-physical-button"
+    );
+    assert.ok(off, "the button stays while a search is on");
+    assert.strictEqual(
+      off.props.active,
+      false,
+      "unpressed: a searched list is not the one physical pages apply to"
+    );
+
+    // The other two gates: not a gallery's page, and the setting off.
+    global.window.location.pathname = "/images";
+    assert.strictEqual(
+      button(),
+      null,
+      "no button outside a gallery's Images tab"
+    );
+
+    global.window.location.pathname = "/galleries/801";
+    NS.physicalPages = false;
+    assert.strictEqual(button(), null, "and none with the setting off");
+
+    slider.remove();
+    global.window.location.pathname = wasPath;
+    NS.physicalPages = wasPages;
+    NS.readerTakeover = wasTakeover;
+    state.currentLocale = wasLocale;
+    // No `forgetPhysicalGrids()` here: it fires every watcher, and the section
+    // above counts watcher calls from a timer that is still in flight. The grid
+    // left in the cache is one no other section reads.
   });
 
   runSection("15 the patches are registered", () => {

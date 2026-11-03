@@ -41,6 +41,7 @@ import { NS } from "../languages";
 import { type MangaToolsIntl, requirePluginApi } from "../plugin-api";
 import { currentGalleryId } from "./core";
 import { noteFired, registerPatch } from "./patches";
+import { PhysicalPagesButton } from "./physical-button";
 
 const PluginApi = requirePluginApi();
 const React = PluginApi.React;
@@ -650,21 +651,38 @@ function registerListPatch(): void {
       }
     });
 
-    if (!expanded) return next(props);
+    const rendered = (
+      expanded
+        ? next({
+            ...props,
+            images: expanded.images,
+            selectedIds: expanded.selectedIds,
+            onSelectChange: expanded.onSelectChange,
+            totalCount: expanded.total,
+            pageCount: expanded.pages,
+            filter: {
+              ...(props.filter || {}),
+              currentPage: expanded.page,
+              itemsPerPage: expanded.perPage,
+            },
+          })
+        : next(props)
+    ) as React.ReactNode;
 
-    return next({
-      ...props,
-      images: expanded.images,
-      selectedIds: expanded.selectedIds,
-      onSelectChange: expanded.onSelectChange,
-      totalCount: expanded.total,
-      pageCount: expanded.pages,
-      filter: {
-        ...(props.filter || {}),
-        currentPage: expanded.page,
-        itemsPerPage: expanded.perPage,
-      },
-    });
+    // **The toolbar's own button, and it is rendered whether or not the expansion
+    // is in force** — that is the whole point of it: an unpressed button is how a
+    // reader finds out the mode is not on. It decides for itself whether this list
+    // is the one it belongs to (a gallery's Images tab, with the setting on), and
+    // portals itself into the toolbar.
+    return React.createElement(
+      React.Fragment,
+      null,
+      rendered,
+      React.createElement(PhysicalPagesButton, {
+        filter: props.filter,
+        files: grid?.files,
+      })
+    );
   });
 }
 
