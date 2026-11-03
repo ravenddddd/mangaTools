@@ -528,6 +528,16 @@ module.exports = async () => {
         false,
         "…including the autostart 0.32 adds"
       );
+      // **The place is not written out.** A handover to a lightbox that is already
+      // up has no place to give: Stash read `initialIndex` when it mounted, and
+      // sending `undefined` cleared it for the next mount — the lightbox then
+      // defaulted to its first image, so a gallery opened twice stayed on page one
+      // however far down the grid the reader clicked.
+      assert.strictEqual(
+        Object.prototype.hasOwnProperty.call(props, "initialIndex"),
+        false,
+        "a handover leaves Stash's place alone rather than clearing it"
+      );
       assert.deepStrictEqual(
         props.images.map((i) => i.id),
         CHAPTERS_VIEW.map(String),

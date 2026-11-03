@@ -104,9 +104,14 @@ function LightboxBridge(): null {
           pages: 1,
           pageSize: request.images.length,
           totalCount: request.totalCount,
-          // Only read when the lightbox mounts, which is how a chapter clicked on the
-          // gallery's own page opens one — see the chapters tab.
-          initialIndex: request.at,
+          // **Only written when a place was asked for, never written out.**
+          // `initialIndex` is what a lightbox that has just mounted reads to decide
+          // which image to show; a handover to one that is already up — which is
+          // every opening of a gallery already read once this session — must leave
+          // it alone. Sending `undefined` here cleared it before Stash's own mount
+          // effect could consume it, and the lightbox then opened on the first
+          // image: the reader saw page one however far down the grid they clicked.
+          ...(request.at === undefined ? {} : { initialIndex: request.at }),
           // **A still carousel.** 0.32 can open the lightbox with its slideshow
           // already running (a gallery card's preview, #7035), and that timer moves
           // Stash's own carousel — which the reader has replaced — underneath the
