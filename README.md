@@ -1588,12 +1588,12 @@ why a desktop reader's clicks, drags and wheel are exactly what they were.
 | Gesture | What it does |
 |---|---|
 | **Tap the left / right third** | The previous / next page. Thirds rather than the halves a mouse click uses: a finger has no cursor to aim with, and the middle of the screen is where a thumb falls, so a tap there is touching the page rather than asking for the next one — it does nothing |
-| **Swipe right / left** | The next / previous page, the same turn the arrow keys make. Rightwards is forwards: a paper manga is turned that way |
+| **Swipe left / right** | The next / previous page: the finger flicks the page away to the left and the next one comes from the right. (The arrow keys are the other way round — `ArrowRight` is forward — because a key is not a sheet of paper; the tap's thirds follow the swipe) |
 | **Two fingers** | Pinch: the same zoom the wheel has, about the point between the fingers. In the column it is the column's own zoom — the pages drawn wider — and the reader keeps their place by proportion |
 | **Double tap** | The fit and 2.5×, about the place tapped; again to put it back |
 | **A drag while zoomed** | The pages, exactly as a mouse drag moves them. In the column a finger's drag is the browser's own scrolling — the column is read by scrolling, not panned |
 | **The progress bar** | A finger presses and drags it as a mouse does; on a phone the bar's box is taller (or wider, down the side) so a thumb can find the line |
-| **The controls** | On a coarse pointer every header button gets a 44 px box around its icon, the options panel is capped to the screen's width, and the footer leaves room for a home indicator |
+| **The controls** | On a coarse pointer every header button gets a 44 px box around its icon; the options panel is capped to the screen's width; the footer leaves room for a home indicator, its file name and gallery title are each one line with an ellipsis, and the row grows with them rather than clipping a long title; and Stash's thumbnail strip is hidden — a finger has the swipe and the bar, and the strip is a fifth of the screen |
 
 **One touch, one page.** The browser sends a click after every tap and swipe, and the
 gesture has already turned the page: the click handler swallows the one that follows,

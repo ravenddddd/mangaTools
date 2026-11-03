@@ -35,12 +35,13 @@ module.exports = async () => {
       "a finger that rested is a reader looking, not asking for the next page"
     );
     assert.strictEqual(
-      NR.touchGesture(80, 5, 300),
+      NR.touchGesture(-80, 5, 300),
       "forward",
-      "a swipe to the right is forwards — the paper book is turned that way"
+      "a swipe to the left is forwards — the page is flicked away, as a sheet of " +
+        "paper is"
     );
     assert.strictEqual(
-      NR.touchGesture(-80, 5, 300),
+      NR.touchGesture(80, 5, 300),
       "back",
       "…and the other way"
     );
@@ -154,13 +155,13 @@ module.exports = async () => {
       box.lightbox.querySelector(".manga-reader-counter").textContent;
     view.rect = { left: 0, top: 0, width: 900, height: 600 };
 
-    view.dispatch("pointerdown", touch("pointerdown", 1, 400, 300, 4000));
-    dom.document.dispatch("pointerup", touch("pointerup", 1, 600, 300, 4100));
-    assert.strictEqual(counter(), "2 / 5", "a swipe to the right turns on");
+    view.dispatch("pointerdown", touch("pointerdown", 1, 600, 300, 4000));
+    dom.document.dispatch("pointerup", touch("pointerup", 1, 400, 300, 4100));
+    assert.strictEqual(counter(), "2 / 5", "a swipe to the left turns on");
 
-    view.dispatch("pointerdown", touch("pointerdown", 1, 600, 300, 5000));
-    dom.document.dispatch("pointerup", touch("pointerup", 1, 400, 300, 5100));
-    assert.strictEqual(counter(), "1 / 5", "…and to the left turns back");
+    view.dispatch("pointerdown", touch("pointerdown", 1, 400, 300, 5000));
+    dom.document.dispatch("pointerup", touch("pointerup", 1, 600, 300, 5100));
+    assert.strictEqual(counter(), "1 / 5", "…and to the right turns back");
 
     stopReader(box);
   });

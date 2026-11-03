@@ -13,10 +13,12 @@
  * travelling forty-five degrees is left to the browser, because a reader trying to
  * scroll a screen mode has nowhere to go with that either.
  *
- * **The directions are the book's, not the browser's.** A manga is read right to
- * left, so a swipe *right* is the next page — the finger pulls the sheet the way a
- * paper one is turned — and so is `ArrowRight`, which is the other half of the same
- * promise. A tap on the right third is forward for the same reason.
+ * **A swipe left is the next page.** That is what a reader expects of a book on
+ * glass: the finger flicks the page away to the left, and the next one comes from
+ * the right. (This is the one direction that is *not* the keys': `ArrowRight` turns
+ * forward, because a keyboard is not a sheet of paper. The tap's thirds follow the
+ * swipe — the right third is forward — so the two touch gestures agree with each
+ * other.)
  *
  * The view arithmetic a pinch needs is in zoom.ts (zoomedAbout); this file only says
  * what the fingers asked for.
@@ -61,9 +63,10 @@ export function touchGesture(
     return ms <= TOUCH_TAP_MS ? "tap" : "none";
   }
 
-  // Forwards is to the right — see the note at the top of this file.
+  // Forwards is a flick to the left — see the note at the top of this file. It is not
+  // the arrow key's direction: a key is not a sheet of paper.
   if (across >= TOUCH_SWIPE && across > down * 1.4) {
-    return dx > 0 ? "forward" : "back";
+    return dx < 0 ? "forward" : "back";
   }
 
   return "none";

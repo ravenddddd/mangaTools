@@ -1341,8 +1341,40 @@
   .manga-reader-chrome {
     padding-top: env(safe-area-inset-top);
   }
+
+  /* **The bottom of the screen on a phone.** Stash's footer is a fixed 4.5rem row
+     holding a bold file name and, under it, a gallery title that wraps — on a phone
+     that title runs to several lines and is clipped by the fixed height. The two
+     lines are each clamped to one with an ellipsis, and the row grows with them (the
+     picture area gives the height up). */
   .Lightbox-footer {
+    height: auto;
+    min-height: 3.25rem;
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  .Lightbox-footer-center {
+    min-width: 0;
+    padding-left: 0.5rem;
+  }
+  .Lightbox-footer-center > div {
+    max-width: 100%;
+    min-width: 0;
+  }
+  .Lightbox-footer-center .image-link,
+  .Lightbox-footer-center .image-gallery-link {
+    display: block;
+    font-size: 0.8rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The thumbnail strip above it is Stash's own navigation. On a phone it is a fifth
+     of the screen, and a finger has the swipe and the bar instead. */
+  .Lightbox.manga-reader-takeover .Lightbox-nav {
+    display: none;
   }
 
   .manga-reader-progress {

@@ -816,6 +816,28 @@ module.exports = () => {
     ),
     "…and the home indicator's inset under the footer"
   );
+  // The bottom of a phone's screen: Stash's footer is a fixed row with a title that
+  // wraps, and a phone clipped that title off. The row grows with two one-line links,
+  // and the thumbnail strip above it — Stash's own navigation, a fifth of the screen —
+  // steps aside for the swipe and the bar.
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*\.Lightbox-footer\s*\{[^}]*height:\s*auto/.test(
+      readerCss
+    ),
+    "a phone's footer grows with its lines instead of clipping a long title"
+  );
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*\.image-gallery-link\s*\{[^}]*text-overflow:\s*ellipsis/.test(
+      readerCss
+    ),
+    "…with the gallery title on one line and an ellipsis"
+  );
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*\.Lightbox-nav\s*\{[^}]*display:\s*none/.test(
+      readerCss
+    ),
+    "…and no thumbnail strip under the pages"
+  );
 
   // **Stash 0.32's lightbox delete button, hidden in takeover mode.** The button
   // opens a delete dialog on the image Stash's own carousel is on (#7022) — and the
