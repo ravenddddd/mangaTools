@@ -127,7 +127,17 @@ import {
   isZoomed,
   panned,
   zoomed,
+  zoomedAbout,
 } from "./zoom";
+import {
+  TOUCH_ZOOM,
+  type MangaReaderTap,
+  isDoubleTap,
+  pinchPoints,
+  pinched,
+  tapZone,
+  touchGesture,
+} from "./touch";
 
 /**
  * The three switches' words, in the interface's language.
@@ -1175,6 +1185,10 @@ function ensureContainer(lightbox: Element): void {
     container.addEventListener("click", onSpreadClick);
     container.addEventListener("wheel", onSpreadWheel);
     container.addEventListener("mousedown", onSpreadPress);
+    // The same area, for a finger — see the touch section below. Pointer events rather
+    // than touch ones, and gated on the pointer not being a mouse: the mouse keeps the
+    // handlers above, unchanged.
+    container.addEventListener("pointerdown", onTouchDown);
     // The third mode's own way of moving the reader. Harmless in the other two: a
     // screen is not a scroll box and fires nothing.
     container.addEventListener("scroll", onColumnScroll);
@@ -2196,6 +2210,11 @@ function onSpreadClick(event: Event): void {
   const lightbox = root;
   if (!lightbox || !container) return;
 
+  // **One touch, one page.** The browser sends a click after a tap and after a swipe,
+  // and the touch handlers above have already turned the page (or decided not to):
+  // letting this one through would turn a second. See onTouchUp.
+  if (answeredByTouch(event)) return;
+
   // The release behind this click was not one of Stash's clicks — it was a pan, or a
   // press that lasted — and a press and a release on one element is a click whether
   // or not either of those is true. Turning the page as well would mean every drag
@@ -2337,26 +2356,8 @@ function onSpreadWheel(event: Event): void {
     const next = zoomedBy(was, delta < 0 ? VIEW_STEP : 1 / VIEW_STEP);
     if (next === was) return;
 
-    // Where the reader is *in the column*, read before the pages change size — a read
-    // forces the layout, so read after it and this is already the clamped new position
-    // rather than the one they were reading at.
-    const wasAt = container
-      ? { top: container.scrollTop || 0, left: container.scrollLeft || 0 }
-      : null;
-
-    refitColumn(next);
-
-    // And put back, in proportion. A row's height is its width times its own ratio, so
-    // a zoom multiplies *every* height by the same factor: the position that keeps the
-    // same words under the reader's eyes is the old one times that factor. Snapping to
-    // the page's own top instead — which is what this did — is a reader looking at the
-    // middle of a long page being thrown back to the beginning of it.
-    if (container && wasAt) {
-      container.scrollTop = wasAt.top * (next / was);
-      container.scrollLeft = wasAt.left * (next / was);
-    }
-
-    sync(lightbox);
+    // The same path a pinch takes, and for the same reasons: see zoomColumnTo.
+    zoomColumnTo(next);
     return;
   }
 
@@ -2537,6 +2538,297 @@ function onSpreadRelease(event: Event): void {
 
   dragFrom = null;
   pressed = null;
+}
+
+// ── Touch ──────────────────────────────────────────────────────────
+
+/**
+ * **The pages as a finger reads them.**
+ *
+ * Pointer events, and only for pointers that are not a mouse: the mouse keeps the
+ * handlers it has always had (a click's two halves, a drag that pans the pages in the
+ * column), so a desktop reader's input does not go through any of this and the suite's
+ * mouse sections keep meaning what they meant. What the browser may do with a touch is
+ * decided in the stylesheet — `touch-action: none` over the pages, `pan-y` over the
+ * column — because a gesture it claims is a gesture nobody else receives.
+ *
+ * The gestures, and why each is what it is:
+ *
+ *   - **tap**, in the outer thirds: back and forward. Thirds rather than the halves a
+ *     mouse click uses — a finger has no cursor to aim with, and the middle of the
+ *     screen is where a thumb falls, so a tap there is a reader touching the page
+ *     rather than asking for the next one.
+ *   - **swipe**, forty-eight pixels and mostly horizontal: a page turn, the same one
+ *     the arrow key makes. Rightwards is forwards, as the paper book is turned.
+ *   - **two fingers**: a pinch, about the point between them — the same zoom the wheel
+ *     has, reached the way a hand on glass reaches it.
+ *   - **double tap**: the fit and TOUCH_ZOOM, about the place tapped.
+ *   - **a drag while zoomed**: a pan, exactly the mouse's.
+ *
+ * A click follows a tap, always. Every gesture that ends here answers for itself and
+ * records that it did, and the click handler swallows the click that follows — one
+ * touch, one page. See answeredByTouch.
+ */
+const touches = new Map<number, MangaReaderTap>();
+/** The first finger of this gesture, while it is the only one */
+let touchDown: { x: number; y: number; at: number; multi: boolean } | null =
+  null;
+/** Where the last move left the finger, for a pan's deltas */
+let touchPan: { x: number; y: number } | null = null;
+/** The pinch in hand: the zoom and view it began from, and the point it holds */
+let pinch: {
+  startZoom: number;
+  startDistance: number;
+  anchor: { x: number; y: number };
+  view: MangaReaderView;
+} | null = null;
+/** The last tap lifted, for the double tap's time-and-place test */
+let lastTap: MangaReaderTap | null = null;
+/**
+ * When the last touch that answered for itself ended, on the events' own clock.
+ *
+ * The click the browser sends after a touch carries a timestamp from the same clock,
+ * so this is what tells it apart from a mouse click that has every right to turn a
+ * page. Cleared as it is used, and old enough after half a second.
+ */
+let touchAnsweredAt = 0;
+/** How long after a touch its click may still arrive */
+const TOUCH_CLICK_GRACE_MS = 500;
+
+/**
+ * A screen point in the pages' own space — from the container's middle, before the
+ * transform. What a zoom about a point needs: see zoomedAbout in zoom.ts.
+ */
+function localPoint(x: number, y: number): { x: number; y: number } {
+  if (!container) return { x: 0, y: 0 };
+  const rect = container.getBoundingClientRect();
+  const zoom = view.zoom || 1;
+  return {
+    x: (x - ((rect.left || 0) + (rect.width || 0) / 2) - view.x) / zoom,
+    y: (y - ((rect.top || 0) + (rect.height || 0) / 2) - view.y) / zoom,
+  };
+}
+
+/** The zoom the column should be drawn at, keeping the reader where they were */
+function zoomColumnTo(next: number): void {
+  const lightbox = root;
+  if (!container || !(next > 0)) return;
+
+  const was = columnZoom();
+  if (Math.abs(next - was) < 1e-6) return;
+
+  // Where the reader is *in the column*, read before the pages change size — a read
+  // forces the layout, so read after it and this is already the clamped new position
+  // rather than the one they were reading at.
+  const wasAt = {
+    top: container.scrollTop || 0,
+    left: container.scrollLeft || 0,
+  };
+
+  refitColumn(next);
+
+  // Put back in proportion: a row's height is its width times its own ratio, so a
+  // zoom multiplies *every* height by the same factor — the position that keeps the
+  // same words under the eyes is the old one times that factor. Snapping to the
+  // page's own top instead is a reader in the middle of a long page thrown back to
+  // the beginning of it.
+  container.scrollTop = wasAt.top * (next / was);
+  container.scrollLeft = wasAt.left * (next / was);
+
+  if (lightbox) sync(lightbox);
+}
+
+/** One finger down: the start of whatever this gesture turns out to be */
+function onTouchDown(event: Event): void {
+  const down = event as PointerEvent;
+  if (down.pointerType === "mouse") return;
+  if (!wanted() || !root || !container) return;
+
+  touches.set(down.pointerId, {
+    x: down.clientX,
+    y: down.clientY,
+    at: down.timeStamp,
+  });
+
+  if (touches.size === 1) {
+    touchDown = {
+      x: down.clientX,
+      y: down.clientY,
+      at: down.timeStamp,
+      multi: false,
+    };
+    touchPan = { x: down.clientX, y: down.clientY };
+  } else if (touches.size === 2) {
+    // A second finger ends the tap or swipe the first had begun: this is a pinch, and
+    // a page turn on the way out of it would be one nobody asked for.
+    if (touchDown) touchDown.multi = true;
+    const [a, b] = [...touches.values()];
+    const at = pinchPoints(a, b);
+    pinch =
+      settings.readingMode === "scroll"
+        ? {
+            startZoom: columnZoom(),
+            startDistance: at.distance,
+            anchor: { x: 0, y: 0 },
+            view,
+          }
+        : {
+            startZoom: view.zoom,
+            startDistance: at.distance,
+            anchor: localPoint(at.x, at.y),
+            view,
+          };
+  }
+
+  document.addEventListener("pointermove", onTouchMove);
+  document.addEventListener("pointerup", onTouchUp);
+  document.addEventListener("pointercancel", onTouchUp);
+}
+
+/** The fingers moved: a pinch, or a pan when the pages are zoomed */
+function onTouchMove(event: Event): void {
+  const move = event as PointerEvent;
+  if (!touches.has(move.pointerId)) return;
+
+  touches.set(move.pointerId, {
+    x: move.clientX,
+    y: move.clientY,
+    at: move.timeStamp,
+  });
+
+  // A pinch is read from the two fingers that are down, whatever the first one did.
+  if (pinch && touches.size >= 2) {
+    const [a, b] = [...touches.values()];
+    const at = pinchPoints(a, b);
+    const zoom = pinched(pinch.startZoom, pinch.startDistance, at.distance);
+    if (zoom === pinch.startZoom) return;
+
+    if (settings.readingMode === "scroll") {
+      zoomColumnTo(zoom);
+      pinch.startZoom = zoom;
+      return;
+    }
+
+    view = zoomedAbout(pinch.view, zoom, pinch.anchor);
+    pinch.view = view;
+    pinch.startZoom = zoom;
+    pinch.startDistance = at.distance;
+    applyView();
+    return;
+  }
+
+  if (!touchDown || touchDown.multi) return;
+
+  const from = touchPan || touchDown;
+  const dx = move.clientX - from.x;
+  const dy = move.clientY - from.y;
+  touchPan = { x: move.clientX, y: move.clientY };
+
+  // The column's one-finger gesture is the browser's own scrolling: nothing here.
+  if (settings.readingMode === "scroll" || !isZoomed(view)) return;
+
+  view = panned(view, dx, dy);
+  applyView();
+}
+
+/** The last finger lifted, or was cancelled: what the gesture was is decided here */
+function onTouchUp(event: Event): void {
+  const up = event as PointerEvent;
+  if (!touches.has(up.pointerId)) return;
+
+  touches.delete(up.pointerId);
+
+  if (touches.size > 0) {
+    // One of two fingers left: the pinch is over, and the finger still down may pan —
+    // but it is not the start of a new tap.
+    touchDown = null;
+    touchPan = null;
+    pinch = null;
+    return;
+  }
+
+  document.removeEventListener("pointermove", onTouchMove);
+  document.removeEventListener("pointerup", onTouchUp);
+  document.removeEventListener("pointercancel", onTouchUp);
+
+  const wasPinch = pinch !== null;
+  const start = touchDown;
+  touchDown = null;
+  touchPan = null;
+  pinch = null;
+
+  // Every touch that ends here answers for itself, so the click that follows is not
+  // this page's business. See answeredByTouch and onSpreadClick.
+  touchAnsweredAt = up.timeStamp;
+
+  if (up.type === "pointercancel" || !start || start.multi || wasPinch) return;
+  if (!root) return;
+
+  const lightbox = root;
+  const dx = up.clientX - start.x;
+  const dy = up.clientY - start.y;
+  const gesture = touchGesture(dx, dy, up.timeStamp - start.at);
+
+  if (gesture === "tap") {
+    const tap = { x: up.clientX, y: up.clientY, at: up.timeStamp };
+    if (isDoubleTap(lastTap, tap)) {
+      lastTap = null;
+      toggleZoomAt(lightbox, tap.x, tap.y);
+      return;
+    }
+
+    lastTap = tap;
+    tapAt(lightbox, tap.x);
+    return;
+  }
+
+  lastTap = null;
+  if (gesture !== "forward" && gesture !== "back") return;
+
+  // A drag on a zoomed screen is a pan, and a pan does not turn pages. The column is
+  // not asked: its swipe is the page turn it always was, and it has no pan.
+  if (settings.readingMode !== "scroll" && isZoomed(view)) return;
+
+  turnBy(lightbox, gesture === "forward" ? 1 : -1);
+}
+
+/** A tap on a third of the screen: one page, or nothing in the middle */
+function tapAt(lightbox: Element, x: number): void {
+  if (!container) return;
+
+  // A page in the column is not something to turn, exactly as a mouse click there is
+  // not: there is only more of the same column on either side of it.
+  if (settings.readingMode === "scroll") return;
+
+  const rect = container.getBoundingClientRect();
+  const zone = tapZone(x, rect.left || 0, rect.width || 0);
+  if (!zone) return;
+
+  turnBy(lightbox, zone);
+}
+
+/** A double tap: the fit and TOUCH_ZOOM, about the place tapped */
+function toggleZoomAt(lightbox: Element, x: number, y: number): void {
+  if (settings.readingMode === "scroll") {
+    zoomColumnTo(columnZoom() === 1 ? TOUCH_ZOOM : 1);
+    return;
+  }
+
+  view = isZoomed(view)
+    ? fitView()
+    : zoomedAbout(fitView(), TOUCH_ZOOM, localPoint(x, y));
+  applyView();
+  redrawChrome();
+  void lightbox;
+}
+
+/** Whether the click in hand is the one a touch already answered for */
+function answeredByTouch(event: Event): boolean {
+  if (touchAnsweredAt === 0) return false;
+
+  const within = event.timeStamp - touchAnsweredAt < TOUCH_CLICK_GRACE_MS;
+  if (within) touchAnsweredAt = 0;
+  return within;
 }
 
 /**

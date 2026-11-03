@@ -507,6 +507,22 @@ export interface MangaReaderNamespace {
     page: number,
     size?: number
   ): { start: number; end: number };
+  /** The column's zoom, kept out of the domain of the window — see scroll.ts */
+  columnZoom(): number;
+
+  /**
+   * Touch decisions, published for the smoke test: what a movement means, which
+   * third a tap landed in, whether two taps are one double tap, and the zoom a pinch
+   * asks for. The handlers themselves are DOM work in takeover.ts.
+   */
+  touchGesture(dx: number, dy: number, ms: number): string;
+  tapZone(x: number, left: number, width: number): -1 | 0 | 1;
+  isDoubleTap(
+    previous: { x: number; y: number; at: number } | null,
+    next: { x: number; y: number; at: number }
+  ): boolean;
+  pinched(startZoom: number, startDistance: number, distance: number): number;
+  TOUCH_ZOOM: number;
   /**
    * How far a menu has to move sideways to be inside the window — see chrome.ts.
    *

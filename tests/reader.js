@@ -27,6 +27,7 @@ const diagnostics = require("./reader/16-diagnostics.js");
 const revalidate = require("./reader/17-revalidate.js");
 const physical = require("./reader/18-physical.js");
 const react = require("./reader/19-react.js");
+const touch = require("./reader/20-touch.js");
 
 // ── Sections ───────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ async function main() {
   await revalidate();
   await physical();
   await react();
+  await touch();
   // Last, because it reloads the bundle twice — a second and third instance of the
   // plugin on one page — which is a state no section after it should have to read.
   await diagnostics();

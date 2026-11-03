@@ -1578,13 +1578,41 @@ would show files the query excluded, so the deduplicated results stand), the ima
 detail page, and the fact that a batch action still operates on the image rather
 than on one occurrence.
 
+### Reading by touch
+
+The reader is built for a hand on glass as well as a mouse, and the two are kept
+apart on purpose: **a pointer that is a mouse goes through the handlers the reader
+has always had**, and everything a finger does is pointer events of its own. That is
+why a desktop reader's clicks, drags and wheel are exactly what they were.
+
+| Gesture | What it does |
+|---|---|
+| **Tap the left / right third** | The previous / next page. Thirds rather than the halves a mouse click uses: a finger has no cursor to aim with, and the middle of the screen is where a thumb falls, so a tap there is touching the page rather than asking for the next one — it does nothing |
+| **Swipe right / left** | The next / previous page, the same turn the arrow keys make. Rightwards is forwards: a paper manga is turned that way |
+| **Two fingers** | Pinch: the same zoom the wheel has, about the point between the fingers. In the column it is the column's own zoom — the pages drawn wider — and the reader keeps their place by proportion |
+| **Double tap** | The fit and 2.5×, about the place tapped; again to put it back |
+| **A drag while zoomed** | The pages, exactly as a mouse drag moves them. In the column a finger's drag is the browser's own scrolling — the column is read by scrolling, not panned |
+| **The progress bar** | A finger presses and drags it as a mouse does; on a phone the bar's box is taller (or wider, down the side) so a thumb can find the line |
+| **The controls** | On a coarse pointer every header button gets a 44 px box around its icon, the options panel is capped to the screen's width, and the footer leaves room for a home indicator |
+
+**One touch, one page.** The browser sends a click after every tap and swipe, and the
+gesture has already turned the page: the click handler swallows the one that follows,
+so a tap is not two pages. The gesture that ends is the one that decides — a tap that
+wandered is not a tap, a press that rested is a reader looking, and a pan across a
+zoomed page is not a swipe.
+
+**The browser is told which gestures are the reader's.** `touch-action` is `none` over
+the pages in the two screen modes — otherwise the browser's own scrolling, zoom and
+double-tap zoom would claim the gestures first — and `pan-y` over the column, because
+reading it *is* the browser's scrolling. The bar's own line says `none` for the same
+reason a drag needs the events.
+
 ### What is not here yet
 
-- **No pinch or touch panning.** The mouse is back — a drag that pans, a wheel that
-  turns, `Ctrl`+wheel to zoom — but a touchscreen's gestures are not: no two-finger
-  pinch, and no dragging the pages with one finger. Stash's own lightbox has both.
-  The progress bar is dragged with a mouse for the same reason: a drag is the same
-  gesture whatever it is dragging, and this plugin has built the one.
+- **No touch gestures beyond the ones listed below.** Swipes, taps, pinch and the
+  touch drag are in the reader (see "Reading by touch"); what a touchscreen does not
+  get is a *long* press's menu, or a gesture for the chapter menu — those are taps on
+  buttons like any other.
 - **Stash's four image settings are not read.** Display mode, scale up to fit, reset
   zoom on navigation and scroll mode are Stash's own options, and their defaults are
   what this half does: fit to the screen, no scaling up, the position reset on every

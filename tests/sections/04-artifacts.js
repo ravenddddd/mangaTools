@@ -777,6 +777,46 @@ module.exports = () => {
       "the chapters tab's own button is marked, and a mark with no rule behind it hides nothing"
   );
 
+  // **Touch is a stylesheet question before it is a script one.** A gesture the
+  // browser claims is a gesture nobody else receives, so the pages have to say which
+  // gestures are theirs: none in the two screen modes, vertical panning in the column
+  // (where reading *is* the browser's scrolling), and none on the bar, which a finger
+  // drags. None of that is visible in the DOM stub — it is the browser's own rule.
+  assert.ok(
+    /\.manga-reader-spread\s*\{[^}]*touch-action:\s*none/.test(readerCss),
+    "the picture area must own its gestures in the screen modes"
+  );
+  assert.ok(
+    /\.manga-reader-spread\.is-scroll\s*\{[^}]*touch-action:\s*pan-y/.test(
+      readerCss
+    ),
+    "…and the column must keep the browser's own vertical scrolling"
+  );
+  assert.ok(
+    /\.manga-reader-progress-track\s*\{[^}]*touch-action:\s*none/.test(
+      readerCss
+    ),
+    "the bar is dragged with a finger, so a touch on it is the bar's"
+  );
+  // The chrome a finger can actually hit: a 44px box around each icon, an options
+  // panel that cannot run off the side of a phone, and the safe-area insets.
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*min-height:\s*44px/.test(readerCss),
+    "coarse pointers get a thumb-sized box on every control"
+  );
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*max-width:\s*calc\(100vw - 24px\)/.test(
+      readerCss
+    ),
+    "…and an options panel that fits a phone's width"
+  );
+  assert.ok(
+    /@media \(pointer: coarse\)\s*\{[\s\S]*env\(safe-area-inset-bottom\)/.test(
+      readerCss
+    ),
+    "…and the home indicator's inset under the footer"
+  );
+
   // **Stash 0.32's lightbox delete button, hidden in takeover mode.** The button
   // opens a delete dialog on the image Stash's own carousel is on (#7022) — and the
   // reader never moves that carousel, so in takeover mode it is not the page on

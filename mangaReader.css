@@ -1285,3 +1285,76 @@
   font-size: 13px;
   margin-top: 8px;
 }
+
+/*
+ * ── Touch ─────────────────────────────────────────────────────────────────────
+ *
+ * The picture area reads its own gestures in the two screen modes — a tap, a swipe, a
+ * pinch and a drag are pointer events in takeover.ts — so the browser must not also
+ * scroll, zoom or select in there. The column is the opposite deal: reading it *is*
+ * the browser's own scrolling, so it keeps vertical panning and gives up the rest.
+ * A gesture the browser claims is a gesture nobody else receives, which is why this
+ * is a rule and not a hint.
+ */
+.manga-reader-spread {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+.manga-reader-spread.is-scroll {
+  touch-action: pan-y;
+}
+
+/* The bar is dragged with a finger too (progress.ts), so a touch on the line is the
+   line's and not the page's. */
+.manga-reader-progress-track {
+  touch-action: none;
+}
+
+/*
+ * A finger's worth of every control.
+ *
+ * 44px is the smallest box a thumb hits reliably, and the icons keep their size — it
+ * is the box around them that grows. The bar is the one control that is a *line*
+ * rather than a button: its painted line stays 4px, and what a finger answers to is
+ * the 24px box around it (32px across, when it is down the side of the column).
+ */
+@media (pointer: coarse) {
+  .manga-reader-chrome .btn {
+    align-items: center;
+    display: inline-flex;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* The options panel hangs off the gear's right edge. On a phone that edge is the
+     screen's, and a width written for a desktop would run off the left of it. */
+  .manga-reader-chrome .popover {
+    max-width: calc(100vw - 24px);
+  }
+
+  /* A phone's own furniture: the notch at the top, the home indicator at the bottom.
+     `env()` is 0 wherever there is no such inset, so the rule costs nothing on a
+     desktop that happens to report a coarse pointer. */
+  .manga-reader-chrome {
+    padding-top: env(safe-area-inset-top);
+  }
+  .Lightbox-footer {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .manga-reader-progress {
+    height: 28px;
+  }
+  .manga-reader-progress-track {
+    height: 24px;
+  }
+  .manga-reader-progress.is-vertical {
+    width: 32px;
+  }
+  .manga-reader-progress.is-vertical .manga-reader-progress-track {
+    width: 32px;
+  }
+}

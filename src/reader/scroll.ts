@@ -645,6 +645,7 @@ export function forgetColumn(): void {
 NR.pageAtTop = pageAtTop;
 NR.zoomedBy = zoomedBy;
 NR.columnFitted = columnFitted;
+NR.columnZoom = columnZoom;
 NR.pageAtOffset = pageAtOffset;
 NR.columnPlan = columnPlan;
 NR.columnWindow = columnWindow;

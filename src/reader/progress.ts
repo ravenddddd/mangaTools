@@ -482,6 +482,12 @@ function build(): void {
   track.addEventListener("mouseleave", onLeaveTrack);
 
   track.addEventListener("mousedown", onPress);
+
+  // The same bar, for a finger: the press and its drag are pointer events (a mouse is
+  // filtered out), and a touch moving along the line counts as being on it — a finger
+  // never hovers, which is the one thing about the bar that is different under glass.
+  track.addEventListener("pointerdown", onPointerDown);
+  track.addEventListener("pointermove", onTouchOverBar);
 }
 
 /** The picture area, which the column's bar is drawn over rather than beside */
@@ -705,6 +711,12 @@ function onMoveOverBar(event: Event): void {
   redraw();
 }
 
+/** A finger moving along the line: on it, awake, and over whatever tick it is over */
+function onTouchOverBar(event: Event): void {
+  if ((event as PointerEvent).pointerType === "mouse") return;
+  onMoveOverBar(event);
+}
+
 /** The pointer left the line: the bubble goes, unless a drag is holding it */
 function onLeaveTrack(): void {
   onTrack = false;
@@ -839,6 +851,23 @@ function onPress(event: Event): void {
   const press = event as MouseEvent;
   if (press.button !== 0 || !track) return;
 
+  pressAt(event);
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onRelease);
+}
+
+/**
+ * The press itself, for whichever kind of pointer made it.
+ *
+ * Split out because a finger and a mouse ask for the same thing on the line and only
+ * differ in how the drag that follows is tracked: the mouse's move and release are
+ * mouse events on the document, a finger's are pointer events. What a press *means* —
+ * a tick is that chapter, anywhere else goes to where it landed — is here, once.
+ */
+function pressAt(event: Event): void {
+  const press = event as MouseEvent;
+  if (!track) return;
+
   press.preventDefault();
   press.stopPropagation();
 
@@ -870,9 +899,42 @@ function onPress(event: Event): void {
     bubble = null;
     scrubTo(fractionAt(press));
   }
+}
 
-  document.addEventListener("mousemove", onMove);
-  document.addEventListener("mouseup", onRelease);
+/**
+ * A finger on the line, and the drag that follows it.
+ *
+ * The same press and the same scrub as the mouse's, tracked on the document as pointer
+ * events so it survives a finger leaving the line. A mouse is left to its own three
+ * listeners — this one returns for it, so a press with a mouse is not handled twice.
+ */
+function onPointerDown(event: Event): void {
+  const down = event as PointerEvent;
+  if (down.pointerType === "mouse" || !track) return;
+
+  down.preventDefault();
+  down.stopPropagation();
+  pressAt(event);
+
+  document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("pointerup", onPointerRelease);
+  document.addEventListener("pointercancel", onPointerRelease);
+}
+
+function onPointerMove(event: Event): void {
+  const move = event as PointerEvent;
+  if (move.pointerType === "mouse") return;
+  onMove(event);
+}
+
+function onPointerRelease(event: Event): void {
+  const up = event as PointerEvent;
+  if (up.pointerType === "mouse") return;
+
+  document.removeEventListener("pointermove", onPointerMove);
+  document.removeEventListener("pointerup", onPointerRelease);
+  document.removeEventListener("pointercancel", onPointerRelease);
+  onRelease();
 }
 
 function onMove(event: Event): void {

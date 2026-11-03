@@ -119,3 +119,25 @@ export function panned(
 ): MangaReaderView {
   return { zoom: view.zoom, x: view.x + dx, y: view.y + dy };
 }
+
+/**
+ * The same view at another zoom, with one point of the pages left where it was.
+ *
+ * What a pinch and a double tap mean, and why they are not `zoomed`: those two are
+ * about a *place* — the point between the fingers, the point that was tapped — and a
+ * zoom about the middle would throw that place away. The transform is
+ * `translate(x, y) scale(zoom)` about the container's middle, so a local point `p`
+ * (measured from that middle, in the pages' own untransformed pixels) sits at
+ * `p * zoom + x`; keeping it there while the zoom changes gives the new x and y below.
+ *
+ * `local` is in that untransformed space, which is what the caller has to compute
+ * from the screen point and the view in hand — see localPoint in takeover.ts.
+ */
+export function zoomedAbout(
+  view: MangaReaderView,
+  zoom: number,
+  local: { x: number; y: number }
+): MangaReaderView {
+  const k = zoom - view.zoom;
+  return { zoom, x: view.x - local.x * k, y: view.y - local.y * k };
+}
