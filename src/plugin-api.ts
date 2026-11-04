@@ -555,6 +555,8 @@ export interface MangaToolsNamespace {
   nameTaken(shops: unknown[], name: string, except: number): boolean;
   /** The shop already using a domain, or null. */
   domainOwner(shops: unknown[], domain: string, except: number): unknown;
+  /** A list with one item moved to just before or after another. */
+  moveItem<T>(items: T[], from: number, target: number, after: boolean): T[];
   /** The stand-in icon for a shop without one: a letter and its colour. */
   shopLetter(shop: unknown): { letter: string; color: string } | null;
   /** The settings row that opens the shop editor. */

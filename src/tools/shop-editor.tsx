@@ -36,6 +36,7 @@ import {
   compilePattern,
   domainOwner,
   isValidDomain,
+  moveItem,
   nameTaken,
   normalizeDomain,
   type Shop,
@@ -478,13 +479,7 @@ export function ShopDialog(props: {
                   (candidate) => candidate.id === drop.id
                 );
                 if (from >= 0 && target >= 0) {
-                  const next = rows.slice();
-                  next.splice(
-                    target + (drop.after ? 1 : 0),
-                    0,
-                    next.splice(from, 1)[0]
-                  );
-                  setRows(next);
+                  setRows(moveItem(rows, from, target, drop.after));
                 }
                 setDragRow("");
                 setDrop(null);

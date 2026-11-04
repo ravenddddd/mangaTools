@@ -253,6 +253,38 @@ export function shopsToJson(shops: Shop[]): string {
 }
 
 /**
+ * The list with one item moved, dropped just before or after another.
+ *
+ * `from` and `target` are **the indices the drag event reports**, taken before
+ * anything moves. Removing the item first shifts everything after it down by one,
+ * so an insertion point past `from` has to come down with it — without that
+ * correction, dropping at the bottom of a row and at the top of the row after it
+ * (the same gap, drawn as the same line) landed in two different places.
+ */
+export function moveItem<T>(
+  items: T[],
+  from: number,
+  target: number,
+  after: boolean
+): T[] {
+  if (
+    from < 0 ||
+    from >= items.length ||
+    target < 0 ||
+    target >= items.length
+  ) {
+    return items.slice();
+  }
+
+  let at = target + (after ? 1 : 0);
+  if (from < at) at -= 1;
+
+  const next = items.slice();
+  next.splice(at, 0, next.splice(from, 1)[0]);
+  return next;
+}
+
+/**
  * Whether a name is already used, ignoring case and surrounding space.
  *
  * `except` is the index doing the asking — the row being edited is not a duplicate

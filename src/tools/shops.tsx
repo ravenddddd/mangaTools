@@ -30,6 +30,7 @@ import {
   compilePattern,
   domainOwner,
   isValidDomain,
+  moveItem,
   nameTaken,
   normalizeDomain,
   patternsOf,
@@ -53,6 +54,7 @@ export {
   compilePattern,
   domainOwner,
   isValidDomain,
+  moveItem,
   nameTaken,
   normalizeDomain,
   shopsFromJson,
@@ -237,6 +239,7 @@ NS.shopsToJson = shopsToJson;
 NS.builtinShops = builtinShops;
 NS.normalizeDomain = normalizeDomain;
 NS.isValidDomain = isValidDomain;
+NS.moveItem = moveItem;
 NS.compilePattern = compilePattern;
 NS.nameTaken = nameTaken;
 NS.domainOwner = domainOwner;

@@ -838,6 +838,39 @@ module.exports = () => {
     );
   });
 
+  /**
+   * A drop lands where the line says.
+   *
+   * The event reports indices from before the move; removing the item first shifts
+   * everything after it down one, so the insertion point has to come down too.
+   * Without that, the two halves of one gap landed in two different places — which
+   * is what a row dragged between its neighbours looked like.
+   */
+  runSection("16 a dragged row lands on the line", () => {
+    const list = ["A", "B", "C", "D"];
+
+    assert.deepStrictEqual(
+      NS.moveItem(list, 0, 1, true),
+      ["B", "A", "C", "D"],
+      "A dropped on B's lower half goes after it"
+    );
+    assert.deepStrictEqual(
+      NS.moveItem(list, 0, 1, false),
+      ["A", "B", "C", "D"],
+      "A dropped on B's upper half stays where it is"
+    );
+    assert.deepStrictEqual(
+      NS.moveItem(list, 3, 0, false),
+      ["D", "A", "B", "C"],
+      "the last row dropped on the first's upper half goes first"
+    );
+    assert.deepStrictEqual(
+      NS.moveItem(list, 3, 0, true),
+      NS.moveItem(list, 3, 1, false),
+      "…and the two halves of the gap after A are one place"
+    );
+  });
+
   /** The row that opens the editor: one line, and the list's own length. */
   runSection("16 the settings row names the list and how long it is", () => {
     const row = NS.shopsSetting({ persist: () => {} });
