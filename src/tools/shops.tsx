@@ -1,5 +1,5 @@
 /**
- * The four shops a gallery's links can point at.
+ * The shops a gallery's links can point at, matched against the configured list.
  *
  * A gallery's links live in **Stash's own `urls`** — plain strings, no label —
  * and this module derives everything from them: which shop a link belongs to, the
@@ -7,18 +7,35 @@
  * change the link and the badge follows (at the next store refresh), with no
  * second copy to migrate.
  *
- * The four are a fixed, deliberate set (see the design notes in the README):
- * the long tail of stores is left to Stash's own link list.
+ * The list itself is data — its shape and rules are in shop-model.ts, and the
+ * settings page edits it. This module is the half that knows the running plugin:
+ * where a built-in icon is served from, and the list currently in force
+ * (`NS.shops`, which `refreshSettings` keeps fresh).
  *
  * **Recognition is by registered domain**, not by matching the whole URL: a
  * `book.dmm.co.jp` link is FANZA, and a shop may move its pages around without
- * changing its host. The code is then read by each shop's own URL shape. A link
- * on the right host with a shape this module does not know keeps its icon and
- * shows no code — guessing a code would be worse than showing none.
+ * changing its host. The code is then read by the shop's own patterns, tried in
+ * the order entered — the first one that captures wins. A link on the right host
+ * whose shape no pattern knows keeps its icon and shows no code; guessing a code
+ * would be worse than showing none.
  */
 import { assetBase } from "./core";
 import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
+import {
+  BUILTIN_ICONS,
+  BUILTIN_SHOPS,
+  builtinShops,
+  codeOf,
+  compilePattern,
+  domainOwner,
+  nameTaken,
+  normalizeDomain,
+  patternsOf,
+  type Shop,
+  shopsFromJson,
+  shopsToJson,
+} from "./shop-model";
 
 const PluginApi = requirePluginApi();
 
@@ -27,67 +44,18 @@ const PluginApi = requirePluginApi();
 // biome-ignore lint/correctness/noUnusedVariables: used by the JSX below, via the classic transform
 const React = PluginApi.React;
 
-export type ShopKey = "dlsite" | "fanza" | "toranoana" | "melonbooks";
-
-export interface Shop {
-  key: ShopKey;
-  /** The shop's own name, for a tooltip. The badge itself shows the code only. */
-  name: string;
-  /** The registered domain a link has to be on, or under. */
-  domain: string;
-  /** The product code in a link, or "" when the shape is not one this knows. */
-  code(raw: string): string;
-}
-
-/**
- * The first pattern that names a code wins; none means no code.
- *
- * More than one because a shop does not keep one URL shape forever — FANZA alone
- * has the doujin `cid=` page and the book `product/<id>/<code>/` page — and a
- * shape learned later is one entry here rather than a new branch.
- */
-const codeIn =
-  (...patterns: RegExp[]) =>
-  (raw: string): string => {
-    for (const pattern of patterns) {
-      const code = pattern.exec(raw)?.[1];
-      if (code) return code;
-    }
-    return "";
-  };
-
-export const SHOPS: Shop[] = [
-  {
-    key: "dlsite",
-    name: "DLsite",
-    domain: "dlsite.com",
-    // /books/work/=/product_id/BJ03044888.html, and the older product_id=RJ…
-    code: codeIn(/product_id[=/]([A-Za-z]{2}\d+)/),
-  },
-  {
-    key: "fanza",
-    name: "FANZA",
-    // The doujin pages live on dmm.co.jp, not on a fanza host.
-    domain: "dmm.co.jp",
-    // /dc/doujin/-/detail/=/cid=d_790745/ — and the book shape,
-    // /product/6300672/b915awnmg04612/
-    code: codeIn(/[?&/]cid=([A-Za-z0-9_]+)/, /\/product\/\d+\/([A-Za-z0-9]+)/),
-  },
-  {
-    key: "toranoana",
-    name: "虎穴",
-    domain: "toranoana.jp",
-    // /tora_r/ec/item/040030474993/
-    code: codeIn(/\/ec\/item\/(\d+)/),
-  },
-  {
-    key: "melonbooks",
-    name: "Melonbooks",
-    domain: "melonbooks.co.jp",
-    // /detail/detail.php?product_id=2500562
-    code: codeIn(/[?&]product_id=(\d+)/),
-  },
-];
+export type { Shop };
+export {
+  BUILTIN_ICONS,
+  BUILTIN_SHOPS,
+  builtinShops,
+  compilePattern,
+  domainOwner,
+  nameTaken,
+  normalizeDomain,
+  shopsFromJson,
+  shopsToJson,
+};
 
 /** One recognised link: the shop, the code ("" when unparsed), and the URL. */
 export interface ShopLink {
@@ -110,13 +78,20 @@ export function shopOf(raw: string): ShopLink | null {
   // URL keeps it: `www.dlsite.com.` is the same site to a browser. Left on, it
   // fails both the equality and the `.dlsite.com` test below.
   const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  const shop = SHOPS.find(
-    (candidate) =>
-      host === candidate.domain || host.endsWith("." + candidate.domain)
-  );
-  if (!shop) return null;
 
-  return { shop, code: shop.code(String(raw)), url: String(raw) };
+  for (const shop of NS.shops) {
+    const matched = shop.domains.some(
+      (domain) => host === domain || host.endsWith("." + domain)
+    );
+    if (!matched) continue;
+
+    return {
+      shop,
+      code: codeOf(patternsOf(shop), String(raw)),
+      url: String(raw),
+    };
+  }
+  return null;
 }
 
 /** The recognised links among a gallery's `urls`, in their own order. */
@@ -135,18 +110,24 @@ export function shopsIn(urls: string[]): ShopLink[] {
 }
 
 /**
- * Where a shop's favicon is served from.
+ * Where a shop's icon is served from.
  *
  * `assetBase` is the plugin's own asset root, known once the half has started;
- * before that this is "" and callers draw no image rather than a broken one.
- * **One icon per shop**, used both at the head of the edit form's link row and in
- * the manga-info badges: a square favicon is the shape both places can take, and
- * the wordmarks the earlier design also shipped were dropped — two icon families
- * for one shop is a choice nobody needs to make.
+ * before that a built-in icon is "" and callers draw no image rather than a broken
+ * one. An uploaded icon is a data URI and needs no base at all — the plugin has no
+ * files of its own it can write, so an image the user picks is kept in the
+ * settings as one.
  */
 export function shopIconUrl(shop: Shop): string {
+  const icon = shop.icon || "";
+  if (icon.startsWith("data:image/")) return icon;
+
+  const prefix = "builtin:";
+  if (!icon.startsWith(prefix)) return "";
+  const key = icon.slice(prefix.length);
+  if (BUILTIN_ICONS.indexOf(key) === -1) return "";
   if (!assetBase) return "";
-  return assetBase + "assets/shops/favicon-" + shop.key + ".ico";
+  return assetBase + "assets/shops/favicon-" + key + ".ico";
 }
 
 /**
@@ -186,6 +167,13 @@ export function ShopBadges(props: { links: ShopLink[] }) {
 
 // Published for the smoke test, which reaches them through the window — see the
 // note on the namespace in plugin-api.ts.
-NS.SHOPS = SHOPS;
+NS.SHOPS = BUILTIN_SHOPS;
 NS.shopOf = shopOf;
 NS.shopsIn = shopsIn;
+NS.shopsFromJson = shopsFromJson;
+NS.shopsToJson = shopsToJson;
+NS.builtinShops = builtinShops;
+NS.normalizeDomain = normalizeDomain;
+NS.compilePattern = compilePattern;
+NS.nameTaken = nameTaken;
+NS.domainOwner = domainOwner;

@@ -509,19 +509,74 @@ export interface MangaToolsNamespace {
    */
   physicalPageMode(): boolean;
 
-  /** Whether links to the four shops are recognised and shown at all. */
+  /** Whether links to the configured shops are recognised and shown at all. */
   shopLinks: boolean;
-  /** The four recognised shops, for the smoke test. */
-  SHOPS: Array<{ key: string; name: string; domain: string }>;
+  /**
+   * The shop list in force — one entry per shop, in matching order.
+   *
+   * `icon` is `"builtin:<key>"`, a `data:image/…` URI, or `""`.
+   */
+  shops: Array<{
+    name: string;
+    icon: string;
+    domains: string[];
+    regexes: string[];
+  }>;
+  /** The built-in presets, for the smoke test and the editor's add menu. */
+  SHOPS: Array<{
+    name: string;
+    icon: string;
+    domains: string[];
+    regexes: string[];
+  }>;
+  /** One JSON string as a shop list; absent or unreadable reads as the presets. */
+  shopsFromJson(raw: unknown): Array<{
+    name: string;
+    icon: string;
+    domains: string[];
+    regexes: string[];
+  }>;
+  /** The shop list as the settings store it. */
+  shopsToJson(shops: unknown[]): string;
+  /** A fresh copy of the built-in presets. */
+  builtinShops(): Array<{
+    name: string;
+    icon: string;
+    domains: string[];
+    regexes: string[];
+  }>;
+  /** A domain as the list compares them. */
+  normalizeDomain(raw: string): string;
+  /** A pattern source as a regular expression, or null when it does not compile. */
+  compilePattern(source: string): RegExp | null;
+  /** Whether a name is already used, ignoring case; `except` is the asker. */
+  nameTaken(shops: unknown[], name: string, except: number): boolean;
+  /** The shop already using a domain, or null. */
+  domainOwner(shops: unknown[], domain: string, except: number): unknown;
+  /** The settings row that opens the shop editor. */
+  shopsSetting: unknown;
+  /** The editor dialog, for the smoke test: rendered only while it is open. */
+  shopDialog: unknown;
+  /** What one row of the editor would say, all of it — display is gated. */
+  shopIssues(
+    shops: unknown[],
+    index: number,
+    locale: string
+  ): {
+    name: string;
+    domains: string;
+    domainAt: string[];
+    regexAt: string[];
+  };
   /** The shop a link belongs to and its code, or null for any other link. */
   shopOf(raw: string): {
-    shop: { key: string; name: string; domain: string };
+    shop: { name: string; icon: string; domains: string[]; regexes: string[] };
     code: string;
     url: string;
   } | null;
   /** The recognised links among a gallery's urls, in their own order. */
   shopsIn(urls: string[]): Array<{
-    shop: { key: string; name: string; domain: string };
+    shop: { name: string; icon: string; domains: string[]; regexes: string[] };
     code: string;
     url: string;
   }>;
@@ -1098,6 +1153,13 @@ export interface IPluginApi {
       };
       Button: ComponentType<Record<string, unknown>>;
       Collapse: ComponentType<Record<string, unknown>>;
+      /**
+       * react-bootstrap's tooltip pair, for the texts too long for a `title`
+       * attribute (the shop editor's pattern hint, and a duplicate domain).
+       * Optional: the code falls back to `title` when a Stash exposes neither.
+       */
+      OverlayTrigger?: ComponentType<Record<string, unknown>>;
+      Tooltip?: ComponentType<Record<string, unknown>>;
       /**
        * The dialog, for the one thing this plugin asks before doing. `Body` and
        * `Footer` are react-bootstrap's static sub-components, so they are declared

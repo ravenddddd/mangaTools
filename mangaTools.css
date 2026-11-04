@@ -1291,3 +1291,223 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   font-size: 0.78rem;
   letter-spacing: 0.01em;
 }
+
+/*
+ * ── The shop editor ──────────────────────────────────────────────────────
+ *
+ * The row that opens it, the dialog's list and the expanded form. Everything
+ * here is drawn inside Stash's own settings page and modal, so the colours are
+ * Stash's: `rgba(138, 155, 168, …)` is the plugin's usual translucent fill, and
+ * the inputs are Stash's `.text-input`, not Bootstrap's white default.
+ *
+ * The list fields are Stash's `StringListInput` shape — an input-group-looking
+ * row per value, the actions butted against the input's right edge, and an empty
+ * row at the end to type into.
+ */
+
+.manga-tools-shop-entry + .manga-tools-shop-entry {
+  margin-top: 2px;
+}
+
+.manga-tools-shop-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.manga-tools-shop-row:hover {
+  background: rgba(138, 155, 168, 0.1);
+}
+
+.manga-tools-shop-row.is-open {
+  border-color: #137cbd;
+  background: rgba(19, 124, 189, 0.1);
+}
+
+.manga-tools-shop-grip {
+  display: flex;
+  align-items: center;
+  color: rgba(245, 248, 250, 0.45);
+  cursor: grab;
+}
+
+.manga-tools-shop-grip:active {
+  cursor: grabbing;
+}
+
+.manga-tools-shop-name {
+  flex: 1;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manga-tools-shop-delete {
+  flex: none;
+}
+
+.manga-tools-shop-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  border-radius: 3px;
+}
+
+/* The expanded form: one label column, one control column, like Stash's rows. */
+.manga-tools-shop-form {
+  padding: 12px 24px;
+  border-radius: 4px;
+  background: rgba(19, 124, 189, 0.07);
+}
+
+.manga-tools-shop-field {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 8px;
+  align-items: start;
+  margin-bottom: 6px;
+}
+
+.manga-tools-shop-field:last-child {
+  margin-bottom: 0;
+}
+
+.manga-tools-shop-field > label {
+  color: #8a9ba8;
+  font-size: 0.8rem;
+  padding-top: 7px;
+  white-space: nowrap;
+}
+
+/* The name field is a single control, so its label sits on the control's line. */
+.manga-tools-shop-field:first-child {
+  align-items: center;
+}
+
+.manga-tools-shop-field:first-child > label {
+  padding-top: 0;
+}
+
+.manga-tools-shop-list-row {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.manga-tools-shop-list-row:last-child {
+  margin-bottom: 0;
+}
+
+/* The tooltip wrapper is a flex item of its own when there is one; the field
+ * inside it has to fill the row either way. */
+.manga-tools-shop-list-row > span,
+.manga-tools-shop-list-row > .manga-tools-shop-tip {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.manga-tools-shop-list-row input {
+  flex: 1;
+  min-width: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.manga-tools-shop-list-actions {
+  display: flex;
+}
+
+.manga-tools-shop-list-actions .btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: 0;
+}
+
+.manga-tools-shop-list-actions .btn + .btn {
+  border-left: 0;
+}
+
+.manga-tools-shop-list-actions .btn:last-child {
+  border-top-right-radius: 0.25rem;
+  border-bottom-right-radius: 0.25rem;
+}
+
+.manga-tools-shop-icon-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 6px;
+}
+
+.manga-tools-shop-help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(138, 155, 168, 0.4);
+  border-radius: 50%;
+  color: #8a9ba8;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: help;
+}
+
+.manga-tools-shop-adder {
+  margin-top: 10px;
+}
+
+.manga-tools-shop-menu {
+  max-width: 520px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid rgba(16, 22, 26, 0.6);
+  border-radius: 4px;
+  background: #30404d;
+}
+
+.manga-tools-shop-menu-entry {
+  padding: 7px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.manga-tools-shop-menu-entry:hover {
+  background: rgba(138, 155, 168, 0.12);
+}
+
+.manga-tools-shop-menu-title {
+  margin: 6px 8px 2px;
+  color: #8a9ba8;
+  font-size: 0.8rem;
+}
+
+.manga-tools-shop-menu-builtins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px 6px;
+}
+
+.manga-tools-shop-preset {
+  padding: 4px 9px;
+  border: 1px solid rgba(16, 22, 26, 0.6);
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.manga-tools-shop-preset.is-added {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.manga-tools-shop-empty {
+  color: #8a9ba8;
+}

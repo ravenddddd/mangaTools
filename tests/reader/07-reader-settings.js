@@ -382,6 +382,7 @@ module.exports = async () => {
         "readerSettings",
         "readerTakeover",
         "shopLinks",
+        "shops",
         "showCoverBadge",
         "showDisabledFields",
         "showFlags",

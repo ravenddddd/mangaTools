@@ -1051,6 +1051,12 @@ module.exports = () => {
   // what section 11 sees.
   NS.settingsLoaded = true;
 
+  // The shop list as the settings store it, through the same serialiser the
+  // settings page uses. What this section is asserting is that the list is *part
+  // of the whole map* — the presets themselves, and their round trip, are section
+  // 11's subject.
+  const SHOPS_JSON = NS.shopsToJson(NS.SHOPS);
+
   // Selecting a new set writes it back through configurePlugin and updates the
   // shared NS.enabledLanguages immediately.
   settingsSelect.props.onChange([{ value: "ja" }, { value: "zh-Hans" }]);
@@ -1093,6 +1099,10 @@ module.exports = () => {
         // the setting's own parser, and a settings page that wrote nothing would
         // be a page whose setting could never be changed.
         sidebarFilters: "censorship,language,original,translationGroup",
+        // The shop list, as the one JSON string it is stored as. The list itself is
+        // section 11's subject; here it only has to be part of the whole map, since
+        // the mutation replaces the map rather than merging into it.
+        shops: SHOPS_JSON,
         // The reading half's own settings are part of this map too, and empty here
         // because nothing has been written to the library — see the reader's
         // readSettings, where absent is what puts the browser's value back in force.
@@ -1269,6 +1279,7 @@ module.exports = () => {
       readerTakeover: true,
       physicalPages: false,
       shopLinks: false,
+      shops: SHOPS_JSON,
       manageChapters: true,
       fields: true,
       fieldLanguage: true,

@@ -52,7 +52,10 @@ function headFor(input: HTMLInputElement): {
   if (!found) return null;
 
   return {
-    key: found.shop.key,
+    // The shop's name is its identity — there is no id. It is only used to tell
+    // "already the right head" from "a different shop", so a rename simply
+    // rewrites the attribute on the next pass.
+    key: found.shop.name,
     src: shopIconUrl(found.shop),
     title: found.shop.name + (found.code ? " · " + found.code : ""),
   };

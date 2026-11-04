@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.10.14
+version: 0.10.15
 ui:
   javascript:
     - mangaTools.js
@@ -105,7 +105,7 @@ settings:
     type: BOOLEAN
   shopLinks:
     displayName: Shop links
-    description: Recognise links to DLsite, FANZA, Toranoana and Melonbooks — an icon in the link field, and a badge with the product code in the Manga info block. The links stay in Stash's own list; nothing is stored or changed.
+    description: Recognise links to the shops on the list below — an icon in the link field, and a badge with the product code in the Manga info block. The links stay in Stash's own list; nothing is stored or changed.
     type: BOOLEAN
   manageChapters:
     displayName: Take over the Chapters tab
@@ -178,6 +178,15 @@ settings:
   sidebarFilters:
     displayName: Sidebar filters
     description: Which of this plugin's filters the gallery list's sidebar offers. A filter for a field that is switched off cannot be shown, and is not remembered while it is hidden — turning the field back on brings its filter back. Leave empty to offer none of them.
+    type: STRING
+  # The shop list, as the JSON string it is stored as: one entry per shop, with its
+  # name (its identity), icon, domains and product-code patterns. Not edited here —
+  # the plugin's own settings page draws the dialog, and this entry exists so the
+  # map says what it holds. See src/tools/shop-model.ts for the shape, and
+  # shopsFromJson for what absent or unreadable means (the four presets).
+  shops:
+    displayName: Shops
+    description: The shops a gallery's links may point at. Edited on the plugin's own settings page; the presets are DLsite, FANZA, Toranoana and Melonbooks.
     type: STRING
   # The reading half's own settings, as the JSON string they are stored as. They are
   # *not* rendered on the settings page — the plugin's own UI is what draws that page,

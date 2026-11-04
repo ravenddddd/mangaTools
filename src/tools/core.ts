@@ -23,6 +23,7 @@
 import "./fields";
 import { NS, collatorFor } from "../languages";
 import { gqlDoc, requirePluginApi } from "../plugin-api";
+import { builtinShops, shopsFromJson, shopsToJson } from "./shop-model";
 import type {
   MangaToolsApolloClient,
   MangaToolsCustomFields,
@@ -533,6 +534,11 @@ const SHOP_LINKS_BY_DEFAULT = false;
 NS.readerTakeover = FEATURE_ON_BY_DEFAULT;
 NS.physicalPages = PHYSICAL_PAGES_BY_DEFAULT;
 NS.shopLinks = SHOP_LINKS_BY_DEFAULT;
+// The four presets until Stash answers — what a library that has never edited the
+// list has always been matched against. `refreshSettings` replaces them with the
+// stored list (which may be empty: removing every shop is a choice, not an
+// absence, and `shopsFromJson` is what tells those two apart).
+NS.shops = builtinShops();
 NS.manageChapters = FEATURE_ON_BY_DEFAULT;
 NS.fields = FEATURE_ON_BY_DEFAULT;
 NS.fieldLanguage = FEATURE_ON_BY_DEFAULT;
@@ -672,6 +678,11 @@ function refreshSettings(): void {
       // something surprising, is drawn exactly as it was.
       NS.groupOrder =
         pluginCfg && pluginCfg.groupOrder === "use" ? "use" : "name";
+
+      // The shop list is one JSON string. Absent (a library that never opened the
+      // editor) reads as the four presets; an empty list is a real answer and stays
+      // empty — see shopsFromJson.
+      NS.shops = shopsFromJson(pluginCfg ? pluginCfg.shops : null);
 
       NS.showFlags = NS.parseFlag(pluginCfg ? pluginCfg.showFlags : null, true);
       NS.showCoverBadge = NS.parseFlag(
@@ -1073,6 +1084,8 @@ function settingsInput(): { [key: string]: unknown } {
     readerTakeover: NS.readerTakeover,
     physicalPages: NS.physicalPages,
     shopLinks: NS.shopLinks,
+    // The whole list, one JSON string — the shape `readerSettings` already uses.
+    shops: shopsToJson(NS.shops),
     manageChapters: NS.manageChapters,
     fields: NS.fields,
     fieldLanguage: NS.fieldLanguage,

@@ -1,0 +1,743 @@
+/**
+ * The settings page's shop editor: a row, and the dialog behind it.
+ *
+ * **The list is data.** The plugin ships four presets (see BUILTIN_SHOPS), and
+ * this dialog is where a library changes them: rename a shop, add or remove the
+ * domains a link may live on, add the patterns that read its product code, pick
+ * an icon. What it edits is a **draft** — the list in force (`NS.shops`) is
+ * replaced only when Save is pressed, so Cancel really cancels and a half-typed
+ * shop never changes what the edit form recognises.
+ *
+ * **Identity is the name.** Two shops may not share a name, and no domain may be
+ * used twice; those two rules are what the dialog checks, and also what decides
+ * whether a built-in can be added again — a preset that keeps a name or a domain
+ * in use is greyed out, because adding it would break the same rule the form
+ * checks. There is no id to store: an edited preset simply stops matching its
+ * preset, and the preset becomes addable again.
+ *
+ * **The two list fields are Stash's own `StringListInput`, reproduced.** That
+ * component is not exposed to plugins, so this is its markup (an `input-group`
+ * per row, a grip, a danger minus, and an empty row at the end to type into) with
+ * Bootstrap's controls. The order matters for the patterns — the first that
+ * captures wins — and is meaningless for the domains, which is why only the
+ * patterns carry a drag handle.
+ *
+ * **Errors follow Stash's forms**: `is-invalid` on the control and a message
+ * under it, shown once the field has been touched or Save has been pressed; Save
+ * is disabled while any error stands.
+ */
+import { NS } from "../languages";
+import { emit } from "./core";
+import { shopIconUrl } from "./shops";
+import { numbered, stringFor, t } from "../i18n";
+import { requirePluginApi } from "../plugin-api";
+import {
+  BUILTIN_SHOPS,
+  compilePattern,
+  domainOwner,
+  nameTaken,
+  normalizeDomain,
+  type Shop,
+} from "./shop-model";
+
+const PluginApi = requirePluginApi();
+
+// The classic JSX transform compiles every element to React.createElement, which
+// resolves to this binding; the hooks below use it explicitly as well.
+const React = PluginApi.React;
+
+/** A draft nobody else holds: the dialog edits this, and Cancel throws it away. */
+function draftOf(shops: Shop[]): Shop[] {
+  return shops.map((shop) => ({
+    name: shop.name,
+    icon: shop.icon,
+    domains: shop.domains.slice(),
+    regexes: shop.regexes.slice(),
+  }));
+}
+
+/** One row's messages, by where they are shown. "" means "nothing to say". */
+interface RowIssues {
+  /** Under the name field */
+  name: string;
+  /** Under the domain list, when it is empty */
+  domains: string;
+  /** Per domain row */
+  domainAt: string[];
+  /** Per pattern row */
+  regexAt: string[];
+}
+
+/** The messages one row would show, all of them — what is *displayed* is gated. */
+function issuesOf(shops: Shop[], index: number, locale: string): RowIssues {
+  const shop = shops[index];
+  const taken = shop ? nameTaken(shops, shop.name, index) : false;
+
+  const issues: RowIssues = {
+    name: !shop?.name.trim()
+      ? stringFor(locale, "mangaTools.shops.nameRequired")
+      : taken
+        ? stringFor(locale, "mangaTools.shops.nameTaken")
+        : "",
+    domains:
+      !shop || shop.domains.length === 0
+        ? stringFor(locale, "mangaTools.shops.domainsRequired")
+        : "",
+    domainAt: [],
+    regexAt: [],
+  };
+
+  if (shop) {
+    issues.domainAt = shop.domains.map((domain) => {
+      if (normalizeDomain(domain) === "") {
+        return stringFor(locale, "mangaTools.shops.domainInvalid");
+      }
+      const owner = domainOwner(shops, domain, index);
+      if (!owner) return "";
+      return stringFor(locale, "mangaTools.shops.domainTaken").replace(
+        "{name}",
+        owner.name
+      );
+    });
+    issues.regexAt = shop.regexes.map((source) =>
+      source.trim() !== "" && !compilePattern(source)
+        ? stringFor(locale, "mangaTools.shops.badPattern")
+        : ""
+    );
+  }
+
+  return issues;
+}
+
+function rowHasIssues(issues: RowIssues): boolean {
+  return (
+    issues.name !== "" ||
+    issues.domains !== "" ||
+    issues.domainAt.some((message) => message !== "") ||
+    issues.regexAt.some((message) => message !== "")
+  );
+}
+
+/** A counter for tooltip ids: react-bootstrap wants one, and it must be unique. */
+let tipSeq = 0;
+
+/**
+ * A Bootstrap tooltip around its trigger, or a plain `title` when the library
+ * this Stash exposes has none (the test harness's stand-in, and any future Stash
+ * that drops it) — the text is the same either way.
+ */
+function WithTip(props: { text: string; children: React.ReactNode }) {
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+  const Overlay = Bootstrap ? Bootstrap.OverlayTrigger : null;
+  const Tooltip = Bootstrap ? Bootstrap.Tooltip : null;
+
+  if (Overlay && Tooltip && props.text) {
+    tipSeq += 1;
+    return (
+      <Overlay
+        placement="top"
+        overlay={
+          <Tooltip id={"manga-tools-tip-" + tipSeq}>{props.text}</Tooltip>
+        }
+      >
+        {props.children as never}
+      </Overlay>
+    );
+  }
+
+  return (
+    <span className="manga-tools-shop-tip" title={props.text || undefined}>
+      {props.children}
+    </span>
+  );
+}
+
+/**
+ * One string list, in Stash's `StringListInput` shape.
+ *
+ * The extra row at the end is the way in: typing into it makes a new entry, which
+ * is exactly how Stash's own URL and alias lists are filled. `orderable` is false
+ * where the order means nothing.
+ */
+function ListInput(props: {
+  values: string[];
+  placeholder: string;
+  orderable: boolean;
+  /** Message per row, "" for none; `values.length` is the trailing empty row */
+  errors: string[];
+  onChange: (next: string[]) => void;
+  /** Called when a row is edited, for the touched-gating */
+  onEdit?: () => void;
+}) {
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+  const Button = Bootstrap ? Bootstrap.Button : null;
+  const Form = Bootstrap ? Bootstrap.Form : null;
+  const Control = Form ? Form.Control : null;
+
+  const dragged = React.useState(-1);
+  const dragIndex = dragged[0];
+  const setDragIndex = dragged[1];
+
+  const values = props.values.concat("");
+
+  const setAt = (index: number, value: string) => {
+    const next = props.values.slice();
+    if (index === props.values.length) {
+      if (value.trim() === "") return;
+      next.push(value);
+    } else {
+      next[index] = value;
+    }
+    props.onChange(next);
+    if (props.onEdit) props.onEdit();
+  };
+
+  const removeAt = (index: number) => {
+    const next = props.values.slice();
+    next.splice(index, 1);
+    props.onChange(next);
+    if (props.onEdit) props.onEdit();
+  };
+
+  const move = (from: number, to: number) => {
+    if (from < 0 || to < 0 || from >= props.values.length) return;
+    const next = props.values.slice();
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    props.onChange(next);
+  };
+
+  return (
+    <div className="manga-tools-shop-list">
+      {values.map((value, index) => {
+        const last = index === values.length - 1;
+        const message = props.errors[index] || "";
+
+        return (
+          <div
+            className="manga-tools-shop-list-row"
+            key={index}
+            onDragOver={(e: React.DragEvent) => {
+              if (dragIndex < 0 || last || dragIndex === index) return;
+              e.preventDefault();
+              move(dragIndex, index);
+              setDragIndex(index);
+            }}
+          >
+            <WithTip text={message}>
+              {Control ? (
+                <Control
+                  className={"text-input" + (message ? " is-invalid" : "")}
+                  value={value}
+                  placeholder={last ? props.placeholder : undefined}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setAt(index, e.currentTarget.value)
+                  }
+                  onBlur={() => {
+                    if (
+                      !last &&
+                      value.trim() === "" &&
+                      index < props.values.length
+                    ) {
+                      removeAt(index);
+                    }
+                  }}
+                />
+              ) : null}
+            </WithTip>
+            <div className="manga-tools-shop-list-actions">
+              {Button && props.orderable && !last ? (
+                <Button
+                  variant="secondary"
+                  className="drag-handle minimal"
+                  draggable
+                  onDragStart={() => setDragIndex(index)}
+                  onDragEnd={() => setDragIndex(-1)}
+                >
+                  <PluginApi.components.Icon
+                    icon={
+                      PluginApi.libraries.FontAwesomeSolid
+                        ? PluginApi.libraries.FontAwesomeSolid.faGripVertical
+                        : undefined
+                    }
+                  />
+                </Button>
+              ) : null}
+              {Button ? (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  disabled={last}
+                  onClick={() => removeAt(index)}
+                >
+                  <PluginApi.components.Icon
+                    icon={
+                      PluginApi.libraries.FontAwesomeSolid
+                        ? PluginApi.libraries.FontAwesomeSolid.faMinus
+                        : undefined
+                    }
+                  />
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The dialog: the list, the expanded form, the add menu and the footer.
+ *
+ * Rendered only while open (see ShopsSetting), so the draft is taken once, at
+ * mount — `useState`'s initialiser is the copy.
+ */
+export function ShopDialog(props: {
+  onClose: () => void;
+  onSave: (shops: Shop[]) => void;
+}) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+
+  const shopsState = React.useState<Shop[]>(() => draftOf(NS.shops));
+  const shops = shopsState[0];
+  const setShops = shopsState[1];
+
+  const openState = React.useState(-1);
+  const open = openState[0];
+  const setOpen = openState[1];
+
+  const menuState = React.useState(false);
+  const menuOpen = menuState[0];
+  const setMenuOpen = menuState[1];
+
+  const touchState = React.useState<{ [key: string]: boolean }>({});
+  const touch = touchState[0];
+  const setTouch = touchState[1];
+
+  const attemptState = React.useState(false);
+  const attempted = attemptState[0];
+  const setAttempted = attemptState[1];
+
+  const dragState = React.useState(-1);
+  const dragShop = dragState[0];
+  const setDragShop = dragState[1];
+
+  const issues = shops.map((_shop, index) =>
+    issuesOf(shops, index, intl.locale)
+  );
+  const invalid = issues.some(rowHasIssues);
+
+  const edit = (index: number, change: (shop: Shop) => Shop) => {
+    const next = shops.slice();
+    next[index] = change(shops[index]);
+    setShops(next);
+    setTouch({ ...touch, [index]: true });
+  };
+
+  const addShop = (preset: Shop) => {
+    const next = shops.concat([draftOf([preset])[0]]);
+    setShops(next);
+    setOpen(next.length - 1);
+    setMenuOpen(false);
+  };
+
+  const removeShop = (index: number) => {
+    const next = shops.slice();
+    next.splice(index, 1);
+    setShops(next);
+    setOpen(-1);
+  };
+
+  /** Whether a preset could be added: no name clash and no domain clash. */
+  const canAdd = (preset: Shop): boolean => {
+    if (nameTaken(shops, preset.name, -1)) return false;
+    return !preset.domains.some((domain) => domainOwner(shops, domain, -1));
+  };
+
+  const Modal = Bootstrap ? Bootstrap.Modal : null;
+  if (!Bootstrap || !Modal) return null;
+
+  return (
+    <Modal show onHide={props.onClose}>
+      <div className="modal-header">
+        <span>{t(intl, "mangaTools.shops.title")}</span>
+      </div>
+      <div className="modal-body">
+        {shops.length === 0 ? (
+          <p className="manga-tools-shop-empty">
+            {t(intl, "mangaTools.shops.empty")}
+          </p>
+        ) : null}
+
+        {shops.map((shop, index) => {
+          const shown =
+            attempted || touch[index]
+              ? issues[index]
+              : { name: "", domains: "", domainAt: [], regexAt: [] };
+
+          return (
+            <div
+              className="manga-tools-shop-entry"
+              key={index}
+              onDragOver={(e: React.DragEvent) => {
+                if (dragShop < 0 || dragShop === index) return;
+                e.preventDefault();
+                const next = shops.slice();
+                next.splice(index, 0, next.splice(dragShop, 1)[0]);
+                setShops(next);
+                setDragShop(index);
+              }}
+            >
+              <div
+                className={
+                  "manga-tools-shop-row" + (open === index ? " is-open" : "")
+                }
+                onClick={() => setOpen(open === index ? -1 : index)}
+              >
+                <span
+                  className="manga-tools-shop-grip"
+                  draggable
+                  title={t(intl, "mangaTools.shops.reorder")}
+                  onDragStart={() => setDragShop(index)}
+                  onDragEnd={() => setDragShop(-1)}
+                >
+                  <PluginApi.components.Icon
+                    icon={
+                      PluginApi.libraries.FontAwesomeSolid
+                        ? PluginApi.libraries.FontAwesomeSolid.faGripVertical
+                        : undefined
+                    }
+                  />
+                </span>
+                {shopIconUrl(shop) ? (
+                  <img
+                    className="manga-tools-shop-icon"
+                    src={shopIconUrl(shop)}
+                    alt=""
+                  />
+                ) : null}
+                <span className="manga-tools-shop-name">
+                  {shop.name.trim() || t(intl, "mangaTools.shops.unnamed")}
+                </span>
+                {Bootstrap?.Button ? (
+                  <Bootstrap.Button
+                    variant="danger"
+                    size="sm"
+                    className="manga-tools-shop-delete"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      removeShop(index);
+                    }}
+                  >
+                    {t(intl, "mangaTools.shops.remove")}
+                  </Bootstrap.Button>
+                ) : null}
+              </div>
+
+              {open === index ? (
+                <ShopForm
+                  shop={shop}
+                  issues={shown}
+                  onChange={(change) => edit(index, change)}
+                  onOpenIcon={() =>
+                    pickIcon((icon) =>
+                      edit(index, (current) => ({ ...current, icon }))
+                    )
+                  }
+                />
+              ) : null}
+            </div>
+          );
+        })}
+
+        <div className="manga-tools-shop-adder">
+          {Bootstrap?.Button ? (
+            <Bootstrap.Button
+              variant="secondary"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              {t(intl, "mangaTools.shops.add")}
+            </Bootstrap.Button>
+          ) : null}
+
+          {menuOpen ? (
+            <div className="manga-tools-shop-menu">
+              <div
+                className="manga-tools-shop-menu-entry"
+                onClick={() =>
+                  addShop({ name: "", icon: "", domains: [], regexes: [] })
+                }
+              >
+                {t(intl, "mangaTools.shops.new")}
+              </div>
+              <div className="manga-tools-shop-menu-title">
+                {t(intl, "mangaTools.shops.builtin")}
+              </div>
+              <div className="manga-tools-shop-menu-builtins">
+                {BUILTIN_SHOPS.map((preset) => {
+                  const allowed = canAdd(preset);
+                  return (
+                    <span
+                      key={preset.name}
+                      className={
+                        "manga-tools-shop-preset" + (allowed ? "" : " is-added")
+                      }
+                      onClick={allowed ? () => addShop(preset) : undefined}
+                    >
+                      {preset.name}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="modal-footer">
+        <div />
+        <div>
+          <Bootstrap.Button
+            className="ml-2"
+            variant="secondary"
+            onClick={props.onClose}
+          >
+            {t(intl, "mangaTools.shops.cancel")}
+          </Bootstrap.Button>
+          <Bootstrap.Button
+            className="ml-2"
+            variant="primary"
+            // Disabled only once a save has been *attempted*, which is the state
+            // Stash's own forms end up in: formik has no errors before its first
+            // validation, so the button is pressable and pressing it is what shows
+            // them. Disabling it from the start would leave a new, empty shop with
+            // a grey button and no explanation.
+            disabled={invalid && attempted}
+            onClick={() => {
+              setAttempted(true);
+              if (invalid) return;
+              // The list as it will be stored: trimmed names and domains in the
+              // spelling the matcher compares, so `DLsite.com` and `www.` never
+              // reach the settings.
+              props.onSave(
+                shops.map((shop) => ({
+                  name: shop.name.trim(),
+                  icon: shop.icon,
+                  domains: shop.domains
+                    .map(normalizeDomain)
+                    .filter((domain) => domain !== ""),
+                  regexes: shop.regexes.map((source) => source.trim()),
+                }))
+              );
+            }}
+          >
+            {t(intl, "mangaTools.shops.save")}
+          </Bootstrap.Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Reads an image and answers a 32×32 PNG as a data URI.
+ *
+ * The settings are one JSON value in Stash's configuration, so an icon has to
+ * *be* the bytes: there is no file of the plugin's own it could point at. 32px is
+ * enough for both places it is drawn (a 16px head and a 15px badge) and keeps the
+ * value to a few kilobytes rather than whatever the user happened to pick.
+ */
+function iconFromFile(file: File, done: (icon: string) => void): void {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 32;
+      canvas.height = 32;
+      const context = canvas.getContext("2d");
+      if (!context) {
+        done("");
+        return;
+      }
+      context.drawImage(image, 0, 0, 32, 32);
+      done(canvas.toDataURL("image/png"));
+    };
+    image.onerror = () => done("");
+    image.src = String(reader.result || "");
+  };
+  reader.onerror = () => done("");
+  reader.readAsDataURL(file);
+}
+
+/** Opens the file picker; answers nothing when the picker is cancelled. */
+function pickIcon(done: (icon: string) => void): void {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    iconFromFile(file, done);
+  };
+  input.click();
+}
+
+/** The expanded form of one shop. */
+function ShopForm(props: {
+  shop: Shop;
+  issues: RowIssues;
+  onChange: (change: (shop: Shop) => Shop) => void;
+  onOpenIcon: () => void;
+}) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+  const Form = Bootstrap ? Bootstrap.Form : null;
+  const Control = Form ? Form.Control : null;
+  const src = shopIconUrl(props.shop);
+
+  return (
+    <div className="manga-tools-shop-form">
+      <div className="manga-tools-shop-field">
+        <label>{t(intl, "mangaTools.shops.name")}</label>
+        <div>
+          {Control ? (
+            <Control
+              className={
+                "text-input" + (props.issues.name ? " is-invalid" : "")
+              }
+              value={props.shop.name}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                props.onChange((shop) => ({
+                  ...shop,
+                  name: e.currentTarget.value,
+                }))
+              }
+            />
+          ) : null}
+          {props.issues.name ? (
+            <div className="invalid-feedback d-block">{props.issues.name}</div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="manga-tools-shop-field">
+        <label>{t(intl, "mangaTools.shops.domains")}</label>
+        <div>
+          <ListInput
+            values={props.shop.domains}
+            placeholder={t(intl, "mangaTools.shops.domainPlaceholder")}
+            orderable={false}
+            errors={props.issues.domainAt}
+            onChange={(domains) =>
+              props.onChange((shop) => ({ ...shop, domains }))
+            }
+          />
+          {props.issues.domains ? (
+            <div className="invalid-feedback d-block">
+              {props.issues.domains}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="manga-tools-shop-field">
+        <label>
+          {t(intl, "mangaTools.shops.regexes")}{" "}
+          <WithTip text={t(intl, "mangaTools.shops.regexHelp")}>
+            <span className="manga-tools-shop-help">?</span>
+          </WithTip>
+        </label>
+        <div>
+          <ListInput
+            values={props.shop.regexes}
+            placeholder={t(intl, "mangaTools.shops.regexPlaceholder")}
+            orderable
+            errors={props.issues.regexAt}
+            onChange={(regexes) =>
+              props.onChange((shop) => ({ ...shop, regexes }))
+            }
+          />
+        </div>
+      </div>
+
+      <div className="manga-tools-shop-field">
+        <label>{t(intl, "mangaTools.shops.icon")}</label>
+        <div className="manga-tools-shop-icon-row">
+          {src ? (
+            <img className="manga-tools-shop-icon" src={src} alt="" />
+          ) : null}
+          {Bootstrap?.Button ? (
+            <Bootstrap.Button variant="secondary" onClick={props.onOpenIcon}>
+              {t(intl, "mangaTools.shops.pickIcon")}
+            </Bootstrap.Button>
+          ) : null}
+          {src && Bootstrap?.Button ? (
+            <Bootstrap.Button
+              variant="secondary"
+              onClick={() => props.onChange((shop) => ({ ...shop, icon: "" }))}
+            >
+              {t(intl, "mangaTools.shops.clearIcon")}
+            </Bootstrap.Button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The row on the settings page: what the list is, how many, and the way in.
+ *
+ * A row rather than a switch: the shop list is not something to turn on and off
+ * — that is the switch above it — and the dialog is where the list changes.
+ */
+export function ShopsSetting(props: { persist: () => void }) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+
+  const openState = React.useState(false);
+  const open = openState[0];
+  const setOpen = openState[1];
+
+  return (
+    <>
+      <div className="setting manga-tools-setting">
+        <div>
+          <h3>{t(intl, "mangaTools.settings.shops.heading")}</h3>
+          <div className="sub-heading">
+            {numbered(
+              intl.locale,
+              "mangaTools.settings.shops.count",
+              NS.shops.length
+            )}
+          </div>
+        </div>
+        <div>
+          {Bootstrap ? (
+            <Bootstrap.Button variant="secondary" onClick={() => setOpen(true)}>
+              {t(intl, "mangaTools.shops.edit")}
+            </Bootstrap.Button>
+          ) : null}
+        </div>
+      </div>
+
+      {open ? (
+        <ShopDialog
+          onClose={() => setOpen(false)}
+          onSave={(shops) => {
+            NS.shops = shops;
+            emit();
+            props.persist();
+            setOpen(false);
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+// Published for the smoke test, which reaches the tools half through the window.
+NS.shopsSetting = ShopsSetting;
+NS.shopDialog = ShopDialog;
+NS.shopIssues = issuesOf;

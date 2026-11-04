@@ -1,6 +1,7 @@
 /**
- * 16: the four shops — recognising a link, reading its code, and the icon head
- * the edit form's URL rows get.
+ * 16: the shops — recognising a link, reading its code, and the icon head the
+ * edit form's URL rows get. The list is configured now; the four presets are
+ * what an untouched library has, and the model's own rules are at the end.
  *
  * The parsing is pure and driven directly; the decoration is DOM work, and is
  * driven against a small form built here. The real thing is Stash's own markup:
@@ -13,6 +14,8 @@ const {
   NS,
   asManga,
   globalListeners,
+  find,
+  hasText,
   makeEl,
   observed,
   runSection,
@@ -27,64 +30,64 @@ module.exports = () => {
       const cases = [
         [
           "https://www.dlsite.com/books/work/=/product_id/BJ03044888.html",
-          "dlsite",
+          "DLsite",
           "BJ03044888",
         ],
         [
           "https://www.dlsite.com/maniax/work/=/product_id/RJ01668994.html",
-          "dlsite",
+          "DLsite",
           "RJ01668994",
         ],
         // The `product_id=RJ…` spelling the same regex reads.
         [
           "https://www.dlsite.com/maniax/work/=/product_id=RJ01668994.html",
-          "dlsite",
+          "DLsite",
           "RJ01668994",
         ],
         // A dotted-FQDN host: the trailing dot is the same site to a browser,
         // and WHATWG's URL keeps it.
         [
           "https://www.dlsite.com./books/work/=/product_id/BJ03044888.html",
-          "dlsite",
+          "DLsite",
           "BJ03044888",
         ],
         // Case and a default port are already normalised by the URL parser; the
         // table says so rather than assuming it.
         [
           "HTTPS://WWW.DLsite.com:443/maniax/work/=/product_id/RJ01668994.html",
-          "dlsite",
+          "DLsite",
           "RJ01668994",
         ],
         [
           "https://www.dmm.co.jp/dc/doujin/-/detail/=/cid=d_790745/",
-          "fanza",
+          "FANZA",
           "d_790745",
         ],
         // The book shape, which is on a different subdomain and has no `cid=`.
         [
           "https://book.dmm.co.jp/product/6300672/b915awnmg04612/",
-          "fanza",
+          "FANZA",
           "b915awnmg04612",
         ],
         // A subdomain is still the shop; a shape this build does not know keeps
         // the shop and loses only the code.
-        ["https://book.dmm.co.jp/product/123456/", "fanza", ""],
+        ["https://book.dmm.co.jp/product/123456/", "FANZA", ""],
         [
           "https://ec.toranoana.jp/tora_r/ec/item/040030474993/",
-          "toranoana",
+          "虎穴",
           "040030474993",
         ],
         [
           "https://www.melonbooks.co.jp/detail/detail.php?product_id=2500562",
-          "melonbooks",
+          "Melonbooks",
           "2500562",
         ],
       ];
 
-      cases.forEach(([url, key, code]) => {
+      cases.forEach(([url, name, code]) => {
         const found = NS.shopOf(url);
         assert.ok(found, url + " should be recognised");
-        assert.strictEqual(found.shop.key, key, url + " is " + key);
+        assert.strictEqual(found.shop.name, name, url + " is " + name);
         assert.strictEqual(found.code, code, url + " code");
       });
 
@@ -118,8 +121,8 @@ module.exports = () => {
     ]);
 
     assert.deepStrictEqual(
-      links.map((link) => link.shop.key + ":" + link.code),
-      ["dlsite:BJ03044888", "fanza:d_790745"],
+      links.map((link) => link.shop.name + ":" + link.code),
+      ["DLsite:BJ03044888", "FANZA:d_790745"],
       "the recognised links, in the gallery's order, each once"
     );
   });
@@ -165,7 +168,7 @@ module.exports = () => {
       assert.ok(head, "the recognised row gets a head");
       assert.strictEqual(
         head.getAttribute("data-shop"),
-        "dlsite",
+        "DLsite",
         "…carrying the shop it recognised"
       );
       // **No icon in this world, and that is the contract.** `assetBase` is
@@ -206,7 +209,7 @@ module.exports = () => {
       NS.decorateShopUrls(form);
       assert.strictEqual(
         head.getAttribute("data-shop"),
-        "dlsite",
+        "DLsite",
         "the shop is unchanged"
       );
       assert.strictEqual(
@@ -220,7 +223,7 @@ module.exports = () => {
       NS.decorateShopUrls(form);
       assert.strictEqual(
         head.getAttribute("data-shop"),
-        "toranoana",
+        "虎穴",
         "changing the link changes the head in place"
       );
       assert.strictEqual(
@@ -303,7 +306,7 @@ module.exports = () => {
     form.listeners.dragend();
     assert.strictEqual(
       head().getAttribute("data-shop"),
-      "toranoana",
+      "虎穴",
       "dragend re-decorates the row React rewrote"
     );
 
@@ -312,7 +315,7 @@ module.exports = () => {
     form.listeners.change();
     assert.strictEqual(
       head().getAttribute("data-shop"),
-      "fanza",
+      "FANZA",
       "change does too"
     );
 
@@ -322,7 +325,7 @@ module.exports = () => {
     observed[observed.length - 1].callback();
     assert.strictEqual(
       head().getAttribute("data-shop"),
-      "melonbooks",
+      "Melonbooks",
       "and the observer still watches the form"
     );
 
@@ -448,4 +451,299 @@ module.exports = () => {
       );
     }
   );
+
+  /**
+   * The list itself: what the settings string means, and the rules the editor
+   * checks.
+   *
+   * Everything here is pure — a value in, a list out — so it is driven directly.
+   * The four presets are what the parsing falls back to, which is why every test
+   * above still reads as it did: those are the shops an untouched library has.
+   */
+  runSection("16 the shop list parses, and falls back to the presets", () => {
+    const names = (list) => list.map((shop) => shop.name);
+    const presets = ["DLsite", "FANZA", "虎穴", "Melonbooks"];
+
+    assert.deepStrictEqual(
+      names(NS.shopsFromJson(null)),
+      presets,
+      "absent reads as the presets — a library that never opened the editor"
+    );
+    assert.deepStrictEqual(
+      names(NS.shopsFromJson("{not json")),
+      presets,
+      "so does a value that does not parse"
+    );
+    assert.deepStrictEqual(
+      names(NS.shopsFromJson('{"a":1}')),
+      presets,
+      "and so does the wrong shape"
+    );
+    assert.deepStrictEqual(
+      NS.shopsFromJson("[]"),
+      [],
+      "an empty list is a value, not an absence: removing every shop keeps none"
+    );
+
+    const parsed = NS.shopsFromJson(
+      JSON.stringify([
+        {
+          name: "  Example  ",
+          icon: "",
+          domains: ["WWW.Example.com", "m.example.com/"],
+          regexes: ["/x/(\\d+)"],
+        },
+        { name: "", domains: ["nope.com"] },
+        { name: "NoDomains", domains: [] },
+        { name: "NoPatterns", domains: ["plain.test"] },
+      ])
+    );
+
+    assert.deepStrictEqual(
+      parsed,
+      [
+        {
+          name: "Example",
+          icon: "",
+          domains: ["example.com", "m.example.com"],
+          regexes: ["/x/(\\d+)"],
+        },
+        { name: "NoPatterns", icon: "", domains: ["plain.test"], regexes: [] },
+      ],
+      "usable entries are kept and their domains normalised; the rest are dropped"
+    );
+    assert.deepStrictEqual(
+      NS.shopsFromJson(NS.shopsToJson(parsed)),
+      parsed,
+      "and the list round-trips through the settings string unchanged"
+    );
+  });
+
+  runSection(
+    "16 a configured shop is matched, and its first pattern wins",
+    () => {
+      const presets = NS.shops;
+      NS.shops = NS.shopsFromJson(
+        JSON.stringify([
+          {
+            name: "Example",
+            icon: "",
+            domains: ["example.com"],
+            regexes: ["/a/([A-Z]+)", "/b/([0-9]+)"],
+          },
+        ])
+      );
+
+      try {
+        const found = NS.shopOf("https://sub.example.com/b/42?x=/a/ZZ");
+        assert.ok(found, "a subdomain is the shop");
+        assert.strictEqual(
+          found.shop.name,
+          "Example",
+          "…and it is the configured one"
+        );
+        assert.strictEqual(
+          found.code,
+          "ZZ",
+          "the first pattern that matches wins"
+        );
+        assert.strictEqual(
+          NS.shopOf("https://www.dlsite.com/x"),
+          null,
+          "a preset that is not in the list is not recognised"
+        );
+      } finally {
+        NS.shops = presets;
+      }
+
+      assert.deepStrictEqual(
+        NS.shops.map((shop) => shop.name),
+        ["DLsite", "FANZA", "虎穴", "Melonbooks"],
+        "the list in force is put back for the sections after this one"
+      );
+    }
+  );
+
+  runSection("16 the editor's rules: domains, patterns, names", () => {
+    assert.strictEqual(
+      NS.normalizeDomain(" HTTPS://WWW.DLsite.com:443/a/b?c "),
+      "dlsite.com",
+      "scheme, case, port, path, `www.` and space all collapse"
+    );
+    assert.strictEqual(
+      NS.normalizeDomain("dlsite.com."),
+      "dlsite.com",
+      "a trailing dot is the same host"
+    );
+    assert.strictEqual(
+      NS.normalizeDomain("user@www.dlsite.com"),
+      "dlsite.com",
+      "and a user part is not part of the host"
+    );
+
+    const literal = NS.compilePattern("/g/(\\d+)/gi");
+    assert.ok(literal, "a JavaScript literal is accepted");
+    assert.deepStrictEqual(
+      [literal.exec("/g/12/")[1], literal.exec("/g/12/")[1]],
+      ["12", "12"],
+      "the g flag is dropped, so one pattern answers the same way every time"
+    );
+    assert.strictEqual(
+      NS.compilePattern("([a-z"),
+      null,
+      "a pattern that does not compile is null, not a throw"
+    );
+    assert.strictEqual(NS.compilePattern(""), null, "and so is an empty one");
+
+    const list = NS.shopsFromJson(
+      JSON.stringify([
+        { name: "One", domains: ["one.test"] },
+        { name: "Two", domains: ["Two.test"] },
+      ])
+    );
+    assert.strictEqual(
+      NS.nameTaken(list, " one ", -1),
+      true,
+      "names ignore case and space"
+    );
+    assert.strictEqual(
+      NS.nameTaken(list, " One ", 0),
+      false,
+      "a row is not a duplicate of itself"
+    );
+    assert.strictEqual(
+      NS.domainOwner(list, "www.TWO.test", -1).name,
+      "Two",
+      "domains are compared as the matcher compares them"
+    );
+    assert.strictEqual(
+      NS.domainOwner(list, "free.test", -1),
+      null,
+      "a free domain has no owner"
+    );
+
+    const broken = [
+      { name: "", icon: "", domains: [], regexes: ["([a-z"] },
+      { name: "Two", icon: "", domains: ["one.test"], regexes: [] },
+    ];
+    const issues = NS.shopIssues(broken, 0, "en");
+    assert.match(issues.name, /required/);
+    assert.match(issues.domains, /At least one domain/);
+    assert.match(issues.regexAt[0], /regular expression/);
+
+    const duplicated = [
+      { name: "One", icon: "", domains: ["a.test"], regexes: [] },
+      { name: "one", icon: "", domains: ["www.A.test"], regexes: [] },
+    ];
+    const both = NS.shopIssues(duplicated, 1, "en");
+    assert.strictEqual(both.name, "Another shop already has this name");
+    assert.strictEqual(both.domainAt[0], "Already used by One");
+    assert.strictEqual(
+      both.regexAt.length,
+      0,
+      "a shop with no patterns has no pattern errors — the icon alone is valid"
+    );
+  });
+
+  /** An uploaded icon is the bytes, and needs no asset base to draw. */
+  runSection("16 an uploaded icon is drawn straight from the settings", () => {
+    const form = makeEl("form");
+    const all = (selector) => {
+      const out = [];
+      const name = selector.slice(1);
+      const walk = (node) => {
+        node.children.forEach((child) => {
+          if (child.classList.contains(name)) out.push(child);
+          walk(child);
+        });
+      };
+      walk(form);
+      return out;
+    };
+    form.querySelectorAll = all;
+
+    const group = makeEl("div");
+    group.className = "input-group";
+    const input = makeEl("input");
+    input.value = "https://example.test/item/7";
+    const append = makeEl("div");
+    append.className = "input-group-append";
+    const scrape = makeEl("button");
+    scrape.className = "scrape-url-button";
+    append.appendChild(scrape);
+    group.appendChild(input);
+    group.appendChild(append);
+    form.appendChild(group);
+
+    const before = NS.shops;
+    NS.shops = [
+      {
+        name: "Example",
+        icon: "data:image/png;base64,AA==",
+        domains: ["example.test"],
+        regexes: ["/item/(\\d+)"],
+      },
+    ];
+    NS.shopLinks = true;
+
+    try {
+      NS.decorateShopUrls(form);
+      const head = all(".manga-tools-shop-prefix")[0];
+      assert.ok(head, "the configured shop's row gets a head");
+      assert.strictEqual(
+        head.querySelector("img").src,
+        "data:image/png;base64,AA==",
+        "the uploaded image is the icon — it needs no asset base"
+      );
+      assert.strictEqual(
+        head.querySelector(".input-group-text").getAttribute("title"),
+        "Example · 7",
+        "and the code is read by the configured pattern"
+      );
+    } finally {
+      NS.shops = before;
+      NS.shopLinks = false;
+    }
+  });
+
+  /**
+   * The dialog draws the list it was handed, and the way in to adding one.
+   *
+   * The stub's `useState` is inert, so this is the state a dialog opens in: every
+   * row folded, the add button, and the footer. What it pins is that the tree
+   * renders at all with the components Stash hands a plugin — the parts a real
+   * Stash would draw, without a browser to draw them in.
+   */
+  runSection("16 the shop editor draws the list, folded", () => {
+    const tree = NS.shopDialog({ onClose: () => {}, onSave: () => {} });
+
+    assert.ok(tree, "the dialog renders");
+    assert.ok(hasText(tree, "DLsite"), "every shop in the list has a row");
+    assert.ok(hasText(tree, "FANZA"), "…including the presets");
+    assert.ok(hasText(tree, "虎穴"), "…all of them");
+    assert.ok(hasText(tree, "Melonbooks"), "…in the order they are matched in");
+    assert.ok(
+      !hasText(tree, "Product code patterns"),
+      "no form is open until a row is clicked"
+    );
+  });
+
+  /** The row that opens the editor: one line, and the list's own length. */
+  runSection("16 the settings row names the list and how long it is", () => {
+    const row = NS.shopsSetting({ persist: () => {} });
+    assert.ok(
+      find(row, (node) => node.type === "h3"),
+      "the row draws a heading"
+    );
+    assert.ok(
+      hasText(
+        row,
+        NS.stringFor(
+          state.currentLocale,
+          "mangaTools.settings.shops.count"
+        ).replace("{n}", String(NS.shops.length))
+      ),
+      "and counts the shops in the list"
+    );
+  });
 };

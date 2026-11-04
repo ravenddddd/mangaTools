@@ -18,6 +18,7 @@ import { emit, saveSettings, useGlobalVersion } from "./core";
 import { formatLanguageOption, languageChip, resolveSelect } from "./fields-ui";
 import { fieldLabel } from "./filter-model";
 import { MangaIcon } from "./icons";
+import { ShopsSetting } from "./shop-editor";
 import { requirePluginApi } from "../plugin-api";
 import type { ReactNode } from "react";
 import type {
@@ -825,9 +826,10 @@ export function MangaToolsSettings() {
         })}
       />
 
-      {/* ── The four shops a gallery's links may point at ────────────────── */}
-      {/* No children: one icon per shop (its favicon) is both the edit form's
-          square head and the manga-info badge, so there is no style to choose. */}
+      {/* ── The shops a gallery's links may point at ─────────────────────── */}
+      {/* One row under the switch: the list itself, with the dialog behind it.
+          No style to choose — one icon per shop is both the edit form's square
+          head and the manga-info badge. */}
       <SettingSwitch
         id="mangaTools-shopLinks"
         heading={t(intl, "mangaTools.settings.shopLinks.heading")}
@@ -836,7 +838,9 @@ export function MangaToolsSettings() {
         onChange={writeFlag((next) => {
           NS.shopLinks = next;
         })}
-      />
+      >
+        <ShopsSetting persist={persist} />
+      </SettingSwitch>
 
       {/* ── The four fields, and how what they hold is shown ─────────────── */}
       <SettingSwitch

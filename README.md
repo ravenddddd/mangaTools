@@ -673,14 +673,14 @@ checkbox got it right first (see `cycleManga`).
 ### Shop links
 
 A gallery's links live in **Stash's own `urls`** — plain strings, no label — and
-this feature derives everything from them. It recognises four shops by their
-registered domain (**DLsite**, **FANZA** on `dmm.co.jp`, **虎穴**, **Melonbooks**),
-reads each one's product code from the URL shape, and does two things:
+this feature derives everything from them. It recognises the shops on its list by
+their registered domain, reads each one's product code from the URL shape, and does
+two things:
 
-- in a **manga gallery's edit form**, a link row whose value points at one of the
-  four gets the shop's favicon at the head of the input group. The plugin is on
-  marked galleries and nowhere else: a scene's, an image's or a performer's edit
-  form is Stash's own and its links are left alone;
+- in a **manga gallery's edit form**, a link row whose value points at a shop gets
+  its icon at the head of the input group. The plugin is on marked galleries and
+  nowhere else: a scene's, an image's or a performer's edit form is Stash's own and
+  its links are left alone;
 - in the **Manga info block**, a `商店` row shows the recognised links as badges:
   the icon and the product code, each badge the link itself. A shop with no link is
   simply absent; there is no "checked, not there" state in this version.
@@ -688,12 +688,48 @@ reads each one's product code from the URL shape, and does two things:
 **Nothing is stored or written.** The code and the shop are derived from the URL on
 every render of the block, so a link changed on the edit form shows up at the
 store's next refresh (the same poll the mark rides on) with no migration and no
-second copy to go stale. A URL on a recognised host whose shape this build does not
+second copy to go stale. A URL on a recognised host whose shape the list does not
 know keeps the icon and shows no code — guessing a code is worse than showing none.
 
+#### The shop list
+
+The four shops above are only the **presets**. The list lives in the plugin's
+settings as one JSON string (`shops`), and **Settings → Plugins → Manga Tools →
+Shop links → Recognised shops → Edit…** is where it changes: rename a shop, add or
+remove domains, add the patterns that read its code, pick an icon. A library that
+never opens the editor has exactly the four presets — the behaviour the plugin had
+before any of this was editable.
+
+- **A shop has no id.** Its name is its identity: two entries may not share a name,
+  and no domain may appear under two shops. Those are the same two rules the editor
+  checks while typing, and the ones that decide whether a built-in can be added
+  again — a preset whose name or domain is still in use is greyed out, because
+  adding it would break the rule the form checks. An edited preset simply stops
+  being that preset: rename it *and* move it to another domain and the preset comes
+  back to the add menu, rename it alone and it does not (the domain is still taken).
+- **Domains** are compared the way the matcher compares them: lower case, no `www.`,
+  no path, port or user. A link on a subdomain belongs to the same shop.
+- **Patterns** are tried in order and **the first one that captures wins**; capture
+  group 1 is the product code. A bare source (`product_id[=/](…)`) and a JavaScript
+  literal (`/g/(\d+)/`) are both accepted; an empty list is fine — the shop keeps its
+  icon and shows no code. The drag handle reorders them, because the order is the
+  precedence.
+- **Icons**: a preset keeps the favicon bundled in `assets/shops/`; a shop of the
+  user's own may have an image uploaded, which is resized to a 32×32 PNG and kept in
+  the settings as a data URI. The plugin has no files of its own it can write, and
+  fetching a shop's favicon at runtime would depend on the network and tell the shop
+  the page was opened.
+
+The editor is drawn like Stash's own forms: the domain and pattern lists are
+`StringListInput`'s shape (one input per row, a grip, a danger minus, and an empty
+row at the end to type into), errors are `is-invalid` with the message under the
+field, and Save is disabled while anything is wrong. Nothing is written until Save:
+the dialog edits a draft, so Cancel really cancels.
+
 The shop-link feature is a switch of its own (off by default). **One icon per shop**
-— its favicon — is used both at the input head and in the badge: one square asset
-fits both places, and a second icon family would be a choice nobody needs to make.
+— the bundled favicon or the uploaded image — is used both at the input head and in
+the badge: one square asset fits both places, and a second icon family would be a
+choice nobody needs to make.
 A searched or filtered gallery is unaffected — this row is about the gallery's
 links, not its page list.
 
@@ -705,10 +741,10 @@ form renders it — so the mount is where the gallery gate has to be; without it
 scene whose link was a FANZA product wore the shop's icon on its own link row.
 Rows are added by React (a mutation observer) and the input's value
 changes without a mutation (a capture `input` listener); every write is guarded by
-a comparison so the two cannot answer each other. The icons are **bundled** in
-`assets/shops/` — the four favicons — rather than fetched from the shops at
-runtime, which would depend on the network, the shop's current paths, and would
-tell the shop the page was opened.
+a comparison so the two cannot answer each other. The presets' icons are **bundled**
+in `assets/shops/` rather than fetched from the shops at runtime, which would depend
+on the network, the shop's current paths, and would tell the shop the page was
+opened; an uploaded icon is the image itself, kept in the settings.
 
 ### Settings
 
