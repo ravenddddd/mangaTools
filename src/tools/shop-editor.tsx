@@ -578,18 +578,17 @@ function AddShopMenu(props: {
     glyph ? <PluginApi.components.Icon icon={glyph} /> : null;
 
   const content = (
-    <Popover id="manga-tools-shop-add">
+    <Popover id="manga-tools-shop-add" className="manga-tools-shop-popover">
       <Content>
-        <button
-          type="button"
-          className="manga-tools-shop-menu-row"
+        <Bootstrap.Button
+          className="minimal"
           onClick={() =>
             props.onAdd({ name: "", icon: "", domains: [], regexes: [] })
           }
         >
           {icon(PluginApi.libraries.FontAwesomeSolid?.faPlus)}
           <span>{t(intl, "mangaTools.shops.new")}</span>
-        </button>
+        </Bootstrap.Button>
         <div className="manga-tools-shop-menu-divider" />
         <div className="manga-tools-shop-menu-title">
           {t(intl, "mangaTools.shops.builtin")}
@@ -598,10 +597,9 @@ function AddShopMenu(props: {
           const allowed = props.canAdd(preset);
           const src = shopIconUrl(preset);
           return (
-            <button
-              type="button"
+            <Bootstrap.Button
               key={preset.name}
-              className="manga-tools-shop-menu-row"
+              className="minimal"
               disabled={!allowed}
               onClick={allowed ? () => props.onAdd(preset) : undefined}
             >
@@ -614,7 +612,7 @@ function AddShopMenu(props: {
                 />
               ) : null}
               <span>{preset.name}</span>
-            </button>
+            </Bootstrap.Button>
           );
         })}
       </Content>
