@@ -118,8 +118,35 @@ export function normalizeDomain(raw: string): string {
   const colon = host.indexOf(":");
   if (colon !== -1) host = host.slice(0, colon);
   host = host.replace(/\.+$/, "");
+
+  // An internationalised name is written as Unicode and kept by the browser as
+  // punycode; without this, a shop typed as `例え.jp` would never meet a link
+  // whose hostname is `xn--r8jz45g.jp`. A host URL() refuses is left as typed —
+  // a wildcard, say — so that the editor can say why rather than dropping it.
+  try {
+    host = new URL("http://" + host).hostname.toLowerCase();
+  } catch {
+    /* keep what was typed */
+  }
+
   if (host.startsWith("www.")) host = host.slice(4);
   return host;
+}
+
+/**
+ * Whether a domain is one the matcher can ever meet.
+ *
+ * A domain needs at least two labels and no wildcards: `*.dlsite.com` reads like
+ * a pattern but every comparison here is a suffix test on a real hostname, so a
+ * `*` can only ever fail. The name is normalised first, so `www.` and a trailing
+ * dot are not objections.
+ */
+export function isValidDomain(raw: string): boolean {
+  const host = normalizeDomain(raw);
+  if (!host || host.indexOf(".") === -1) return false;
+  return /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(
+    host
+  );
 }
 
 /**
@@ -237,7 +264,14 @@ export function nameTaken(
   );
 }
 
-/** The shop already using a domain, ignoring case and `www.`, or null. */
+/**
+ * The shop already using a domain, ignoring case and `www.`, or null.
+ *
+ * **Overlapping is using.** `dmm.co.jp` and `book.dmm.co.jp` are one site to the
+ * matcher — a link on either matches the broader entry, and the narrower one can
+ * never be reached. Left as exact equality, the editor would happily accept the
+ * narrower domain and the shop would silently never match anything.
+ */
 export function domainOwner(
   shops: Shop[],
   domain: string,
@@ -248,7 +282,16 @@ export function domainOwner(
 
   for (let index = 0; index < shops.length; index++) {
     if (index === except) continue;
-    if (shops[index].domains.indexOf(wanted) !== -1) return shops[index];
+
+    for (const owned of shops[index].domains) {
+      if (
+        wanted === owned ||
+        wanted.endsWith("." + owned) ||
+        owned.endsWith("." + wanted)
+      ) {
+        return shops[index];
+      }
+    }
   }
   return null;
 }

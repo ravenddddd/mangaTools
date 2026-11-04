@@ -777,6 +777,59 @@ module.exports = () => {
     );
   });
 
+  /**
+   * Overlapping domains are one shop to the matcher, and a domain has to be one
+   * the matcher could ever meet.
+   */
+  runSection("16 a domain is taken by everything under and above it", () => {
+    const broader = NS.shopsFromJson(
+      JSON.stringify([{ name: "One", domains: ["dmm.co.jp"] }])
+    );
+    const narrower = NS.shopsFromJson(
+      JSON.stringify([{ name: "Two", domains: ["book.dmm.co.jp"] }])
+    );
+
+    assert.strictEqual(
+      NS.domainOwner(broader, "book.dmm.co.jp", -1).name,
+      "One",
+      "a subdomain of a taken domain is taken — the broader entry would shadow it"
+    );
+    assert.strictEqual(
+      NS.domainOwner(narrower, "dmm.co.jp", -1).name,
+      "Two",
+      "and so is the domain a taken subdomain sits under"
+    );
+    assert.strictEqual(
+      NS.domainOwner(broader, "notdmm.co.jp", -1),
+      null,
+      "a lookalike host is not a subdomain"
+    );
+
+    assert.strictEqual(NS.isValidDomain("dlsite.com"), true);
+    assert.strictEqual(
+      NS.isValidDomain("www.dlsite.com"),
+      true,
+      "`www.` is normalised away before the question is asked"
+    );
+    assert.strictEqual(NS.isValidDomain("dlsite"), false, "one label");
+    assert.strictEqual(
+      NS.isValidDomain("*.dlsite.com"),
+      false,
+      "a wildcard can never be met by a suffix test"
+    );
+    assert.strictEqual(NS.isValidDomain(""), false);
+    assert.strictEqual(
+      NS.normalizeDomain("例え.jp"),
+      "xn--r8jz45g.jp",
+      "an internationalised name is kept the way the browser keeps it"
+    );
+    assert.strictEqual(
+      NS.isValidDomain("例え.jp"),
+      true,
+      "and is a usable domain"
+    );
+  });
+
   /** The row that opens the editor: one line, and the list's own length. */
   runSection("16 the settings row names the list and how long it is", () => {
     const row = NS.shopsSetting({ persist: () => {} });

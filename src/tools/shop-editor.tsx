@@ -35,6 +35,7 @@ import {
   BUILTIN_SHOPS,
   compilePattern,
   domainOwner,
+  isValidDomain,
   nameTaken,
   normalizeDomain,
   type Shop,
@@ -89,7 +90,7 @@ function issuesOf(shops: Shop[], index: number, locale: string): RowIssues {
 
   if (shop) {
     issues.domainAt = shop.domains.map((domain) => {
-      if (normalizeDomain(domain) === "") {
+      if (!isValidDomain(domain)) {
         return stringFor(locale, "mangaTools.shops.domainInvalid");
       }
       const owner = domainOwner(shops, domain, index);
@@ -155,6 +156,10 @@ function WithTip(props: { text: string; children: React.ReactNode }) {
  * where the order means nothing.
  */
 function ListInput(props: {
+  /** Prefix for each row's id — one control per row, so one id per row */
+  idPrefix: string;
+  /** The field's name, for each row's accessible name */
+  label: string;
   values: string[];
   placeholder: string;
   orderable: boolean;
@@ -224,6 +229,8 @@ function ListInput(props: {
             <WithTip text={message}>
               {Control ? (
                 <Control
+                  id={props.idPrefix + "-" + index}
+                  aria-label={props.label}
                   className={"text-input" + (message ? " is-invalid" : "")}
                   value={value}
                   placeholder={last ? props.placeholder : undefined}
@@ -697,13 +704,25 @@ function ShopForm(props: {
    * Stash's `renderField`). Not the plugin's own grid, because a label drawn by
    * this plugin looks nearly — and next to Stash's rows, wrongly — like Stash's.
    */
+  /**
+   * One row, laid out the way Stash lays out its own.
+   *
+   * `controlId` only where there is exactly one control to name — react-bootstrap
+   * hands the id down through context, so a group holding several controls gives
+   * them all the same id (React's "Duplicate form field id") and a group holding
+   * none leaves the label pointing at nothing (Chrome's "Incorrect use of
+   * <label for>"). The list rows carry their own ids and accessible names.
+   */
   const field = (
-    id: string,
+    controlId: string,
     label: React.ReactNode,
     control: React.ReactNode
   ) =>
     Group && Label && Col ? (
-      <Group as={Bootstrap ? Bootstrap.Row : undefined} controlId={id}>
+      <Group
+        as={Bootstrap ? Bootstrap.Row : undefined}
+        controlId={controlId || undefined}
+      >
         <Label column sm={3}>
           {label}
         </Label>
@@ -740,10 +759,12 @@ function ShopForm(props: {
       )}
 
       {field(
-        "manga-tools-shop-domains",
+        "",
         t(intl, "mangaTools.shops.domains"),
         <>
           <ListInput
+            idPrefix="manga-tools-shop-domain"
+            label={t(intl, "mangaTools.shops.domains")}
             values={props.shop.domains}
             placeholder={t(intl, "mangaTools.shops.domainPlaceholder")}
             orderable
@@ -761,7 +782,7 @@ function ShopForm(props: {
       )}
 
       {field(
-        "manga-tools-shop-regexes",
+        "",
         <>
           {t(intl, "mangaTools.shops.regexes")}
           <WithTip text={t(intl, "mangaTools.shops.regexHelp")}>
@@ -783,6 +804,8 @@ function ShopForm(props: {
           </WithTip>
         </>,
         <ListInput
+          idPrefix="manga-tools-shop-regex"
+          label={t(intl, "mangaTools.shops.regexes")}
           values={props.shop.regexes}
           placeholder={t(intl, "mangaTools.shops.regexPlaceholder")}
           orderable
@@ -794,7 +817,7 @@ function ShopForm(props: {
       )}
 
       {field(
-        "manga-tools-shop-icon",
+        "",
         t(intl, "mangaTools.shops.icon"),
         <div className="manga-tools-shop-icon-row">
           <ShopIcon shop={props.shop} />

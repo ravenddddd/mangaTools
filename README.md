@@ -708,7 +708,12 @@ before any of this was editable.
   being that preset: rename it *and* move it to another domain and the preset comes
   back to the add menu, rename it alone and it does not (the domain is still taken).
 - **Domains** are compared the way the matcher compares them: lower case, no `www.`,
-  no path, port or user. A link on a subdomain belongs to the same shop.
+  no path, port or user; an internationalised name is kept as the punycode the
+  browser would report. A link on a subdomain belongs to the same shop — which is
+  why no two shops may hold domains that overlap: `dmm.co.jp` and
+  `book.dmm.co.jp` are one site to the matcher, and the broader entry would shadow
+  the narrower one. A domain with no dot, or with a wildcard, is refused: it could
+  never be met.
 - **Patterns** are tried in order and **the first one that captures wins**; capture
   group 1 is the product code. A bare source (`product_id[=/](…)`) and a JavaScript
   literal (`/g/(\d+)/`) are both accepted; an empty list is fine — the shop keeps its

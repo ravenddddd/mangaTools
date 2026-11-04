@@ -547,6 +547,8 @@ export interface MangaToolsNamespace {
   }>;
   /** A domain as the list compares them. */
   normalizeDomain(raw: string): string;
+  /** Whether a domain can ever be matched: two labels, no wildcards. */
+  isValidDomain(raw: string): boolean;
   /** A pattern source as a regular expression, or null when it does not compile. */
   compilePattern(source: string): RegExp | null;
   /** Whether a name is already used, ignoring case; `except` is the asker. */
