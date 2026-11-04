@@ -408,6 +408,10 @@ export function ShopDialog(props: {
                   title={t(intl, "mangaTools.shops.reorder")}
                   onDragStart={() => {
                     afterDrag.current = true;
+                    // A drag is about the list's order, not about one row's
+                    // fields: the open form folds away, so the rows being
+                    // reordered are what the drag is drawn on.
+                    setOpen(-1);
                     setDragShop(index);
                   }}
                   onDragEnd={() => setDragShop(-1)}
