@@ -786,8 +786,10 @@ descriptions is a page nobody reads.)
 
 **A group can also be folded shut, and that is a view rather than a setting.** A row
 that has rows under it carries a chevron, and so does a heading that is not a switch —
-the mark's, and how the manga info is shown. Clicking the chevron, or the heading it
-shares a row with, takes those rows off the page without touching a single value. The
+the mark's, and how the manga info is shown. **Every group starts shut**: the page
+opens on its headings, because a setting is a row to find rather than a page to read.
+Clicking the chevron, or the heading it shares a row with, takes those rows off the
+page without touching a single value. The
 chevron is drawn in the indent to the left of the heading: in front of the heading it
 would push that heading a glyph to the right of the sibling rows without one, and the
 right-hand column is the vertical line every switch on this page is aligned to, so the

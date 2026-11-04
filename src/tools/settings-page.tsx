@@ -523,21 +523,27 @@ function SelectSetting(props: {
 }
 
 /**
- * Which groups the reader has folded shut, by the id of the row that opens them.
+ * Which groups the reader has opened, by the id of the row that opens them.
+ *
+ * **The page starts shut.** Everything with rows under it is a group, and the
+ * settings page is long enough that opening it on every one of them buries the
+ * headings a reader is actually scanning for; what a group is called is the
+ * question, and its contents are the answer to "and what is in there". Empty is
+ * therefore the default, and the set holds what has been *opened*.
  *
  * View state, and nothing else: it is not a setting, it never reaches Stash's
- * configuration, and a page that starts folded would be hiding settings that are
- * on. It lives out here rather than in React's state for the reason the settings
+ * configuration, and a group that stays shut changes nothing about what is on.
+ * It lives out here rather than in React's state for the reason the settings
  * themselves do — this page is redrawn from `emit()` on every switch, and the
  * smoke tests' React stub has no working state setter, so anything held inside a
  * component would be either lost or untestable. `NS.*` is the pattern; this is the
  * same pattern with a set.
  */
-const foldedGroups = new Set<string>();
+const unfoldedGroups = new Set<string>();
 
 function setGroupFolded(id: string, folded: boolean): void {
-  if (folded) foldedGroups.add(id);
-  else foldedGroups.delete(id);
+  if (folded) unfoldedGroups.delete(id);
+  else unfoldedGroups.add(id);
   emit();
 }
 
@@ -592,7 +598,7 @@ function SettingSwitch(props: {
   children?: ReactNode;
 }) {
   const rows = props.checked && props.children ? props.children : null;
-  const folded = foldedGroups.has(props.id);
+  const folded = !unfoldedGroups.has(props.id);
   const fold = rows
     ? { folded, onToggle: () => setGroupFolded(props.id, !folded) }
     : undefined;
@@ -630,13 +636,13 @@ function SettingSwitch(props: {
  * else (see `.manga-tools-settings-body` in the stylesheet).
  */
 function SettingsGroup(props: {
-  /** Which fold this is, in `foldedGroups` — not a setting id */
+  /** Which fold this is, in `unfoldedGroups` — not a setting id */
   id: string;
   heading: string;
   subHeading?: string;
   children?: ReactNode;
 }) {
-  const folded = foldedGroups.has(props.id);
+  const folded = !unfoldedGroups.has(props.id);
 
   return (
     <>
@@ -686,7 +692,7 @@ function SettingsHeading(props: {
   );
 }
 
-/** The ids `foldedGroups` holds the two headings' folds under — not setting ids */
+/** The ids `unfoldedGroups` holds the three headings' folds under — not setting ids */
 const MARK_GROUP_ID = "mangaTools-markGroup";
 const MAINTENANCE_GROUP_ID = "mangaTools-maintenanceGroup";
 const DISPLAY_GROUP_ID = "mangaTools-displayGroup";

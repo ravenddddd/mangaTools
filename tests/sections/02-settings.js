@@ -264,6 +264,62 @@ module.exports = () => {
   // strings, which are translated (see 7d), so leaving the locale to whatever ran
   // last would make them say something different for reasons that are not the point.
   state.currentLocale = "en-US";
+
+  // **The page starts shut.** Every row with rows under it is a group folded away,
+  // so what opens is the page's headings rather than one long column; the folds
+  // are the reader's, and a test that is about the rows has to open them first,
+  // with the same chevron a reader would press.
+  const foldButtonsIn = (el) => {
+    const out = [];
+    find(el, (n) => {
+      if (
+        typeof n.props?.className === "string" &&
+        n.props.className.split(" ").includes("manga-tools-fold")
+      ) {
+        out.push(n);
+      }
+      return false;
+    });
+    return out;
+  };
+  const switchesInPage = (el) => {
+    const out = [];
+    find(el, (n) => {
+      if (n.type === "Switch") out.push(n);
+      return false;
+    });
+    return out;
+  };
+  const openPage = () => call("PluginSettings", { pluginID: "mangaTools" });
+  const unfoldAll = () => {
+    for (let pass = 0; pass < 6; pass++) {
+      const shut = foldButtonsIn(openPage()).filter(
+        (c) => c.props["aria-expanded"] === false
+      );
+      if (!shut.length) break;
+      shut.forEach((c) => {
+        c.props.onClick({ stopPropagation: () => {} });
+      });
+    }
+  };
+
+  {
+    const folded = openPage();
+    const chevrons = foldButtonsIn(folded);
+    assert.ok(chevrons.length > 0, "the page draws its folds");
+    assert.ok(
+      chevrons.every((c) => c.props["aria-expanded"] === false),
+      "…all shut, so the page opens on its headings rather than on every row"
+    );
+
+    const foldedSwitches = switchesInPage(folded).length;
+    unfoldAll();
+    assert.ok(
+      switchesInPage(openPage()).length > foldedSwitches,
+      "…and opening them brings rows the folded page did not draw"
+    );
+  }
+
   const settingsEl = call("PluginSettings", { pluginID: "mangaTools" });
   assert.notStrictEqual(
     settingsEl.type,
