@@ -302,14 +302,14 @@ module.exports = () => {
   );
 
   // No language: a value with no flag, so this plugin draws its own mark in the flag's
-  // place — and the raw mark comes with it, because a work with no language was not
-  // translated. Which is the whole reason the two are one value here.
+  // place. **No raw mark in brackets**: a work with no language is raw by definition
+  // (see isRaw), so the bracket only repeated what the name had just said.
   r9 = detail({ "plugin.mangaTools.language": NS.NO_LANGUAGE });
   const noneRow = rowsIn(r9.portal)[0];
   assert.deepStrictEqual(
     noneRow.props.children.filter((c) => typeof c === "string"),
-    ["语言: ", " ", "无语言内容", "（生肉）"],
-    "the row reads as the language and the raw mark, with the mark's own gap after it"
+    ["语言: ", " ", "无语言内容"],
+    "the row reads as the language alone"
   );
   assert.strictEqual(
     (

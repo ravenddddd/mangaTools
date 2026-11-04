@@ -204,8 +204,13 @@ export function MangaDetailsPanel(props: {
             The space in front of it is part of the string, not a text node of its
             own like the flag's: English wants one before a bracket and Chinese
             takes none, so the catalog is where that difference belongs.
+
+            **Not on the no-language row.** That row already says the text is in
+            no known language, which is all the mark would add — and the two are
+            one value by definition (see isRaw), so the bracket only ever repeated
+            what the name had just said.
           */}
-          {original
+          {original && !NS.isNoLanguage(language.code)
             ? t(intl, "mangaTools.translationGroup.originalInline")
             : null}
         </h6>
