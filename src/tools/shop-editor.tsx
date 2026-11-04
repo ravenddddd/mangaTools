@@ -351,6 +351,20 @@ export function ShopDialog(props: {
   const setDragRow = dragState[1];
 
   /**
+   * Where a drop would land: the row it is on, and which side of its middle.
+   *
+   * **Reordering happens on drop, not on every drag-over.** Moving the dragged
+   * element in the DOM mid-drag makes the browser re-aim the drag at the element
+   * now under the pointer, which is the row that just moved — so the list swaps
+   * and swaps back on alternate events, and the rows flicker. A thin line over
+   * the row that would be split is the whole of the feedback now; the list moves
+   * once, when the drop arrives.
+   */
+  const dropState = React.useState<{ id: string; after: boolean } | null>(null);
+  const drop = dropState[0];
+  const setDrop = dropState[1];
+
+  /**
    * Set while a row is being dragged, so the click that ends the drag does not
    * open the form. Cleared on the next mouse-down: the press that begins a drag
    * is also a mouse-down on the row, and it comes before `dragstart`, so a real
@@ -426,7 +440,14 @@ export function ShopDialog(props: {
 
           return (
             <div
-              className="manga-tools-shop-entry"
+              className={
+                "manga-tools-shop-entry" +
+                (drop && drop.id === row.id
+                  ? drop.after
+                    ? " drop-after"
+                    : " drop-before"
+                  : "")
+              }
               key={row.id}
               ref={(element: HTMLElement | null) => {
                 entries.current[row.id] = element;
@@ -434,14 +455,39 @@ export function ShopDialog(props: {
               onDragOver={(e: React.DragEvent) => {
                 if (!dragRow || dragRow === row.id) return;
                 e.preventDefault();
+                const box = (
+                  e.currentTarget as HTMLElement
+                ).getBoundingClientRect();
+                const after = e.clientY > box.top + box.height / 2;
+                if (!drop || drop.id !== row.id || drop.after !== after) {
+                  setDrop({ id: row.id, after });
+                }
+              }}
+              onDrop={(e: React.DragEvent) => {
+                e.preventDefault();
+                if (!dragRow || !drop || dragRow === drop.id) {
+                  setDragRow("");
+                  setDrop(null);
+                  return;
+                }
+
                 const from = rows.findIndex(
                   (candidate) => candidate.id === dragRow
                 );
-                if (from < 0) return;
-                const next = rows.slice();
-                next.splice(index, 0, next.splice(from, 1)[0]);
-                setRows(next);
-                setDragRow(row.id);
+                const target = rows.findIndex(
+                  (candidate) => candidate.id === drop.id
+                );
+                if (from >= 0 && target >= 0) {
+                  const next = rows.slice();
+                  next.splice(
+                    target + (drop.after ? 1 : 0),
+                    0,
+                    next.splice(from, 1)[0]
+                  );
+                  setRows(next);
+                }
+                setDragRow("");
+                setDrop(null);
               }}
             >
               <div
@@ -474,7 +520,10 @@ export function ShopDialog(props: {
                     setOpen("");
                     setDragRow(row.id);
                   }}
-                  onDragEnd={() => setDragRow("")}
+                  onDragEnd={() => {
+                    setDragRow("");
+                    setDrop(null);
+                  }}
                 >
                   <PluginApi.components.Icon
                     icon={

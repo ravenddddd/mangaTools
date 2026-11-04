@@ -1334,6 +1334,16 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   margin-top: 2px;
 }
 
+/* Where a drop would land: a line over the row that would be split, drawn inside
+ * it so the list does not reflow while the pointer moves. */
+.manga-tools-shop-entry.drop-before {
+  box-shadow: inset 0 2px 0 #137cbd;
+}
+
+.manga-tools-shop-entry.drop-after {
+  box-shadow: inset 0 -2px 0 #137cbd;
+}
+
 .manga-tools-shop-row {
   display: flex;
   align-items: center;
