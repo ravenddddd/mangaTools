@@ -1562,35 +1562,41 @@ module.exports = () => {
     "and the task name is the one the manifest declares — Stash looks it up by it"
   );
 
-  // The counts the dialog shows beside each field come from one query with one
-  // alias per field — the same NOT_NULL filter the task uses, so the number and the
-  // run agree — and an answer that is missing an alias reads 0 rather than blank.
-  const countsQuery = NS.clearFieldsCountsQuery();
+  // The numbers the dialog shows — per field, and how many galleries a run would
+  // touch — come from one query with one alias per field, filtered exactly the way
+  // the task discovers galleries. The per-field numbers are the lengths of those
+  // lists; the total is their union, because a gallery holding three of the fields
+  // is still one gallery.
+  const scanQuery = NS.clearFieldsScanQuery();
   for (const field of NS.CLEARABLE_FIELDS) {
     assert.ok(
-      countsQuery.indexOf(field) !== -1,
-      `the count query should ask about ${field}`
+      scanQuery.indexOf(field) !== -1,
+      `the scan query should ask about ${field}`
     );
   }
   assert.ok(
-    countsQuery.split("NOT_NULL").length - 1 === NS.CLEARABLE_FIELDS.length,
+    scanQuery.split("NOT_NULL").length - 1 === NS.CLEARABLE_FIELDS.length,
     "…each with the same NOT_NULL the task discovers galleries by"
   );
   assert.deepStrictEqual(
-    NS.clearFieldsCountsFrom({
-      f0: { count: 12 },
-      f2: { count: 3 },
-      f5: { count: 0 },
+    NS.clearFieldsScanFrom({
+      f0: { galleries: [{ id: "1" }, { id: "2" }] },
+      // "2" again: one gallery with both fields is still one gallery
+      f2: { galleries: [{ id: "2" }, { id: "3" }] },
+      f5: { galleries: [] },
     }),
     {
-      [NS.CLEARABLE_FIELDS[0]]: 12,
-      [NS.CLEARABLE_FIELDS[1]]: 0,
-      [NS.CLEARABLE_FIELDS[2]]: 3,
-      [NS.CLEARABLE_FIELDS[3]]: 0,
-      [NS.CLEARABLE_FIELDS[4]]: 0,
-      [NS.CLEARABLE_FIELDS[5]]: 0,
+      counts: {
+        [NS.CLEARABLE_FIELDS[0]]: 2,
+        [NS.CLEARABLE_FIELDS[1]]: 0,
+        [NS.CLEARABLE_FIELDS[2]]: 2,
+        [NS.CLEARABLE_FIELDS[3]]: 0,
+        [NS.CLEARABLE_FIELDS[4]]: 0,
+        [NS.CLEARABLE_FIELDS[5]]: 0,
+      },
+      total: 3,
     },
-    "an unanswered field reads 0, so a switch never claims a count it does not have"
+    "an unanswered field reads 0, and the total counts each gallery once"
   );
 
   const maintenance = call("PluginSettings", { pluginID: "mangaTools" });

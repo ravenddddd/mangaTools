@@ -161,5 +161,6 @@
   "mangaTools.clearFields.cancel": "取消",
   "mangaTools.clearFields.confirm": "移除字段",
   "mangaTools.clearFields.queued": "已加入 Stash 任务队列——进度和日志见「设置 → 任务」。",
-  "mangaTools.clearFields.failed": "无法把任务加入队列，详见浏览器控制台。"
+  "mangaTools.clearFields.failed": "无法把任务加入队列，详见浏览器控制台。",
+  "mangaTools.clearFields.total": "将会影响 {n} 个画廊"
 }

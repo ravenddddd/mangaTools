@@ -161,5 +161,6 @@
   "mangaTools.clearFields.cancel": "取消",
   "mangaTools.clearFields.confirm": "移除欄位",
   "mangaTools.clearFields.queued": "已加入 Stash 任務佇列——進度和日誌見「設定 → 任務」。",
-  "mangaTools.clearFields.failed": "無法把任務加入佇列，詳見瀏覽器主控台。"
+  "mangaTools.clearFields.failed": "無法把任務加入佇列，詳見瀏覽器主控台。",
+  "mangaTools.clearFields.total": "將會影響 {n} 個畫廊"
 }

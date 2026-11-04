@@ -161,5 +161,6 @@
   "mangaTools.clearFields.cancel": "Cancel",
   "mangaTools.clearFields.confirm": "Remove fields",
   "mangaTools.clearFields.queued": "Added to Stash's task queue — progress and the log are on the Tasks page.",
-  "mangaTools.clearFields.failed": "The task could not be queued. See the browser console."
+  "mangaTools.clearFields.failed": "The task could not be queued. See the browser console.",
+  "mangaTools.clearFields.total": "This would affect {n} gallery(ies)"
 }

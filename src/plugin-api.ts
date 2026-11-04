@@ -300,10 +300,13 @@ export interface MangaToolsNamespace {
   CLEAR_FIELDS_TASK: string;
   /** The fields that task's dialog offers, in its own order. */
   CLEARABLE_FIELDS: string[];
-  /** The one query the dialog asks for six counts with — see countsQuery. */
-  clearFieldsCountsQuery(): string;
-  /** Those counts, by field, out of its answer — see countsFrom. */
-  clearFieldsCountsFrom(data: unknown): Record<string, number>;
+  /** The one query the dialog asks for the galleries carrying each field — see scanQuery. */
+  clearFieldsScanQuery(): string;
+  /** The per-field counts and the union, out of its answer — see scanFrom. */
+  clearFieldsScanFrom(data: unknown): {
+    counts: Record<string, number>;
+    total: number;
+  };
   /** The values the censorship field takes, in cycle order. See censorship.tsx. */
   CENSORSHIP_VALUES: string[];
   /** A stored censorship value as one of CENSORSHIP_VALUES, or "" for anything else. */

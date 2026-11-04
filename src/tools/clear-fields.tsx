@@ -20,7 +20,7 @@
  * a field somebody has to come back for.
  */
 import { NS } from "../languages";
-import { t } from "../i18n";
+import { numbered, t } from "../i18n";
 import { gqlDoc, requirePluginApi } from "../plugin-api";
 
 const PluginApi = requirePluginApi();
@@ -119,45 +119,71 @@ function queueClear(args: Record<string, string>): Promise<boolean> {
     .then(() => true);
 }
 
+/** What the dialog shows once the count is in: per field, and the union */
+export interface ClearFieldTotals {
+  /** Galleries carrying each field, by key */
+  counts: Record<string, number>;
+  /** Galleries carrying at least one of them — what a run would touch */
+  total: number;
+}
+
 /**
- * One query, one alias per field, asking only for `count`.
+ * One query, one alias per field, asking for the galleries carrying that field.
  *
- * Six small counts rather than one big list: the dialog only wants the numbers, and
- * the same filter the task uses (`NOT_NULL`) is the one that makes them true — a
- * count from anywhere else could disagree with what the run would actually do.
+ * **Ids rather than `count`, and that costs something.** The per-field numbers are
+ * cheap either way, but the *union* — how many galleries a run would touch — is
+ * not something `count` can answer: Stash ANDs the entries of `custom_fields` and
+ * `OR` takes a single nested filter, so "has any of these six" is not expressible
+ * as one query. Ids are the price of the total, and they are only asked for while
+ * this dialog is open. A very large library pays more for it than a small one; the
+ * alternative was a total that guessed (adding the six counts up counts a gallery
+ * holding three fields three times), which is worse than a slower answer to a
+ * question nobody opens twice.
+ *
+ * The filter is the one the task discovers by (`NOT_NULL`), so the numbers here and
+ * what the run actually does cannot drift apart.
  */
-export function countsQuery(): string {
+export function scanQuery(): string {
   const parts = CLEARABLE_FIELDS.map(
     (field, index) =>
       `f${index}: findGalleries(` +
       `gallery_filter: { custom_fields: [{ field: "${field}", modifier: NOT_NULL }] }, ` +
-      "filter: { per_page: 1 }) { count }"
+      "filter: { per_page: -1 }) { galleries { id } }"
   );
   return "query { " + parts.join(" ") + " }";
 }
 
-/** Those counts, by field, out of the answer — a field with no answer reads 0 */
-export function countsFrom(data: unknown): Record<string, number> {
-  const answer = (data || {}) as Record<string, { count?: number } | undefined>;
+/** The counts and the union, out of that answer — a field with no answer reads 0 */
+export function scanFrom(data: unknown): ClearFieldTotals {
+  const answer = (data || {}) as Record<
+    string,
+    { galleries?: Array<{ id?: string | number }> } | undefined
+  >;
   const counts: Record<string, number> = {};
+  const union = new Set<string>();
+
   CLEARABLE_FIELDS.forEach((field, index) => {
-    const count = answer["f" + index]?.count;
-    counts[field] = typeof count === "number" ? count : 0;
+    const found = answer["f" + index]?.galleries || [];
+    counts[field] = found.length;
+    for (const gallery of found) {
+      if (gallery?.id !== undefined) union.add(String(gallery.id));
+    }
   });
-  return counts;
+
+  return { counts, total: union.size };
 }
 
-/** The counts for the dialog, or null while they are being asked for */
-function loadCounts(): Promise<Record<string, number> | null> {
+/** The numbers for the dialog, or null while they are on their way */
+function loadTotals(): Promise<ClearFieldTotals | null> {
   const client = PluginApi.utils.StashService.getClient();
   if (!client) return Promise.resolve(null);
 
-  const query = gqlDoc(countsQuery(), "build the clear-fields count query");
+  const query = gqlDoc(scanQuery(), "build the clear-fields scan query");
   if (!query) return Promise.resolve(null);
 
   return client
     .query({ query, fetchPolicy: "no-cache" })
-    .then((res: { data?: unknown } | undefined) => countsFrom(res?.data))
+    .then((res: { data?: unknown } | undefined) => scanFrom(res?.data))
     .catch(() => null);
 }
 
@@ -211,16 +237,17 @@ export function ClearFieldsSetting() {
   const notice = noticeState[0];
   const setNotice = noticeState[1];
 
-  // How many galleries carry each field, asked for when the dialog opens so the
-  // switches say what choosing them would touch. Null until the answer lands.
-  const countsState = React.useState<Record<string, number> | null>(null);
-  const counts = countsState[0];
-  const setCounts = countsState[1];
+  // How many galleries carry each field, and how many in total, asked for when the
+  // dialog opens so the switches say what choosing them would touch. Null until
+  // the answer lands.
+  const totalsState = React.useState<ClearFieldTotals | null>(null);
+  const totals = totalsState[0];
+  const setTotals = totalsState[1];
 
   const openDialog = () => {
-    setCounts(null);
+    setTotals(null);
     setOpen(true);
-    loadCounts().then(setCounts);
+    loadTotals().then(setTotals);
   };
 
   /** Adds or removes one field, keeping the dialog's own order */
@@ -293,6 +320,17 @@ export function ClearFieldsSetting() {
         </div>
         <div className="modal-body">
           <p>{t(intl, "mangaTools.clearFields.intro")}</p>
+          {totals ? (
+            <p>
+              <b>
+                {numbered(
+                  intl.locale,
+                  "mangaTools.clearFields.total",
+                  totals.total
+                )}
+              </b>
+            </p>
+          ) : null}
           <div className="setting-section">
             <div className="card">
               {CLEARABLE_FIELDS.map((field) => (
@@ -301,7 +339,7 @@ export function ClearFieldsSetting() {
                   id={"mangaTools-clear-" + field.split(".").pop()}
                   label={
                     t(intl, LABEL_OF[field]) +
-                    (counts ? " (" + counts[field] + ")" : "")
+                    (totals ? " (" + totals.counts[field] + ")" : "")
                   }
                   checked={chosen.indexOf(field) !== -1}
                   onChange={(next) => toggle(field, next)}
@@ -347,5 +385,5 @@ export function ClearFieldsSetting() {
 NS.clearTaskArgs = clearTaskArgs;
 NS.CLEAR_FIELDS_TASK = CLEAR_FIELDS_TASK;
 NS.CLEARABLE_FIELDS = CLEARABLE_FIELDS;
-NS.clearFieldsCountsQuery = countsQuery;
-NS.clearFieldsCountsFrom = countsFrom;
+NS.clearFieldsScanQuery = scanQuery;
+NS.clearFieldsScanFrom = scanFrom;
