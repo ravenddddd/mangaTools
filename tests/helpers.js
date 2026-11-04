@@ -880,6 +880,14 @@ const PluginApi = {
       faChessPawn: "faChessPawn",
       faChessKnight: "faChessKnight",
       faChessBoard: "faChessBoard",
+      // The icons the settings' slots default to, and the dialog's own clear
+      // button: present as names, so a surface that draws them draws something.
+      faM: "faM",
+      faFont: "faFont",
+      faLanguage: "faLanguage",
+      faSquare: "faSquare",
+      faMask: "faMask",
+      faTrashCan: "faTrashCan",
       // The language row's suggestion, for a reader with flags turned off. The
       // other two names in its fallback chain are deliberately absent here, so a
       // test can take this one away and drive the rest of the chain.
@@ -889,7 +897,11 @@ const PluginApi = {
       // the other half of the same assertion.
       faInfoCircle: "faInfoCircle",
     },
-    FontAwesomeRegular: { faTimesCircle: "faTimesCircle(regular)" },
+    FontAwesomeRegular: {
+      faTimesCircle: "faTimesCircle(regular)",
+      // The uncensored slot's default is the outlined square.
+      faSquare: "faSquare(regular)",
+    },
     // Captured so a test can assert the URL the filter pushes.
     ReactRouterDOM: {
       useHistory: () => fakeHistory,

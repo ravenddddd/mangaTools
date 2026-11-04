@@ -33,6 +33,7 @@
  * One difference is not an oversight and stays; see plainCandidates.
  */
 import { NS } from "../languages";
+import { CensorshipIcon } from "./censorship";
 import { t } from "../i18n";
 import { requirePluginApi } from "../plugin-api";
 import {
@@ -410,11 +411,12 @@ function SidebarSection(props: {
   );
 }
 
-/** The chess icon for a censorship value, drawn where a language row draws its flag */
+/**
+ * The censorship icon for a value, drawn where a language row draws its flag —
+ * the same slot the settings dialog sets.
+ */
 function censorshipLeading(value: string): ReactElement | null {
-  const Icon = PluginApi.components.Icon;
-  const icon = NS.censorshipIcon(value);
-  return icon ? <Icon className="fa-fw" icon={icon} /> : null;
+  return <CensorshipIcon value={value} />;
 }
 
 /** The censorship field's two values as options, in the order censorship.tsx lists them */

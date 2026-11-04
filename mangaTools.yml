@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.10.31
+version: 0.10.32
 ui:
   javascript:
     - mangaTools.js
@@ -26,16 +26,14 @@ ui:
     # change.
     - mangaTools.css
     - mangaReader.css
-  # The things this plugin ships that are not code: the icon for the mark that
-  # makes a gallery manga, and the two steaks the original-text button draws
-  # (raw.svg for the original text, cooked.svg for a translation). Stash serves a mapped directory at
-  # /plugin/{pluginId}/assets/<path>, so `assets/icons/x.svg` is fetched from
-  # /plugin/mangaTools/assets/icons/x.svg.
+  # The things this plugin ships that are not code: the favicon of each shop the
+  # link list can recognise. Stash serves a mapped directory at
+  # /plugin/{pluginId}/assets/<path>, so `assets/shops/x.ico` is fetched from
+  # /plugin/mangaTools/assets/shops/x.ico.
   #
-  # They are files rather than paths in the bundle because they are somebody else's
-  # artwork and are kept exactly as downloaded, attribution comment and all.
-  # Colouring them is done with a CSS mask, which reads the shape rather than the
-  # colour — see the three .manga-tools-*-icon rules in mangaTools.css.
+  # The plugin's own five icons — the mark, the two states of the original text,
+  # the two of censorship — are **not** here: they are Font Awesome names or SVGs
+  # the reader uploads, chosen in the icons dialog and kept in the settings.
   #
   # `build.mjs` copies whatever this maps, so a directory named here is a
   # directory that ships; naming one that does not exist fails the build.
@@ -184,6 +182,10 @@ settings:
   # the plugin's own settings page draws the dialog, and this entry exists so the
   # map says what it holds. See src/tools/shop-model.ts for the shape, and
   # shopsFromJson for what absent or unreadable means (the four presets).
+  icons:
+    displayName: Icons
+    description: The five icons the plugin draws — the mark, the two states of the original text and the two of censorship. Edited on the plugin's own settings page, each one a Font Awesome name or an uploaded SVG.
+    type: STRING
   shops:
     displayName: Shops
     description: The shops a gallery's links may point at. Edited on the plugin's own settings page; the presets are DLsite, FANZA, Toranoana and Melonbooks.

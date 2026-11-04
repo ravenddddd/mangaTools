@@ -1051,16 +1051,21 @@ module.exports = () => {
     "still directly after the span holding the button"
   );
 
-  // The switch's icon is a masked span, not an svg: the artwork is a file, and a
-  // file cannot see `currentColor` — the mask reads its shape and CSS supplies
-  // the colour, which is what makes two states out of one image. Two renders deep,
-  // because MangaIcon is one of the three asset icons and hands over to the one
-  // that knows about assetBase.
-  const mangaIcon = toggleOn.props.children.type(toggleOn.props.children.props);
-  assert.strictEqual(mangaIcon.props.className, "manga-tools-manga-icon");
-  const icon = mangaIcon.type(mangaIcon.props);
+  // The mark is the settings' `mark` slot: a 1em box drawn by the one renderer
+  // every icon goes through, whatever the slot holds — a font glyph or an uploaded
+  // SVG. Three renders deep: MangaIcon names the slot, SlotIcon reads it, IconView
+  // draws it.
+  const slotElement = toggleOn.props.children.type(
+    toggleOn.props.children.props
+  );
+  assert.strictEqual(slotElement.props.className, "manga-tools-manga-icon");
+  const viewElement = slotElement.type(slotElement.props);
+  const icon = viewElement.type(viewElement.props);
   assert.strictEqual(icon.type, "span");
-  assert.strictEqual(icon.props.className, "manga-tools-manga-icon");
+  assert.ok(
+    icon.props.className.split(" ").includes("manga-tools-manga-icon"),
+    "…carrying the class the slot is known by"
+  );
 
   // A gallery the store does not list is not manga, *however* the values Stash
   // handed in read. Those come from Apollo's cache, which neither of this plugin's
@@ -1594,16 +1599,20 @@ module.exports = () => {
   };
 
   // The icon it draws is the state: cooked while a translation group is what the
-  // gallery has, raw once it is declared the original. Two files, and neither says a
-  // word of anybody's language, which is the point of using a picture for a piece of
-  // slang.
+  // gallery has, raw once it is declared the original. Two slots, and neither says
+  // a word of anybody's language, which is the point of using a picture for a
+  // piece of slang.
   const steakOf = (chip) =>
-    find(
-      chip,
-      (n) =>
-        n.props?.className === "manga-tools-raw-icon" ||
-        n.props?.className === "manga-tools-cooked-icon"
-    );
+    find(chip, (n) => {
+      const classes =
+        typeof n.props?.className === "string"
+          ? n.props.className.split(" ")
+          : [];
+      return (
+        classes.includes("manga-tools-raw-icon") ||
+        classes.includes("manga-tools-cooked-icon")
+      );
+    });
 
   const notOriginal = originalField({ other: "x" });
   assert.ok(
@@ -1616,9 +1625,10 @@ module.exports = () => {
     false,
     "unset reads as not pressed"
   );
-  assert.strictEqual(
-    steakOf(notOriginal.chip)?.props.className,
-    "manga-tools-cooked-icon",
+  assert.ok(
+    steakOf(notOriginal.chip)
+      ?.props.className.split(" ")
+      .includes("manga-tools-cooked-icon"),
     "a gallery that is not the original shows the cooked steak"
   );
   assert.strictEqual(
@@ -1712,9 +1722,10 @@ module.exports = () => {
     "btn btn-secondary manga-tools-chip manga-tools-original active",
     "…and wears Bootstrap's pressed look, so the state is visible without hovering"
   );
-  assert.strictEqual(
-    steakOf(wasOriginal.chip)?.props.className,
-    "manga-tools-raw-icon",
+  assert.ok(
+    steakOf(wasOriginal.chip)
+      ?.props.className.split(" ")
+      .includes("manga-tools-raw-icon"),
     "…and it swaps the steak: raw, because that is what the gallery is"
   );
   assert.strictEqual(
@@ -2046,11 +2057,13 @@ module.exports = () => {
   // undefined icon, so a Stash whose FontAwesome has neither spelling of the wand
   // must still get a button with something in it.
   delete Solid.faWandMagicSparkles;
+  delete Solid.faLanguage;
   assert.ok(
     hasText(chipField({ [TG]: "Lily Manga", other: "x" }).chip, "简体中文"),
     "with no wand to draw, the button falls back to the language's name"
   );
   Solid.faWandMagicSparkles = "faWandMagicSparkles";
+  Solid.faLanguage = "faLanguage";
   NS.showFlags = true;
 
   assert.strictEqual(
@@ -2384,13 +2397,16 @@ module.exports = () => {
     );
   assert.ok(iconOf(panel), "a name the bundled set has draws its icon");
 
-  const knight = PluginApi.libraries.FontAwesomeSolid.faChessKnight;
-  delete PluginApi.libraries.FontAwesomeSolid.faChessKnight;
+  // The name to take away is whatever the `censored` slot holds — that is the
+  // lookup under test now, not a name written into the module.
+  const censoredIcon = NS.icons.censored;
+  const censoredDef = PluginApi.libraries.FontAwesomeSolid[censoredIcon];
+  delete PluginApi.libraries.FontAwesomeSolid[censoredIcon];
   let withoutKnight = null;
   try {
     withoutKnight = iconOf(panelOf({ [NS.CENSORSHIP_FIELD_NAME]: "censored" }));
   } finally {
-    PluginApi.libraries.FontAwesomeSolid.faChessKnight = knight;
+    PluginApi.libraries.FontAwesomeSolid[censoredIcon] = censoredDef;
   }
   assert.strictEqual(
     withoutKnight,

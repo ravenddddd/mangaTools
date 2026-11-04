@@ -603,29 +603,24 @@ module.exports = () => {
       "group's name: clipped rather than wrapped, so one long language does not " +
       "make every row in the menu two lines tall"
   );
-  // This plugin's own artwork — the manga mark and the two steaks — is masked
-  // rather than inlined, and the three files share every declaration but the URL.
-  // The sharing is what is asserted: three near-identical rules are how one of
-  // them quietly ends up a pixel different from the others.
-  const assetIconRule =
-    /\.manga-tools-manga-icon,\s*\.manga-tools-raw-icon,\s*\.manga-tools-cooked-icon\s*\{([^}]*)\}/.exec(
-      css
-    );
-  assert.ok(assetIconRule, "the three masked icons should share one rule");
+  // The five icons the settings offer share one box: 1em square, the colour of
+  // the text around it. A Font Awesome glyph fills it; an uploaded SVG is masked,
+  // so the file supplies the shape and `background-color` the colour — one rule
+  // for both kinds is what keeps them the same size on every surface.
+  const slotIconRule = /\.manga-tools-slot-icon\s*\{([^}]*)\}/.exec(css);
+  assert.ok(slotIconRule, "the five icons should share one rule");
   assert.ok(
-    /mask:\s*var\(--manga-tools-icon\)/.test(assetIconRule[1]) &&
-      /background-color:\s*currentColor/.test(assetIconRule[1]),
+    /height:\s*1em/.test(slotIconRule[1]) &&
+      /width:\s*1em/.test(slotIconRule[1]),
+    "…a 1em box, so whichever kind fills it, it is the size of a glyph"
+  );
+  const maskRule = /\.manga-tools-slot-icon\.is-mask\s*\{([^}]*)\}/.exec(css);
+  assert.ok(maskRule, "and an uploaded SVG is drawn as a mask");
+  assert.ok(
+    /mask:\s*var\(--manga-tools-icon\)/.test(maskRule[1]) &&
+      /background-color:\s*currentColor/.test(maskRule[1]),
     "…which masks the file's shape and takes the colour from the text around it"
   );
-  for (const name of ["manga", "raw", "cooked"]) {
-    assert.ok(
-      new RegExp(
-        `\\.manga-tools-${name}-icon\\s*\\{[^}]*--manga-tools-icon:\\s*url\\("assets/icons/${name}\\.svg"\\)`
-      ).test(css),
-      `and .manga-tools-${name}-icon should name its own file, relatively, so it ` +
-        "follows the plugin's ID wherever it is installed"
-    );
-  }
   assert.ok(
     /\.manga-tools-original\s+\.manga-tools-raw-icon[^{]*\{[^}]*width:\s*1\.15em/.test(
       css
@@ -690,17 +685,24 @@ module.exports = () => {
     "languages.ts should be inlined into the bundle, not left as a separate file"
   );
 
-  // The artwork, which is the one thing the bundle cannot inline: `ui.assets` maps
-  // `assets/` to a served path, so a file that did not get copied is an icon that
-  // draws nothing — and nothing in Stash would say why. The names here are the ones
-  // the stylesheet asks for, one per rule.
-  for (const name of ["manga", "raw", "cooked"]) {
+  // **The icons are Font Awesome's now**, so the plugin ships no icon files of its
+  // own — what it does still ship is the shop favicons, and those are served from
+  // `assets/` the same way. A file the build forgets is a 404 that draws an empty
+  // box and says nothing.
+  for (const name of ["dlsite", "fanza", "toranoana", "melonbooks"]) {
     assert.ok(
-      fs.existsSync(path.join(PLUGIN, "assets", "icons", `${name}.svg`)),
-      `dist/ should carry assets/icons/${name}.svg: a served icon that was not ` +
-        "packaged is a mask over a 404, which draws an empty box and logs nothing"
+      fs.existsSync(
+        path.join(PLUGIN, "assets", "shops", `favicon-${name}.ico`)
+      ),
+      `dist/ should carry assets/shops/favicon-${name}.ico: a served icon that ` +
+        "was not packaged is an image over a 404, which draws nothing"
     );
   }
+  assert.ok(
+    !fs.existsSync(path.join(PLUGIN, "assets", "icons")),
+    "and no icons/ directory: the three bundled SVGs are gone, their slots are " +
+      "Font Awesome names or uploads now"
+  );
 
   // Both halves' stylesheets, for the same reason as the artwork: ui.css names
   // them one by one, so a file the manifest lists and the build does not copy is a

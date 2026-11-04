@@ -749,7 +749,7 @@ function AddShopMenu(props: {
   };
 
   const content = (
-    <Popover id="manga-tools-shop-add" className="manga-tools-shop-popover">
+    <Popover id="manga-tools-shop-add" className="manga-tools-popover">
       <Content>
         <Bootstrap.Button
           className="minimal"

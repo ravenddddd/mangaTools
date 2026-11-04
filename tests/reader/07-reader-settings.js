@@ -375,6 +375,7 @@ module.exports = async () => {
         "fields",
         "groupOrder",
         "hidePerformers",
+        "icons",
         "manageChapters",
         "openDetailsBlock",
         "openEditBlock",

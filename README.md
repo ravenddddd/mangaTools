@@ -754,6 +754,41 @@ in `assets/shops/` rather than fetched from the shops at runtime, which would de
 on the network, the shop's current paths, and would tell the shop the page was
 opened; an uploaded icon is the image itself, kept in the settings.
 
+### Icons
+
+Five icons the plugin draws are the reader's to choose: the **mark** that makes a
+gallery manga, the two states of the **original text** (as written, and
+translated), and the two of **censorship** (censored, uncensored). They live in a
+dialog behind one row on the settings page — a name, a preview and three buttons
+per slot is too much furniture to keep five of them inline.
+
+A slot's value is one string:
+
+- a **Font Awesome name** from the set Stash itself ships — `faM`, `faFont`,
+  `regular:faSquare` (the `regular:` prefix selects the outlined set; brands are
+  not offered). The editor checks a typed name against the very library Stash
+  hands the plugin, so a name that would draw nothing is refused there rather than
+  discovered on a card;
+- an **uploaded SVG**, kept in the settings as a data URI and drawn as a **mask**:
+  the file supplies the shape and the surrounding text supplies the colour. That
+  is also why an upload is safe — a mask is an image, and an image cannot run
+  script or fetch anything;
+- `""` — nothing is drawn. Empty is a choice, not an absence: it stays empty
+  rather than reverting to the default. Every slot may be emptied except the
+  mark, whose clear button is disabled — a gallery's "is this manga" toggle with
+  nothing drawn is a control nobody can find.
+
+The defaults are the letter `M` for the mark (the plugin's own name, and a shape
+that survives any size), `A` and `A` with a character from another script for the
+raw/translated pair, and the checkered square and the empty one for censorship:
+the mosaic, and the same tile without it. Every surface that draws one — the
+cover's info row, the sidebar, the details block, the edit block, the bulk dialog,
+the filter cards — reads the same five values, so a change in the dialog reaches
+all of them on the next redraw.
+
+The three SVGs the plugin used to ship (`assets/icons/`) are gone: they were
+somebody else's artwork, and a Font Awesome name needs no file at all.
+
 ### Settings
 
 **Settings → Plugins → Manga Tools**, drawn by the plugin itself (see "A custom UI"

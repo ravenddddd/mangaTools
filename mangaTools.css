@@ -1148,31 +1148,34 @@ button.minimal.manga-tools-manga-toggle.is-manga {
  * directory, so the relative URL lands on /plugin/<id>/assets/<path> as long as
  * the stylesheet is served from anywhere under /plugin/<id>/.
  */
-.manga-tools-manga-icon,
-.manga-tools-raw-icon,
-.manga-tools-cooked-icon {
+/*
+ * ── The five icons ─────────────────────────────────────────────────────────
+ *
+ * One box per slot, 1em square, in the colour of whatever it sits in. A Font
+ * Awesome glyph fills it; an uploaded SVG is drawn as a mask, so the file supplies
+ * the shape and the colour comes from here — which is also what keeps an uploaded
+ * file harmless: a mask is an image, and an image cannot run script.
+ */
+.manga-tools-slot-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1em;
+  width: 1em;
+  vertical-align: -0.125em;
+}
+
+.manga-tools-slot-icon > .fa-icon {
+  height: 1em;
+  margin: 0;
+  width: 1em;
+}
+
+.manga-tools-slot-icon.is-mask {
   background-color: currentColor;
   display: inline-block;
-  height: 1em;
-  vertical-align: -0.125em;
-  width: 1em;
   -webkit-mask: var(--manga-tools-icon) center / contain no-repeat;
   mask: var(--manga-tools-icon) center / contain no-repeat;
-}
-
-/* The file each one draws is the only thing that differs between them. The
-   stylesheet's own relative URLs are the fallback; the component overwrites
-   --manga-tools-icon with one built from the plugin's tag when it has it. */
-.manga-tools-manga-icon {
-  --manga-tools-icon: url("assets/icons/manga.svg");
-}
-
-.manga-tools-raw-icon {
-  --manga-tools-icon: url("assets/icons/raw.svg");
-}
-
-.manga-tools-cooked-icon {
-  --manga-tools-icon: url("assets/icons/cooked.svg");
 }
 
 /*
@@ -1318,7 +1321,7 @@ button.minimal.manga-tools-manga-toggle.is-manga {
 .manga-tools-shop-grip,
 .manga-tools-shop-form label,
 .manga-tools-shop-list-actions,
-.manga-tools-shop-popover,
+.manga-tools-popover,
 .manga-tools-shop-help {
   user-select: none;
   -webkit-user-select: none;
@@ -1501,14 +1504,14 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   font-size: 9px;
 }
 
-.manga-tools-shop-popover .btn.minimal {
+.manga-tools-popover .btn.minimal {
   display: flex;
   align-items: center;
   text-align: left;
   width: 100%;
 }
 
-.manga-tools-shop-popover .btn.minimal .fa-icon {
+.manga-tools-popover .btn.minimal .fa-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1518,20 +1521,21 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   width: 1.25em;
 }
 
-.manga-tools-shop-popover .btn.minimal .manga-tools-shop-icon,
-.manga-tools-shop-popover .btn.minimal .manga-tools-shop-letter {
+.manga-tools-popover .btn.minimal .manga-tools-shop-icon,
+.manga-tools-popover .btn.minimal .manga-tools-shop-letter,
+.manga-tools-popover .btn.minimal .manga-tools-slot-icon {
   flex-shrink: 0;
   margin-right: 0.4rem;
 }
 
-.manga-tools-shop-popover .manga-tools-shop-menu-divider {
+.manga-tools-popover .manga-tools-shop-menu-divider {
   border-top: 1px solid rgba(16, 22, 26, 0.3);
   height: 0;
   margin: 0.25rem -0.75rem;
   overflow: hidden;
 }
 
-.manga-tools-shop-popover .manga-tools-shop-menu-title {
+.manga-tools-popover .manga-tools-shop-menu-title {
   color: #8a9ba8;
   font-size: 0.8rem;
   margin: 2px 0 4px;
@@ -1540,4 +1544,82 @@ button.minimal.manga-tools-manga-toggle.is-manga {
 
 .manga-tools-shop-empty {
   color: #8a9ba8;
+}
+
+/*
+ * ── The icons dialog ──────────────────────────────────────────────────────
+ *
+ * Three blocks, each a heading on the left and its rows on the right — the same
+ * shape as the settings rows the dialog stands in for. The preview box is the size
+ * the icon is actually drawn at (18px), not a blown-up version of it, so a name
+ * that reads badly small reads badly here too.
+ */
+.manga-tools-icon-block {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+.manga-tools-icon-block + .manga-tools-icon-block {
+  border-top: 1px solid rgba(16, 22, 26, 0.6);
+}
+
+.manga-tools-icon-block h3 {
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.manga-tools-icon-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.manga-tools-icon-line-wrap + .manga-tools-icon-line-wrap {
+  margin-top: 8px;
+}
+
+.manga-tools-icon-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.manga-tools-icon-line-wrap .invalid-feedback {
+  margin-left: calc(4em + 22px + 16px);
+}
+
+.manga-tools-icon-name {
+  color: #8a9ba8;
+  font-size: 0.78rem;
+  text-align: right;
+  width: 4em;
+}
+
+.manga-tools-icon-preview {
+  align-items: center;
+  display: inline-flex;
+  font-size: 18px;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
+.manga-tools-icon-line input {
+  width: 150px;
+}
+
+/* The clear button is square and as tall as the buttons beside it — Bootstrap
+ * sizes a button from its padding, and this one has none. */
+.manga-tools-icon-clear {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  height: 2.375rem;
+  padding: 0;
+  width: 2.375rem;
+}
+
+.manga-tools-icon-clear .fa-icon {
+  margin: 0;
 }

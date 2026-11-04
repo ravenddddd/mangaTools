@@ -19,6 +19,7 @@ import { formatLanguageOption, languageChip, resolveSelect } from "./fields-ui";
 import { fieldLabel } from "./filter-model";
 import { MangaIcon } from "./icons";
 import { ShopsSetting } from "./shop-editor";
+import { IconsSetting } from "./icon-settings";
 import { requirePluginApi } from "../plugin-api";
 import type { ReactNode } from "react";
 import type {
@@ -695,6 +696,7 @@ function SettingsHeading(props: {
 /** The ids `unfoldedGroups` holds the three headings' folds under — not setting ids */
 const MARK_GROUP_ID = "mangaTools-markGroup";
 const MAINTENANCE_GROUP_ID = "mangaTools-maintenanceGroup";
+const ICONS_GROUP_ID = "mangaTools-iconsGroup";
 const DISPLAY_GROUP_ID = "mangaTools-displayGroup";
 
 export function MangaToolsSettings() {
@@ -1104,6 +1106,16 @@ export function MangaToolsSettings() {
             NS.coverIcon = next;
           })}
         />
+      </SettingsGroup>
+
+      {/* ── Icons ─────────────────────────────────────────────────────────── */}
+      {/* One row and a dialog behind it: five icons, each a name or an uploaded
+          SVG, and a dialog is where five of anything belongs on a page this long. */}
+      <SettingsGroup
+        id={ICONS_GROUP_ID}
+        heading={t(intl, "mangaTools.icons.heading")}
+      >
+        <IconsSetting persist={persist} />
       </SettingsGroup>
 
       {/* ── Maintenance ────────────────────────────────────────────────────── */}

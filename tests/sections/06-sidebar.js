@@ -832,16 +832,33 @@ module.exports = () => {
     "the censorship section is headed by this plugin's own word for it"
   );
 
-  const chessIcons = [];
-  find(censSection.node, (n) => {
-    if (n.type === "Icon" && /^faChess/.test(n.props.icon || ""))
-      chessIcons.push(n);
-    return false;
-  });
+  // The leading mark is drawn from the settings' `censored` / `uncensored` slots
+  // — not a name written into this module — so changing the slot changes what the
+  // row draws. The row is rendered again for that: the tree in hand was drawn with
+  // the value that was in force when it was built.
+  const rowIcon = (row) => {
+    const wrapper = find(
+      row,
+      (n) =>
+        typeof n.props?.className === "string" &&
+        n.props.className.split(" ").includes("manga-tools-censorship-icon")
+    );
+    return wrapper ? find(wrapper, (n) => n.type === "Icon") : null;
+  };
+  const censoredCandidate = candidateRows(censSection.node)[2];
   assert.ok(
-    chessIcons.length >= 2,
-    "each censorship value should draw a chess piece where a flag would go"
+    rowIcon(censoredCandidate),
+    "each censorship value draws an icon where a flag would go"
   );
+
+  const before = NS.icons.censored;
+  NS.icons.censored = "faMask";
+  assert.strictEqual(
+    rowIcon(candidateRows(renderCensorshipFilter().node)[2]).props.icon,
+    PluginApi.libraries.FontAwesomeSolid.faMask,
+    "…and it is whatever the censored slot names, read when the row is drawn"
+  );
+  NS.icons.censored = before;
 
   const censCandidates = candidateRows(censSection.node);
   assert.deepStrictEqual(

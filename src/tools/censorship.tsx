@@ -18,6 +18,7 @@
  */
 import { NS } from "../languages";
 import { t } from "../i18n";
+import { SlotIcon } from "./icons";
 import { requirePluginApi } from "../plugin-api";
 import type { MangaToolsIntl } from "../plugin-api";
 
@@ -64,65 +65,26 @@ NS.normalizeCensorship = (raw: unknown): string => {
 };
 
 /**
- * One icon per state, and the one place the three names are written down.
+ * The state's icon, or nothing at all.
  *
- * The pairing is a pun in the fandom's own vocabulary rather than anything to do
- * with chess: "cavalry" is what a censored release is, and "infantry" is what it
- * is — by way of the mosaic a censor lays over the page. A pawn and a knight say
- * the same thing in one glyph each. The joke is deliberately explained nowhere on
- * screen: the icons carry it, and a tooltip that spelled it out would be a
- * tooltip about a word rather than about the gallery.
- *
- * `faChessBoard` is the absence, and it earns its place twice over — it is the
- * third member of the same set, so the control reads as one thing with three
- * states rather than as two chess pieces beside a UI glyph, and a board with
- * nothing on it *is* "nothing marked yet". It looks a little like the mosaic the
- * other two are named after, which the dimmed grey helps along.
- *
- * No fallback name is needed, unlike `faXmark` in dialog-filter.tsx:
- * chess-board has been spelled that way in every FontAwesome since 5, so
- * whichever version Stash bundles answers to it.
+ * Drawn from the settings' `censored` / `uncensored` slots — the same two icons
+ * the dialog offers, on every surface that shows a state: the details row, the
+ * selector's menu, the sidebar's filter. An unknown value draws nothing rather
+ * than guessing: the value is what the reader stored, and the two states are the
+ * only ones this field has.
  */
-const ICONS: { [value: string]: string } = {
-  censored: "faChessKnight",
-  uncensored: "faChessPawn",
-  "": "faChessBoard",
-};
+export function CensorshipIcon(props: { value: string }) {
+  const slot =
+    props.value === "censored"
+      ? "censored"
+      : props.value === "uncensored"
+        ? "uncensored"
+        : null;
 
-/** Names already reported, so a page of galleries does not print a page of logs */
-const missingIcons: { [name: string]: boolean } = {};
-
-function noteMissingIcon(name: string): void {
-  if (missingIcons[name]) return;
-  missingIcons[name] = true;
-  console.error(
-    "[mangaTools] this Stash's FontAwesome has no " +
-      name +
-      ", so that icon is drawn as nothing. Run this in the console to see which " +
-      "names it does have: window.PluginApi.libraries.FontAwesomeSolid." +
-      name
-  );
+  return slot ? (
+    <SlotIcon slot={slot} className="manga-tools-censorship-icon" />
+  ) : null;
 }
-
-/**
- * The icon definition for a state, or null when this Stash has no such name.
- *
- * The lookup is by string, at runtime, so a name the bundled set does not have
- * comes back undefined — and undefined handed to Stash's Icon *throws inside a
- * render*, which takes the whole page down rather than one glyph. The names above
- * are checked against the wrong source by nature: FontAwesome's docs list every
- * version, not the subset a given Stash ships.
- */
-NS.censorshipIcon = (value: string): unknown => {
-  const Solid = PluginApi.libraries.FontAwesomeSolid || {};
-  const name = ICONS[value] || ICONS[""];
-  const icon = Solid[name];
-  if (!icon) {
-    noteMissingIcon(name);
-    return null;
-  }
-  return icon;
-};
 
 /** The plugin's own word for a state, for a tooltip or a label */
 NS.censorshipLabel = (intl: MangaToolsIntl, value: string): string => {
@@ -131,19 +93,6 @@ NS.censorshipLabel = (intl: MangaToolsIntl, value: string): string => {
     return t(intl, "mangaTools.censorship.uncensored");
   return t(intl, "mangaTools.censorship.unset");
 };
-
-/**
- * The state's icon, or nothing at all when this Stash has no such name.
- *
- * A component rather than a bare `<Icon icon={censorshipIcon(...)} />`, so that a
- * missing name costs one glyph instead of throwing through a render — which on a
- * detail page would mean the page, not the icon.
- */
-export function CensorshipIcon(props: { value: string }) {
-  const Icon = PluginApi.components.Icon;
-  const icon = NS.censorshipIcon(props.value);
-  return icon ? <Icon icon={icon} /> : null;
-}
 
 /**
  * One option of the selector: the state's icon, then its name.

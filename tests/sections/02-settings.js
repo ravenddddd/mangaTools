@@ -399,11 +399,12 @@ module.exports = () => {
   });
   assert.strictEqual(
     rowCount,
-    switches.length + 2,
+    switches.length + 3,
     "every row carries the class the stylesheet uses to keep its control beside " +
       "its text — the switches' rows, the one single-choice row, which has a " +
-      "select where they have a switch, and the maintenance row, whose control is " +
-      "a button and needs the same rule for the same reason"
+      "select where they have a switch, and the two rows whose control is a button " +
+      "(the icons dialog's way in and the maintenance one's) and need the same rule " +
+      "for the same reason"
   );
   assert.deepStrictEqual(
     switches.map((n) => n.props.id),
@@ -770,10 +771,11 @@ module.exports = () => {
     const chevrons = chevronsIn(page);
     assert.strictEqual(
       chevrons.length,
-      7,
+      8,
       "one chevron per row that has rows under it, and no row without them — " +
         "the translation group's switch is one of them now, since its list order " +
-        "is a row under it, and so is the maintenance group at the end of the page"
+        "is a row under it, and so are the icons group and the maintenance group " +
+        "at the end of the page"
     );
     assert.ok(
       chevrons.every((c) => c.type === "button"),
@@ -1113,6 +1115,12 @@ module.exports = () => {
   // 11's subject.
   const SHOPS_JSON = NS.shopsToJson(NS.SHOPS);
 
+  // The five icons, one JSON string, at their defaults — the list itself is the
+  // icons dialog's subject; here it only has to be part of the whole map.
+  const ICONS_JSON =
+    '{"mark":"faM","raw":"faFont","cooked":"faLanguage",' +
+    '"censored":"faChessBoard","uncensored":"regular:faSquare"}';
+
   // Selecting a new set writes it back through configurePlugin and updates the
   // shared NS.enabledLanguages immediately.
   settingsSelect.props.onChange([{ value: "ja" }, { value: "zh-Hans" }]);
@@ -1159,6 +1167,7 @@ module.exports = () => {
         // section 11's subject; here it only has to be part of the whole map, since
         // the mutation replaces the map rather than merging into it.
         shops: SHOPS_JSON,
+        icons: ICONS_JSON,
         // The reading half's own settings are part of this map too, and empty here
         // because nothing has been written to the library — see the reader's
         // readSettings, where absent is what puts the browser's value back in force.
@@ -1336,6 +1345,7 @@ module.exports = () => {
       physicalPages: false,
       shopLinks: false,
       shops: SHOPS_JSON,
+      icons: ICONS_JSON,
       manageChapters: true,
       fields: true,
       fieldLanguage: true,

@@ -24,6 +24,12 @@ import "./fields";
 import { NS, collatorFor } from "../languages";
 import { gqlDoc, requirePluginApi } from "../plugin-api";
 import { builtinShops, shopsFromJson, shopsToJson } from "./shop-model";
+import {
+  DEFAULT_ICONS,
+  ICON_SLOTS,
+  iconsFromJson,
+  iconsToJson,
+} from "./icon-model";
 import type {
   MangaToolsApolloClient,
   MangaToolsCustomFields,
@@ -539,6 +545,10 @@ NS.shopLinks = SHOP_LINKS_BY_DEFAULT;
 // stored list (which may be empty: removing every shop is a choice, not an
 // absence, and `shopsFromJson` is what tells those two apart).
 NS.shops = builtinShops();
+// The five icons, at their defaults until Stash answers — the same reading the
+// shops get: absent means "what the plugin always drew".
+NS.icons = { ...DEFAULT_ICONS };
+NS.ICON_SLOTS = ICON_SLOTS.slice();
 NS.manageChapters = FEATURE_ON_BY_DEFAULT;
 NS.fields = FEATURE_ON_BY_DEFAULT;
 NS.fieldLanguage = FEATURE_ON_BY_DEFAULT;
@@ -683,6 +693,7 @@ function refreshSettings(): void {
       // editor) reads as the four presets; an empty list is a real answer and stays
       // empty — see shopsFromJson.
       NS.shops = shopsFromJson(pluginCfg ? pluginCfg.shops : null);
+      NS.icons = iconsFromJson(pluginCfg ? pluginCfg.icons : null);
 
       NS.showFlags = NS.parseFlag(pluginCfg ? pluginCfg.showFlags : null, true);
       NS.showCoverBadge = NS.parseFlag(
@@ -1086,6 +1097,9 @@ function settingsInput(): { [key: string]: unknown } {
     shopLinks: NS.shopLinks,
     // The whole list, one JSON string — the shape `readerSettings` already uses.
     shops: shopsToJson(NS.shops),
+    // The five icons, one JSON string — `""` in a slot is a choice, so every slot
+    // is written rather than the map being left sparse.
+    icons: iconsToJson(NS.icons as never),
     manageChapters: NS.manageChapters,
     fields: NS.fields,
     fieldLanguage: NS.fieldLanguage,

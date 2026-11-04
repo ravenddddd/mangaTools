@@ -315,7 +315,33 @@ export interface MangaToolsNamespace {
    * The icon definition for a censorship state, or null when this Stash's
    * FontAwesome has no such name. See censorship.tsx.
    */
-  censorshipIcon(value: string): unknown;
+  /**
+   * The five icons the reader chose, by slot (`mark`, `raw`, `cooked`,
+   * `censored`, `uncensored`). One string each — a Font Awesome name
+   * (`regular:` for the outlined set) or an uploaded SVG as a data URI; `""` means
+   * the slot draws nothing.
+   */
+  icons: { [slot: string]: string };
+  /** The flat list of slot names, for the dialog and the tests. */
+  ICON_SLOTS: string[];
+  /** The settings row that opens the icons dialog. */
+  iconsSetting: unknown;
+  /** The icons dialog, rendered only while it is open. */
+  iconsDialog: unknown;
+  /** One JSON string as the five slots; absent or unreadable reads as defaults. */
+  iconsFromJson(raw: unknown): { [slot: string]: string };
+  /** The five slots as the settings store them — every slot written. */
+  iconsToJson(icons: { [slot: string]: string }): string;
+  /** What a library that never opened the dialog gets. */
+  DEFAULT_ICONS: { [slot: string]: string };
+  /** A value split into its Font Awesome style and name, or null. */
+  parseChoice(value: string): { style: string; name: string } | null;
+  /** Whether a value is an uploaded SVG. */
+  isUpload(value: string): boolean;
+  /** One slot's icon as drawn; published for the smoke test. */
+  slotIcon: unknown;
+  /** One value drawn, for the same. */
+  iconView: unknown;
   /** The plugin's own word for a censorship state, for a tooltip or a label. */
   censorshipLabel(intl: MangaToolsIntl, value: string): string;
 

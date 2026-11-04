@@ -1,68 +1,124 @@
 /**
- * The plugin's own artwork: the mark's icon and the two steaks.
+ * The five icons the settings page lets a reader choose, drawn.
  *
- * They are drawn as a CSS mask over a file each (see the `.manga-tools-*-icon`
- * rules in mangaTools.css), and the file is fetched from
- * where Stash serves this plugin's mapped assets — `assetBase`, which is only
- * known once start() has run, so an unset one falls back to the stylesheet's own
- * relative URL rather than drawing nothing.
+ * **One renderer for two kinds of picture.** A slot holds either a Font Awesome
+ * name or an uploaded SVG, and every surface draws it the same way: a 1em box
+ * that takes the surrounding colour, with a font glyph or a mask inside it. The
+ * mask is how the uploaded file is coloured — the file supplies the shape and
+ * `background-color` supplies the colour, which is also what makes an SVG safe to
+ * accept: a mask is an image, and an image cannot run script.
  *
- * Here rather than in the entry file because the surfaces that draw them are
- * modules of their own: the settings page draws the mark's icon in its help
- * examples, and the edit page and the bulk row draw the steaks.
+ * The current values live in `NS.icons`, refreshed with the rest of the settings,
+ * so a change made in the dialog reaches every surface on the next redraw.
  */
-import { assetBase } from "./core";
+import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
+import { isUpload, parseChoice, type IconSlot } from "./icon-model";
 
 const PluginApi = requirePluginApi();
 
-// Must stay: the classic JSX transform compiles every element to
-// React.createElement, which resolves to this binding.
+// The classic JSX transform compiles every element to React.createElement, which
+// resolves to this binding; the inline style below uses it by name as well.
 const React = PluginApi.React;
 
-/**
- * One of the SVG files this plugin ships, drawn as a mask.
- *
- * A span with a mask rather than an `<svg>`: the artwork is a file, shipped as
- * downloaded with its attribution comment intact, and a file cannot see the
- * page's `currentColor` — that only works for markup inlined into the page. A CSS
- * mask reads the shape and ignores the colour, so the file supplies one and
- * `background-color` supplies the other, and a state is a colour rule each. The
- * class names the icon: `.manga-tools-<name>-icon` carries the file, and the
- * declarations they all share are written once in mangaTools.css.
- */
-function AssetIcon(props: { file: string; className: string }) {
-  // The stylesheet carries a relative URL for this, and it is right whenever
-  // plugin files sit under one path. This is the same answer reached from the
-  // plugin's own tag instead, which does not depend on that being true — and it is
-  // only known after start() has run.
-  const style = assetBase
-    ? ({
-        "--manga-tools-icon": `url("${assetBase}assets/icons/${props.file}")`,
-      } as React.CSSProperties)
-    : undefined;
+/** Names already reported, so a page of galleries does not print a page of logs. */
+const missingNames: { [name: string]: boolean } = {};
 
-  return <span className={props.className} aria-hidden="true" style={style} />;
+function noteMissingName(name: string): void {
+  if (missingNames[name]) return;
+  missingNames[name] = true;
+  console.error(
+    "[mangaTools] this Stash's FontAwesome has no " +
+      name +
+      ", so that icon is drawn as nothing. Check the name on the settings page's " +
+      "icons dialog."
+  );
 }
 
-/** The mark's icon — the one that makes a gallery manga. */
+/** The Font Awesome definition for a stored value, or null when there is none. */
+export function iconDefinition(value: string): unknown {
+  const choice = parseChoice(value);
+  if (!choice) return null;
+
+  const library =
+    choice.style === "regular"
+      ? PluginApi.libraries.FontAwesomeRegular
+      : PluginApi.libraries.FontAwesomeSolid;
+  const icon = library ? library[choice.name] : undefined;
+  if (!icon) {
+    noteMissingName(value);
+    return null;
+  }
+  return icon;
+}
+
+/**
+ * One value drawn, in a 1em box — or nothing at all when the value is empty.
+ *
+ * Takes the value rather than a slot, so the editor's preview can draw the draft
+ * it is showing without touching what is in force.
+ */
+export function IconView(props: { value: string; className?: string }) {
+  const value = props.value;
+  if (!value) return null;
+
+  const className =
+    "manga-tools-slot-icon" + (props.className ? " " + props.className : "");
+
+  if (isUpload(value)) {
+    return (
+      <span
+        className={className + " is-mask"}
+        aria-hidden="true"
+        style={
+          { "--manga-tools-icon": `url("${value}")` } as React.CSSProperties
+        }
+      />
+    );
+  }
+
+  const Icon = PluginApi.components.Icon;
+  const icon = iconDefinition(value);
+  if (!Icon || !icon) return null;
+
+  return (
+    <span className={className} aria-hidden="true">
+      <Icon icon={icon} />
+    </span>
+  );
+}
+
+/**
+ * One slot's icon as it is in force — or nothing at all when the slot is empty.
+ *
+ * Nothing rather than a placeholder: an empty slot is a choice the reader made,
+ * and the call sites are laid out so that a missing icon costs a gap, not a
+ * layout.
+ */
+export function SlotIcon(props: { slot: IconSlot; className?: string }) {
+  return <IconView value={NS.icons[props.slot]} className={props.className} />;
+}
+
+/**
+ * The mark — the one that makes a gallery manga.
+ *
+ * The class is kept for the stylesheet and the tests: it says which slot this is
+ * on the surfaces that draw more than one icon.
+ */
 export function MangaIcon() {
-  return <AssetIcon className="manga-tools-manga-icon" file="manga.svg" />;
+  return <SlotIcon slot="mark" className="manga-tools-manga-icon" />;
 }
 
-/**
- * The two steaks: raw, and cooked.
- *
- * The joke is the fandom's — an untranslated work is "raw meat", and what a
- * translation makes of it is that meat cooked. It is worth keeping for a
- * reason beyond the joke: neither file says a word of anybody's language, so the
- * state of the field reads the same whatever Stash's UI is set to. The words go in
- * the button's name and its tooltip, where the reader's language does apply.
- */
+// Published for the smoke test, which reaches the tools half through the window.
+NS.slotIcon = SlotIcon;
+NS.iconView = IconView;
+
+/** The two states of the original text: as written, and translated. */
 export function SteakIcon(props: { raw: boolean }) {
-  return props.raw ? (
-    <AssetIcon className="manga-tools-raw-icon" file="raw.svg" />
-  ) : (
-    <AssetIcon className="manga-tools-cooked-icon" file="cooked.svg" />
+  return (
+    <SlotIcon
+      slot={props.raw ? "raw" : "cooked"}
+      className={props.raw ? "manga-tools-raw-icon" : "manga-tools-cooked-icon"}
+    />
   );
 }
