@@ -131,6 +131,38 @@ export function shopIconUrl(shop: Shop): string {
 }
 
 /**
+ * A stand-in icon for a shop that has none: its first character, on a colour
+ * derived from its name.
+ *
+ * The colour is the name's hash rather than a stored value, so the same shop is
+ * the same block everywhere it is drawn — badges, link heads, the editor — and
+ * on every browser, with nothing to keep in step. 45% saturation keeps every hue
+ * readable under white type; 38% lightness keeps it dark enough for Stash's dark
+ * theme.
+ */
+export interface ShopLetter {
+  letter: string;
+  color: string;
+}
+
+export function shopLetter(shop: Shop): ShopLetter | null {
+  if (shopIconUrl(shop)) return null;
+
+  const name = shop.name.trim();
+  if (!name) return null;
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  }
+
+  return {
+    letter: Array.from(name)[0].toUpperCase(),
+    color: "hsl(" + (hash % 360) + ", 45%, 38%)",
+  };
+}
+
+/**
  * The badges in the manga info block: icon and code, each one a link.
  *
  * No shop name: the icon says which shop, and the code is what a reader actually
@@ -141,6 +173,7 @@ export function ShopBadges(props: { links: ShopLink[] }) {
     <span className="manga-tools-shop-badges">
       {props.links.map((link) => {
         const src = shopIconUrl(link.shop);
+        const letter = src ? null : shopLetter(link.shop);
         const title = link.shop.name + (link.code ? " · " + link.code : "");
 
         return (
@@ -154,6 +187,14 @@ export function ShopBadges(props: { links: ShopLink[] }) {
           >
             {src ? (
               <img className="is-favicon" src={src} alt={link.shop.name} />
+            ) : letter ? (
+              <span
+                className="manga-tools-shop-letter"
+                aria-hidden="true"
+                style={{ backgroundColor: letter.color }}
+              >
+                {letter.letter}
+              </span>
             ) : null}
             {link.code ? (
               <span className="manga-tools-shop-code">{link.code}</span>
@@ -177,3 +218,4 @@ NS.normalizeDomain = normalizeDomain;
 NS.compilePattern = compilePattern;
 NS.nameTaken = nameTaken;
 NS.domainOwner = domainOwner;
+NS.shopLetter = shopLetter;

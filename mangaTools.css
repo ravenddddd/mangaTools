@@ -1454,6 +1454,36 @@ button.minimal.manga-tools-manga-toggle.is-manga {
  * popover: a full-width, left-aligned row, the icon in a fixed slot, and a
  * divider that runs the width of the card.
  */
+/*
+ * The dialog's footer holds two groups: the add button, pushed to the left edge,
+ * and the two buttons Stash's footer already pushes right.
+ */
+.modal-footer > .manga-tools-shop-add {
+  margin-right: auto;
+}
+
+/* A shop with no icon of its own: its first character on a colour derived from
+ * its name, the same block in the badges, the link row's head and this editor. */
+.manga-tools-shop-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.manga-tools-shop-badge .manga-tools-shop-letter {
+  width: 15px;
+  height: 15px;
+  font-size: 9px;
+}
+
 .manga-tools-shop-popover .btn.minimal {
   display: flex;
   align-items: center;

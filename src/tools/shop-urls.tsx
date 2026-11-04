@@ -22,7 +22,7 @@
  */
 import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
-import { shopOf, shopIconUrl } from "./shops";
+import { shopLetter, shopOf, shopIconUrl, type ShopLetter } from "./shops";
 
 const PluginApi = requirePluginApi();
 
@@ -46,6 +46,8 @@ function ownPrefix(group: HTMLElement): HTMLElement | null {
 function headFor(input: HTMLInputElement): {
   key: string;
   src: string;
+  /** The fallback when there is no image: first letter, and its colour */
+  letter: ShopLetter | null;
   title: string;
 } | null {
   const found = shopOf(input.value || "");
@@ -57,6 +59,7 @@ function headFor(input: HTMLInputElement): {
     // rewrites the attribute on the next pass.
     key: found.shop.name,
     src: shopIconUrl(found.shop),
+    letter: shopLetter(found.shop),
     title: found.shop.name + (found.code ? " · " + found.code : ""),
   };
 }
@@ -98,7 +101,14 @@ export function decorateShopUrls(form: Element): void {
       }
 
       let img = current.querySelector("img") as HTMLImageElement | null;
+      let mark = current.querySelector(
+        ".manga-tools-shop-letter"
+      ) as HTMLElement | null;
       if (want.src) {
+        if (mark) {
+          mark.remove();
+          mark = null;
+        }
         if (!img) {
           img = iconFor(want.src, want.title);
           text?.appendChild(img);
@@ -106,10 +116,27 @@ export function decorateShopUrls(form: Element): void {
           if (img.getAttribute("src") !== want.src) img.src = want.src;
           if (img.alt !== want.title) img.alt = want.title;
         }
-      } else if (img) {
-        // The asset base is unknown: `shopIconUrl`'s contract is no image rather
-        // than a broken one, and `src=""` resolves to the document itself.
-        img.remove();
+      } else if (want.letter) {
+        if (img) {
+          img.remove();
+          img = null;
+        }
+        if (!mark) {
+          mark = letterFor(want.letter);
+          text?.appendChild(mark);
+        } else {
+          if (mark.textContent !== want.letter.letter) {
+            mark.textContent = want.letter.letter;
+          }
+          if (mark.style.backgroundColor !== want.letter.color) {
+            mark.style.backgroundColor = want.letter.color;
+          }
+        }
+      } else {
+        // No image and no name to stand in: `shopIconUrl`'s contract is no image
+        // rather than a broken one, and `src=""` resolves to the document itself.
+        if (img) img.remove();
+        if (mark) mark.remove();
       }
       continue;
     }
@@ -124,9 +151,20 @@ export function decorateShopUrls(form: Element): void {
     // Only when there is somewhere to point it: an empty `src` is an image
     // pointing at the page, which is a broken icon rather than no icon.
     if (want.src) text.appendChild(iconFor(want.src, want.title));
+    else if (want.letter) text.appendChild(letterFor(want.letter));
     prepend.appendChild(text);
     group.insertBefore(prepend, group.children[0] || null);
   }
+}
+
+/** A shop with no image: its first letter, on the colour its name gives it. */
+function letterFor(letter: ShopLetter): HTMLElement {
+  const mark = document.createElement("span");
+  mark.className = "manga-tools-shop-letter";
+  mark.setAttribute("aria-hidden", "true");
+  mark.style.backgroundColor = letter.color;
+  mark.textContent = letter.letter;
+  return mark;
 }
 
 /** The head's icon, with the shop and code as its alternative text */

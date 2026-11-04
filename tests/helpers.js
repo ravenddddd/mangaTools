@@ -599,6 +599,9 @@ function makeEl(tag) {
     // querySelector below reads — so the two representations never disagree.
     attributes: {},
     listeners: {},
+    // A real element has inline styles, and the shop head's letter mark sets one
+    // (its colour). Kept as a plain object: what the tests read is what was set.
+    style: {},
     text: "",
     setAttribute(name, value) {
       el.attributes[name] = String(value);

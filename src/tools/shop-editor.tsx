@@ -28,7 +28,7 @@
  */
 import { NS } from "../languages";
 import { emit } from "./core";
-import { shopIconUrl } from "./shops";
+import { shopIconUrl, shopLetter } from "./shops";
 import { numbered, stringFor, t } from "../i18n";
 import { requirePluginApi } from "../plugin-api";
 import {
@@ -424,14 +424,7 @@ export function ShopDialog(props: {
                     }
                   />
                 </span>
-                {shopIconUrl(shop) ? (
-                  <img
-                    className="manga-tools-shop-icon"
-                    src={shopIconUrl(shop)}
-                    alt=""
-                    draggable={false}
-                  />
-                ) : null}
+                <ShopIcon shop={shop} />
                 <span className="manga-tools-shop-name">
                   {shop.name.trim() || t(intl, "mangaTools.shops.unnamed")}
                 </span>
@@ -558,6 +551,37 @@ function pickIcon(done: (icon: string) => void): void {
 }
 
 /**
+ * A shop's icon, or the first letter of its name on the colour that name gives
+ * it — the same block the badges and the link-row heads draw.
+ */
+function ShopIcon(props: { shop: Shop }) {
+  const src = shopIconUrl(props.shop);
+  if (src) {
+    return (
+      <img
+        className="manga-tools-shop-icon"
+        src={src}
+        alt=""
+        draggable={false}
+      />
+    );
+  }
+
+  const letter = shopLetter(props.shop);
+  if (!letter) return null;
+
+  return (
+    <span
+      className="manga-tools-shop-letter"
+      aria-hidden="true"
+      style={{ backgroundColor: letter.color }}
+    >
+      {letter.letter}
+    </span>
+  );
+}
+
+/**
  * "Add a shop": a button in the footer's left corner, and Stash's own popover.
  *
  * The popover is the one Stash draws for "set image" — a `Popover` on a click
@@ -572,14 +596,28 @@ function AddShopMenu(props: {
 }) {
   const intl = PluginApi.libraries.Intl.useIntl();
   const Bootstrap = PluginApi.libraries.Bootstrap;
-  const Overlay = Bootstrap ? Bootstrap.OverlayTrigger : null;
+  const Overlay = Bootstrap ? Bootstrap.Overlay : null;
   const Popover = Bootstrap ? Bootstrap.Popover : null;
   const Content = Popover ? Popover.Content : null;
+
+  // A DOM node rather than the Button itself: react-bootstrap 1.x checks the
+  // target with `findDOMNode` for a component, and that is on its way out in the
+  // React Stash 0.32 runs. A wrapper span is the element it needs either way.
+  const button = React.useRef<HTMLElement | null>(null);
+  const openState = React.useState(false);
+  const open = openState[0];
+  const setOpen = openState[1];
 
   if (!Bootstrap?.Button || !Overlay || !Popover || !Content) return null;
 
   const icon = (glyph: unknown) =>
     glyph ? <PluginApi.components.Icon icon={glyph} /> : null;
+
+  /** A row's action: close the menu first, so a new form does not open under it. */
+  const choose = (shop: Shop) => {
+    setOpen(false);
+    props.onAdd(shop);
+  };
 
   const content = (
     <Popover id="manga-tools-shop-add" className="manga-tools-shop-popover">
@@ -587,7 +625,7 @@ function AddShopMenu(props: {
         <Bootstrap.Button
           className="minimal"
           onClick={() =>
-            props.onAdd({ name: "", icon: "", domains: [], regexes: [] })
+            choose({ name: "", icon: "", domains: [], regexes: [] })
           }
         >
           {icon(PluginApi.libraries.FontAwesomeSolid?.faPlus)}
@@ -599,22 +637,14 @@ function AddShopMenu(props: {
         </div>
         {BUILTIN_SHOPS.map((preset) => {
           const allowed = props.canAdd(preset);
-          const src = shopIconUrl(preset);
           return (
             <Bootstrap.Button
               key={preset.name}
               className="minimal"
               disabled={!allowed}
-              onClick={allowed ? () => props.onAdd(preset) : undefined}
+              onClick={allowed ? () => choose(preset) : undefined}
             >
-              {src ? (
-                <img
-                  className="manga-tools-shop-icon"
-                  src={src}
-                  alt=""
-                  draggable={false}
-                />
-              ) : null}
+              <ShopIcon shop={preset} />
               <span>{preset.name}</span>
             </Bootstrap.Button>
           );
@@ -624,11 +654,24 @@ function AddShopMenu(props: {
   );
 
   return (
-    <Overlay trigger="click" rootClose placement="top" overlay={content}>
-      <Bootstrap.Button variant="secondary">
-        {t(intl, "mangaTools.shops.add")}
-      </Bootstrap.Button>
-    </Overlay>
+    <>
+      <span ref={button}>
+        <Bootstrap.Button variant="secondary" onClick={() => setOpen(!open)}>
+          {t(intl, "mangaTools.shops.add")}
+        </Bootstrap.Button>
+      </span>
+      {open && button.current ? (
+        <Overlay
+          target={button.current}
+          show
+          onHide={() => setOpen(false)}
+          rootClose
+          placement="top"
+        >
+          {content}
+        </Overlay>
+      ) : null}
+    </>
   );
 }
 
@@ -754,14 +797,7 @@ function ShopForm(props: {
         "manga-tools-shop-icon",
         t(intl, "mangaTools.shops.icon"),
         <div className="manga-tools-shop-icon-row">
-          {src ? (
-            <img
-              className="manga-tools-shop-icon"
-              src={src}
-              alt=""
-              draggable={false}
-            />
-          ) : null}
+          <ShopIcon shop={props.shop} />
           {Bootstrap?.Button ? (
             <Bootstrap.Button variant="secondary" onClick={props.onOpenIcon}>
               {t(intl, "mangaTools.shops.pickIcon")}

@@ -182,6 +182,11 @@ module.exports = () => {
         "…with no image when the asset base is unknown"
       );
       assert.strictEqual(
+        head.querySelector(".manga-tools-shop-letter").textContent,
+        "D",
+        "…and the name's first letter where the image would be"
+      );
+      assert.strictEqual(
         head.querySelector(".input-group-text").getAttribute("title"),
         "DLsite · BJ03044888",
         "…but with the shop and the code still named"
@@ -725,6 +730,50 @@ module.exports = () => {
     assert.ok(
       !hasText(tree, "Product code patterns"),
       "no form is open until a row is clicked"
+    );
+  });
+
+  /** A shop with no icon of its own: its first letter, on a colour from its name. */
+  runSection("16 a shop without an icon gets its first letter", () => {
+    const shop = (name, icon) => ({
+      name,
+      icon,
+      domains: ["example.test"],
+      regexes: [],
+    });
+
+    assert.strictEqual(
+      NS.shopLetter(shop("Example", "data:image/png;base64,AA==")),
+      null,
+      "an icon of its own needs no stand-in"
+    );
+
+    const letter = NS.shopLetter(shop("Example", ""));
+    assert.strictEqual(letter.letter, "E", "the first character, upper case");
+    assert.match(
+      letter.color,
+      /^hsl\(\d+, 45%, 38%\)$/,
+      "a colour, not a stored value"
+    );
+    assert.deepStrictEqual(
+      NS.shopLetter(shop("Example", "")),
+      letter,
+      "the same name is always the same block"
+    );
+    assert.notStrictEqual(
+      NS.shopLetter(shop("Another", "")).color,
+      letter.color,
+      "and a different name is a different block"
+    );
+    assert.strictEqual(
+      NS.shopLetter(shop("虎穴", "")).letter,
+      "虎",
+      "a non-Latin name keeps its own first character"
+    );
+    assert.strictEqual(
+      NS.shopLetter(shop("   ", "")),
+      null,
+      "a shop with no name yet has nothing to show"
     );
   });
 

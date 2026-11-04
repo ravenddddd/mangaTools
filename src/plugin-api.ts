@@ -553,6 +553,8 @@ export interface MangaToolsNamespace {
   nameTaken(shops: unknown[], name: string, except: number): boolean;
   /** The shop already using a domain, or null. */
   domainOwner(shops: unknown[], domain: string, except: number): unknown;
+  /** The stand-in icon for a shop without one: a letter and its colour. */
+  shopLetter(shop: unknown): { letter: string; color: string } | null;
   /** The settings row that opens the shop editor. */
   shopsSetting: unknown;
   /** The editor dialog, for the smoke test: rendered only while it is open. */
@@ -1166,6 +1168,8 @@ export interface IPluginApi {
        * Optional: the code falls back to `title` when a Stash exposes neither.
        */
       OverlayTrigger?: ComponentType<Record<string, unknown>>;
+      /** The controlled overlay behind the shop editor's add menu. */
+      Overlay?: ComponentType<Record<string, unknown>>;
       Tooltip?: ComponentType<Record<string, unknown>>;
       /** The popover pair, for the shop editor's "add" menu (react-bootstrap 1.x). */
       Popover?: ComponentType<Record<string, unknown>> & {
