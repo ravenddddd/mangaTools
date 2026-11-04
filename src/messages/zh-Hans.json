@@ -165,7 +165,7 @@
   "mangaTools.clearFields.total": "将会影响 {n} 个画廊",
   "mangaTools.clearFields.job": "移除本插件的字段",
   "mangaTools.settings.shops.heading": "已识别的商店",
-  "mangaTools.settings.shops.count": "{n} 个",
+  "mangaTools.settings.shops.titleWithCount": "已识别的商店（{n} 个）",
   "mangaTools.shops.edit": "编辑…",
   "mangaTools.shops.title": "编辑商店",
   "mangaTools.shops.add": "+ 添加商店",

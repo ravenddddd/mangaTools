@@ -74,7 +74,7 @@ module.exports = () => {
         ["https://book.dmm.co.jp/product/123456/", "FANZA", ""],
         [
           "https://ec.toranoana.jp/tora_r/ec/item/040030474993/",
-          "虎穴",
+          "Toranoana",
           "040030474993",
         ],
         [
@@ -223,12 +223,12 @@ module.exports = () => {
       NS.decorateShopUrls(form);
       assert.strictEqual(
         head.getAttribute("data-shop"),
-        "虎穴",
+        "Toranoana",
         "changing the link changes the head in place"
       );
       assert.strictEqual(
         head.querySelector(".input-group-text").getAttribute("title"),
-        "虎穴 · 040030474993",
+        "Toranoana · 040030474993",
         "…title and all"
       );
       assert.strictEqual(
@@ -306,7 +306,7 @@ module.exports = () => {
     form.listeners.dragend();
     assert.strictEqual(
       head().getAttribute("data-shop"),
-      "虎穴",
+      "Toranoana",
       "dragend re-decorates the row React rewrote"
     );
 
@@ -462,7 +462,7 @@ module.exports = () => {
    */
   runSection("16 the shop list parses, and falls back to the presets", () => {
     const names = (list) => list.map((shop) => shop.name);
-    const presets = ["DLsite", "FANZA", "虎穴", "Melonbooks"];
+    const presets = ["DLsite", "FANZA", "Toranoana", "Melonbooks"];
 
     assert.deepStrictEqual(
       names(NS.shopsFromJson(null)),
@@ -558,7 +558,7 @@ module.exports = () => {
 
       assert.deepStrictEqual(
         NS.shops.map((shop) => shop.name),
-        ["DLsite", "FANZA", "虎穴", "Melonbooks"],
+        ["DLsite", "FANZA", "Toranoana", "Melonbooks"],
         "the list in force is put back for the sections after this one"
       );
     }
@@ -720,7 +720,7 @@ module.exports = () => {
     assert.ok(tree, "the dialog renders");
     assert.ok(hasText(tree, "DLsite"), "every shop in the list has a row");
     assert.ok(hasText(tree, "FANZA"), "…including the presets");
-    assert.ok(hasText(tree, "虎穴"), "…all of them");
+    assert.ok(hasText(tree, "Toranoana"), "…all of them");
     assert.ok(hasText(tree, "Melonbooks"), "…in the order they are matched in");
     assert.ok(
       !hasText(tree, "Product code patterns"),
@@ -740,7 +740,7 @@ module.exports = () => {
         row,
         NS.stringFor(
           state.currentLocale,
-          "mangaTools.settings.shops.count"
+          "mangaTools.settings.shops.titleWithCount"
         ).replace("{n}", String(NS.shops.length))
       ),
       "and counts the shops in the list"

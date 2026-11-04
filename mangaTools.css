@@ -1305,6 +1305,33 @@ button.minimal.manga-tools-manga-toggle.is-manga {
  * row at the end to type into.
  */
 
+/*
+ * Nothing in the editor is text to be selected: a row is a target, a grip is a
+ * drag, and a label names the field beside it. Left selectable, a press-and-drag
+ * on a row paints a selection across the name and the label instead of moving the
+ * row — and the grip's own drag is exactly that gesture. The inputs are left
+ * alone: what is typed in them is meant to be copied.
+ */
+.manga-tools-shop-row,
+.manga-tools-shop-name,
+.manga-tools-shop-icon,
+.manga-tools-shop-grip,
+.manga-tools-shop-form label,
+.manga-tools-shop-preset,
+.manga-tools-shop-list-actions,
+.manga-tools-shop-menu-entry,
+.manga-tools-shop-menu-title,
+.manga-tools-shop-help {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* An image left draggable starts a native image drag, which would shadow the
+ * row's own drag. */
+.manga-tools-shop-icon {
+  -webkit-user-drag: none;
+}
+
 .manga-tools-shop-entry + .manga-tools-shop-entry {
   margin-top: 2px;
 }
@@ -1323,8 +1350,10 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   background: rgba(138, 155, 168, 0.1);
 }
 
+/* The open row is marked by its fill alone: the blue outline it used to carry
+ * read as a selection rather than as "this one is unfolded", and the form under
+ * it already says which row it belongs to. */
 .manga-tools-shop-row.is-open {
-  border-color: #137cbd;
   background: rgba(19, 124, 189, 0.1);
 }
 
@@ -1359,39 +1388,12 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   border-radius: 3px;
 }
 
-/* The expanded form: one label column, one control column, like Stash's rows. */
+/* The expanded form. Its rows are Bootstrap's own `form-group row`s — the same
+ * markup Stash's `renderField` draws — so what is here is only the block's frame. */
 .manga-tools-shop-form {
   padding: 12px 24px;
   border-radius: 4px;
   background: rgba(19, 124, 189, 0.07);
-}
-
-.manga-tools-shop-field {
-  display: grid;
-  grid-template-columns: 104px 1fr;
-  gap: 8px;
-  align-items: start;
-  margin-bottom: 6px;
-}
-
-.manga-tools-shop-field:last-child {
-  margin-bottom: 0;
-}
-
-.manga-tools-shop-field > label {
-  color: #8a9ba8;
-  font-size: 0.8rem;
-  padding-top: 7px;
-  white-space: nowrap;
-}
-
-/* The name field is a single control, so its label sits on the control's line. */
-.manga-tools-shop-field:first-child {
-  align-items: center;
-}
-
-.manga-tools-shop-field:first-child > label {
-  padding-top: 0;
 }
 
 .manga-tools-shop-list-row {
@@ -1445,20 +1447,6 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   padding-top: 6px;
 }
 
-.manga-tools-shop-help {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgba(138, 155, 168, 0.4);
-  border-radius: 50%;
-  color: #8a9ba8;
-  font-size: 0.7rem;
-  line-height: 1;
-  cursor: help;
-}
-
 .manga-tools-shop-adder {
   margin-top: 10px;
 }
@@ -1496,6 +1484,9 @@ button.minimal.manga-tools-manga-toggle.is-manga {
 }
 
 .manga-tools-shop-preset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 9px;
   border: 1px solid rgba(16, 22, 26, 0.6);
   border-radius: 3px;

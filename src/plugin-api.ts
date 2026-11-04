@@ -1145,6 +1145,13 @@ export interface IPluginApi {
       Form: {
         Switch: ComponentType<Record<string, unknown>>;
         /**
+         * react-bootstrap's group and label, for a form laid out like Stash's own
+         * rows (`form-group row`, then a `col-form-label`). Optional: only the
+         * shop editor draws a form of its own.
+         */
+        Group?: ComponentType<Record<string, unknown>>;
+        Label?: ComponentType<Record<string, unknown>>;
+        /**
          * The form control, used `as="select"` for the one single-choice setting.
          * Optional because only that row needs it — Stash's own SelectSetting draws
          * the same thing, so a Stash that has one has both.
@@ -1160,6 +1167,9 @@ export interface IPluginApi {
        */
       OverlayTrigger?: ComponentType<Record<string, unknown>>;
       Tooltip?: ComponentType<Record<string, unknown>>;
+      /** Grid columns, for the same rows. */
+      Row?: ComponentType<Record<string, unknown>>;
+      Col?: ComponentType<Record<string, unknown>>;
       /**
        * The dialog, for the one thing this plugin asks before doing. `Body` and
        * `Footer` are react-bootstrap's static sub-components, so they are declared

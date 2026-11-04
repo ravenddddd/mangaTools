@@ -69,7 +69,7 @@ export const BUILTIN_SHOPS: Shop[] = [
     regexes: ["[?&/]cid=([A-Za-z0-9_]+)", "/product/\\d+/([A-Za-z0-9]+)"],
   },
   {
-    name: "虎穴",
+    name: "Toranoana",
     icon: "builtin:toranoana",
     domains: ["toranoana.jp"],
     // /tora_r/ec/item/040030474993/

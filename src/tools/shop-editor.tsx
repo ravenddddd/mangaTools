@@ -179,6 +179,9 @@ function ListInput(props: {
   const setDragIndex = dragged[1];
 
   const values = props.values.concat("");
+  // Nothing to reorder with a single entry — the same rule Stash's own
+  // `StringListInput` applies before it draws a handle.
+  const orderable = props.orderable && props.values.length > 1;
 
   const setAt = (index: number, value: string) => {
     const next = props.values.slice();
@@ -245,7 +248,7 @@ function ListInput(props: {
               ) : null}
             </WithTip>
             <div className="manga-tools-shop-list-actions">
-              {Button && props.orderable && !last ? (
+              {Button && orderable && !last ? (
                 <Button
                   variant="secondary"
                   className="drag-handle minimal"
@@ -323,6 +326,14 @@ export function ShopDialog(props: {
   const dragShop = dragState[0];
   const setDragShop = dragState[1];
 
+  /**
+   * Set while a row is being dragged, so the click that ends the drag does not
+   * open the form. Cleared on the next mouse-down: the press that begins a drag
+   * is also a mouse-down on the row, and it comes before `dragstart`, so a real
+   * click after a drag clears the flag before the click itself is looked at.
+   */
+  const afterDrag = React.useRef(false);
+
   const issues = shops.map((_shop, index) =>
     issuesOf(shops, index, intl.locale)
   );
@@ -393,13 +404,22 @@ export function ShopDialog(props: {
                 className={
                   "manga-tools-shop-row" + (open === index ? " is-open" : "")
                 }
-                onClick={() => setOpen(open === index ? -1 : index)}
+                onMouseDown={() => {
+                  afterDrag.current = false;
+                }}
+                onClick={() => {
+                  if (afterDrag.current) return;
+                  setOpen(open === index ? -1 : index);
+                }}
               >
                 <span
                   className="manga-tools-shop-grip"
                   draggable
                   title={t(intl, "mangaTools.shops.reorder")}
-                  onDragStart={() => setDragShop(index)}
+                  onDragStart={() => {
+                    afterDrag.current = true;
+                    setDragShop(index);
+                  }}
                   onDragEnd={() => setDragShop(-1)}
                 >
                   <PluginApi.components.Icon
@@ -415,6 +435,7 @@ export function ShopDialog(props: {
                     className="manga-tools-shop-icon"
                     src={shopIconUrl(shop)}
                     alt=""
+                    draggable={false}
                   />
                 ) : null}
                 <span className="manga-tools-shop-name">
@@ -485,6 +506,14 @@ export function ShopDialog(props: {
                       }
                       onClick={allowed ? () => addShop(preset) : undefined}
                     >
+                      {shopIconUrl(preset) ? (
+                        <img
+                          className="manga-tools-shop-icon"
+                          src={shopIconUrl(preset)}
+                          alt=""
+                          draggable={false}
+                        />
+                      ) : null}
                       {preset.name}
                     </span>
                   );
@@ -583,7 +612,7 @@ function pickIcon(done: (icon: string) => void): void {
   input.click();
 }
 
-/** The expanded form of one shop. */
+/** The expanded form of one shop, in Stash's own form layout. */
 function ShopForm(props: {
   shop: Shop;
   issues: RowIssues;
@@ -594,13 +623,39 @@ function ShopForm(props: {
   const Bootstrap = PluginApi.libraries.Bootstrap;
   const Form = Bootstrap ? Bootstrap.Form : null;
   const Control = Form ? Form.Control : null;
+  const Group = Form ? Form.Group : null;
+  const Label = Form ? Form.Label : null;
+  const Col = Bootstrap ? Bootstrap.Col : null;
   const src = shopIconUrl(props.shop);
+
+  /**
+   * One row, laid out the way Stash lays out its own: a `form-group row` with a
+   * `col-form-label` on the left and the control in a column on the right (see
+   * Stash's `renderField`). Not the plugin's own grid, because a label drawn by
+   * this plugin looks nearly — and next to Stash's rows, wrongly — like Stash's.
+   */
+  const field = (
+    id: string,
+    label: React.ReactNode,
+    control: React.ReactNode
+  ) =>
+    Group && Label && Col ? (
+      <Group as={Bootstrap ? Bootstrap.Row : undefined} controlId={id}>
+        <Label column sm={3}>
+          {label}
+        </Label>
+        <Col sm={9}>{control}</Col>
+      </Group>
+    ) : (
+      control
+    );
 
   return (
     <div className="manga-tools-shop-form">
-      <div className="manga-tools-shop-field">
-        <label>{t(intl, "mangaTools.shops.name")}</label>
-        <div>
+      {field(
+        "manga-tools-shop-name",
+        t(intl, "mangaTools.shops.name"),
+        <>
           {Control ? (
             <Control
               className={
@@ -618,16 +673,17 @@ function ShopForm(props: {
           {props.issues.name ? (
             <div className="invalid-feedback d-block">{props.issues.name}</div>
           ) : null}
-        </div>
-      </div>
+        </>
+      )}
 
-      <div className="manga-tools-shop-field">
-        <label>{t(intl, "mangaTools.shops.domains")}</label>
-        <div>
+      {field(
+        "manga-tools-shop-domains",
+        t(intl, "mangaTools.shops.domains"),
+        <>
           <ListInput
             values={props.shop.domains}
             placeholder={t(intl, "mangaTools.shops.domainPlaceholder")}
-            orderable={false}
+            orderable
             errors={props.issues.domainAt}
             onChange={(domains) =>
               props.onChange((shop) => ({ ...shop, domains }))
@@ -638,34 +694,53 @@ function ShopForm(props: {
               {props.issues.domains}
             </div>
           ) : null}
-        </div>
-      </div>
+        </>
+      )}
 
-      <div className="manga-tools-shop-field">
-        <label>
-          {t(intl, "mangaTools.shops.regexes")}{" "}
+      {field(
+        "manga-tools-shop-regexes",
+        <>
+          {t(intl, "mangaTools.shops.regexes")}
           <WithTip text={t(intl, "mangaTools.shops.regexHelp")}>
-            <span className="manga-tools-shop-help">?</span>
+            <span className="manga-tools-help">
+              <button
+                type="button"
+                className="manga-tools-help-button"
+                aria-label={t(intl, "mangaTools.shops.regexHelp")}
+              >
+                {PluginApi.libraries.FontAwesomeSolid?.faQuestionCircle ? (
+                  <PluginApi.components.Icon
+                    icon={PluginApi.libraries.FontAwesomeSolid.faQuestionCircle}
+                  />
+                ) : (
+                  "?"
+                )}
+              </button>
+            </span>
           </WithTip>
-        </label>
-        <div>
-          <ListInput
-            values={props.shop.regexes}
-            placeholder={t(intl, "mangaTools.shops.regexPlaceholder")}
-            orderable
-            errors={props.issues.regexAt}
-            onChange={(regexes) =>
-              props.onChange((shop) => ({ ...shop, regexes }))
-            }
-          />
-        </div>
-      </div>
+        </>,
+        <ListInput
+          values={props.shop.regexes}
+          placeholder={t(intl, "mangaTools.shops.regexPlaceholder")}
+          orderable
+          errors={props.issues.regexAt}
+          onChange={(regexes) =>
+            props.onChange((shop) => ({ ...shop, regexes }))
+          }
+        />
+      )}
 
-      <div className="manga-tools-shop-field">
-        <label>{t(intl, "mangaTools.shops.icon")}</label>
+      {field(
+        "manga-tools-shop-icon",
+        t(intl, "mangaTools.shops.icon"),
         <div className="manga-tools-shop-icon-row">
           {src ? (
-            <img className="manga-tools-shop-icon" src={src} alt="" />
+            <img
+              className="manga-tools-shop-icon"
+              src={src}
+              alt=""
+              draggable={false}
+            />
           ) : null}
           {Bootstrap?.Button ? (
             <Bootstrap.Button variant="secondary" onClick={props.onOpenIcon}>
@@ -681,7 +756,7 @@ function ShopForm(props: {
             </Bootstrap.Button>
           ) : null}
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -704,14 +779,13 @@ export function ShopsSetting(props: { persist: () => void }) {
     <>
       <div className="setting manga-tools-setting">
         <div>
-          <h3>{t(intl, "mangaTools.settings.shops.heading")}</h3>
-          <div className="sub-heading">
+          <h3>
             {numbered(
               intl.locale,
-              "mangaTools.settings.shops.count",
+              "mangaTools.settings.shops.titleWithCount",
               NS.shops.length
             )}
-          </div>
+          </h3>
         </div>
         <div>
           {Bootstrap ? (

@@ -165,7 +165,7 @@
   "mangaTools.clearFields.total": "將會影響 {n} 個畫廊",
   "mangaTools.clearFields.job": "移除本外掛的欄位",
   "mangaTools.settings.shops.heading": "已辨識的商店",
-  "mangaTools.settings.shops.count": "{n} 個",
+  "mangaTools.settings.shops.titleWithCount": "已辨識的商店（{n} 個）",
   "mangaTools.shops.edit": "編輯…",
   "mangaTools.shops.title": "編輯商店",
   "mangaTools.shops.add": "+ 新增商店",

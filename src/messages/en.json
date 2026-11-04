@@ -165,7 +165,7 @@
   "mangaTools.clearFields.total": "This would affect {n} gallery(ies)",
   "mangaTools.clearFields.job": "Remove the plugin's fields",
   "mangaTools.settings.shops.heading": "Recognised shops",
-  "mangaTools.settings.shops.count": "{n} shop(s)",
+  "mangaTools.settings.shops.titleWithCount": "Recognised shops ({n})",
   "mangaTools.shops.edit": "Edit…",
   "mangaTools.shops.title": "Edit shops",
   "mangaTools.shops.add": "Add shop",
