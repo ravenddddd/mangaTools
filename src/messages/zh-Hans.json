@@ -177,7 +177,7 @@
   "mangaTools.shops.name": "名称",
   "mangaTools.shops.domains": "域名",
   "mangaTools.shops.domainPlaceholder": "域名",
-  "mangaTools.shops.regexes": "商品编号正则",
+  "mangaTools.shops.regexes": "编号正则",
   "mangaTools.shops.regexPlaceholder": "正则",
   "mangaTools.shops.icon": "图标",
   "mangaTools.shops.pickIcon": "选择文件…",

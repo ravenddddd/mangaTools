@@ -177,7 +177,7 @@
   "mangaTools.shops.name": "名稱",
   "mangaTools.shops.domains": "網域",
   "mangaTools.shops.domainPlaceholder": "網域",
-  "mangaTools.shops.regexes": "商品編號正規表示式",
+  "mangaTools.shops.regexes": "編號正規式",
   "mangaTools.shops.regexPlaceholder": "正規表示式",
   "mangaTools.shops.icon": "圖示",
   "mangaTools.shops.pickIcon": "選擇檔案…",
