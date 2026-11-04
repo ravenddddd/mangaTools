@@ -291,11 +291,35 @@ function ListInput(props: {
   );
 }
 
+/** One row of the draft: a stable id, and the shop being edited. */
+interface DraftRow {
+  id: string;
+  shop: Shop;
+}
+
+/** Ids are compared and never shown; a counter is enough. */
+let rowSeq = 0;
+
+function nextRowId(): string {
+  rowSeq += 1;
+  return "shop-" + rowSeq;
+}
+
+/** A draft row holding a copy of `shop`, so the list can be edited safely. */
+function rowOf(shop: Shop): DraftRow {
+  return { id: nextRowId(), shop: draftOf([shop])[0] };
+}
+
 /**
  * The dialog: the list, the expanded form, the add menu and the footer.
  *
  * Rendered only while open (see ShopsSetting), so the draft is taken once, at
  * mount — `useState`'s initialiser is the copy.
+ *
+ * **Rows carry an id of their own.** An index is not an identity: deleting one
+ * row would move every later row's "touched" mark onto its neighbour, so an
+ * error could appear on a row nobody has edited — or not appear on the one that
+ * has it. The open row and the row being dragged are named the same way.
  */
 export function ShopDialog(props: {
   onClose: () => void;
@@ -304,15 +328,17 @@ export function ShopDialog(props: {
   const intl = PluginApi.libraries.Intl.useIntl();
   const Bootstrap = PluginApi.libraries.Bootstrap;
 
-  const shopsState = React.useState<Shop[]>(() => draftOf(NS.shops));
-  const shops = shopsState[0];
-  const setShops = shopsState[1];
+  const rowsState = React.useState<DraftRow[]>(() =>
+    draftOf(NS.shops).map(rowOf)
+  );
+  const rows = rowsState[0];
+  const setRows = rowsState[1];
 
-  const openState = React.useState(-1);
+  const openState = React.useState("");
   const open = openState[0];
   const setOpen = openState[1];
 
-  const touchState = React.useState<{ [key: string]: boolean }>({});
+  const touchState = React.useState<{ [id: string]: boolean }>({});
   const touch = touchState[0];
   const setTouch = touchState[1];
 
@@ -320,9 +346,9 @@ export function ShopDialog(props: {
   const attempted = attemptState[0];
   const setAttempted = attemptState[1];
 
-  const dragState = React.useState(-1);
-  const dragShop = dragState[0];
-  const setDragShop = dragState[1];
+  const dragState = React.useState("");
+  const dragRow = dragState[0];
+  const setDragRow = dragState[1];
 
   /**
    * Set while a row is being dragged, so the click that ends the drag does not
@@ -332,29 +358,41 @@ export function ShopDialog(props: {
    */
   const afterDrag = React.useRef(false);
 
+  /** The entry elements, by row id, so a newly opened form can be scrolled to. */
+  const entries = React.useRef<{ [id: string]: HTMLElement | null }>({});
+
+  const shops = rows.map((row) => row.shop);
   const issues = shops.map((_shop, index) =>
     issuesOf(shops, index, intl.locale)
   );
   const invalid = issues.some(rowHasIssues);
 
-  const edit = (index: number, change: (shop: Shop) => Shop) => {
-    const next = shops.slice();
-    next[index] = change(shops[index]);
-    setShops(next);
-    setTouch({ ...touch, [index]: true });
+  // A form that opens at the end of a long list is off the screen; a form that
+  // opens on a row the reader just clicked is already in view, and `nearest`
+  // then does nothing.
+  React.useEffect(() => {
+    if (!open) return;
+    entries.current[open]?.scrollIntoView?.({ block: "nearest" });
+  }, [open]);
+
+  const edit = (id: string, change: (shop: Shop) => Shop) => {
+    setRows(
+      rows.map((row) =>
+        row.id === id ? { ...row, shop: change(row.shop) } : row
+      )
+    );
+    setTouch({ ...touch, [id]: true });
   };
 
   const addShop = (preset: Shop) => {
-    const next = shops.concat([draftOf([preset])[0]]);
-    setShops(next);
-    setOpen(next.length - 1);
+    const row = rowOf(preset);
+    setRows(rows.concat([row]));
+    setOpen(row.id);
   };
 
-  const removeShop = (index: number) => {
-    const next = shops.slice();
-    next.splice(index, 1);
-    setShops(next);
-    setOpen(-1);
+  const removeShop = (id: string) => {
+    setRows(rows.filter((row) => row.id !== id));
+    setOpen("");
   };
 
   /** Whether a preset could be added: no name clash and no domain clash. */
@@ -372,41 +410,56 @@ export function ShopDialog(props: {
         <span>{t(intl, "mangaTools.shops.title")}</span>
       </div>
       <div className="modal-body">
-        {shops.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="manga-tools-shop-empty">
             {t(intl, "mangaTools.shops.empty")}
           </p>
         ) : null}
 
-        {shops.map((shop, index) => {
+        {rows.map((row, index) => {
+          const shop = row.shop;
+          const isOpen = open === row.id;
           const shown =
-            attempted || touch[index]
+            attempted || touch[row.id]
               ? issues[index]
               : { name: "", domains: "", domainAt: [], regexAt: [] };
 
           return (
             <div
               className="manga-tools-shop-entry"
-              key={index}
+              key={row.id}
+              ref={(element: HTMLElement | null) => {
+                entries.current[row.id] = element;
+              }}
               onDragOver={(e: React.DragEvent) => {
-                if (dragShop < 0 || dragShop === index) return;
+                if (!dragRow || dragRow === row.id) return;
                 e.preventDefault();
-                const next = shops.slice();
-                next.splice(index, 0, next.splice(dragShop, 1)[0]);
-                setShops(next);
-                setDragShop(index);
+                const from = rows.findIndex(
+                  (candidate) => candidate.id === dragRow
+                );
+                if (from < 0) return;
+                const next = rows.slice();
+                next.splice(index, 0, next.splice(from, 1)[0]);
+                setRows(next);
+                setDragRow(row.id);
               }}
             >
               <div
-                className={
-                  "manga-tools-shop-row" + (open === index ? " is-open" : "")
-                }
+                className={"manga-tools-shop-row" + (isOpen ? " is-open" : "")}
+                role="button"
+                tabIndex={0}
                 onMouseDown={() => {
                   afterDrag.current = false;
                 }}
                 onClick={() => {
                   if (afterDrag.current) return;
-                  setOpen(open === index ? -1 : index);
+                  setOpen(isOpen ? "" : row.id);
+                }}
+                onKeyDown={(e: React.KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setOpen(isOpen ? "" : row.id);
+                  }
                 }}
               >
                 <span
@@ -418,10 +471,10 @@ export function ShopDialog(props: {
                     // A drag is about the list's order, not about one row's
                     // fields: the open form folds away, so the rows being
                     // reordered are what the drag is drawn on.
-                    setOpen(-1);
-                    setDragShop(index);
+                    setOpen("");
+                    setDragRow(row.id);
                   }}
-                  onDragEnd={() => setDragShop(-1)}
+                  onDragEnd={() => setDragRow("")}
                 >
                   <PluginApi.components.Icon
                     icon={
@@ -442,7 +495,7 @@ export function ShopDialog(props: {
                     className="manga-tools-shop-delete"
                     onClick={(e: React.MouseEvent) => {
                       e.stopPropagation();
-                      removeShop(index);
+                      removeShop(row.id);
                     }}
                   >
                     {t(intl, "mangaTools.shops.remove")}
@@ -450,14 +503,14 @@ export function ShopDialog(props: {
                 ) : null}
               </div>
 
-              {open === index ? (
+              {isOpen ? (
                 <ShopForm
                   shop={shop}
                   issues={shown}
-                  onChange={(change) => edit(index, change)}
+                  onChange={(change) => edit(row.id, change)}
                   onOpenIcon={() =>
                     pickIcon((icon) =>
-                      edit(index, (current) => ({ ...current, icon }))
+                      edit(row.id, (current) => ({ ...current, icon }))
                     )
                   }
                 />
@@ -534,7 +587,17 @@ function iconFromFile(file: File, done: (icon: string) => void): void {
         done("");
         return;
       }
-      context.drawImage(image, 0, 0, 32, 32);
+      // **Cropped, not squashed.** A 16:9 picture drawn into 32×32 comes out
+      // stretched; taking the largest centred square out of it keeps the part
+      // that reads as an icon and leaves the aspect ratio alone.
+      const source = Math.min(image.naturalWidth, image.naturalHeight);
+      if (source <= 0) {
+        done("");
+        return;
+      }
+      const x = (image.naturalWidth - source) / 2;
+      const y = (image.naturalHeight - source) / 2;
+      context.drawImage(image, x, y, source, source, 0, 0, 32, 32);
       done(canvas.toDataURL("image/png"));
     };
     image.onerror = () => done("");

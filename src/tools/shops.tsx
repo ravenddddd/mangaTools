@@ -66,6 +66,25 @@ export interface ShopLink {
   url: string;
 }
 
+/**
+ * Each shop's patterns, compiled once.
+ *
+ * A shop object is replaced rather than edited — the settings reader builds a new
+ * list and the editor saves a new one — so the cache can be keyed by the object
+ * itself: a shop that has moved has a different key and is compiled again. Without
+ * it every link of every render rebuilt its patterns from source.
+ */
+const COMPILED = new WeakMap<Shop, RegExp[]>();
+
+function patternsFor(shop: Shop): RegExp[] {
+  const cached = COMPILED.get(shop);
+  if (cached) return cached;
+
+  const patterns = patternsOf(shop);
+  COMPILED.set(shop, patterns);
+  return patterns;
+}
+
 /** The shop a link belongs to, and its code, or null for any other link. */
 export function shopOf(raw: string): ShopLink | null {
   let url: URL;
@@ -89,7 +108,7 @@ export function shopOf(raw: string): ShopLink | null {
 
     return {
       shop,
-      code: codeOf(patternsOf(shop), String(raw)),
+      code: codeOf(patternsFor(shop), String(raw)),
       url: String(raw),
     };
   }

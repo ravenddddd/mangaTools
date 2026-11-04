@@ -1344,6 +1344,13 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   cursor: pointer;
 }
 
+/* The row is a button to the keyboard as well as to the mouse: without a ring,
+ * tabbing through the list would say nothing about where you are. */
+.manga-tools-shop-row:focus-visible {
+  outline: 2px solid #137cbd;
+  outline-offset: -2px;
+}
+
 .manga-tools-shop-row:hover {
   background: rgba(138, 155, 168, 0.1);
 }
