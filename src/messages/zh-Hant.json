@@ -191,5 +191,6 @@
   "mangaTools.shops.domainInvalid": "這不是一個網域",
   "mangaTools.shops.domainTaken": "已被「{name}」使用",
   "mangaTools.shops.badPattern": "不是合法的正規表示式",
-  "mangaTools.shops.regexHelp": "依序比對連結，第一條命中的規則生效，取擷取組 1 作為商品編號；留空則只顯示圖示。"
+  "mangaTools.shops.regexHelp": "依序比對連結，第一條命中的規則生效，取擷取組 1 作為商品編號；留空則只顯示圖示。",
+  "mangaTools.original.heading": "原文"
 }

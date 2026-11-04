@@ -977,7 +977,11 @@ export function MangaToolsSettings() {
 
         {field(
           "mangaTools-fieldOriginal",
-          t(intl, "mangaTools.translationGroup.original"),
+          // The field's own name, not the raw state's: this switch turns the
+          // field on and off, and "Raw" is the name of one of its two values — the
+          // field itself is what the filter's heading and the clear-fields row
+          // call it.
+          t(intl, "mangaTools.original.heading"),
           () => NS.fieldOriginal,
           (next) => {
             NS.fieldOriginal = next;

@@ -191,5 +191,6 @@
   "mangaTools.shops.domainInvalid": "This is not a domain",
   "mangaTools.shops.domainTaken": "Already used by {name}",
   "mangaTools.shops.badPattern": "This is not a valid regular expression",
-  "mangaTools.shops.regexHelp": "Patterns are matched in order; the first match wins, and its first capture group becomes the product code. Leave empty to show the icon without a code."
+  "mangaTools.shops.regexHelp": "Patterns are matched in order; the first match wins, and its first capture group becomes the product code. Leave empty to show the icon without a code.",
+  "mangaTools.original.heading": "Original text"
 }
