@@ -72,6 +72,14 @@ module.exports = () => {
         // A subdomain is still the shop; a shape this build does not know keeps
         // the shop and loses only the code.
         ["https://book.dmm.co.jp/product/123456/", "FANZA", ""],
+        // The software and game pages: another subdomain, another shape.
+        ["https://dlsoft.dmm.co.jp/detail/hobe_0407/", "FANZA", "hobe_0407"],
+        // DLsite's pro/software section is the same shape as its books.
+        [
+          "https://www.dlsite.com/pro/work/=/product_id/VJ008455.html",
+          "DLsite",
+          "VJ008455",
+        ],
         [
           "https://ec.toranoana.jp/tora_r/ec/item/040030474993/",
           "Toranoana",
