@@ -696,7 +696,6 @@ function SettingsHeading(props: {
 /** The ids `unfoldedGroups` holds the three headings' folds under — not setting ids */
 const MARK_GROUP_ID = "mangaTools-markGroup";
 const MAINTENANCE_GROUP_ID = "mangaTools-maintenanceGroup";
-const ICONS_GROUP_ID = "mangaTools-iconsGroup";
 const DISPLAY_GROUP_ID = "mangaTools-displayGroup";
 
 export function MangaToolsSettings() {
@@ -1109,14 +1108,10 @@ export function MangaToolsSettings() {
       </SettingsGroup>
 
       {/* ── Icons ─────────────────────────────────────────────────────────── */}
-      {/* One row and a dialog behind it: five icons, each a name or an uploaded
-          SVG, and a dialog is where five of anything belongs on a page this long. */}
-      <SettingsGroup
-        id={ICONS_GROUP_ID}
-        heading={t(intl, "mangaTools.icons.heading")}
-      >
-        <IconsSetting persist={persist} />
-      </SettingsGroup>
+      {/* One row and a dialog behind it — not a group of its own: the row says what
+          it is, and a heading above a heading was one layer more than the thing
+          has. */}
+      <IconsSetting persist={persist} />
 
       {/* ── Maintenance ────────────────────────────────────────────────────── */}
       {/* Last on the page, and folded like the others: it is not part of how the

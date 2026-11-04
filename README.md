@@ -764,9 +764,10 @@ per slot is too much furniture to keep five of them inline.
 
 A slot's value is one string:
 
-- a **Font Awesome name** from the set Stash itself ships — `faM`, `faFont`,
-  `regular:faSquare` (the `regular:` prefix selects the outlined set; brands are
-  not offered). The editor checks a typed name against the very library Stash
+- a **Font Awesome name** from the set Stash itself ships — `m`, `font`,
+  `regular:square` (the `regular:` prefix selects the outlined set; brands are not
+  offered). Written the way the Font Awesome site lists them; the export spelling
+  (`faChessBoard`) is accepted too. The editor checks a typed name against the very library Stash
   hands the plugin, so a name that would draw nothing is refused there rather than
   discovered on a card;
 - an **uploaded SVG**, kept in the settings as a data URI and drawn as a **mask**:
@@ -774,7 +775,10 @@ A slot's value is one string:
   is also why an upload is safe — a mask is an image, and an image cannot run
   script or fetch anything;
 - `""` — nothing is drawn. Empty is a choice, not an absence: it stays empty
-  rather than reverting to the default. Every slot may be emptied except the
+  rather than reverting to the default. A name Stash does not have is the other
+  case: the editor refuses it, and a value that sits in the config anyway (a
+  hand-edited one) falls back to the slot's default — the shape that slot is
+  supposed to have. Every slot may be emptied except the
   mark, whose clear button is disabled — a gallery's "is this manga" toggle with
   nothing drawn is a control nobody can find.
 

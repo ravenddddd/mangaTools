@@ -2399,14 +2399,17 @@ module.exports = () => {
 
   // The name to take away is whatever the `censored` slot holds — that is the
   // lookup under test now, not a name written into the module.
-  const censoredIcon = NS.icons.censored;
-  const censoredDef = PluginApi.libraries.FontAwesomeSolid[censoredIcon];
-  delete PluginApi.libraries.FontAwesomeSolid[censoredIcon];
+  // The slot holds the name as the reader typed it — `chess-board`, say — while
+  // the library is keyed by its export name, so the name to take away is the one
+  // the lookup resolves.
+  const censoredName = NS.parseChoice(NS.icons.censored).name;
+  const censoredDef = PluginApi.libraries.FontAwesomeSolid[censoredName];
+  delete PluginApi.libraries.FontAwesomeSolid[censoredName];
   let withoutKnight = null;
   try {
     withoutKnight = iconOf(panelOf({ [NS.CENSORSHIP_FIELD_NAME]: "censored" }));
   } finally {
-    PluginApi.libraries.FontAwesomeSolid[censoredIcon] = censoredDef;
+    PluginApi.libraries.FontAwesomeSolid[censoredName] = censoredDef;
   }
   assert.strictEqual(
     withoutKnight,

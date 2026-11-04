@@ -13,7 +13,12 @@
  */
 import { NS } from "../languages";
 import { requirePluginApi } from "../plugin-api";
-import { isUpload, parseChoice, type IconSlot } from "./icon-model";
+import {
+  DEFAULT_ICONS,
+  isUpload,
+  parseChoice,
+  type IconSlot,
+} from "./icon-model";
 
 const PluginApi = requirePluginApi();
 
@@ -35,8 +40,14 @@ function noteMissingName(name: string): void {
   );
 }
 
-/** The Font Awesome definition for a stored value, or null when there is none. */
-export function iconDefinition(value: string): unknown {
+/**
+ * The Font Awesome definition for a stored value, or null when there is none.
+ *
+ * `quiet` skips the console line: the editor asks this on every keystroke while a
+ * name is being typed, and a name that is half-typed is not a library missing a
+ * glyph worth reporting.
+ */
+export function iconDefinition(value: string, quiet = false): unknown {
   const choice = parseChoice(value);
   if (!choice) return null;
 
@@ -46,7 +57,7 @@ export function iconDefinition(value: string): unknown {
       : PluginApi.libraries.FontAwesomeSolid;
   const icon = library ? library[choice.name] : undefined;
   if (!icon) {
-    noteMissingName(value);
+    if (!quiet) noteMissingName(value);
     return null;
   }
   return icon;
@@ -96,7 +107,20 @@ export function IconView(props: { value: string; className?: string }) {
  * layout.
  */
 export function SlotIcon(props: { slot: IconSlot; className?: string }) {
-  return <IconView value={NS.icons[props.slot]} className={props.className} />;
+  const value = NS.icons[props.slot];
+
+  // A name this Stash does not have falls back to the slot's default rather than
+  // disappearing: the editor refuses such a name, so a stored one came from a
+  // hand-edited config, and the default is what that slot is supposed to look
+  // like. `""` is not that case — it is the reader's own choice to draw nothing.
+  const broken = !!value && !isUpload(value) && !iconDefinition(value);
+
+  return (
+    <IconView
+      value={broken ? DEFAULT_ICONS[props.slot] : value}
+      className={props.className}
+    />
+  );
 }
 
 /**

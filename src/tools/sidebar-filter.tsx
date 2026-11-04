@@ -34,6 +34,7 @@
  */
 import { NS } from "../languages";
 import { CensorshipIcon } from "./censorship";
+import { SlotIcon } from "./icons";
 import { t } from "../i18n";
 import { requirePluginApi } from "../plugin-api";
 import {
@@ -383,12 +384,12 @@ function SidebarSection(props: {
               README has no way to tell which of the fourteen headings came from a
               plugin. The icon is the one the covers already wear, so the answer is
               a thing they have seen rather than a new vocabulary — and it is
-              dimmed, because it is a label on the heading and not a control.
-              A span rather than the entry file's MangaIcon for the same reason as
-              the steaks above: the rule is in the stylesheet. */}
-          <span
+              dimmed, because it is a label on the heading and not a control. It
+              comes from the same slot the covers do, so choosing a mark changes
+              both. */}
+          <SlotIcon
+            slot="mark"
             className="manga-tools-manga-icon manga-tools-sidebar-mark"
-            aria-hidden="true"
           />
         </Bootstrap.Button>
       </div>

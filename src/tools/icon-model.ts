@@ -41,27 +41,54 @@ export type IconChoices = { [slot in IconSlot]: string };
  * any size. The original-text pair is `A` and `A` with a character from another
  * script: the text as written, and the text with a translation. Censorship is the
  * mosaic and the same tile without it: a checkered square, and an empty one.
+ *
+ * Written the way the Font Awesome site lists them — `chess-board`, not
+ * `faChessBoard` — because that is the spelling a reader copies; the lookup
+ * accepts either.
  */
 export const DEFAULT_ICONS: IconChoices = {
-  mark: "faM",
-  raw: "faFont",
-  cooked: "faLanguage",
-  censored: "faChessBoard",
-  uncensored: "regular:faSquare",
+  mark: "m",
+  raw: "font",
+  cooked: "language",
+  censored: "chess-board",
+  uncensored: "regular:square",
 };
 
 /** The recommended names the editor offers per slot, the default first. */
 export const ICON_SUGGESTIONS: { [slot in IconSlot]: string[] } = {
-  mark: ["faM", "faToriiGate", "faBookOpen"],
-  raw: ["faFont", "faHouse", "faCrow"],
-  cooked: ["faLanguage", "faEarthAsia", "faDrumstickBite"],
-  censored: ["faChessBoard", "faMask", "faChessKnight"],
-  uncensored: ["regular:faSquare", "faFaceSmile", "faChessPawn"],
+  mark: ["m", "torii-gate", "book-open"],
+  raw: ["font", "house", "crow"],
+  cooked: ["language", "earth-asia", "drumstick-bite"],
+  censored: ["chess-board", "mask", "chess-knight"],
+  uncensored: ["regular:square", "face-smile", "chess-pawn"],
 };
 
 /** Whether a slot's value is an uploaded SVG rather than a Font Awesome name. */
 export function isUpload(value: string): boolean {
   return value.startsWith("data:image/");
+}
+
+/**
+ * The name Font Awesome exports an icon under, from either spelling.
+ *
+ * The site lists `chess-board`; the library exports `faChessBoard`. Both are
+ * accepted, and so is either with the `fa` prefix — what is stored is whatever the
+ * reader typed, and the lookup normalises it here. Dashes become capitals, a
+ * leading `fa` is dropped and put back, and the first letter is capitalised, which
+ * is the whole of the difference between the two spellings.
+ */
+export function exportName(raw: string): string {
+  let text = String(raw || "").trim();
+  if (!text) return "";
+
+  text = text.replace(/-([a-z0-9])/gi, (_whole, letter: string) =>
+    letter.toUpperCase()
+  );
+  text = text.replace(/^fa(?=[A-Z])/, "");
+  text = text.replace(/^fa$/i, "");
+  if (!text) return "";
+
+  return "fa" + text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /**
@@ -77,14 +104,15 @@ export function parseChoice(
   if (!value || isUpload(value)) return null;
 
   if (value.startsWith("regular:")) {
-    const name = value.slice("regular:".length).trim();
+    const name = exportName(value.slice("regular:".length));
     return name ? { style: "regular", name } : null;
   }
   if (value.startsWith("solid:")) {
-    const name = value.slice("solid:".length).trim();
+    const name = exportName(value.slice("solid:".length));
     return name ? { style: "solid", name } : null;
   }
-  return { style: "solid", name: value.trim() };
+  const name = exportName(value);
+  return name ? { style: "solid", name } : null;
 }
 
 /** The settings value as the dialog shows it: one line, already a name. */

@@ -27,8 +27,8 @@ module.exports = () => {
         defaults.censored,
         defaults.uncensored,
       ],
-      ["faM", "faFont", "faLanguage", "faChessBoard", "regular:faSquare"],
-      "and the defaults the dialog shows"
+      ["m", "font", "language", "chess-board", "regular:square"],
+      "and the defaults the dialog shows, in the spelling the site lists"
     );
 
     // Absent or unreadable reads as the defaults — the same reading every other
@@ -45,14 +45,14 @@ module.exports = () => {
     // ignored. `""` is a value, not an absence — that is the "draw nothing" state.
     assert.deepStrictEqual(
       NS.iconsFromJson(
-        JSON.stringify({ mark: "", raw: "faCrow", bogus: "faAngry" })
+        JSON.stringify({ mark: "", raw: "crow", bogus: "faAngry" })
       ),
       {
         mark: "",
-        raw: "faCrow",
-        cooked: "faLanguage",
-        censored: "faChessBoard",
-        uncensored: "regular:faSquare",
+        raw: "crow",
+        cooked: "language",
+        censored: "chess-board",
+        uncensored: "regular:square",
       },
       'a written slot wins, a missing one keeps its default, and `""` survives'
     );
@@ -79,6 +79,29 @@ module.exports = () => {
       "an upload is not a name"
     );
     assert.strictEqual(NS.parseChoice(""), null, "and neither is nothing");
+    // Both spellings of a name are accepted: the site lists `chess-board`, the
+    // library exports `faChessBoard`, and a reader copies whichever they have.
+    for (const typed of [
+      "chess-board",
+      "faChessBoard",
+      "fa-chess-board",
+      "ChessBoard",
+    ]) {
+      assert.deepStrictEqual(
+        NS.parseChoice(typed),
+        { style: "solid", name: "faChessBoard" },
+        `${typed} is the icon the library exports as faChessBoard`
+      );
+    }
+    assert.deepStrictEqual(NS.parseChoice("face-smile"), {
+      style: "solid",
+      name: "faFaceSmile",
+    });
+    assert.deepStrictEqual(NS.parseChoice("regular:square"), {
+      style: "regular",
+      name: "faSquare",
+    });
+
     assert.strictEqual(
       NS.isUpload("data:image/svg+xml;charset=utf-8,%3Csvg%3E"),
       true

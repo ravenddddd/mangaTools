@@ -19,7 +19,7 @@
  */
 import { NS } from "../languages";
 import { emit } from "./core";
-import { numbered, t } from "../i18n";
+import { t } from "../i18n";
 import { IconView, iconDefinition } from "./icons";
 import {
   DEFAULT_ICONS,
@@ -182,7 +182,16 @@ function IconLine(props: {
           <Control
             className={"text-input" + (props.problem ? " is-invalid" : "")}
             value={upload ? "" : props.value}
-            placeholder={upload ? t(intl, "mangaTools.icons.svg") : "faM"}
+            placeholder={
+              upload
+                ? t(intl, "mangaTools.icons.svg")
+                : t(
+                    intl,
+                    props.slot === "mark"
+                      ? "mangaTools.icons.markHint"
+                      : "mangaTools.icons.emptyHint"
+                  )
+            }
             aria-label={t(intl, LABEL_OF[props.slot])}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
               props.onChange(e.currentTarget.value)
@@ -287,7 +296,9 @@ export function IconsDialog(props: {
       return slot === "mark" ? t(intl, "mangaTools.icons.markRequired") : "";
     }
     if (isUpload(value)) return "";
-    return iconDefinition(value) ? "" : t(intl, "mangaTools.icons.badName");
+    return iconDefinition(value, true)
+      ? ""
+      : t(intl, "mangaTools.icons.badName");
   };
 
   const broken = ICON_SLOTS.some((slot) => problemOf(slot) !== "");
@@ -295,13 +306,25 @@ export function IconsDialog(props: {
   const Modal = Bootstrap ? Bootstrap.Modal : null;
   if (!Bootstrap || !Modal) return null;
 
+  // Wide, unlike the other dialogs: five rows of six controls each need the room,
+  // and a row that wraps is a row whose buttons read as two controls apiece.
   return (
-    <Modal show onHide={props.onClose}>
+    <Modal show size="lg" onHide={props.onClose}>
       <div className="modal-header">
         <span>{t(intl, "mangaTools.icons.title")}</span>
       </div>
       <div className="modal-body">
-        <p>{t(intl, "mangaTools.icons.note")}</p>
+        <p>
+          {t(intl, "mangaTools.icons.noteBefore")}
+          <a
+            href="https://fontawesome.com/free"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Font Awesome Free
+          </a>
+          {t(intl, "mangaTools.icons.noteAfter")}
+        </p>
         {BLOCKS.map((block) => (
           <div className="manga-tools-icon-block" key={block.heading}>
             <h3>{t(intl, block.heading)}</h3>
@@ -368,9 +391,6 @@ export function IconsSetting(props: { persist: () => void }) {
       <div className="setting manga-tools-setting">
         <div>
           <h3>{t(intl, "mangaTools.icons.heading")}</h3>
-          <div className="sub-heading">
-            {numbered(intl.locale, "mangaTools.icons.count", ICON_SLOTS.length)}
-          </div>
         </div>
         <div>
           {Bootstrap ? (

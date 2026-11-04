@@ -194,10 +194,8 @@
   "mangaTools.shops.regexHelp": "Patterns are matched in order; the first match wins, and its first capture group becomes the product code. Leave empty to show the icon without a code.",
   "mangaTools.original.heading": "Original text",
   "mangaTools.icons.heading": "Icons",
-  "mangaTools.icons.count": "{n} icons",
   "mangaTools.icons.edit": "Edit…",
   "mangaTools.icons.title": "Icons",
-  "mangaTools.icons.note": "Names come from Stash's own Font Awesome: solid, or `regular:` for the outlined set.",
   "mangaTools.icons.mark": "Manga mark",
   "mangaTools.icons.rawHeading": "Original text",
   "mangaTools.icons.censorshipHeading": "Censorship",
@@ -205,7 +203,7 @@
   "mangaTools.icons.cooked": "Translated",
   "mangaTools.icons.censored": "Censored",
   "mangaTools.icons.uncensored": "Uncensored",
-  "mangaTools.icons.upload": "Upload SVG",
+  "mangaTools.icons.upload": "Upload",
   "mangaTools.icons.suggestions": "Suggestions",
   "mangaTools.icons.svg": "SVG",
   "mangaTools.icons.badName": "Stash has no icon with this name",
@@ -214,5 +212,9 @@
   "mangaTools.icons.tooLarge": "That SVG is too large (64 KB at most)",
   "mangaTools.icons.clear": "Remove the icon",
   "mangaTools.icons.cancel": "Cancel",
-  "mangaTools.icons.save": "Save"
+  "mangaTools.icons.save": "Save",
+  "mangaTools.icons.emptyHint": "Empty shows nothing",
+  "mangaTools.icons.markHint": "Required",
+  "mangaTools.icons.noteBefore": "Icons come from the ",
+  "mangaTools.icons.noteAfter": " that Stash ships. The outlined set takes a prefix, as in regular:faSquare."
 }

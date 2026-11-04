@@ -1165,10 +1165,13 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   vertical-align: -0.125em;
 }
 
+/* The glyph fills the box rather than a line: the box is 1em by default, and the
+ * sidebar draws the same icon at 0.8em — an icon sized in em of its own would
+ * overflow the smaller box. */
 .manga-tools-slot-icon > .fa-icon {
-  height: 1em;
+  height: 100%;
   margin: 0;
-  width: 1em;
+  width: 100%;
 }
 
 .manga-tools-slot-icon.is-mask {
@@ -1568,6 +1571,7 @@ button.minimal.manga-tools-manga-toggle.is-manga {
 .manga-tools-icon-block h3 {
   font-size: 0.95rem;
   margin: 0;
+  white-space: nowrap;
 }
 
 .manga-tools-icon-lines {
@@ -1585,6 +1589,13 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   gap: 8px;
 }
 
+/* The buttons keep their words on one line: three of them share the row, and a
+ * shrunk button that wraps "Upload" over "SVG" reads as two controls. */
+.manga-tools-icon-line > .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
 .manga-tools-icon-line-wrap .invalid-feedback {
   margin-left: calc(4em + 22px + 16px);
 }
@@ -1593,6 +1604,7 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   color: #8a9ba8;
   font-size: 0.78rem;
   text-align: right;
+  white-space: nowrap;
   width: 4em;
 }
 

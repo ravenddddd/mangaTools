@@ -194,10 +194,8 @@
   "mangaTools.shops.regexHelp": "依序比對連結，第一條命中的規則生效，取擷取組 1 作為商品編號；留空則只顯示圖示。",
   "mangaTools.original.heading": "原文",
   "mangaTools.icons.heading": "圖示",
-  "mangaTools.icons.count": "{n} 個圖示",
   "mangaTools.icons.edit": "編輯…",
   "mangaTools.icons.title": "圖示",
-  "mangaTools.icons.note": "名稱來自 Stash 自帶的 Font Awesome：預設 solid，描邊體加 `regular:` 前綴。",
   "mangaTools.icons.mark": "漫畫標記",
   "mangaTools.icons.rawHeading": "原文",
   "mangaTools.icons.censorshipHeading": "審查",
@@ -205,7 +203,7 @@
   "mangaTools.icons.cooked": "熟肉",
   "mangaTools.icons.censored": "修正",
   "mangaTools.icons.uncensored": "無修正",
-  "mangaTools.icons.upload": "上傳 SVG",
+  "mangaTools.icons.upload": "上傳",
   "mangaTools.icons.suggestions": "推薦",
   "mangaTools.icons.svg": "SVG",
   "mangaTools.icons.badName": "Stash 裡沒有這個圖示",
@@ -214,5 +212,9 @@
   "mangaTools.icons.tooLarge": "SVG 太大了（最多 64 KB）",
   "mangaTools.icons.clear": "刪除圖示",
   "mangaTools.icons.cancel": "取消",
-  "mangaTools.icons.save": "儲存"
+  "mangaTools.icons.save": "儲存",
+  "mangaTools.icons.emptyHint": "留空則不顯示圖示",
+  "mangaTools.icons.markHint": "不能留空",
+  "mangaTools.icons.noteBefore": "圖示來自 Stash 自帶的 ",
+  "mangaTools.icons.noteAfter": "。描邊體需加對應前綴，例如 regular:faSquare。"
 }

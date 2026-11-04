@@ -771,11 +771,10 @@ module.exports = () => {
     const chevrons = chevronsIn(page);
     assert.strictEqual(
       chevrons.length,
-      8,
+      7,
       "one chevron per row that has rows under it, and no row without them — " +
         "the translation group's switch is one of them now, since its list order " +
-        "is a row under it, and so are the icons group and the maintenance group " +
-        "at the end of the page"
+        "is a row under it, and so is the maintenance group at the end of the page"
     );
     assert.ok(
       chevrons.every((c) => c.type === "button"),
@@ -1118,8 +1117,8 @@ module.exports = () => {
   // The five icons, one JSON string, at their defaults — the list itself is the
   // icons dialog's subject; here it only has to be part of the whole map.
   const ICONS_JSON =
-    '{"mark":"faM","raw":"faFont","cooked":"faLanguage",' +
-    '"censored":"faChessBoard","uncensored":"regular:faSquare"}';
+    '{"mark":"m","raw":"font","cooked":"language",' +
+    '"censored":"chess-board","uncensored":"regular:square"}';
 
   // Selecting a new set writes it back through configurePlugin and updates the
   // shared NS.enabledLanguages immediately.
