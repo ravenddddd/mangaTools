@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.10.13
+version: 0.10.14
 ui:
   javascript:
     - mangaTools.js
@@ -60,8 +60,8 @@ interface: js
 exec:
   - mangaToolsTasks.js
 tasks:
-  - name: Remove the plugin's fields
-    description: Removes the custom fields this plugin wrote to galleries.
+  - name: Survey the plugin's fields
+    description: Counts the galleries carrying each of this plugin's fields. Running it from here removes nothing.
     defaultArgs:
       fields: all
       dryRun: "true"

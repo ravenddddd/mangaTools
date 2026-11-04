@@ -1558,8 +1558,9 @@ module.exports = () => {
   );
   assert.strictEqual(
     NS.CLEAR_FIELDS_TASK,
-    "Remove the plugin's fields",
-    "and the task name is the one the manifest declares — Stash looks it up by it"
+    "Survey the plugin's fields",
+    "and the task name is the one the manifest declares — Stash looks it up by it, " +
+      "and it names what the Tasks page's button does, which is the dry run"
   );
 
   // The numbers the dialog shows — per field, and how many galleries a run would

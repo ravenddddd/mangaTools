@@ -765,6 +765,12 @@ module.exports = () => {
     typeof task.description === "string" && task.description.trim(),
     "and it says what it does, in the language the manifest is written in"
   );
+  assert.ok(
+    /removes nothing/.test(task.description),
+    "the description says the Tasks page's own button removes nothing — its " +
+      "default is the dry run, and a name that read as destructive was the whole " +
+      "reason it was renamed"
+  );
   assert.deepStrictEqual(
     task.defaultArgs,
     { fields: "all", dryRun: "true" },

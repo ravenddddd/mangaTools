@@ -32,8 +32,16 @@ const React = PluginApi.React;
 /** This plugin's id, as Stash names it — the manifest's filename */
 const PLUGIN_ID = "mangaTools";
 
-/** Must match the task's `name` in mangaTools.yml — the id Stash looks it up by */
-export const CLEAR_FIELDS_TASK = "Remove the plugin's fields";
+/**
+ * Must match the task's `name` in mangaTools.yml — the id Stash looks it up by.
+ *
+ * The name is the Tasks page's, and that button never takes arguments, so what it
+ * does there is the manifest's default: count, and remove nothing. Naming it
+ * "Remove…" made a rehearsal read as a destructive button; the run this page
+ * actually starts names itself in the queue instead — see RUN_TASK_MUTATION,
+ * whose `description` is what the job list shows.
+ */
+export const CLEAR_FIELDS_TASK = "Survey the plugin's fields";
 
 /**
  * The fields the dialog offers, in the order it lists them.
@@ -83,8 +91,8 @@ const LABEL_OF: Record<string, string> = {
 };
 
 const RUN_TASK_MUTATION = [
-  "mutation MangaToolsRunTask($plugin_id: ID!, $task_name: String!, $args_map: Map) {",
-  "  runPluginTask(plugin_id: $plugin_id, task_name: $task_name, args_map: $args_map)",
+  "mutation MangaToolsRunTask($plugin_id: ID!, $task_name: String!, $description: String, $args_map: Map) {",
+  "  runPluginTask(plugin_id: $plugin_id, task_name: $task_name, description: $description, args_map: $args_map)",
   "}",
 ].join("\n");
 
@@ -98,7 +106,10 @@ let runTaskDocument: unknown = null;
  * and the row has a line to say so. A rejected promise is the server's own answer
  * and is reported the same way by the caller.
  */
-function queueClear(args: Record<string, string>): Promise<boolean> {
+function queueClear(
+  args: Record<string, string>,
+  description: string
+): Promise<boolean> {
   const client = PluginApi.utils.StashService.getClient();
   if (!client) return Promise.resolve(false);
 
@@ -113,6 +124,9 @@ function queueClear(args: Record<string, string>): Promise<boolean> {
       variables: {
         plugin_id: PLUGIN_ID,
         task_name: CLEAR_FIELDS_TASK,
+        // What the job list shows. The task's own name is the Tasks page's, whose
+        // button is the dry run; this one is the run this dialog asked for.
+        description,
         args_map: args,
       },
     })
@@ -266,7 +280,10 @@ export function ClearFieldsSetting() {
   const confirm = () => {
     setBusy(true);
     setNotice("");
-    queueClear(clearTaskArgs(chosen, dryRun)).then(
+    queueClear(
+      clearTaskArgs(chosen, dryRun),
+      t(intl, "mangaTools.clearFields.job")
+    ).then(
       (queued) => {
         setBusy(false);
         if (!queued) {

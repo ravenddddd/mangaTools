@@ -1005,7 +1005,10 @@ closing the browser, and a Cancel button that works. The dialog only passes two
 arguments — which fields, and whether to rehearse — and Stash owns the rest. Because
 the task is a task, it is also listed on the Tasks page on its own; that entry has no
 dialog in front of it, so its defaults (every field, dry run on) are the cautious
-ones. Galleries are found by asking Stash which ones carry each field, so a stray
+ones — and its name says what that button actually does: *Survey the plugin's
+fields*, which counts. The dialog's own run names itself in the job queue through
+`runPluginTask`'s `description`, so the queue says "Remove the plugin's fields"
+while the Tasks page keeps saying "Survey". Galleries are found by asking Stash which ones carry each field, so a stray
 language value on an unmarked gallery is caught too; Stash's own data is never
 touched.
 
