@@ -16,7 +16,7 @@ name: Manga Tools
 description: Manages manga galleries in Stash — language, censorship and translation group — and reads them two pages at a time.
 # Shown as the link button beside the plugin in Settings → Plugins.
 url: https://github.com/ravenddddd/mangaTools
-version: 0.10.10
+version: 0.10.11
 ui:
   javascript:
     - mangaTools.js
@@ -41,6 +41,30 @@ ui:
   # directory that ships; naming one that does not exist fails the build.
   assets:
     /: assets
+
+# The plugin's own backend task, run from Stash's task queue rather than the page.
+#
+# Stash reads `exec` as a script it runs in its own JavaScript engine, with a
+# GraphQL client bound to the server (`gql`), a logger that feeds the job's log and
+# its progress bar (`log`), and the operation's arguments (`input.Args`). A task
+# rather than a loop in the settings page because a library-wide write of hundreds
+# of galleries has to outlive the tab that started it, needs to be cancellable,
+# and should leave a log behind. See mangaToolsTasks.js and the settings page's
+# "Remove the plugin's fields" row, which is the only caller with arguments.
+#
+# The defaults are what a run started from Settings → Tasks gets: every field, and
+# a dry run — a task with no dialog in front of it must not clear a library the
+# first time somebody presses its button. The plugin's own dialog passes its own
+# arguments and is not bound by these.
+interface: js
+exec:
+  - mangaToolsTasks.js
+tasks:
+  - name: Remove the plugin's fields
+    description: Removes the custom fields this plugin wrote to galleries.
+    defaultArgs:
+      fields: all
+      dryRun: "true"
 
 # Plugin settings, editable under Settings → Plugins. Stash renders one plain
 # input per entry below (STRING/NUMBER/BOOLEAN only); the plugin patches that UI

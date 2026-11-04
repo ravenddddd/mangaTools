@@ -38,7 +38,15 @@ const MANIFEST = "mangaTools.yml";
  * concatenated: neither is large, both name their own classes, and a browser
  * caching the one that did not change is worth more than one file.
  */
-const FILES = [MANIFEST, "mangaTools.css", "mangaReader.css", "README.md"];
+const FILES = [
+  MANIFEST,
+  "mangaTools.css",
+  "mangaReader.css",
+  "README.md",
+  // The manifest's `exec`: the plugin's server-side task, run by Stash itself
+  // rather than loaded into the page, so it is copied as it is and not bundled.
+  "mangaToolsTasks.js",
+];
 
 /** Copied whole: the directory the manifest maps at `ui.assets` */
 const DIRECTORIES = ["assets"];

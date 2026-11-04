@@ -13,6 +13,7 @@
  */
 import { NS } from "../languages";
 import { t } from "../i18n";
+import { ClearFieldsSetting } from "./clear-fields";
 import { emit, saveSettings, useGlobalVersion } from "./core";
 import { formatLanguageOption, languageChip, resolveSelect } from "./fields-ui";
 import { fieldLabel } from "./filter-model";
@@ -686,6 +687,7 @@ function SettingsHeading(props: {
 
 /** The ids `foldedGroups` holds the two headings' folds under — not setting ids */
 const MARK_GROUP_ID = "mangaTools-markGroup";
+const MAINTENANCE_GROUP_ID = "mangaTools-maintenanceGroup";
 const DISPLAY_GROUP_ID = "mangaTools-displayGroup";
 
 export function MangaToolsSettings() {
@@ -1088,6 +1090,18 @@ export function MangaToolsSettings() {
             NS.coverIcon = next;
           })}
         />
+      </SettingsGroup>
+
+      {/* ── Maintenance ────────────────────────────────────────────────────── */}
+      {/* Last on the page, and folded like the others: it is not part of how the
+          plugin behaves, it is what to do with its data on the way out. The row
+          only queues a task — see clear-fields.tsx for why that is a task and not
+          a loop here. */}
+      <SettingsGroup
+        id={MAINTENANCE_GROUP_ID}
+        heading={t(intl, "mangaTools.settings.maintenance.heading")}
+      >
+        <ClearFieldsSetting />
       </SettingsGroup>
     </>
   );

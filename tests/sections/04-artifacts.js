@@ -6,7 +6,7 @@ const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
 const { load } = require("js-yaml");
-const { PLUGIN } = require("../helpers.js");
+const { NS, PLUGIN } = require("../helpers.js");
 
 module.exports = () => {
   // ── 10. Basic CSS checks (catch typos and missing rules after hand edits) ──
@@ -668,9 +668,12 @@ module.exports = () => {
   // still produce a file, and it would only fail in the browser.
   const buildFiles = fs.readdirSync(PLUGIN).filter((f) => f.endsWith(".js"));
   assert.deepStrictEqual(
-    buildFiles,
-    ["mangaTools.js"],
-    "one bundled file, named after the plugin ID — ui.javascript in the yml names this file"
+    buildFiles.sort(),
+    ["mangaTools.js", "mangaToolsTasks.js"],
+    "the bundle, named after the plugin ID, and the manifest's task script beside " +
+      "it — the task is run by Stash itself rather than loaded into the page, so it " +
+      "is copied rather than bundled, and a package missing it is a task that " +
+      "cannot start"
   );
 
   const bundle = fs.readFileSync(path.join(PLUGIN, "mangaTools.js"), "utf8");
@@ -725,6 +728,63 @@ module.exports = () => {
     "and carry a plain three-part version: the publishing repository appends the commit to it, " +
       "and Stash compares the two to decide whether an update is available"
   );
+
+  // **The server-side task, and the contract it has with Stash.** `exec` names a
+  // script Stash runs in its own engine and `tasks` names it for the Tasks page; a
+  // manifest naming a file the package does not carry is a task that fails the
+  // moment somebody presses it, and a `name` that drifts from the one the settings
+  // page sends is a button that queues nothing. Both are string matches across two
+  // files, which is exactly the kind of thing nothing else in this repository can
+  // catch.
+  assert.strictEqual(
+    manifest.interface,
+    "js",
+    "the plugin's task runs as JavaScript inside Stash, so the manifest says so"
+  );
+  assert.ok(
+    Array.isArray(manifest.exec) && manifest.exec.length === 1,
+    "exactly one script for Stash to run"
+  );
+  for (const file of manifest.exec) {
+    assert.ok(
+      fs.existsSync(path.join(PLUGIN, file)),
+      `dist/ should carry ${file}, which the manifest's exec names and runs`
+    );
+  }
+
+  const tasks = manifest.tasks || [];
+  assert.strictEqual(tasks.length, 1, "one task: the library-wide clear");
+  const task = tasks[0];
+  assert.strictEqual(
+    task.name,
+    NS.CLEAR_FIELDS_TASK,
+    "the task's name is the one the settings page sends — Stash looks a task up by " +
+      "that string, and a mismatch is a button that queues nothing"
+  );
+  assert.ok(
+    typeof task.description === "string" && task.description.trim(),
+    "and it says what it does, in the language the manifest is written in"
+  );
+  assert.deepStrictEqual(
+    task.defaultArgs,
+    { fields: "all", dryRun: "true" },
+    "a run started with no arguments clears every field and rehearses it — the " +
+      "Tasks page has no dialog in front of its button"
+  );
+
+  // The script knows the same keys the dialog offers, and the same six the
+  // plugin's own fields are. A key missing there is a field the dialog promises to
+  // clear and a run handed `all` silently leaves behind.
+  const tasksScript = fs.readFileSync(
+    path.join(PLUGIN, "mangaToolsTasks.js"),
+    "utf8"
+  );
+  for (const field of NS.CLEARABLE_FIELDS) {
+    assert.ok(
+      tasksScript.indexOf(field) !== -1,
+      `mangaToolsTasks.js should know ${field}, which the dialog offers`
+    );
+  }
 
   // Every setting, as Stash's own settings page would render it: a name and a description, and
   // one of the three input types it can draw. A fourth type is not a setting Stash silently

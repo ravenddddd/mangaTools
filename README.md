@@ -989,6 +989,26 @@ as before — the value is simply no longer offered as a new choice. This is
 react-select's `value`/`options` split: the selected value is rendered from `value`,
 which is never filtered, while only the option *list* is filtered.
 
+**Removing the plugin's fields is a Stash task, not a loop in the page.** The last
+group on the settings page is *Maintenance*: one row whose button opens the same kind
+of dialog as Stash's own "Clean generated files" — a switch for each of the plugin's
+six fields, a dry run, and a destructive button in the footer — for the day the plugin
+is going away and its fields should not stay behind. It is the only thing here that
+deletes data, so it describes itself before it does anything: the task logs how many
+galleries carry each field, and the dry run stops after that and writes nothing.
+
+The work itself runs in Stash's job queue, from `mangaToolsTasks.js`, which the
+manifest declares as the plugin's `exec` and a `tasks` entry. That is what a
+library-wide write needs: hundreds of mutations queued in batches, a progress bar and
+a log line per step in Settings → Tasks beside every other job, a run that survives
+closing the browser, and a Cancel button that works. The dialog only passes two
+arguments — which fields, and whether to rehearse — and Stash owns the rest. Because
+the task is a task, it is also listed on the Tasks page on its own; that entry has no
+dialog in front of it, so its defaults (every field, dry run on) are the cautious
+ones. Galleries are found by asking Stash which ones carry each field, so a stray
+language value on an unmarked gallery is caught too; Stash's own data is never
+touched.
+
 ## Reading: three ways
 
 A reader for Stash's image lightbox, for reading manga the way it was printed — two

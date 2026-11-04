@@ -343,10 +343,11 @@ module.exports = () => {
   });
   assert.strictEqual(
     rowCount,
-    switches.length + 1,
+    switches.length + 2,
     "every row carries the class the stylesheet uses to keep its control beside " +
-      "its text — the switches' rows, and the one single-choice row, which has a " +
-      "select where they have a switch and needs the same rule for the same reason"
+      "its text — the switches' rows, the one single-choice row, which has a " +
+      "select where they have a switch, and the maintenance row, whose control is " +
+      "a button and needs the same rule for the same reason"
   );
   assert.deepStrictEqual(
     switches.map((n) => n.props.id),
@@ -713,10 +714,10 @@ module.exports = () => {
     const chevrons = chevronsIn(page);
     assert.strictEqual(
       chevrons.length,
-      6,
+      7,
       "one chevron per row that has rows under it, and no row without them — " +
         "the translation group's switch is one of them now, since its list order " +
-        "is a row under it"
+        "is a row under it, and so is the maintenance group at the end of the page"
     );
     assert.ok(
       chevrons.every((c) => c.type === "button"),
@@ -1535,6 +1536,40 @@ module.exports = () => {
         "would ever be read"
     );
   }
+
+  // ── The maintenance row ────────────────────────────────────────────
+  // The row that queues the library-wide clear task. What is pinned here is the
+  // arguments the task is handed — a string map, because the task reads it the way
+  // a command line would, and `all` for the full set so that a field added later is
+  // not silently left out of a run started from this page — and that the row is a
+  // destructive button rather than another switch.
+  assert.deepStrictEqual(
+    NS.clearTaskArgs(NS.CLEARABLE_FIELDS.slice(), true),
+    { fields: "all", dryRun: "true" },
+    "every field is the word `all`, and the dry run is on"
+  );
+  assert.deepStrictEqual(
+    NS.clearTaskArgs([NS.CLEARABLE_FIELDS[0], NS.CLEARABLE_FIELDS[5]], false),
+    {
+      fields: NS.CLEARABLE_FIELDS[0] + "," + NS.CLEARABLE_FIELDS[5],
+      dryRun: "false",
+    },
+    "a subset is a comma-separated list, in the order the dialog lists them"
+  );
+  assert.strictEqual(
+    NS.CLEAR_FIELDS_TASK,
+    "Remove the plugin's fields",
+    "and the task name is the one the manifest declares — Stash looks it up by it"
+  );
+
+  const maintenance = call("PluginSettings", { pluginID: "mangaTools" });
+  assert.ok(
+    find(
+      maintenance,
+      (n) => n.type === "Button" && n.props?.variant === "danger"
+    ),
+    "the maintenance row's control is a destructive button, not a switch"
+  );
 
   // Back to the state the load left: the configuration response has not been
   // handled yet, so the save guard is still in force. Section 11 asserts that

@@ -291,6 +291,15 @@ export interface MangaToolsNamespace {
   fieldsToClear(customFields: unknown): string[];
   /** A copy of a custom_fields map holding none of this plugin's fields. */
   clearFields(customFields: unknown): MangaToolsCustomFields;
+  /**
+   * The arguments the library-wide clear task is given — see clearTaskArgs in
+   * clear-fields.tsx, and mangaToolsTasks.js, which reads them.
+   */
+  clearTaskArgs(fields: string[], dryRun: boolean): Record<string, string>;
+  /** The task's `name` in the manifest, which is how Stash looks it up. */
+  CLEAR_FIELDS_TASK: string;
+  /** The fields that task's dialog offers, in its own order. */
+  CLEARABLE_FIELDS: string[];
   /** The values the censorship field takes, in cycle order. See censorship.tsx. */
   CENSORSHIP_VALUES: string[];
   /** A stored censorship value as one of CENSORSHIP_VALUES, or "" for anything else. */

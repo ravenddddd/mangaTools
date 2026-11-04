@@ -144,5 +144,22 @@
   "mangaTools.physicalButton.on": "Physical pages",
   "mangaTools.physicalButton.repeats": "{n} pages repeat an image",
   "mangaTools.physicalButton.off": "Switch to physical pages. This clears the search term and the filters.",
-  "mangaTools.physicalButton.repeatsOne": "1 page repeats an image"
+  "mangaTools.physicalButton.repeatsOne": "1 page repeats an image",
+  "mangaTools.settings.maintenance.heading": "Maintenance",
+  "mangaTools.settings.clearFields.heading": "Remove this plugin's fields",
+  "mangaTools.settings.clearFields.description": "Deletes the custom fields this plugin wrote to galleries — for when it is going away. Stash's own data is not touched. It runs as a Stash task, so it carries on if this page is closed.",
+  "mangaTools.clearFields.button": "Remove fields…",
+  "mangaTools.clearFields.title": "Remove this plugin's fields",
+  "mangaTools.clearFields.intro": "Choose which fields to remove. Only galleries carrying one of them are touched.",
+  "mangaTools.clearFields.manga": "Manga mark",
+  "mangaTools.clearFields.language": "Language",
+  "mangaTools.clearFields.censorship": "Censorship",
+  "mangaTools.clearFields.original": "Original text",
+  "mangaTools.clearFields.translationGroup": "Translation group",
+  "mangaTools.clearFields.chapters": "Chapters",
+  "mangaTools.clearFields.dryRun": "Dry run — do not remove anything",
+  "mangaTools.clearFields.cancel": "Cancel",
+  "mangaTools.clearFields.confirm": "Remove fields",
+  "mangaTools.clearFields.queued": "Added to Stash's task queue — progress and the log are on the Tasks page.",
+  "mangaTools.clearFields.failed": "The task could not be queued. See the browser console."
 }

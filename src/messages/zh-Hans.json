@@ -144,5 +144,22 @@
   "mangaTools.physicalButton.on": "物理页视图",
   "mangaTools.physicalButton.repeats": "重复 {n} 页",
   "mangaTools.physicalButton.off": "切换到物理页视图。这会清除搜索词和筛选条件。",
-  "mangaTools.physicalButton.repeatsOne": "重复 1 页"
+  "mangaTools.physicalButton.repeatsOne": "重复 1 页",
+  "mangaTools.settings.maintenance.heading": "维护",
+  "mangaTools.settings.clearFields.heading": "移除本插件的字段",
+  "mangaTools.settings.clearFields.description": "删除本插件写在画廊上的自定义字段——用于卸载前收尾。不会动 Stash 自己的数据。任务在 Stash 的任务队列里运行，关掉这个页面也会继续。",
+  "mangaTools.clearFields.button": "移除字段…",
+  "mangaTools.clearFields.title": "移除本插件的字段",
+  "mangaTools.clearFields.intro": "选择要移除的字段。只有带有其中任意一个字段的画廊会被处理。",
+  "mangaTools.clearFields.manga": "漫画标记",
+  "mangaTools.clearFields.language": "语言",
+  "mangaTools.clearFields.censorship": "审查",
+  "mangaTools.clearFields.original": "原文",
+  "mangaTools.clearFields.translationGroup": "翻译组",
+  "mangaTools.clearFields.chapters": "章节",
+  "mangaTools.clearFields.dryRun": "仅模拟运行，不要删除任何东西",
+  "mangaTools.clearFields.cancel": "取消",
+  "mangaTools.clearFields.confirm": "移除字段",
+  "mangaTools.clearFields.queued": "已加入 Stash 任务队列——进度和日志见「设置 → 任务」。",
+  "mangaTools.clearFields.failed": "无法把任务加入队列，详见浏览器控制台。"
 }
