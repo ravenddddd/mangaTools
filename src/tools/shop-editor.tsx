@@ -456,12 +456,27 @@ export function ShopDialog(props: {
               onDragOver={(e: React.DragEvent) => {
                 if (!dragRow || dragRow === row.id) return;
                 e.preventDefault();
+
                 const box = (
                   e.currentTarget as HTMLElement
                 ).getBoundingClientRect();
-                const after = e.clientY > box.top + box.height / 2;
-                if (!drop || drop.id !== row.id || drop.after !== after) {
-                  setDrop({ id: row.id, after });
+                const below = e.clientY > box.top + box.height / 2;
+
+                // **One line per gap.** The lower half of a row and the upper half
+                // of the one after it are the same place, so the marker is always
+                // "before a row" — only past the last row is it "after" one.
+                const next = rows[index + 1];
+                const landing =
+                  below && next
+                    ? { id: next.id, after: false }
+                    : { id: row.id, after: below && !next };
+
+                if (
+                  !drop ||
+                  drop.id !== landing.id ||
+                  drop.after !== landing.after
+                ) {
+                  setDrop(landing);
                 }
               }}
               onDrop={(e: React.DragEvent) => {
