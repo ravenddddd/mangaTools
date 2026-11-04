@@ -121,13 +121,13 @@ function main() {
     return { Error: "no fields selected: " + argString(args.fields) };
   }
 
-  log.Info("Fields: " + fields.join(", "));
-  log.Info(dryRun ? "Dry run: nothing will be removed" : "Removing");
-
   // One query per field, and the counts are logged before anything is written:
-  // they are the only answer to "what is about to go" that a dry run can give.
+  // they are the only answer to "what is about to go" that a dry run can give. One
+  // line rather than one per field — the job log is read, not scanned, and the
+  // dialog already shows the same numbers beside each switch.
   const seen = {};
   const ids = [];
+  const parts = [];
   for (const field of fields) {
     const found = galleriesWith(field);
     for (const id of found) {
@@ -136,10 +136,16 @@ function main() {
       seen[key] = true;
       ids.push(key);
     }
-    log.Info(field + ": " + found.length + " gallery(ies)");
+    parts.push(field.replace("plugin.mangaTools.", "") + " " + found.length);
   }
 
-  log.Info("Galleries with any of these fields: " + ids.length);
+  log.Info(
+    "Galleries with any of these fields: " +
+      ids.length +
+      " (" +
+      parts.join(", ") +
+      ")"
+  );
 
   if (dryRun) {
     log.Info("Dry run complete; nothing was removed.");

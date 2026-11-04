@@ -147,7 +147,7 @@
   "mangaTools.physicalButton.repeatsOne": "重复 1 页",
   "mangaTools.settings.maintenance.heading": "维护",
   "mangaTools.settings.clearFields.heading": "移除本插件的字段",
-  "mangaTools.settings.clearFields.description": "删除本插件写在画廊上的自定义字段——用于卸载前收尾。不会动 Stash 自己的数据。任务在 Stash 的任务队列里运行，关掉这个页面也会继续。",
+  "mangaTools.settings.clearFields.description": "删除本插件写在画廊上的自定义字段",
   "mangaTools.clearFields.button": "移除字段…",
   "mangaTools.clearFields.title": "移除本插件的字段",
   "mangaTools.clearFields.intro": "选择要移除的字段。只有带有其中任意一个字段的画廊会被处理。",

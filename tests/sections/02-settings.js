@@ -1562,6 +1562,37 @@ module.exports = () => {
     "and the task name is the one the manifest declares — Stash looks it up by it"
   );
 
+  // The counts the dialog shows beside each field come from one query with one
+  // alias per field — the same NOT_NULL filter the task uses, so the number and the
+  // run agree — and an answer that is missing an alias reads 0 rather than blank.
+  const countsQuery = NS.clearFieldsCountsQuery();
+  for (const field of NS.CLEARABLE_FIELDS) {
+    assert.ok(
+      countsQuery.indexOf(field) !== -1,
+      `the count query should ask about ${field}`
+    );
+  }
+  assert.ok(
+    countsQuery.split("NOT_NULL").length - 1 === NS.CLEARABLE_FIELDS.length,
+    "…each with the same NOT_NULL the task discovers galleries by"
+  );
+  assert.deepStrictEqual(
+    NS.clearFieldsCountsFrom({
+      f0: { count: 12 },
+      f2: { count: 3 },
+      f5: { count: 0 },
+    }),
+    {
+      [NS.CLEARABLE_FIELDS[0]]: 12,
+      [NS.CLEARABLE_FIELDS[1]]: 0,
+      [NS.CLEARABLE_FIELDS[2]]: 3,
+      [NS.CLEARABLE_FIELDS[3]]: 0,
+      [NS.CLEARABLE_FIELDS[4]]: 0,
+      [NS.CLEARABLE_FIELDS[5]]: 0,
+    },
+    "an unanswered field reads 0, so a switch never claims a count it does not have"
+  );
+
   const maintenance = call("PluginSettings", { pluginID: "mangaTools" });
   assert.ok(
     find(

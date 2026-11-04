@@ -147,7 +147,7 @@
   "mangaTools.physicalButton.repeatsOne": "1 page repeats an image",
   "mangaTools.settings.maintenance.heading": "Maintenance",
   "mangaTools.settings.clearFields.heading": "Remove this plugin's fields",
-  "mangaTools.settings.clearFields.description": "Deletes the custom fields this plugin wrote to galleries — for when it is going away. Stash's own data is not touched. It runs as a Stash task, so it carries on if this page is closed.",
+  "mangaTools.settings.clearFields.description": "Deletes the custom fields this plugin wrote to galleries.",
   "mangaTools.clearFields.button": "Remove fields…",
   "mangaTools.clearFields.title": "Remove this plugin's fields",
   "mangaTools.clearFields.intro": "Choose which fields to remove. Only galleries carrying one of them are touched.",

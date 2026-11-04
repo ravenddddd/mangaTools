@@ -147,7 +147,7 @@
   "mangaTools.physicalButton.repeatsOne": "重複 1 頁",
   "mangaTools.settings.maintenance.heading": "維護",
   "mangaTools.settings.clearFields.heading": "移除本外掛的欄位",
-  "mangaTools.settings.clearFields.description": "刪除本外掛寫在畫廊上的自訂欄位——用於解除安裝前收尾。不會動 Stash 自己的資料。任務在 Stash 的任務佇列裡執行，關掉這個頁面也會繼續。",
+  "mangaTools.settings.clearFields.description": "刪除本外掛寫在畫廊上的自訂欄位",
   "mangaTools.clearFields.button": "移除欄位…",
   "mangaTools.clearFields.title": "移除本外掛的欄位",
   "mangaTools.clearFields.intro": "選擇要移除的欄位。只有帶有其中任一個欄位的畫廊會被處理。",

@@ -119,6 +119,48 @@ function queueClear(args: Record<string, string>): Promise<boolean> {
     .then(() => true);
 }
 
+/**
+ * One query, one alias per field, asking only for `count`.
+ *
+ * Six small counts rather than one big list: the dialog only wants the numbers, and
+ * the same filter the task uses (`NOT_NULL`) is the one that makes them true — a
+ * count from anywhere else could disagree with what the run would actually do.
+ */
+export function countsQuery(): string {
+  const parts = CLEARABLE_FIELDS.map(
+    (field, index) =>
+      `f${index}: findGalleries(` +
+      `gallery_filter: { custom_fields: [{ field: "${field}", modifier: NOT_NULL }] }, ` +
+      "filter: { per_page: 1 }) { count }"
+  );
+  return "query { " + parts.join(" ") + " }";
+}
+
+/** Those counts, by field, out of the answer — a field with no answer reads 0 */
+export function countsFrom(data: unknown): Record<string, number> {
+  const answer = (data || {}) as Record<string, { count?: number } | undefined>;
+  const counts: Record<string, number> = {};
+  CLEARABLE_FIELDS.forEach((field, index) => {
+    const count = answer["f" + index]?.count;
+    counts[field] = typeof count === "number" ? count : 0;
+  });
+  return counts;
+}
+
+/** The counts for the dialog, or null while they are being asked for */
+function loadCounts(): Promise<Record<string, number> | null> {
+  const client = PluginApi.utils.StashService.getClient();
+  if (!client) return Promise.resolve(null);
+
+  const query = gqlDoc(countsQuery(), "build the clear-fields count query");
+  if (!query) return Promise.resolve(null);
+
+  return client
+    .query({ query, fetchPolicy: "no-cache" })
+    .then((res: { data?: unknown } | undefined) => countsFrom(res?.data))
+    .catch(() => null);
+}
+
 /** One row of the dialog: a label and its switch */
 function SwitchRow(props: {
   id: string;
@@ -169,6 +211,18 @@ export function ClearFieldsSetting() {
   const notice = noticeState[0];
   const setNotice = noticeState[1];
 
+  // How many galleries carry each field, asked for when the dialog opens so the
+  // switches say what choosing them would touch. Null until the answer lands.
+  const countsState = React.useState<Record<string, number> | null>(null);
+  const counts = countsState[0];
+  const setCounts = countsState[1];
+
+  const openDialog = () => {
+    setCounts(null);
+    setOpen(true);
+    loadCounts().then(setCounts);
+  };
+
   /** Adds or removes one field, keeping the dialog's own order */
   const toggle = (key: string, on: boolean) => {
     setChosen((current: string[]) => {
@@ -214,7 +268,7 @@ export function ClearFieldsSetting() {
       </div>
       <div>
         {Bootstrap ? (
-          <Bootstrap.Button variant="danger" onClick={() => setOpen(true)}>
+          <Bootstrap.Button variant="danger" onClick={openDialog}>
             {t(intl, "mangaTools.clearFields.button")}
           </Bootstrap.Button>
         ) : null}
@@ -230,7 +284,6 @@ export function ClearFieldsSetting() {
       {row}
       <Modal
         show
-        size="lg"
         onHide={() => {
           if (!busy) setOpen(false);
         }}
@@ -246,7 +299,10 @@ export function ClearFieldsSetting() {
                 <SwitchRow
                   key={field}
                   id={"mangaTools-clear-" + field.split(".").pop()}
-                  label={t(intl, LABEL_OF[field])}
+                  label={
+                    t(intl, LABEL_OF[field]) +
+                    (counts ? " (" + counts[field] + ")" : "")
+                  }
                   checked={chosen.indexOf(field) !== -1}
                   onChange={(next) => toggle(field, next)}
                 />
@@ -291,3 +347,5 @@ export function ClearFieldsSetting() {
 NS.clearTaskArgs = clearTaskArgs;
 NS.CLEAR_FIELDS_TASK = CLEAR_FIELDS_TASK;
 NS.CLEARABLE_FIELDS = CLEARABLE_FIELDS;
+NS.clearFieldsCountsQuery = countsQuery;
+NS.clearFieldsCountsFrom = countsFrom;
