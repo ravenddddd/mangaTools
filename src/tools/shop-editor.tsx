@@ -122,33 +122,28 @@ function rowHasIssues(issues: RowIssues): boolean {
 let tipSeq = 0;
 
 /**
- * A Bootstrap tooltip around its trigger, or a plain `title` when the library
- * this Stash exposes has none (the test harness's stand-in, and any future Stash
- * that drops it) — the text is the same either way.
+ * A Bootstrap tooltip around its trigger.
+ *
+ * Nothing to fall back to: `OverlayTrigger` and `Tooltip` come from the same
+ * react-bootstrap module as the Button and Modal this dialog cannot draw without,
+ * so a Stash that has those has these. (The smoke test's stand-in has neither, so
+ * the guard below draws the bare trigger there.)
  */
 function WithTip(props: { text: string; children: React.ReactNode }) {
   const Bootstrap = PluginApi.libraries.Bootstrap;
   const Overlay = Bootstrap ? Bootstrap.OverlayTrigger : null;
   const Tooltip = Bootstrap ? Bootstrap.Tooltip : null;
 
-  if (Overlay && Tooltip && props.text) {
-    tipSeq += 1;
-    return (
-      <Overlay
-        placement="top"
-        overlay={
-          <Tooltip id={"manga-tools-tip-" + tipSeq}>{props.text}</Tooltip>
-        }
-      >
-        {props.children as never}
-      </Overlay>
-    );
-  }
+  if (!Overlay || !Tooltip || !props.text) return <>{props.children}</>;
 
+  tipSeq += 1;
   return (
-    <span className="manga-tools-shop-tip" title={props.text || undefined}>
-      {props.children}
-    </span>
+    <Overlay
+      placement="top"
+      overlay={<Tooltip id={"manga-tools-tip-" + tipSeq}>{props.text}</Tooltip>}
+    >
+      {props.children as never}
+    </Overlay>
   );
 }
 
@@ -310,10 +305,6 @@ export function ShopDialog(props: {
   const open = openState[0];
   const setOpen = openState[1];
 
-  const menuState = React.useState(false);
-  const menuOpen = menuState[0];
-  const setMenuOpen = menuState[1];
-
   const touchState = React.useState<{ [key: string]: boolean }>({});
   const touch = touchState[0];
   const setTouch = touchState[1];
@@ -350,7 +341,6 @@ export function ShopDialog(props: {
     const next = shops.concat([draftOf([preset])[0]]);
     setShops(next);
     setOpen(next.length - 1);
-    setMenuOpen(false);
   };
 
   const removeShop = (index: number) => {
@@ -471,60 +461,11 @@ export function ShopDialog(props: {
             </div>
           );
         })}
-
-        <div className="manga-tools-shop-adder">
-          {Bootstrap?.Button ? (
-            <Bootstrap.Button
-              variant="secondary"
-              onClick={() => setMenuOpen(!menuOpen)}
-            >
-              {t(intl, "mangaTools.shops.add")}
-            </Bootstrap.Button>
-          ) : null}
-
-          {menuOpen ? (
-            <div className="manga-tools-shop-menu">
-              <div
-                className="manga-tools-shop-menu-entry"
-                onClick={() =>
-                  addShop({ name: "", icon: "", domains: [], regexes: [] })
-                }
-              >
-                {t(intl, "mangaTools.shops.new")}
-              </div>
-              <div className="manga-tools-shop-menu-title">
-                {t(intl, "mangaTools.shops.builtin")}
-              </div>
-              <div className="manga-tools-shop-menu-builtins">
-                {BUILTIN_SHOPS.map((preset) => {
-                  const allowed = canAdd(preset);
-                  return (
-                    <span
-                      key={preset.name}
-                      className={
-                        "manga-tools-shop-preset" + (allowed ? "" : " is-added")
-                      }
-                      onClick={allowed ? () => addShop(preset) : undefined}
-                    >
-                      {shopIconUrl(preset) ? (
-                        <img
-                          className="manga-tools-shop-icon"
-                          src={shopIconUrl(preset)}
-                          alt=""
-                          draggable={false}
-                        />
-                      ) : null}
-                      {preset.name}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-        </div>
       </div>
       <div className="modal-footer">
-        <div />
+        <div className="manga-tools-shop-add">
+          <AddShopMenu onAdd={addShop} canAdd={canAdd} />
+        </div>
         <div>
           <Bootstrap.Button
             className="ml-2"
@@ -610,6 +551,83 @@ function pickIcon(done: (icon: string) => void): void {
     iconFromFile(file, done);
   };
   input.click();
+}
+
+/**
+ * "Add a shop": a button in the footer's left corner, and Stash's own popover.
+ *
+ * The popover is the one Stash draws for "set image" — a `Popover` on a click
+ * trigger, one full-width minimal row per action with its icon, and a divider
+ * between the two kinds of entry. A built-in that cannot be added (its name or a
+ * domain is in use) is a disabled row rather than a hidden one: the list is
+ * finite and fixed, and a row that disappears would say nothing about why.
+ */
+function AddShopMenu(props: {
+  onAdd: (shop: Shop) => void;
+  canAdd: (preset: Shop) => boolean;
+}) {
+  const intl = PluginApi.libraries.Intl.useIntl();
+  const Bootstrap = PluginApi.libraries.Bootstrap;
+  const Overlay = Bootstrap ? Bootstrap.OverlayTrigger : null;
+  const Popover = Bootstrap ? Bootstrap.Popover : null;
+  const Content = Popover ? Popover.Content : null;
+
+  if (!Bootstrap?.Button || !Overlay || !Popover || !Content) return null;
+
+  const icon = (glyph: unknown) =>
+    glyph ? <PluginApi.components.Icon icon={glyph} /> : null;
+
+  const content = (
+    <Popover id="manga-tools-shop-add">
+      <Content>
+        <button
+          type="button"
+          className="manga-tools-shop-menu-row"
+          onClick={() =>
+            props.onAdd({ name: "", icon: "", domains: [], regexes: [] })
+          }
+        >
+          {icon(PluginApi.libraries.FontAwesomeSolid?.faPlus)}
+          <span>{t(intl, "mangaTools.shops.new")}</span>
+        </button>
+        <div className="manga-tools-shop-menu-divider" />
+        <div className="manga-tools-shop-menu-title">
+          {t(intl, "mangaTools.shops.builtin")}
+        </div>
+        {BUILTIN_SHOPS.map((preset) => {
+          const allowed = props.canAdd(preset);
+          const src = shopIconUrl(preset);
+          return (
+            <button
+              type="button"
+              key={preset.name}
+              className="manga-tools-shop-menu-row"
+              disabled={!allowed}
+              onClick={allowed ? () => props.onAdd(preset) : undefined}
+            >
+              {src ? (
+                <img
+                  className="manga-tools-shop-icon"
+                  src={src}
+                  alt=""
+                  draggable={false}
+                />
+              ) : null}
+              <span>{preset.name}</span>
+            </button>
+          );
+        })}
+      </Content>
+    </Popover>
+  );
+
+  return (
+    <Overlay trigger="click" rootClose placement="top" overlay={content}>
+      <Bootstrap.Button variant="secondary">
+        {t(intl, "mangaTools.shops.add")}
+      </Bootstrap.Button>
+    </Overlay>
+  );
 }
 
 /** The expanded form of one shop, in Stash's own form layout. */

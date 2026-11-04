@@ -1317,9 +1317,8 @@ button.minimal.manga-tools-manga-toggle.is-manga {
 .manga-tools-shop-icon,
 .manga-tools-shop-grip,
 .manga-tools-shop-form label,
-.manga-tools-shop-preset,
 .manga-tools-shop-list-actions,
-.manga-tools-shop-menu-entry,
+.manga-tools-shop-menu-row,
 .manga-tools-shop-menu-title,
 .manga-tools-shop-help {
   user-select: none;
@@ -1447,56 +1446,54 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   padding-top: 6px;
 }
 
-.manga-tools-shop-adder {
-  margin-top: 10px;
+/*
+ * The add menu, inside Stash's popover. Its rows are the shape Stash's own
+ * image menu uses: a full-width minimal button, the icon in a fixed-width slot,
+ * the label after it, and a divider between the two kinds of entry.
+ */
+/* The dialog's footer holds two groups: the add button, pushed to the left edge,
+ * and the two buttons Stash's footer already pushes right. */
+.modal-footer > .manga-tools-shop-add {
+  margin-right: auto;
 }
 
-.manga-tools-shop-menu {
-  max-width: 520px;
-  margin-top: 6px;
-  padding: 8px;
-  border: 1px solid rgba(16, 22, 26, 0.6);
-  border-radius: 4px;
-  background: #30404d;
-}
-
-.manga-tools-shop-menu-entry {
-  padding: 7px 8px;
-  border-radius: 3px;
+.manga-tools-shop-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
 }
 
-.manga-tools-shop-menu-entry:hover {
-  background: rgba(138, 155, 168, 0.12);
+.manga-tools-shop-menu-row:hover:not([disabled]) {
+  color: #fff;
+}
+
+.manga-tools-shop-menu-row[disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.manga-tools-shop-menu-row .fa-icon {
+  flex: none;
+  width: 16px;
+}
+
+.manga-tools-shop-menu-divider {
+  height: 0;
+  margin: 0.35rem -0.75rem;
+  border-top: 1px solid #26343d;
 }
 
 .manga-tools-shop-menu-title {
-  margin: 6px 8px 2px;
   color: #8a9ba8;
   font-size: 0.8rem;
-}
-
-.manga-tools-shop-menu-builtins {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px 8px 6px;
-}
-
-.manga-tools-shop-preset {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 9px;
-  border: 1px solid rgba(16, 22, 26, 0.6);
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
-.manga-tools-shop-preset.is-added {
-  opacity: 0.45;
-  cursor: default;
+  margin: 2px 0 4px;
 }
 
 .manga-tools-shop-empty {

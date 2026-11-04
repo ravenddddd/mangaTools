@@ -1167,6 +1167,11 @@ export interface IPluginApi {
        */
       OverlayTrigger?: ComponentType<Record<string, unknown>>;
       Tooltip?: ComponentType<Record<string, unknown>>;
+      /** The popover pair, for the shop editor's "add" menu (react-bootstrap 1.x). */
+      Popover?: ComponentType<Record<string, unknown>> & {
+        Content?: ComponentType<Record<string, unknown>>;
+        Title?: ComponentType<Record<string, unknown>>;
+      };
       /** Grid columns, for the same rows. */
       Row?: ComponentType<Record<string, unknown>>;
       Col?: ComponentType<Record<string, unknown>>;
