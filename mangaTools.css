@@ -1574,19 +1574,23 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   white-space: nowrap;
 }
 
+/* One grid for the whole block, not one per row: the label, the preview, the
+ * field and the three buttons are columns, and every row's cell lands in the same
+ * column whatever the language — a fixed label width was either too narrow for
+ * "Uncensored" or too wide for 「無修正」, and per-row widths put the inputs at
+ * different x. The rows themselves are `display: contents`, so their cells are
+ * the grid's. */
 .manga-tools-icon-lines {
-  display: flex;
-  flex-direction: column;
-}
-
-.manga-tools-icon-line-wrap + .manga-tools-icon-line-wrap {
-  margin-top: 8px;
-}
-
-.manga-tools-icon-line {
-  display: flex;
+  display: grid;
+  grid-template-columns: 8em 22px 150px max-content max-content 2.375rem;
   align-items: center;
   gap: 8px;
+  justify-content: end;
+}
+
+.manga-tools-icon-line-wrap,
+.manga-tools-icon-line {
+  display: contents;
 }
 
 /* The buttons keep their words on one line: three of them share the row, and a
@@ -1596,16 +1600,19 @@ button.minimal.manga-tools-manga-toggle.is-manga {
   white-space: nowrap;
 }
 
+/* The message spans the row under it, right-aligned: the label column is the
+ * only one that can be short, and the message belongs to the whole row. */
 .manga-tools-icon-line-wrap .invalid-feedback {
-  margin-left: calc(4em + 22px + 16px);
+  grid-column: 1 / -1;
+  text-align: right;
 }
 
 .manga-tools-icon-name {
   color: #8a9ba8;
+  flex: none;
   font-size: 0.78rem;
   text-align: right;
   white-space: nowrap;
-  width: 4em;
 }
 
 .manga-tools-icon-preview {
