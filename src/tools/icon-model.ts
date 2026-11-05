@@ -13,8 +13,9 @@
  *     a data URI and drawn as a **mask** (its shape in the surrounding colour, no
  *     colours of its own — which is also why it cannot carry script or fetch
  *     anything);
- *   - `faName` / `regular:faName` — one of the Font Awesome icons Stash ships,
- *     solid by default and `regular:` for the outlined set.
+ *   - `name` / `regular:name` — one of the Font Awesome icons Stash ships, as the
+ *     site lists it (`square`, `chess-board`), solid by default and `regular:` for
+ *     the outlined set.
  *
  * Absent reads as the default, so a library that never opens the settings draws
  * what it always drew; `""` is a choice, not an absence, and survives a restart.

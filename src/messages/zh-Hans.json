@@ -216,5 +216,5 @@
   "mangaTools.icons.emptyHint": "留空则不显示图标",
   "mangaTools.icons.markHint": "不能留空",
   "mangaTools.icons.noteBefore": "图标来自 Stash 自带的 ",
-  "mangaTools.icons.noteAfter": "。描边体需加对应前缀，例如 regular:faSquare。"
+  "mangaTools.icons.noteAfter": "。描边体需加对应前缀，例如 regular:square。"
 }
