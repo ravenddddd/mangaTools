@@ -234,6 +234,21 @@ let pageGalleryId: string | null = null;
 let clickedGalleryId: string | null = null;
 
 /**
+ * Which answer about a lightbox's gallery was the one in force — see galleryOf.
+ *
+ * **The order a lightbox shows its pages in depends on where it was opened from, and
+ * the address bar only describes one list.** On the galleries list it describes the
+ * *galleries*: the preview lightbox a card opens belongs to a gallery and is fetched
+ * by Stash in path order whatever the list is sorted by (`useGalleriesLightbox` asks
+ * for `sort: "path"` outright). Everywhere else the lightbox holds the list that is
+ * under it — a gallery page's Images tab, the Images list — and the address bar is
+ * that list's sort. So the place the id came from is kept with it, and loadGallery
+ * asks for the order Stash itself would. See lightboxOrder for the guess this
+ * replaces, and orderAgrees for the check that still stands behind it.
+ */
+let gallerySource: "path" | "card" | "image" | null = null;
+
+/**
  * Every image whose galleries have been asked about, and what came back.
  *
  * Kept across lightboxes, not per lightbox: the answer cannot change while a page
@@ -362,7 +377,10 @@ let place = -1;
  */
 function galleryOf(lightbox: Element): string | null {
   const fromPath = galleryIdFromPath(window.location.pathname);
-  if (fromPath) return fromPath;
+  if (fromPath) {
+    gallerySource = "path";
+    return fromPath;
+  }
   if (pageGalleryId) return pageGalleryId;
 
   // What the click that opened this lightbox was inside, when it was inside a
@@ -378,6 +396,9 @@ function galleryOf(lightbox: Element): string | null {
     const clicked = clickedGalleryId;
     clickedGalleryId = null;
     pageGalleryId = clicked;
+    // The one answer whose lightbox is *not* the list under it: a gallery's card
+    // preview is the gallery, fetched in path order. See gallerySource.
+    gallerySource = "card";
     return pageGalleryId;
   }
 
@@ -388,6 +409,7 @@ function galleryOf(lightbox: Element): string | null {
   // which is the case that makes the takeover happen in this same `step`.
   if (image.id in galleriesOfImage) {
     pageGalleryId = galleriesOfImage[image.id];
+    gallerySource = "image";
     return pageGalleryId;
   }
 
@@ -401,6 +423,7 @@ function galleryOf(lightbox: Element): string | null {
     if (root !== lightbox) return;
 
     pageGalleryId = galleriesOfImage[image.id];
+    gallerySource = "image";
     // The answer moved what this lightbox is, so everything downstream has to be
     // looked at again — the chapters, the takeover, the drawing.
     if (root) step();
@@ -428,6 +451,7 @@ function step(): void {
     root = lightbox;
     galleryId = null;
     pageGalleryId = null;
+    gallerySource = null;
     shownAt = -1;
     place = -1;
     reinsers = 0;
@@ -470,6 +494,16 @@ function step(): void {
   // is something to draw. A lightbox that is empty for the length of a query is an
   // honest one; a flash of pages the reader is not going to be shown is not.
   claim(lightbox);
+
+  // **Nothing is decided while Stash is still fetching.** A lightbox that is loading
+  // has no carousel — Stash replaces the display and the header with a spinner — so
+  // the question "which order is this lightbox showing" cannot be answered, and a
+  // cached list would be taken on trust without the check that makes it trustworthy:
+  // the reader would draw whatever order was in hand, which is how a gallery read
+  // earlier from a sorted list stayed in that order on a page that shows path. The
+  // observer calls back when the spinner is replaced, and that pass decides. See
+  // lightboxIsLoading, gallerySource and orderAgrees.
+  if (lightboxIsLoading(lightbox)) return;
 
   // Read whether or not the mode is on: the chapters are what the lightbox is handed
   // once this gallery is in hand, and a reader who never turns the spread view on
@@ -606,10 +640,19 @@ function loadGallery(id: string): void {
   if (pending?.id === id && pending.lightbox === forLightbox) return;
   pending = { id, lightbox: forLightbox };
 
-  // Read here rather than remembered: the order belongs to the list the lightbox
-  // was opened from, and opening another gallery — or the same one after changing
-  // the list's sort — is a different order. See lightboxOrder.
-  loadPages(id, lightboxOrder(window.location.search), forLightbox)
+  // **The order Stash itself would ask for, which depends on where the lightbox came
+  // from.** A gallery card's preview belongs to the gallery and is path whatever the
+  // galleries list is sorted by — Stash's own `useGalleriesLightbox` asks for
+  // `sort: "path"` outright, and the address bar there describes the galleries, not
+  // the images. Every other entry point holds the list under it, and the address bar
+  // is that list's sort. Read here rather than remembered: opening another gallery,
+  // or the same one after changing the list's sort, is a different order. See
+  // gallerySource, and lightboxOrder, whose answer orderAgrees still checks.
+  const order: MangaReaderOrder =
+    gallerySource === "card"
+      ? { sort: "path", direction: "ASC" }
+      : lightboxOrder(window.location.search);
+  loadPages(id, order, forLightbox)
     .then(({ answer, order }) => {
       // Another opening was asked for while this was in flight: its answer is the
       // one that matters, and this one must not be drawn over it. Matching the
@@ -797,25 +840,25 @@ function nextIndex(pages: MangaReaderPage[], id: string | undefined): number {
 /**
  * The gallery's pages, in the order the lightbox is actually showing them.
  *
- * The order is *guessed* from the URL, and the URL is not always right: Stash's
- * gallery page keeps its inner tabs in component state, so switching from the
- * Images tab to the Chapters tab leaves `?sortby=title` in the address bar while
- * the lightbox that tab opens is Stash's own, and always path. Worse, the address
- * bar of the **galleries list** carries that list's sort — `random_<seed>`, `date` —
- * and the server applies it to *images* without complaint, so the guess comes back
- * as a real list in an order no lightbox is showing. Fetching one for a path-ordered
- * lightbox pairs the wrong pages and puts every index this plugin computes off by
- * however much the two orders disagree.
+ * The order comes from where the lightbox was opened from — a card's preview is
+ * path, everything else is the address bar's sort, see gallerySource — and that is
+ * not always right: Stash's gallery page keeps its inner tabs in component state, so
+ * switching from the Images tab to the Chapters tab leaves `?sortby=title` in the
+ * address bar while the lightbox that tab opens is Stash's own, and always path. So
+ * the list that comes back is checked against the lightbox itself: the image on
+ * screen **and the slides either side of it** (see orderAgrees). A list that
+ * disagrees is thrown away and asked for again in path order, which is what every
+ * one of Stash's own gallery lightboxes is in.
  *
- * So the guess is checked against the lightbox itself: the image on screen **and the
- * slides either side of it** (see orderAgrees). A list that disagrees is thrown away
- * and asked for again in path order, which is what every one of Stash's own gallery
- * lightboxes is in. If that disagrees too, nothing here fits and the caller is told
- * so rather than drawing pages that do not match the lightbox.
+ * **Nothing here gives the lightbox up.** The reader is on, so the lightbox is this
+ * plugin's: a list that still disagrees is drawn as the best answer there is rather
+ * than handing the lightbox back to Stash — a wrong order in a case that could not
+ * be reproduced from here is the smaller price, and a reader that silently stops
+ * being one is the bigger.
  *
- * A lightbox whose carousel cannot be read concludes nothing: the check is skipped
- * and the guess stands, because a reader that cannot verify an assumption is not
- * entitled to fail on it either.
+ * A lightbox whose carousel cannot be read is not checked at all: the list stands as
+ * fetched, because a reader that cannot verify an assumption is not entitled to
+ * decide anything against it either.
  */
 async function loadPages(
   id: string,
@@ -853,26 +896,20 @@ async function loadPages(
   if (orderAgrees(answer, lightbox)) return { answer, order };
 
   // Stash's own gallery lightbox is path — a card's preview, the chapters tab, the
-  // header button — so that is the order to ask for when the URL's is not it. Any
-  // other order cannot be reproduced from here, and a reader with no pages is
-  // better than one reading the wrong ones.
+  // header button — so that is the order to ask for when the one chosen is not it.
   const byPath: MangaReaderOrder = { sort: "path", direction: "ASC" };
   if (order.sort === byPath.sort && order.direction === byPath.direction) {
-    throw new Error(
-      "[mangaReader] the lightbox is showing this gallery's images in an order " +
-        "that is not path order, so they cannot be paired — the list behind it is " +
-        "filtered or sorted some other way"
-    );
+    // Already path and still not what the lightbox is holding: there is no other
+    // order left to ask for, so this one is drawn. A lightbox half a list in some
+    // order this plugin cannot name is still better served by the reader than by
+    // being handed back — see the note above.
+    return { answer, order };
   }
 
+  // The second answer is not checked again: it is the last order there is, and the
+  // reader draws it whether or not the carousel agrees.
   const again = await fetchGallery(id, byPath);
-  if (orderAgrees(again, lightbox)) return { answer: again, order: byPath };
-
-  throw new Error(
-    "[mangaReader] the lightbox is showing this gallery's images in an order " +
-      "that neither the address bar's sort nor path order reproduces, so they " +
-      "cannot be paired"
-  );
+  return { answer: again, order: byPath };
 }
 
 /**

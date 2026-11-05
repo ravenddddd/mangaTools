@@ -1446,29 +1446,30 @@ query is lifted onto the reader's own relative path: same resource, same cache
 entry, and now the pages Stash has already loaded are there the moment they are
 asked for.
 
-**And in the order the lightbox is showing them.** Which is not always path: the
-lightbox opened from the gallery page's Chapters tab is Stash's own and path-sorted,
-but the one opened from the **Images** tab holds *the list's* images, in the list's
-own sort — and the list keeps that sort in the URL (`?sortby=title&perPage=500`).
-Pairing path-ordered pages against a title-ordered carousel draws the wrong pages,
-and puts every index the reader computes off by however much the two orders
-disagree. So the sort and direction are read from the URL and asked for back, with
-Stash's own rules for them — including that an absent direction means descending
-for `date` and nothing else, and that a seeded `random_…` is a sort name to hand
-back rather than a shuffle to roll again.
+**And in the order the lightbox is showing them.** Which is not always path, and is
+not always the address bar either. Stash's own answer depends on where the lightbox
+was opened from: a gallery card's preview — the one the **galleries** list opens —
+belongs to the gallery and is fetched in path order whatever that list is sorted by
+(`useGalleriesLightbox` asks for `sort: "path"` outright, and the address bar there
+describes the galleries, not the images); the lightbox opened from a gallery page's
+**Images** tab or from the **Images** list holds *the list's* images, in the list's
+own sort, which the list keeps in the URL (`?sortby=title&perPage=500`). The reader
+reads the order the same way — path when the lightbox came from a card, and the
+URL's sort and direction otherwise, with Stash's own rules for them: an absent
+direction means descending for `date` and nothing else, and a seeded `random_…` is
+a sort name to hand back rather than a shuffle to roll again.
 
-**The URL is only a guess, and it is checked.** The address bar can be describing
-another list entirely: a gallery opened from the **galleries** list carries that
-list's sort — `date`, `name`, a `random_<seed>` — and the server applies it to
-*images* without complaint, while the lightbox the reader lands in is Stash's own
-gallery lightbox and **always path**. (That was a real bug: a gallery read from a
-random-sorted list showed page 1 correctly and every page after it wrong.) So the
-list that comes back is verified against the lightbox itself — the image on screen,
-and the two slides Stash renders either side of it — and a list that disagrees is
-thrown away and asked for again in path order. If that disagrees too, the reader
-stands down rather than draw pages that are not where the lightbox has them. A
-cached gallery is checked the same way on every opening, which is also what keeps a
-list read in one order from being reused for another.
+**A list is still checked against the lightbox itself**, because the address bar can
+name another list entirely and a sort can be right about the URL and wrong about the
+picture. The image on screen and the two slides Stash renders either side of it are
+compared against the list that came back; one that disagrees is thrown away and
+asked for again in path order, and one that disagrees too is drawn as it is — the
+lightbox was turned on, so it stays this plugin's rather than being handed back to
+Stash. A list that cannot be checked is not decided at all: while Stash is still
+fetching, the lightbox is a spinner with no carousel, so the reader waits for it —
+the observer calls back when the spinner is replaced — and reads then. A cached
+gallery is checked the same way on every opening, which is also what keeps a list
+read in one order from being reused for another.
 
 What remains is genuinely cold: the first screen, a jump, a slow disk. For those,
 the screen is built **detached** and shown in one step — the reader keeps whatever

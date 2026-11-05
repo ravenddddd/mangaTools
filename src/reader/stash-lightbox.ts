@@ -251,13 +251,14 @@ export function pressEscape(): void {
  * of how many images it is showing no longer matches the pages fetched here, so
  * nothing is drawn.
  *
- * **This is a guess and only a guess.** The address bar can be describing another
- * list entirely — the **galleries** list's sort travels with the reader into a
- * gallery they opened from it, and `random_<seed>` is a sort the server applies to
- * images without complaining — so the caller verifies the answer against the
- * lightbox's own slides and falls back to path when it does not match (see
- * orderAgrees in takeover.ts). Nothing here should be trusted with the question
- * "what order is this lightbox in".
+ * **A guess, asked for only where the address bar can be right.** A gallery card's
+ * preview is the gallery, which Stash itself fetches in path order whatever the list
+ * is sorted by, so the caller does not come here for one at all (see gallerySource
+ * in takeover.ts). Everywhere else the address bar is the sort of the list the
+ * lightbox holds — and can still be describing another list entirely, which is why
+ * the answer is verified against the lightbox's own slides and replaced with path
+ * when they disagree (see orderAgrees). Nothing here should be trusted with the
+ * question "what order is this lightbox in".
  */
 export function lightboxOrder(search: string): MangaReaderOrder {
   const params = new URLSearchParams(search || "");

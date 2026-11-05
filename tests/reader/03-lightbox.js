@@ -12,6 +12,7 @@ const {
   buildLightbox,
   container,
   drawn,
+  imageQueries,
   NS,
   startReader,
   stopReader,
@@ -433,6 +434,102 @@ module.exports = async () => {
         container(),
         "and the lightbox is this plugin's from the first frame"
       );
+
+      stopReader(box);
+      dom.window.location.pathname = "/";
+    }
+  );
+
+  /**
+   * A gallery card's preview is the gallery, and Stash fetches it in path order
+   * whatever the galleries list is sorted by: `useGalleriesLightbox` asks for
+   * `sort: "path"` outright, and the address bar on that page describes the
+   * *galleries* — its `random_<seed>` is not an order the lightbox has. The reader
+   * used to take the address bar's word for it, fetch the images in that order, and
+   * draw them: the pages of a manga, scrambled.
+   */
+  await runSection(
+    "a card's preview is read in path order, not the galleries list's",
+    async () => {
+      dom.window.location.pathname = "/scenes/11593";
+      dom.window.location.search = "?sortby=random_1234&perPage=500";
+      for (const child of dom.body.children.slice()) child.remove();
+
+      const card = dom.makeElement("div");
+      card.className = "gallery-card";
+      const cardLink = dom.makeElement("a");
+      cardLink.setAttribute("href", "/galleries/21");
+      card.appendChild(cardLink);
+      const cardThumb = dom.makeElement("img");
+      cardThumb.setAttribute(
+        "src",
+        "http://nas.local:9998/image/601/thumbnail?t=1"
+      );
+      card.appendChild(cardThumb);
+      dom.body.appendChild(card);
+
+      const before = imageQueries().length;
+      dom.click(cardThumb);
+
+      const box = buildLightbox(1, 2, ["601", "602"]);
+      dom.flush();
+      await settle();
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(before)
+          .map((q) => q.variables.sort),
+        ["path"],
+        "the gallery is read in path order, and the list's sort is never asked for"
+      );
+      assert.ok(container(), "and the reader draws it");
+      assert.ok(drawn().length > 0, "…with pages in it");
+
+      stopReader(box);
+      dom.window.location.pathname = "/";
+      dom.window.location.search = "";
+    }
+  );
+
+  /**
+   * While Stash is still fetching, the lightbox has no carousel — the spinner stands
+   * in for the display and the header — so the order it is showing cannot be read,
+   * and a cached list cannot be checked against it. Nothing is decided on that pass;
+   * the observer calls back when the spinner is replaced, and the read happens then.
+   */
+  await runSection(
+    "a lightbox that is still loading is neither read nor drawn",
+    async () => {
+      dom.window.location.pathname = "/galleries/22";
+      dom.window.location.search = "";
+      for (const child of dom.body.children.slice()) child.remove();
+
+      const before = imageQueries().length;
+      const box = buildLightbox(1, 2, ["601", "602"]);
+      box.loading(true);
+      dom.flush();
+      await settle();
+
+      assert.strictEqual(
+        imageQueries().length,
+        before,
+        "nothing is read while the spinner is up"
+      );
+      assert.strictEqual(container(), null, "and nothing is drawn either");
+
+      // The lightbox comes back: the display, the header, and the carousel with it.
+      box.loading(false);
+      dom.flush();
+      await settle();
+
+      assert.deepStrictEqual(
+        imageQueries()
+          .slice(before)
+          .map((q) => q.variables.sort),
+        ["path"],
+        "the read follows the carousel's own order, once there is one to read"
+      );
+      assert.ok(container(), "and the reader draws");
 
       stopReader(box);
       dom.window.location.pathname = "/";
